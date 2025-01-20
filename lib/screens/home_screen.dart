@@ -1,52 +1,52 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/app_state.dart';
-import 'cards_screen.dart';
+import 'home_overview.dart';
 import 'collections_screen.dart';
-import 'scan_screen.dart';
+import 'search_screen.dart';
 import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
+class HomeScreenState extends State<HomeScreen> {
+  int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    const CardsScreen(),
-    const CollectionsScreen(),
-    const ScanScreen(),
-    const ProfileScreen(),
+  final List<Widget> _pages = const [
+    HomeOverview(),
+    CollectionsScreen(),
+    SearchScreen(),
+    ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: _pages[_selectedIndex],
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() => _currentIndex = index);
-        },
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.credit_card),
-            label: 'Cards',
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Overview',
           ),
           NavigationDestination(
-            icon: Icon(Icons.collections_bookmark),
-            label: 'Collections',
+            icon: Icon(Icons.collections_outlined),
+            selectedIcon: Icon(Icons.collections),
+            label: 'Collection',
           ),
           NavigationDestination(
-            icon: Icon(Icons.qr_code_scanner),
-            label: 'Scan',
+            icon: Icon(Icons.search),
+            selectedIcon: Icon(Icons.search),
+            label: 'Search',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person),
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
             label: 'Profile',
           ),
         ],

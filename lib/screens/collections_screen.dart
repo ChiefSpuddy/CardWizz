@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../widgets/collection_grid.dart';
+import 'search_screen.dart';
 
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
@@ -65,12 +66,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> with SingleTicker
           ),
           const CollectionGrid(),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Implement add card
-        },
-        child: const Icon(Icons.add),
       ),
     );
   }

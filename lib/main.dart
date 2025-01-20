@@ -6,6 +6,7 @@ import 'providers/app_state.dart';
 import 'services/storage_service.dart';
 import 'constants/colors.dart';
 import 'constants/text_styles.dart';
+import 'services/tcg_api_service.dart';  // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +25,7 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AppState(storageService)),
         Provider<StorageService>.value(value: storageService),
-        // Remove TcgApiService line for now
+        Provider<TcgApiService>(create: (_) => TcgApiService()),  // Add this provider
       ],
       child: const CardWizzApp(),
     ),
