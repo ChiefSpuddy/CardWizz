@@ -23,7 +23,8 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppState(storageService)),
-        Provider<StorageService>.value(value: storageService),  // Add this line
+        Provider<StorageService>.value(value: storageService),
+        // Remove TcgApiService line for now
       ],
       child: const CardWizzApp(),
     ),
