@@ -32,11 +32,24 @@ class TcgApiService {
     'Paradox Rift': 'set.id:sv4',
   };
 
+  static const Map<String, String> sortOptions = {
+    'cardmarket.prices.averageSellPrice': 'Price (High to Low)',
+    '-cardmarket.prices.averageSellPrice': 'Price (Low to High)',
+    'name': 'Name (A to Z)',
+    '-name': 'Name (Z to A)',
+    'set.releaseDate': 'Release Date (Newest)',
+    '-set.releaseDate': 'Release Date (Oldest)',
+  };
+
   final _headers = {
     'X-Api-Key': _apiKey,
   };
 
-  Future<Map<String, dynamic>> searchCards(String query, {String? customQuery}) async {
+  Future<Map<String, dynamic>> searchCards(String query, {
+    String? customQuery,
+    String sortBy = 'cardmarket.prices.averageSellPrice',  // Default to price high to low
+    bool ascending = false,
+  }) async {
     try {
       final searchQuery = customQuery ?? 
           popularSearchQueries[query] ?? 
@@ -48,7 +61,7 @@ class TcgApiService {
           queryParameters: {
             'q': searchQuery,
             'select': 'id,name,images,cardmarket,number,set,rarity', // Added rarity
-            'orderBy': 'name',
+            'orderBy': ascending ? sortBy : '-$sortBy',
             'page': '1',
             'pageSize': '30',
           },

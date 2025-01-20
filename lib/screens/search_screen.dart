@@ -17,6 +17,8 @@ class _SearchScreenState extends State<SearchScreen> {
   final _searchController = TextEditingController();
   List<TcgCard>? _searchResults;
   bool _isLoading = false;
+  String _currentSort = 'cardmarket.prices.averageSellPrice';
+  bool _sortAscending = false;
 
   // Add these constants at the top of the class
   static const quickSearches = [
@@ -70,7 +72,12 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      final results = await _apiService.searchCards(query);
+      final results = await _apiService.searchCards(
+        query,
+        sortBy: _currentSort,
+        ascending: _sortAscending,
+      );
+      
       if (mounted) {
         setState(() {
           _searchResults = (results['data'] as List)
@@ -96,7 +103,7 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() {
       _searchController.text = searchType;
       _isLoading = true;
-      _searchResults = null;
+      _searchResults = null;    // Fix: Remove extra parenthesis
     });
 
     try {
@@ -258,6 +265,90 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  void _showSortOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Sort By', style: TextStyle(fontWeight: FontWeight.bold)),
+              trailing: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Done'),
+              ),
+            ),
+            const Divider(height: 0),
+            ListTile(
+              title: const Text('Price (High to Low)'),
+              leading: const Icon(Icons.attach_money),
+              selected: _currentSort == 'cardmarket.prices.averageSellPrice' && !_sortAscending,
+              onTap: () => _updateSort('cardmarket.prices.averageSellPrice', false),
+            ),
+            ListTile(
+              title: const Text('Price (Low to High)'),
+              leading: const Icon(Icons.money_off),
+              selected: _currentSort == 'cardmarket.prices.averageSellPrice' && _sortAscending,
+              onTap: () => _updateSort('cardmarket.prices.averageSellPrice', true),
+            ),
+            ListTile(
+              title: const Text('Name (A to Z)'),
+              leading: const Icon(Icons.sort_by_alpha),
+              selected: _currentSort == 'name' && !_sortAscending,
+              onTap: () => _updateSort('name', false),
+            ),
+            ListTile(
+              title: const Text('Name (Z to A)'),
+              leading: const Icon(Icons.sort_by_alpha),
+              selected: _currentSort == 'name' && _sortAscending,
+              onTap: () => _updateSort('name', true),
+            ),
+            ListTile(
+              title: const Text('Release Date (Newest)'),
+              leading: const Icon(Icons.calendar_today),
+              selected: _currentSort == 'set.releaseDate' && !_sortAscending,
+              onTap: () => _updateSort('set.releaseDate', false),
+            ),
+            ListTile(
+              title: const Text('Release Date (Oldest)'),
+              leading: const Icon(Icons.calendar_today_outlined),
+              selected: _currentSort == 'set.releaseDate' && _sortAscending,
+              onTap: () => _updateSort('set.releaseDate', true),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _updateSort(String sortBy, bool ascending) {
+    setState(() {
+      _currentSort = sortBy;
+      _sortAscending = ascending;
+    });
+    Navigator.pop(context);
+    if (_searchController.text.isNotEmpty) {
+      _performSearch(_searchController.text);
+    }
+  }
+
+  IconData _getSortIcon(String sortKey) {
+    switch (sortKey) {
+      case 'price:desc':
+      case 'price:asc':
+        return Icons.attach_money;
+      case 'name:asc':
+      case 'name:desc':
+        return Icons.sort_by_alpha;
+      case 'releaseDate:desc':
+      case 'releaseDate:asc':
+        return Icons.calendar_today;
+      default:
+        return Icons.sort;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -279,9 +370,14 @@ class _SearchScreenState extends State<SearchScreen> {
                 setState(() => _searchResults = null);
               },
             ),
+          IconButton(
+            icon: Icon(_getSortIcon(_currentSort)),
+            tooltip: TcgApiService.sortOptions[_currentSort],
+            onPressed: _showSortOptions,
+          ),
         ],
       ),
-      body: _buildMainContent(), // This is the key change
+      body: _buildMainContent(),
     );
   }
 
