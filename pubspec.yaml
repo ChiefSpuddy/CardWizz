@@ -1,0 +1,28 @@
+name: card_wizz
+description: A digital business card management application
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.5
+  shared_preferences: ^2.2.2
+  provider: ^6.1.1
+  http: ^1.1.0
+  path_provider: ^2.1.1
+  image_picker: ^1.0.4
+  url_launcher: ^6.1.14
+  permission_handler: ^11.0.1
+  flutter_contacts: ^1.1.7
+  qr_flutter: ^4.1.0
+  share_plus: ^7.1.0
+  flutter_native_splash: ^2.3.2
+  flutter_launcher_icons: ^0.13.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.3
