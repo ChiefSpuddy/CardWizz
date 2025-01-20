@@ -21,6 +21,8 @@ dependencies:
   share_plus: ^7.1.0
   flutter_native_splash: ^2.3.2
   flutter_launcher_icons: ^0.13.1
+  sqflite: ^2.3.0
+  path: ^1.8.3
 
 dev_dependencies:
   flutter_test:

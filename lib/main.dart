@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'routes.dart';
 import 'providers/app_state.dart';
 import 'services/storage_service.dart';
+import 'constants/colors.dart';
+import 'constants/text_styles.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +23,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppState(storageService)),
+        Provider<StorageService>.value(value: storageService),  // Add this line
       ],
       child: const CardWizzApp(),
     ),
@@ -36,9 +39,25 @@ class CardWizzApp extends StatelessWidget {
       title: 'CardWizz',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primaryColor: AppColors.primary,
+        colorScheme: const ColorScheme.light(
+          primary: AppColors.primary,
+          secondary: AppColors.secondary,
+          surface: Colors.white,
+        ),
+        scaffoldBackgroundColor: AppColors.background,
+        textTheme: const TextTheme(
+          displayLarge: AppTextStyles.heading1,
+          displayMedium: AppTextStyles.heading2,
+          bodyLarge: AppTextStyles.body,
+        ),
         useMaterial3: true,
-        brightness: Brightness.light,
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ButtonStyle(
+            backgroundColor: MaterialStateProperty.all(AppColors.primary),
+            foregroundColor: MaterialStateProperty.all(Colors.white),
+          ),
+        ),
       ),
       darkTheme: ThemeData(
         primarySwatch: Colors.blue,
