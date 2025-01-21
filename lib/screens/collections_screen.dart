@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import '../widgets/collection_grid.dart';
-import 'search_screen.dart';
+import '../widgets/custom_collections_grid.dart';  // Add this import
 
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
@@ -12,6 +12,7 @@ class CollectionsScreen extends StatefulWidget {
 
 class _CollectionsScreenState extends State<CollectionsScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _animationController;
+  bool _showCustomCollections = false;
 
   @override
   void initState() {
@@ -32,9 +33,37 @@ class _CollectionsScreenState extends State<CollectionsScreen> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Collection'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('My Collection'),
+            const SizedBox(width: 12),
+            ToggleButtons(
+              isSelected: [!_showCustomCollections, _showCustomCollections],
+              onPressed: (index) {
+                setState(() {
+                  _showCustomCollections = index == 1;
+                });
+              },
+              borderRadius: BorderRadius.circular(8),
+              selectedColor: Colors.white,
+              fillColor: Colors.green.shade600,
+              color: isDark ? Colors.grey[400] : Colors.grey[700],
+              constraints: const BoxConstraints(
+                minHeight: 32,
+                minWidth: 72,
+              ),
+              children: const [
+                Text('Cards'),
+                Text('Sets'),
+              ],
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.analytics_outlined),
@@ -64,7 +93,12 @@ class _CollectionsScreenState extends State<CollectionsScreen> with SingleTicker
               ),
             ),
           ),
-          const CollectionGrid(),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: _showCustomCollections
+                ? const CustomCollectionsGrid()
+                : const CollectionGrid(),
+          ),
         ],
       ),
     );

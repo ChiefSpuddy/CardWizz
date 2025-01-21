@@ -1,21 +1,34 @@
+import 'dart:async';
 import 'dart:convert';
-import 'package:shared_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/tcg_card.dart';
 import '../models/custom_collection.dart';
 
 class CollectionService {
-  static const String _collectionsKey = 'user_collections';
-  static const String _cardsKey = 'collection_cards';
-  final SharedPreferences _prefs;
+  static const String _collectionsKey = 'custom_collections';
+  final _collectionsController = StreamController<List<CustomCollection>>.broadcast();
+  static CollectionService? _instance;
+  late final SharedPreferences _prefs;
 
-  CollectionService(this._prefs);
+  CollectionService._();
 
-  Future<List<TcgCard>> getCollectionCards(String collectionId) async {
-    final cardsJson = _prefs.getStringList(_cardsKey) ?? [];
-    return cardsJson
-        .map((json) => TcgCard.fromJson(jsonDecode(json)))
-        .where((card) => true) // TODO: Add collection filtering
-        .toList();
+  static Future<CollectionService> getInstance() async {
+    if (_instance == null) {
+      _instance = CollectionService._();
+      _instance!._prefs = await SharedPreferences.getInstance();
+      await _instance!._loadCollections();
+    }
+    return _instance!;
+  }
+
+  Stream<List<CustomCollection>> getCustomCollectionsStream() {
+    _loadCollections();
+    return _collectionsController.stream;
+  }
+
+  Future<void> _loadCollections() async {
+    final collections = await getCustomCollections();
+    _collectionsController.add(collections);
   }
 
   Future<List<CustomCollection>> getCustomCollections() async {
@@ -25,16 +38,68 @@ class CollectionService {
         .toList();
   }
 
-  Future<void> addCardToCollection(TcgCard card, String collectionId) async {
-    final cards = await getCollectionCards(collectionId);
-    cards.add(card);
-    await _saveCards(cards);
+  Future<void> createCustomCollection(String name, String description) async {
+    final collections = await getCustomCollections();
+    final newCollection = CustomCollection(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: name,
+      description: description,
+    );
+    collections.add(newCollection);
+    await _saveCollections(collections);
   }
 
-  Future<void> _saveCards(List<TcgCard> cards) async {
-    final cardsJson = cards
-        .map((card) => jsonEncode(card.toJson()))
+  Future<void> updateCollectionDetails(String collectionId, String name, String description) async {
+    final collections = await getCustomCollections();
+    final index = collections.indexWhere((c) => c.id == collectionId);
+    if (index != -1) {
+      collections[index] = collections[index].copyWith(
+        name: name,
+        description: description,
+      );
+      await _saveCollections(collections);
+    }
+  }
+
+  Future<void> deleteCollection(String collectionId) async {
+    final collections = await getCustomCollections();
+    collections.removeWhere((c) => c.id == collectionId);
+    await _saveCollections(collections);
+  }
+
+  Future<void> addCardToCollection(String collectionId, String cardId) async {
+    final collections = await getCustomCollections();
+    final index = collections.indexWhere((c) => c.id == collectionId);
+    if (index != -1) {
+      final cardIds = List<String>.from(collections[index].cardIds);
+      if (!cardIds.contains(cardId)) {
+        cardIds.add(cardId);
+        collections[index] = collections[index].copyWith(cardIds: cardIds);
+        await _saveCollections(collections);
+      }
+    }
+  }
+
+  Future<void> removeCardFromCollection(String collectionId, String cardId) async {
+    final collections = await getCustomCollections();
+    final index = collections.indexWhere((c) => c.id == collectionId);
+    if (index != -1) {
+      final cardIds = List<String>.from(collections[index].cardIds);
+      cardIds.remove(cardId);
+      collections[index] = collections[index].copyWith(cardIds: cardIds);
+      await _saveCollections(collections);
+    }
+  }
+
+  Future<void> _saveCollections(List<CustomCollection> collections) async {
+    final collectionsJson = collections
+        .map((collection) => jsonEncode(collection.toJson()))
         .toList();
-    await _prefs.setStringList(_cardsKey, cardsJson);
+    await _prefs.setStringList(_collectionsKey, collectionsJson);
+    _collectionsController.add(collections);
+  }
+
+  void dispose() {
+    _collectionsController.close();
   }
 }

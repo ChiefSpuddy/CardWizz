@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
 class CustomCollection {
   final String id;
   final String name;
@@ -6,8 +8,6 @@ class CustomCollection {
   final double? totalValue;
   final List<Map<String, dynamic>> priceHistory;
   final DateTime createdAt;
-  final List<String> tags;
-  final List<Map<String, dynamic>> notes;
 
   CustomCollection({
     required this.id,
@@ -17,33 +17,45 @@ class CustomCollection {
     this.totalValue,
     this.priceHistory = const [],
     DateTime? createdAt,
-    this.tags = const [],
-    this.notes = const [],
   }) : createdAt = createdAt ?? DateTime.now();
 
   factory CustomCollection.fromJson(Map<String, dynamic> json) {
     return CustomCollection(
-      id: json['id'],
-      name: json['name'],
-      description: json['description'] ?? '',
+      id: json['id'] as String,
+      name: json['name'] as String,
+      description: json['description'] as String? ?? '',
       cardIds: List<String>.from(json['cardIds'] ?? []),
       totalValue: json['totalValue']?.toDouble(),
       priceHistory: List<Map<String, dynamic>>.from(json['priceHistory'] ?? []),
-      createdAt: DateTime.parse(json['createdAt']),
-      tags: List<String>.from(json['tags'] ?? []),
-      notes: List<Map<String, dynamic>>.from(json['notes'] ?? []),
+      createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'description': description,
-        'cardIds': cardIds,
-        'totalValue': totalValue,
-        'priceHistory': priceHistory,
-        'createdAt': createdAt.toIso8601String(),
-        'tags': tags,
-        'notes': notes,
-      };
+    'id': id,
+    'name': name,
+    'description': description,
+    'cardIds': cardIds,
+    'totalValue': totalValue,
+    'priceHistory': priceHistory,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  CustomCollection copyWith({
+    String? name,
+    String? description,
+    List<String>? cardIds,
+    double? totalValue,
+    List<Map<String, dynamic>>? priceHistory,
+  }) {
+    return CustomCollection(
+      id: id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      cardIds: cardIds ?? this.cardIds,
+      totalValue: totalValue ?? this.totalValue,
+      priceHistory: priceHistory ?? this.priceHistory,
+      createdAt: createdAt,
+    );
+  }
 }
