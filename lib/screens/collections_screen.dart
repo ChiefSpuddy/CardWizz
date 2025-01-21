@@ -37,32 +37,44 @@ class _CollectionsScreenState extends State<CollectionsScreen> with SingleTicker
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('My Collection'),
-            const SizedBox(width: 12),
-            ToggleButtons(
-              isSelected: [!_showCustomCollections, _showCustomCollections],
-              onPressed: (index) {
-                setState(() {
-                  _showCustomCollections = index == 1;
-                });
-              },
-              borderRadius: BorderRadius.circular(8),
-              selectedColor: Colors.white,
-              fillColor: Colors.green.shade600,
-              color: isDark ? Colors.grey[400] : Colors.grey[700],
-              constraints: const BoxConstraints(
-                minHeight: 32,
-                minWidth: 72,
-              ),
-              children: const [
-                Text('Cards'),
-                Text('Sets'),
+        title: LayoutBuilder(
+          builder: (context, constraints) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Flexible(
+                  child: Text(
+                    'My Collection',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  height: 32,
+                  child: ToggleButtons(
+                    constraints: const BoxConstraints(
+                      minWidth: 52,
+                      minHeight: 32,
+                    ),
+                    isSelected: [!_showCustomCollections, _showCustomCollections],
+                    onPressed: (index) {
+                      setState(() {
+                        _showCustomCollections = index == 1;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    selectedColor: Colors.white,
+                    fillColor: Colors.green.shade600,
+                    color: isDark ? Colors.grey[400] : Colors.grey[700],
+                    children: const [
+                      Text('Cards', style: TextStyle(fontSize: 12)),
+                      Text('Sets', style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
               ],
-            ),
-          ],
+            );
+          },
         ),
         actions: [
           IconButton(

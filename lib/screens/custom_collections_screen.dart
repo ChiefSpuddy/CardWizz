@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/custom_collection.dart';
 import '../services/collection_service.dart';
-import '../models/tcg_card.dart';
 import 'custom_collection_detail_screen.dart';
 
 class CustomCollectionsScreen extends StatelessWidget {

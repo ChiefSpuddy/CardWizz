@@ -56,8 +56,8 @@ class CardWizzApp extends StatelessWidget {
         useMaterial3: true,
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.all(AppColors.primary),
-            foregroundColor: MaterialStateProperty.all(Colors.white),
+            backgroundColor: WidgetStateProperty.all(AppColors.primary),
+            foregroundColor: WidgetStateProperty.all(Colors.white),
           ),
         ),
       ),

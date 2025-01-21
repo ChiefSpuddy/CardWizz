@@ -15,8 +15,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   // Temporary mock data until Firebase is integrated
   final bool _isSignedIn = false;
   final String _mockEmail = 'user@example.com';
-  final String? _currentAvatar = 'assets/avatars/avatar1.png';
-  final String? _username = 'TestUser';
+  final String _currentAvatar = 'assets/avatars/avatar1.png';
+  final String _username = 'TestUser';
 
   @override
   void initState() {

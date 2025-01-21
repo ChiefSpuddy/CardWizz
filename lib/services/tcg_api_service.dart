@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../models/tcg_card.dart';
 
 class TcgApiService {
   static const String _baseUrl = 'https://api.pokemontcg.io/v2';

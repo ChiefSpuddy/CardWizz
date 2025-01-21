@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Add this
+// Add this
 import '../services/tcg_api_service.dart';
 import '../services/search_history_service.dart'; // Add this
 import '../screens/card_details_screen.dart';

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/tcg_card.dart';
 import '../models/custom_collection.dart';
 
 class CollectionService {
