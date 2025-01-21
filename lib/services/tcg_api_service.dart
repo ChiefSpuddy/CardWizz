@@ -30,6 +30,8 @@ class TcgApiService {
     'Lost Origin': 'set.id:swsh11',
     'Scarlet & Violet': 'set.id:sv1',
     'Paradox Rift': 'set.id:sv4',
+    'Surging Sparks': 'set.id:sv5pt5', // Added new set
+    'Prismatic Evolution': 'set.id:sv5', // Added new set
   };
 
   static const Map<String, String> sortOptions = {

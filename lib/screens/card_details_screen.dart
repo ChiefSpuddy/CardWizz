@@ -71,16 +71,17 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
   }
 
   Widget _buildPriceChart(Map<String, dynamic> prices) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (prices.isEmpty) return const SizedBox.shrink();
     
-    // Simplify price points to more meaningful data
     final pricePoints = [
       {'label': '30d Avg', 'value': prices['avg30']},
-      {'label': '24h Avg', 'value': prices['avg1']},
-      {'label': 'Current', 'value': prices['market']},
+      {'label': '7d Avg', 'value': prices['avg7']},
+      {'label': 'Current', 'value': prices['market'] ?? prices['averageSellPrice']},
     ].where((p) => p['value'] != null).toList();
 
     if (pricePoints.length < 2) return const SizedBox.shrink();
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Find min and max for better scaling
     final values = pricePoints.map((p) => p['value'] as num).toList();
@@ -209,12 +210,12 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
     );
   }
 
-  // Update the price rows to show only the most relevant information
+  // Update the price rows to show only available information
   List<Widget> _buildPriceInfo(Map<String, dynamic> prices) {
     final relevantPrices = {
-      'Market Price': prices['market'],
-      'Lowest Price': prices['low'],
-      '30 Day Average': prices['avg30'],
+      'Market Price': prices['market'] ?? prices['averageSellPrice'],
+      'Lowest Price': prices['low'] ?? prices['lowPrice'],
+      '30 Day Average': prices['avg30'] ?? prices['avg1'],
     };
 
     return relevantPrices.entries
@@ -233,8 +234,9 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final prices = _additionalData!['prices'];
-    final marketUrl = _additionalData!['cardmarket'];
+    final prices = _additionalData!['tcgplayer']?['prices']?['normal'] ?? 
+                  _additionalData!['cardmarket']?['prices'] ??
+                  {};
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -245,15 +247,18 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildPriceChart(prices),
-          const Divider(height: 32),
-          ..._buildPriceInfo(prices),
-          const SizedBox(height: 24),
+          if (prices.isNotEmpty) ...[
+            _buildPriceChart(prices),
+            const Divider(height: 32),
+            ..._buildPriceInfo(prices),
+            const SizedBox(height: 24),
+          ],
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _launchUrl(marketUrl),
+                  onPressed: () => _launchUrl(_additionalData!['cardmarket']?['url'] ?? 
+                    'https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${Uri.encodeComponent(widget.card.name)}'),
                   icon: const Icon(Icons.shopping_cart),
                   label: const Text('Cardmarket'),
                   style: ElevatedButton.styleFrom(

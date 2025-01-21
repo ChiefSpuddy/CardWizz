@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Add this
 import '../services/tcg_api_service.dart';
+import '../services/search_history_service.dart'; // Add this
 import '../screens/card_details_screen.dart';
 import '../models/tcg_card.dart';
 import '../widgets/card_grid_item.dart';
@@ -19,6 +21,8 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _isLoading = false;
   String _currentSort = 'cardmarket.prices.averageSellPrice';
   bool _sortAscending = false;
+  SearchHistoryService? _searchHistory;
+  bool _isHistoryLoading = true;
 
   // Add these constants at the top of the class
   static const quickSearches = [
@@ -52,6 +56,16 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _initSearchHistory();
+  }
+
+  Future<void> _initSearchHistory() async {
+    _searchHistory = await SearchHistoryService.init();
+    if (mounted) {
+      setState(() {
+        _isHistoryLoading = false;
+      });
+    }
   }
 
   void _onScroll() {
@@ -79,6 +93,15 @@ class _SearchScreenState extends State<SearchScreen> {
       );
       
       if (mounted) {
+        // Save to history if search successful
+        if (results['data'] is List && (results['data'] as List).isNotEmpty) {
+          final firstCard = results['data'][0];
+          await _searchHistory?.addSearch(
+            query,
+            imageUrl: firstCard['images']?['small'],
+          );
+        }
+        
         setState(() {
           _searchResults = (results['data'] as List)
               .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
@@ -212,9 +235,67 @@ class _SearchScreenState extends State<SearchScreen> {
         return '🔴';
       case 'Paradox Rift':
         return '🌀';
+      case 'Surging Sparks':
+        return '⚡'; // New icon
+      case 'Prismatic Evolution':
+        return '🌈'; // New icon
       default:
         return '📦';
     }
+  }
+
+  Widget _buildRecentSearches() {
+    if (_isHistoryLoading || _searchHistory == null) {
+      return const SizedBox.shrink();
+    }
+
+    final searches = _searchHistory!.getRecentSearches();
+    if (searches.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Recent Searches', style: TextStyle(fontWeight: FontWeight.bold)),
+              TextButton(
+                onPressed: () {
+                  _searchHistory?.clearHistory();
+                  setState(() {});
+                },
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+        ),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: searches.length,
+          itemBuilder: (context, index) {
+            final search = searches[index];
+            return ListTile(
+              leading: search['imageUrl'] != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Image.network(
+                        search['imageUrl']!,
+                        width: 32,
+                        height: 45,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : const Icon(Icons.search),
+              title: Text(search['query']!),
+              onTap: () => _performSearch(search['query']!),
+            );
+          },
+        ),
+      ],
+    );
   }
 
   // Modify the _buildMainContent method
@@ -227,15 +308,13 @@ class _SearchScreenState extends State<SearchScreen> {
               : _buildResults();
     }
 
-    return Column(
-      children: [
-        _buildQuickSearches(),
-        Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : const Center(child: Text('Search for Pokémon cards')),
-        ),
-      ],
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildQuickSearches(),
+          _buildRecentSearches(),
+        ],
+      ),
     );
   }
 

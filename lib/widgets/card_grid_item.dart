@@ -63,96 +63,38 @@ class _CardGridItemState extends State<CardGridItem> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: Stack(
-                      children: [
-                        Hero(
-                          tag: 'card_${widget.card.id}',
-                          child: Image.network(
-                            widget.card.imageUrl,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => const Center(
-                              child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.grey),
-                            ),
-                            loadingBuilder: (context, child, progress) {
-                              if (progress == null) {
-                                // Fix setState error by checking mounted state
-                                if (mounted) {
-                                  Future.microtask(() {
-                                    if (mounted) {
-                                      setState(() => _isLoaded = true);
-                                    }
-                                  });
-                                }
-                                return child;
+                    child: Center( // Add this Center widget
+                      child: Hero(
+                        tag: 'card_${widget.card.id}',
+                        child: Image.network(
+                          widget.card.imageUrl,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => const Center(
+                            child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.grey),
+                          ),
+                          loadingBuilder: (context, child, progress) {
+                            if (progress == null) {
+                              // Fix setState error by checking mounted state
+                              if (mounted) {
+                                Future.microtask(() {
+                                  if (mounted) {
+                                    setState(() => _isLoaded = true);
+                                  }
+                                });
                               }
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  value: progress.expectedTotalBytes != null
-                                      ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                                      : null,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        // Improved Card Info Overlay
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black.withOpacity(0.8),
-                                ],
-                                stops: const [0.0, 0.7],
+                              return child;
+                            }
+                            return Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                value: progress.expectedTotalBytes != null
+                                    ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                                    : null,
                               ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  widget.card.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    shadows: [
-                                      Shadow(
-                                        blurRadius: 2,
-                                        color: Colors.black,
-                                      ),
-                                    ],
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (widget.card.setNumber != null)
-                                  Text(
-                                    widget.card.setNumber!,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      shadows: [
-                                        Shadow(
-                                          blurRadius: 2,
-                                          color: Colors.black,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
+                            );
+                          },
                         ),
-                      ],
+                      ),
                     ),
                   ),
                   // Price bar
