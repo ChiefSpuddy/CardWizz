@@ -1,38 +1,76 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../services/storage_service.dart';
+import '../services/auth_service.dart';
+import '../services/collection_service.dart';  // Add this import
 
-class AppState extends ChangeNotifier {
-  bool _isLoading = false;
-  String? _error;
+class AppState with ChangeNotifier {
+  final StorageService _storageService;
+  final AuthService _authService;
+  CollectionService? _collectionService;  // Add this
   bool _isDarkMode = false;
-  final StorageService _storage;
+  bool _isLoading = true;
 
-  AppState(this._storage);
+  AppState(this._storageService, this._authService);
 
-  // Getters
-  bool get isLoading => _isLoading;
-  String? get error => _error;
+  Future<void> initialize() async {
+    _isLoading = true;
+    notifyListeners();
+
+    await _authService.initialize();
+    _collectionService = await CollectionService.getInstance();  // Add this
+    
+    if (_authService.isAuthenticated) {
+      _storageService.setCurrentUser(_authService.currentUser!.id);
+      _collectionService?.setCurrentUser(_authService.currentUser!.id);
+    }
+    
+    final darkMode = await _storageService.getBool('darkMode');
+    _isDarkMode = darkMode ?? false;
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
   bool get isDarkMode => _isDarkMode;
+  bool get isLoading => _isLoading;
+  bool get isAuthenticated => _authService.isAuthenticated;
+  AuthUser? get currentUser => _authService.currentUser;
 
-  // Methods
-  void setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
-  }
-
-  void setError(String? error) {
-    _error = error;
-    notifyListeners();
-  }
-
-  void toggleTheme() {
+  Future<void> toggleTheme() async {
     _isDarkMode = !_isDarkMode;
-    _storage.savePreference('isDarkMode', _isDarkMode);
+    await _storageService.setBool('darkMode', _isDarkMode);
     notifyListeners();
   }
 
-  Future<void> loadPreferences() async {
-    _isDarkMode = _storage.getPreference('isDarkMode') ?? false;
+  Future<AuthUser?> signInWithApple() async {
+    final user = await _authService.signInWithApple();
+    if (user != null) {
+      // Use proper async/await
+      await Future.delayed(const Duration(milliseconds: 100));
+      _storageService.setCurrentUser(user.id);
+      if (_collectionService != null) {
+        _collectionService!.setCurrentUser(user.id);
+      }
+      print('Signed in user: ${user.id}');
+    }
+    notifyListeners();
+    return user;
+  }
+
+  Future<void> signOut() async {
+    final userId = _authService.currentUser?.id;
+    if (userId != null) {
+      print('Signing out user: $userId');
+      // Clear in correct order
+      await _storageService.clearUserData();
+      await _collectionService?.clearUserData();
+      await _authService.signOut();
+    }
+    notifyListeners();
+  }
+
+  Future<void> updateAvatar(String avatarPath) async {
+    await _authService.updateAvatar(avatarPath);
     notifyListeners();
   }
 }

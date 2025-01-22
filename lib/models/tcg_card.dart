@@ -7,6 +7,7 @@ class TcgCard {
   final double? price;
   final Map<String, dynamic>? cardmarket;
   final String? rarity;
+  final String? type;    // Add this field
 
   TcgCard({
     required this.id,
@@ -17,6 +18,7 @@ class TcgCard {
     this.price,
     this.cardmarket,
     this.rarity,
+    this.type,    // Add this
   });
 
   String get setNumber => number != null ? '#$number' : '';
@@ -44,6 +46,7 @@ class TcgCard {
       price: json['price']?.toDouble() ?? prices?['averageSellPrice']?.toDouble(),
       cardmarket: market,
       rarity: json['rarity'] as String?,
+      type: json['type'] as String?,      // Add this
     );
   }
 
@@ -56,5 +59,30 @@ class TcgCard {
     'price': price,
     'cardmarket': cardmarket,
     'rarity': rarity,
+    'type': type,      // Add this
   };
+
+  TcgCard copyWith({
+    String? id,
+    String? name,
+    String? imageUrl,
+    String? setName,
+    String? number,
+    double? price,
+    Map<String, dynamic>? cardmarket,
+    String? rarity,  // Add this
+    String? type,    // Add this
+  }) {
+    return TcgCard(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      imageUrl: imageUrl ?? this.imageUrl,
+      setName: setName ?? this.setName,
+      number: number ?? this.number,
+      price: price ?? this.price,
+      cardmarket: cardmarket ?? this.cardmarket,
+      rarity: rarity ?? this.rarity,  // Add this
+      type: type ?? this.type,        // Add this
+    );
+  }
 }

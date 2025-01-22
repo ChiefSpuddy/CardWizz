@@ -2,36 +2,40 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/tcg_card.dart';
 import '../services/storage_service.dart';
-import '../services/collection_service.dart'; // Add this import
+import '../services/collection_service.dart';
 import '../screens/card_details_screen.dart';
 import 'card_grid_item.dart';
 import '../models/custom_collection.dart';
+import '../providers/app_state.dart';
+import '../widgets/sign_in_button.dart';
 
 class CollectionGrid extends StatelessWidget {
   const CollectionGrid({super.key});
 
   Future<void> _showRemoveDialog(BuildContext context, TcgCard card) async {
+    // Store StorageService before showing dialog
+    final storage = Provider.of<StorageService>(context, listen: false);
+    
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Remove Card'),
         content: Text('Remove ${card.name} from your collection?'),
         actions: [
           TextButton(
             child: const Text('Cancel'),
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
           ),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Remove'),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
           ),
         ],
       ),
     );
 
-    if (confirmed == true) {
-      final storage = Provider.of<StorageService>(context, listen: false);
+    if (confirmed == true && context.mounted) {
       await storage.removeCard(card.id);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -215,17 +219,46 @@ class CollectionGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
     final storage = Provider.of<StorageService>(context);
     
+    if (!appState.isAuthenticated) {
+      return const SignInButton();
+    }
+
     return StreamBuilder<List<TcgCard>>(
-      stream: storage.watchCards(), // We'll add this method to StorageService
+      stream: storage.watchCards(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+        if (snapshot.connectionState == ConnectionState.waiting && snapshot.data == null) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Loading your collection...'),
+              ],
+            ),
+          );
         }
 
         if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: Colors.red),
+                SizedBox(height: 16),
+                Text('Error: ${snapshot.error}'),
+                TextButton(
+                  onPressed: () {
+                    storage.refreshCards(); // Add this method to StorageService
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
         }
 
         final cards = snapshot.data ?? [];

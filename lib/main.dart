@@ -6,7 +6,8 @@ import 'providers/app_state.dart';
 import 'services/storage_service.dart';
 import 'constants/colors.dart';
 import 'constants/text_styles.dart';
-import 'services/tcg_api_service.dart';  // Add this import
+import 'services/tcg_api_service.dart';
+import 'services/auth_service.dart'; // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,13 +20,16 @@ void main() async {
 
   // Initialize storage service
   final storageService = await StorageService.init();
+  final authService = AuthService(); // Add this line
+  final appState = AppState(storageService, authService); // Fix constructor call
+  await appState.initialize();
 
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AppState(storageService)),
+        ChangeNotifierProvider.value(value: appState),
         Provider<StorageService>.value(value: storageService),
-        Provider<TcgApiService>(create: (_) => TcgApiService()),  // Add this provider
+        Provider<TcgApiService>(create: (_) => TcgApiService()),
       ],
       child: const CardWizzApp(),
     ),
@@ -37,41 +41,42 @@ class CardWizzApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'CardWizz',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primaryColor: AppColors.primary,
-        colorScheme: const ColorScheme.light(
-          primary: AppColors.primary,
-          secondary: AppColors.secondary,
-          surface: Colors.white,
-        ),
-        scaffoldBackgroundColor: AppColors.background,
-        textTheme: const TextTheme(
-          displayLarge: AppTextStyles.heading1,
-          displayMedium: AppTextStyles.heading2,
-          bodyLarge: AppTextStyles.body,
-        ),
-        useMaterial3: true,
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ButtonStyle(
-            backgroundColor: WidgetStateProperty.all(AppColors.primary),
-            foregroundColor: WidgetStateProperty.all(Colors.white),
+    return Consumer<AppState>(
+      builder: (context, appState, _) {
+        return MaterialApp(
+          title: 'CardWizz',
+          debugShowCheckedModeBanner: false,
+          themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          theme: ThemeData(
+            primaryColor: AppColors.primary,
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primary,
+              secondary: AppColors.secondary,
+              surface: Colors.white,
+            ),
+            scaffoldBackgroundColor: AppColors.background,
+            textTheme: const TextTheme(
+              displayLarge: AppTextStyles.heading1,
+              displayMedium: AppTextStyles.heading2,
+              bodyLarge: AppTextStyles.body,
+            ),
+            useMaterial3: true,
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ButtonStyle(
+                backgroundColor: WidgetStateProperty.all(AppColors.primary),
+                foregroundColor: WidgetStateProperty.all(Colors.white),
+              ),
+            ),
           ),
-        ),
-      ),
-      darkTheme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-        brightness: Brightness.dark,
-      ),
-      initialRoute: AppRoutes.home,
-      routes: AppRoutes.routes,
-      navigatorKey: GlobalKey<NavigatorState>(),
-      builder: (context, child) {
-        return Consumer<AppState>(
-          builder: (context, appState, _) {
+          darkTheme: ThemeData(
+            primarySwatch: Colors.blue,
+            useMaterial3: true,
+            brightness: Brightness.dark,
+          ),
+          initialRoute: AppRoutes.home,
+          routes: AppRoutes.routes,
+          navigatorKey: GlobalKey<NavigatorState>(),
+          builder: (context, child) {
             if (appState.isLoading) {
               return const MaterialApp(
                 home: Scaffold(

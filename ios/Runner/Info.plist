@@ -57,5 +57,15 @@
 	<array>
 		<string>iCloud.com.sammay.cardwizz</string>
 	</array>
+	
+	<!-- Add these new entries for Apple Sign In -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+
+	<!-- Optional: Add this if you want to use Sign in with Apple in your entitlements -->
+	<key>com.apple.developer.accounts.authentication-services.autofill-credential-provider</key>
+	<true/>
 </dict>
 </plist>
