@@ -21,6 +21,7 @@ class CardGridItem extends StatefulWidget {
 
 class _CardGridItemState extends State<CardGridItem> {
   bool _isLoaded = false;
+  bool _hasError = false;
 
   Future<void> _addToCollection(BuildContext context) async {
     try {
@@ -47,6 +48,43 @@ class _CardGridItemState extends State<CardGridItem> {
     }
   }
 
+  Widget _buildImage() {
+    if (widget.card.imageUrl.isEmpty) {
+      return const Center(
+        child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.grey),
+      );
+    }
+
+    return Image.network(
+      widget.card.imageUrl,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        print('Error loading image: ${widget.card.imageUrl}');  // Add debug print
+        return const Center(
+          child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.grey),
+        );
+      },
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) {
+          if (mounted && !_hasError) {
+            Future.microtask(() {
+              if (mounted) setState(() => _isLoaded = true);
+            });
+          }
+          return child;
+        }
+        return Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            value: progress.expectedTotalBytes != null
+                ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
+                : null,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedOpacity(
@@ -63,57 +101,69 @@ class _CardGridItemState extends State<CardGridItem> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: Center( // Add this Center widget
-                      child: Hero(
-                        tag: 'card_${widget.card.id}',
-                        child: Image.network(
-                          widget.card.imageUrl,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => const Center(
-                            child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.grey),
-                          ),
-                          loadingBuilder: (context, child, progress) {
-                            if (progress == null) {
-                              // Fix setState error by checking mounted state
-                              if (mounted) {
-                                Future.microtask(() {
-                                  if (mounted) {
-                                    setState(() => _isLoaded = true);
-                                  }
-                                });
-                              }
-                              return child;
-                            }
-                            return Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                value: progress.expectedTotalBytes != null
-                                    ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                                    : null,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Price bar
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    color: Colors.black87,
-                    child: Text(
-                      widget.card.price != null ? '€${widget.card.price!.toStringAsFixed(2)}' : 'No price',
-                      style: TextStyle(
-                        color: widget.card.price != null ? Colors.white : Colors.grey[400],
-                        fontSize: 12,
-                      ),
-                      textAlign: TextAlign.center,
+                    child: Hero(
+                      tag: 'card_${widget.card.id}',
+                      child: _buildImage(),
                     ),
                   ),
                 ],
               ),
             ),
           ),
+          
+          // Set info overlay
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 24,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.7),
+                  ],
+                ),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Text(
+                widget.card.set != null 
+                    ? '${widget.card.set!.name} · ${widget.card.number}'
+                    : widget.card.number.isNotEmpty ? '#${widget.card.number}' : '',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+
+          // Price bar
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              color: Colors.black87,
+              child: Text(
+                widget.card.price != null ? '€${widget.card.price!.toStringAsFixed(2)}' : 'No price',
+                style: TextStyle(
+                  color: widget.card.price != null ? Colors.white : Colors.grey[400],
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+
+          // Quick add button
           if (widget.showQuickAdd)
             Positioned(
               top: 4,

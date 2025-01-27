@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-// Add this
+import 'dart:async';
 import '../services/tcg_api_service.dart';
-import '../services/search_history_service.dart'; // Add this
+import '../services/search_history_service.dart';
 import '../screens/card_details_screen.dart';
 import '../models/tcg_card.dart';
 import '../widgets/card_grid_item.dart';
+import 'package:shimmer/shimmer.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -22,6 +23,7 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _sortAscending = false;
   SearchHistoryService? _searchHistory;
   bool _isHistoryLoading = true;
+  bool _isInitialSearch = true;
 
   // Add these constants at the top of the class
   static const quickSearches = [
@@ -32,6 +34,9 @@ class _SearchScreenState extends State<SearchScreen> {
   ];
 
   static const recentSets = [
+    {'name': 'Surging Sparks', 'icon': '⚡'},
+    {'name': 'Prismatic Evolution', 'icon': '🌈'},
+    {'name': 'Paradox Rift', 'icon': '🌀'},
     {'name': 'Paldea Evolved', 'icon': '🌟'},
     {'name': 'Crown Zenith', 'icon': '👑'},
     {'name': 'Silver Tempest', 'icon': '🌪'},
@@ -50,6 +55,9 @@ class _SearchScreenState extends State<SearchScreen> {
   // Add these fields after other declarations
   int _currentPage = 1;
   final _scrollController = ScrollController();
+  Timer? _searchDebounce;
+  int _totalCards = 0;
+  bool _hasMorePages = true;
 
   @override
   void initState() {
@@ -68,94 +76,283 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
-      if (_searchResults != null && _searchResults!.isNotEmpty) {
-        _currentPage++;
-        _performSearch(_searchController.text);
-      }
+    if (!_isLoading && 
+        !_isInitialSearch &&
+        _hasMorePages &&
+        _scrollController.position.pixels >= 
+        _scrollController.position.maxScrollExtent - 500) {
+      _loadNextPage();
     }
   }
 
-  Future<void> _performSearch(String query) async {
-    if (query.isEmpty) return;
+  void _loadNextPage() {
+    if (_searchController.text.isNotEmpty) {
+      _currentPage++;
+      _performSearch(_searchController.text, isLoadingMore: true);
+    }
+  }
 
-    setState(() {
-      if (_currentPage == 1) {
-        _searchResults = null;
-      }
-      _isLoading = true;
-    });
+// Add this new method for a more stylish loading indicator
+Widget _buildLoadingState() {
+  return Center(  // Add this wrapper
+    child: Padding(
+      padding: const EdgeInsets.only(top: 120.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Searching...',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
-    try {
-      final results = await _apiService.searchCards(
-        query,
-        sortBy: _currentSort,
-        ascending: _sortAscending,
-        page: _currentPage,
-      );
+// Update _performSearch method
+Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
+  if (query.isEmpty) {
+    setState(() => _searchResults = null);
+    return;
+  }
+
+  if (!isLoadingMore) {
+    _currentPage = 1;
+    _hasMorePages = true;
+  }
+
+  if (!_hasMorePages) return;
+
+  setState(() {
+    _isLoading = true;
+    if (!isLoadingMore) {
+      _searchResults = null; // Set to null to show loading state
+    }
+  });
+
+  try {
+    print('Searching for: $query (page $_currentPage)'); // Updated debug print
+    // Remove sorting for now to simplify the search
+    final results = await _apiService.searchCards(
+      query,
+      page: _currentPage,
+      pageSize: 30,
+      sortBy: _currentSort,
+      ascending: _sortAscending,
+    );
+    
+    if (mounted) {
+      final List<dynamic> cardData = results['data'] as List? ?? [];
+      final totalCount = results['totalCount'] as int? ?? 0;
       
-      if (mounted) {
-        if (_currentPage == 1) {
-          // Save to history if search successful
-          if (results['data'] is List && (results['data'] as List).isNotEmpty) {
-            final firstCard = results['data'][0];
-            await _searchHistory?.addSearch(
-              query,
-              imageUrl: firstCard['images']?['small'],
-            );
-          }
-          
-          setState(() {
-            _searchResults = (results['data'] as List)
-                .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
-                .toList();
-            _isLoading = false;
-          });
+      final newCards = cardData
+          .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+          .toList();
+
+      setState(() {
+        _totalCards = totalCount;
+        _hasMorePages = _currentPage * 30 < totalCount;
+        
+        if (isLoadingMore && _searchResults != null) {
+          _searchResults = [..._searchResults!, ...newCards];
         } else {
-          // Append new results for pagination
-          setState(() {
-            _searchResults = [
-              ...?_searchResults,
-              ...(results['data'] as List)
-                  .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
-            ];
-            _isLoading = false;
-          });
+          _searchResults = newCards;
+          _isInitialSearch = false;
         }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _searchResults = null;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+        _isLoading = false;
+      });
+      
+      // Fixed nullable boolean check
+      if (!isLoadingMore && _searchResults != null && _searchResults!.isNotEmpty) {
+        _searchHistory?.addSearch(
+          query,
+          imageUrl: _searchResults![0].imageUrl,
         );
       }
     }
+  } catch (e) {
+    print('Search error: $e');
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        if (!isLoadingMore) _searchResults = [];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Search failed: ${e.toString()}'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
+}
+
+// Update _buildMainContent method
+Widget _buildMainContent() {
+  return SingleChildScrollView(
+    controller: _scrollController,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildQuickSearches(),
+        
+        if (_searchResults == null && !_isLoading) ...[
+          _buildRecentSearches(),
+        ] else if (_isLoading && _searchResults == null) ...[
+          _buildLoadingState(), // Show loading state
+        ] else if (_searchResults != null) ...[
+          // ... existing search results code ...
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),  // Added top padding
+            child: Row(
+              children: [
+                Text(
+                  'Search Results',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                if (_isLoading) ...[
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (_searchResults!.isEmpty && !_isLoading)
+            _buildNoResultsMessage()
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  childAspectRatio: 0.7,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: _searchResults!.length + (_isLoading ? 3 : 0),
+                itemBuilder: (context, index) {
+                  if (index >= _searchResults!.length) {
+                    return _buildShimmerItem();
+                  }
+                  return CardGridItem(
+                    card: _searchResults![index],
+                    showQuickAdd: true,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CardDetailsScreen(
+                          card: _searchResults![index],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 16),
+        ],
+      ],
+    ),
+  );
+}
+
+// Fix the _onSearchChanged method
+void _onSearchChanged(String query) {
+  if (query.isEmpty) {
+    setState(() {
+      _searchResults = null;
+      _isInitialSearch = true;
+    });
+    return;
+  }
+  
+  if (_searchDebounce?.isActive ?? false) {
+    _searchDebounce!.cancel();
+  }
+  
+  _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+    if (mounted && query == _searchController.text && query.isNotEmpty) {
+      setState(() {
+        _currentPage = 1;  // Reset page when searching
+        _isInitialSearch = true;
+      });
+      _performSearch(query);
+    }
+  });
+}
 
   Future<void> _performQuickSearch(String searchType) async {
     setState(() {
       _searchController.text = searchType;
       _isLoading = true;
-      _searchResults = null;    // Fix: Remove extra parenthesis
+      _searchResults = null;
+      _currentPage = 1;
+      _hasMorePages = true;
     });
 
     try {
+      final customQuery = TcgApiService.popularSearchQueries[searchType] ?? 
+                         TcgApiService.setSearchQueries[searchType];
+      
       final results = await _apiService.searchCards(
         searchType,
-        customQuery: TcgApiService.popularSearchQueries[searchType] ?? 
-                    TcgApiService.setSearchQueries[searchType],
+        customQuery: customQuery,
+        page: _currentPage,
+        pageSize: 30,
+        sortBy: _currentSort,
+        ascending: _sortAscending,
       );
       
       if (mounted) {
+        final List<dynamic> cardData = results['data'] as List? ?? [];
+        final totalCount = results['totalCount'] as int? ?? 0;
+        
+        final newCards = cardData
+            .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+            .toList();
+
         setState(() {
-          _searchResults = (results['data'] as List)
-              .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
-              .toList();
+          _totalCards = totalCount;
+          _hasMorePages = _currentPage * 30 < totalCount;
+          _searchResults = newCards;
           _isLoading = false;
+          _isInitialSearch = false;
         });
       }
     } catch (e) {
@@ -270,11 +467,14 @@ class _SearchScreenState extends State<SearchScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          padding: const EdgeInsets.all(16),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Recent Searches', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                'Recent Searches',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               TextButton(
                 onPressed: () {
                   _searchHistory?.clearHistory();
@@ -285,56 +485,32 @@ class _SearchScreenState extends State<SearchScreen> {
             ],
           ),
         ),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: searches.length,
-          itemBuilder: (context, index) {
-            final search = searches[index];
-            return ListTile(
-              leading: search['imageUrl'] != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Image.network(
-                        search['imageUrl']!,
-                        width: 32,
-                        height: 45,
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                  : const Icon(Icons.search),
-              title: Text(search['query']!),
-              onTap: () => _performSearch(search['query']!),
-            );
-          },
+        Column(
+          children: searches.map((search) => ListTile(
+            leading: search['imageUrl'] != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(
+                      search['imageUrl']!,
+                      width: 32,
+                      height: 45,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : const Icon(Icons.search),
+            title: Text(search['query']!),
+            onTap: () {
+              _searchController.text = search['query']!;
+              _performSearch(search['query']!);
+            },
+          )).toList(),
         ),
       ],
     );
   }
 
-  // Modify the _buildMainContent method
-  Widget _buildMainContent() {
-    if (_searchResults != null) {
-      return _isLoading && _currentPage == 1
-          ? const Center(child: CircularProgressIndicator())
-          : _searchResults!.isEmpty
-              ? const Center(child: Text('No cards found'))
-              : _buildResults();
-    }
-
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildQuickSearches(),
-          _buildRecentSearches(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResults() {
+  Widget _buildLoadingShimmer() {
     return GridView.builder(
-      controller: _scrollController,
       padding: const EdgeInsets.all(8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
@@ -342,17 +518,28 @@ class _SearchScreenState extends State<SearchScreen> {
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
-      itemCount: _searchResults!.length,
-      itemBuilder: (context, index) => CardGridItem(
-        card: _searchResults![index],
-        showQuickAdd: true,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CardDetailsScreen(
-              card: _searchResults![index],
-            ),
+      itemCount: 12, // Show 12 shimmer items
+      itemBuilder: (context, index) => Shimmer.fromColors(
+        baseColor: Theme.of(context).colorScheme.surfaceVariant,
+        highlightColor: Theme.of(context).colorScheme.surface,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerItem() {
+    return Shimmer.fromColors(
+      baseColor: Theme.of(context).colorScheme.surfaceVariant,
+      highlightColor: Theme.of(context).colorScheme.surface,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
         ),
       ),
     );
@@ -442,6 +629,44 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  Widget _buildNoResultsMessage() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 48,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No cards found',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            if (_currentSort.contains('cardmarket.prices'))
+              Text(
+                'Try removing price sorting as not all cards have prices',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              )
+            else
+              Text(
+                'Try adjusting your search terms',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -460,10 +685,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   hintText: 'Search cards...',
                   border: InputBorder.none,
                 ),
-                onSubmitted: (query) {
-                  _currentPage = 1;
-                  _performSearch(query);
-                },
+                onChanged: _onSearchChanged, // Add this line
+                textInputAction: TextInputAction.search,  // Add this to show search action on keyboard
               ),
             ),
           ],
@@ -490,6 +713,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();

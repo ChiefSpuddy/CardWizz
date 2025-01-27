@@ -59,14 +59,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 16),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
           ),
+          const SizedBox(width: 16),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 16,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -347,11 +349,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             children: [
               _buildOverviewCard(cards),
               const SizedBox(height: 16),
+              _buildValueTrendCard(cards),  // Moved up
+              const SizedBox(height: 16),
               _buildTimeFrameCard(cards),
               const SizedBox(height: 16),
               _buildTopCardsCard(cards),
-              const SizedBox(height: 16),
-              _buildValueTrendCard(cards),
             ],
           );
         },

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 
 class CustomCollection {
   final String id;
@@ -7,6 +8,7 @@ class CustomCollection {
   final double? totalValue;
   final List<Map<String, dynamic>> priceHistory;
   final DateTime createdAt;
+  final Color color;  // Add this
 
   CustomCollection({
     required this.id,
@@ -16,6 +18,7 @@ class CustomCollection {
     this.totalValue,
     this.priceHistory = const [],
     DateTime? createdAt,
+    this.color = const Color(0xFF90CAF9),  // Default to light blue
   }) : createdAt = createdAt ?? DateTime.now();
 
   factory CustomCollection.fromJson(Map<String, dynamic> json) {
@@ -27,6 +30,7 @@ class CustomCollection {
       totalValue: json['totalValue']?.toDouble(),
       priceHistory: List<Map<String, dynamic>>.from(json['priceHistory'] ?? []),
       createdAt: DateTime.parse(json['createdAt'] as String),
+      color: Color(json['color'] as int? ?? 0xFF90CAF9),
     );
   }
 
@@ -38,6 +42,7 @@ class CustomCollection {
     'totalValue': totalValue,
     'priceHistory': priceHistory,
     'createdAt': createdAt.toIso8601String(),
+    'color': color.value,
   };
 
   CustomCollection copyWith({
@@ -46,6 +51,7 @@ class CustomCollection {
     List<String>? cardIds,
     double? totalValue,
     List<Map<String, dynamic>>? priceHistory,
+    Color? color,
   }) {
     return CustomCollection(
       id: id,
@@ -55,6 +61,7 @@ class CustomCollection {
       totalValue: totalValue ?? this.totalValue,
       priceHistory: priceHistory ?? this.priceHistory,
       createdAt: createdAt,
+      color: color ?? this.color,
     );
   }
 }

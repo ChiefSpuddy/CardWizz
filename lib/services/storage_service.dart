@@ -1,14 +1,18 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 import '../models/tcg_card.dart';
 
 class StorageService {
   late final SharedPreferences _prefs;
+  late final Database _db;
   static StorageService? _instance;
   final _cardsController = StreamController<List<TcgCard>>.broadcast();
   bool _isInitialized = false;
   String? _currentUserId;
+  final Map<String, TcgCard> _cardCache = {};
+  (String, TcgCard)? _lastRemovedCard;
 
   // Update the key format to be consistent
   String _getUserKey(String key) {
@@ -162,36 +166,46 @@ class StorageService {
   final Map<String, TcgCard> _removedCards = {};
 
   Future<void> removeCard(String cardId) async {
-    if (!_isInitialized || _currentUserId == null) return;
+    if (_currentUserId == null) return;
     
-    final List<String> existingCardsJson = _prefs.getStringList(_getUserKey('cards')) ?? [];
-    final existingCards = existingCardsJson
-        .map((json) => jsonDecode(json) as Map<String, dynamic>)
-        .toList();
-    
-    final removedCardJson = existingCards.firstWhere(
-      (card) => card['id'] == cardId,
-      orElse: () => {},
-    );
-    if (removedCardJson.isNotEmpty) {
-      _removedCards[cardId] = TcgCard.fromJson(removedCardJson);
+    try {
+      // First, get the card data before removing
+      final cards = await getCards();
+      final removedCard = cards.firstWhere((card) => card.id == cardId);
+      
+      // Store in removed cards cache
+      _cardCache[cardId] = removedCard;
+      _lastRemovedCard = (cardId, removedCard);
+
+      // Remove from storage
+      final cardsKey = _getUserKey('cards');
+      final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
+      final updatedCardsJson = existingCardsJson
+          .where((json) {
+            final card = TcgCard.fromJson(jsonDecode(json));
+            return card.id != cardId;
+          })
+          .toList();
+
+      await _prefs.setStringList(cardsKey, updatedCardsJson);
+      
+      // Update the stream
+      final updatedCards = await getCards();
+      _cardsController.add(updatedCards);
+      
+    } catch (e) {
+      print('Error removing card: $e');
+      rethrow;
     }
-    
-    existingCards.removeWhere((card) => card['id'] == cardId);
-    
-    final updatedCardsJson = existingCards
-        .map((c) => jsonEncode(c))
-        .cast<String>()
-        .toList();
-    await _prefs.setStringList(_getUserKey('cards'), updatedCardsJson);
-    getCards().then((cards) => _cardsController.add(cards));
   }
 
   Future<void> undoRemoveCard(String cardId) async {
-    if (!_isInitialized) return;
-    final cardToRestore = _removedCards.remove(cardId);
-    if (cardToRestore != null) {
-      await saveCard(cardToRestore);
+    if (_currentUserId == null || _lastRemovedCard == null) return;
+    final (lastCardId, card) = _lastRemovedCard!;
+    
+    if (lastCardId == cardId) {
+      await saveCard(card);
+      _lastRemovedCard = null;
     }
   }
 
@@ -207,6 +221,25 @@ class StorageService {
     // Use user-specific key for theme preference
     final userKey = _getUserKey(key);
     return await _prefs.setBool(userKey, value);
+  }
+
+  Future<List<TcgCard>> _loadCardsFromJson(String jsonStr) async {
+    try {
+      final List<dynamic> jsonList = json.decode(jsonStr);
+      return jsonList.map((cardJson) {
+        try {
+          return TcgCard.fromJson(cardJson);
+        } catch (e) {
+          print('Error parsing card: $e');
+          return null;
+        }
+      })
+      .whereType<TcgCard>() // Filter out null values
+      .toList();
+    } catch (e) {
+      print('Error loading cards: $e');
+      return [];
+    }
   }
 
   void dispose() {

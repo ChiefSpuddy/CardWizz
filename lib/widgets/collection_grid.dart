@@ -9,8 +9,146 @@ import '../models/custom_collection.dart';
 import '../providers/app_state.dart';
 import '../widgets/sign_in_button.dart';
 
-class CollectionGrid extends StatelessWidget {
+class CollectionGrid extends StatefulWidget {
   const CollectionGrid({super.key});
+
+  @override
+  _CollectionGridState createState() => _CollectionGridState();
+}
+
+class _CollectionGridState extends State<CollectionGrid> {
+  final Set<String> _selectedCards = {};
+  bool _isMultiSelectMode = false;
+
+  void _toggleCardSelection(String cardId) {
+    setState(() {
+      if (_selectedCards.contains(cardId)) {
+        _selectedCards.remove(cardId);
+        if (_selectedCards.isEmpty) {
+          _isMultiSelectMode = false;
+        }
+      } else {
+        _selectedCards.add(cardId);
+      }
+    });
+  }
+
+  void _exitMultiSelectMode() {
+    setState(() {
+      _selectedCards.clear();
+      _isMultiSelectMode = false;
+    });
+  }
+
+  Future<void> _removeSelectedCards(BuildContext context) async {
+    final storage = Provider.of<StorageService>(context, listen: false);
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Cards'),
+        content: Text('Remove ${_selectedCards.length} cards from your collection?'),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Remove'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      for (final cardId in _selectedCards) {
+        await storage.removeCard(cardId);
+      }
+      _exitMultiSelectMode();
+    }
+  }
+
+  Future<void> _addToCustomCollection(BuildContext context) async {
+    final service = await CollectionService.getInstance();
+    
+    if (!context.mounted) return;
+
+    final collections = await service.getCustomCollections();
+    
+    if (!context.mounted) return;
+    
+    if (collections.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('No Binders'),
+          content: const Text('Create a binder first to add cards to it.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // TODO: Show create binder dialog
+              },
+              child: const Text('Create Binder'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              child: Text(
+                'Add ${_selectedCards.length} cards to binder',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            const Divider(),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: collections.map((collection) => ListTile(
+                    leading: const Icon(Icons.folder_outlined),
+                    title: Text(collection.name),
+                    subtitle: Text('${collection.cardIds.length} cards'),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      for (final cardId in _selectedCards) {
+                        await service.addCardToCollection(collection.id, cardId);
+                      }
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Added ${_selectedCards.length} cards to ${collection.name}'),
+                          ),
+                        );
+                        _exitMultiSelectMode();
+                      }
+                    },
+                  )).toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Future<void> _showRemoveDialog(BuildContext context, TcgCard card) async {
     // Store StorageService before showing dialog
@@ -284,24 +422,136 @@ class CollectionGrid extends StatelessWidget {
           );
         }
 
-        return GridView.builder(
-          padding: const EdgeInsets.all(8),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            childAspectRatio: 0.7,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-          ),
-          itemCount: cards.length,
-          itemBuilder: (context, index) {
-            return GestureDetector(
-              onLongPress: () => _showCardOptions(context, cards[index]),
-              child: CardGridItem(
-                card: cards[index],
-                onTap: () => _showCardDetails(context, cards[index]),
+        return Stack(
+          children: [
+            GridView.builder(
+              padding: const EdgeInsets.all(8),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                childAspectRatio: 0.7,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
               ),
-            );
-          },
+              itemCount: cards.length,
+              itemBuilder: (context, index) {
+                final card = cards[index];
+                final isSelected = _selectedCards.contains(card.id);
+                
+                return GestureDetector(
+                  onLongPress: () {
+                    setState(() {
+                      _isMultiSelectMode = true;
+                      _toggleCardSelection(card.id);
+                    });
+                  },
+                  onTap: () {
+                    if (_isMultiSelectMode) {
+                      _toggleCardSelection(card.id);
+                    } else {
+                      _showCardDetails(context, card);
+                    }
+                  },
+                  child: Stack(
+                    children: [
+                      CardGridItem(
+                        card: card,
+                        onTap: null,
+                      ),
+                      if (_isMultiSelectMode)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isSelected 
+                                ? Theme.of(context).primaryColor 
+                                : Colors.grey.withOpacity(0.5),
+                            ),
+                            padding: const EdgeInsets.all(2),
+                            child: Icon(
+                              isSelected ? Icons.check_circle : Icons.circle_outlined,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            if (_isMultiSelectMode)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              '${_selectedCards.length} selected',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  FilledButton.tonal(
+                                    onPressed: () => _addToCustomCollection(context),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.collections_bookmark, size: 18),
+                                        SizedBox(width: 8),
+                                        Text('Add to Binder'),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  FilledButton.tonal(
+                                    onPressed: () => _removeSelectedCards(context),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                                      foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.delete_outline, size: 18),
+                                        SizedBox(width: 8),
+                                        Text('Remove'),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );

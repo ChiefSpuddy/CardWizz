@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
+import 'package:flutter/material.dart';  // Add this import for Color
 import '../models/custom_collection.dart';
+import '../services/storage_service.dart';  // Add this import
 
 class CollectionService {
   static CollectionService? _instance;
@@ -12,29 +16,51 @@ class CollectionService {
     _refreshCollections();
   }
 
-  void setCurrentUser(String? userId) {
+  Future<void> setCurrentUser(String? userId) async {
+    print('Setting collection service user: $userId');
     _currentUserId = userId;
-    _refreshCollections();
+    
+    // If signing out, don't clear collections from database
+    if (userId == null) {
+      _collectionsController.add([]);
+      return;
+    }
+
+    // Handle existing collections migration if needed
+    final unassignedCollections = await _db.query(
+      'collections',
+      where: 'user_id IS NULL OR user_id = ""',
+    );
+
+    if (unassignedCollections.isNotEmpty) {
+      // Migrate existing collections to the current user
+      for (final collection in unassignedCollections) {
+        await _db.update(
+          'collections',
+          {'user_id': userId},
+          where: 'id = ?',
+          whereArgs: [collection['id']],
+        );
+      }
+    }
+
+    // Refresh collections after migration
+    await _refreshCollections();
   }
 
   Future<void> clearUserData() async {
-    if (_currentUserId != null) {
-      await _db.delete(
-        'collections',
-        where: 'user_id = ?',
-        whereArgs: [_currentUserId],
-      );
-      await _refreshCollections();
-    }
+    // Remove this method or modify it to not delete data
     _currentUserId = null;
+    _collectionsController.add([]);
   }
 
   static Future<CollectionService> getInstance() async {
     if (_instance != null) return _instance!;
 
+    // Open database without deleting
     final db = await openDatabase(
       'collections.db',
-      version: 2, // Increment version
+      version: 1,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE collections(
@@ -43,14 +69,10 @@ class CollectionService {
             description TEXT,
             created_at INTEGER,
             card_ids TEXT,
-            user_id TEXT
+            user_id TEXT,
+            color INTEGER DEFAULT 4282682873
           )
         ''');
-      },
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          await db.execute('ALTER TABLE collections ADD COLUMN user_id TEXT');
-        }
       },
     );
 
@@ -59,8 +81,19 @@ class CollectionService {
   }
 
   Future<void> _refreshCollections() async {
-    final collections = await getCustomCollections();
-    _collectionsController.add(collections);
+    if (_currentUserId == null) {
+      _collectionsController.add([]);
+      return;
+    }
+    
+    try {
+      final collections = await getCustomCollections();
+      print('Found ${collections.length} collections for user $_currentUserId');
+      _collectionsController.add(collections);
+    } catch (e) {
+      print('Error refreshing collections: $e'); // Add debug print
+      _collectionsController.addError(e);
+    }
   }
 
   Stream<List<CustomCollection>> getCustomCollectionsStream() {
@@ -77,13 +110,24 @@ class CollectionService {
       whereArgs: [_currentUserId],
     );
     
-    return maps.map((map) => CustomCollection(
+    final collections = maps.map((map) => CustomCollection(
       id: map['id'] as String,
       name: map['name'] as String,
       description: map['description'] as String? ?? '',
       cardIds: map['card_ids'].toString().split(',').where((id) => id.isNotEmpty).toList(),
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
+      color: Color(map['color'] as int? ?? 0xFF90CAF9),  // Add color here
     )).toList();
+
+    // Add value calculation
+    final enrichedCollections = await Future.wait(
+      collections.map((collection) async {
+        final value = await calculateCollectionValue(collection.id);
+        return collection.copyWith(totalValue: value);
+      }),
+    );
+    
+    return enrichedCollections;
   }
 
   Future<CustomCollection?> getCollection(String id) async {
@@ -98,47 +142,69 @@ class CollectionService {
     
     if (maps.isEmpty) return null;
     
+    final map = maps.first;
     return CustomCollection(
-      id: maps.first['id'] as String,
-      name: maps.first['name'] as String,
-      description: maps.first['description'] as String? ?? '',
-      cardIds: maps.first['card_ids'].toString().split(',').where((id) => id.isNotEmpty).toList(),
-      createdAt: DateTime.fromMillisecondsSinceEpoch(maps.first['created_at'] as int),
+      id: map['id'] as String,
+      name: map['name'] as String,
+      description: map['description'] as String? ?? '',
+      cardIds: map['card_ids'].toString().split(',').where((id) => id.isNotEmpty).toList(),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
+      color: Color(map['color'] as int? ?? 0xFF90CAF9),
     );
   }
 
-  Future<void> createCustomCollection(String name, String description) async {
+  Future<void> createCustomCollection(
+    String name,
+    String description, {
+    Color color = const Color(0xFF90CAF9),  // Add default color parameter
+  }) async {
     if (_currentUserId == null) return;
 
-    final collection = CustomCollection(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name,
-      description: description,
-      cardIds: [],
-      createdAt: DateTime.now(),
-    );
-
     await _db.insert('collections', {
-      'id': collection.id,
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
       'name': name,
       'description': description,
-      'created_at': collection.createdAt.millisecondsSinceEpoch,
+      'created_at': DateTime.now().millisecondsSinceEpoch,
       'card_ids': '',
       'user_id': _currentUserId,
+      'color': color.value,  // Make sure color value is stored
     });
 
     await _refreshCollections();
   }
 
-  Future<void> updateCollectionDetails(String collectionId, String name, String description) async {
+  Future<void> updateCollectionDetails(
+    String collectionId, 
+    String name, 
+    String description, {
+    Color? color,
+  }) async {
+    if (_currentUserId == null) return;
+    
+    final Map<String, dynamic> updates = {
+      'name': name,
+      'description': description,
+    };
+
+    if (color != null) {
+      updates['color'] = color.value;  // Make sure color value is stored
+    }
+    
+    await _db.update(
+      'collections',
+      updates,
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [collectionId, _currentUserId],
+    );
+    await _refreshCollections();
+  }
+
+  Future<void> updateCollectionColor(String collectionId, Color color) async {
     if (_currentUserId == null) return;
     
     await _db.update(
       'collections',
-      {
-        'name': name,
-        'description': description,
-      },
+      {'color': color.value},
       where: 'id = ? AND user_id = ?',
       whereArgs: [collectionId, _currentUserId],
     );
@@ -184,6 +250,22 @@ class CollectionService {
       );
       await _refreshCollections();
     }
+  }
+
+  Future<double> calculateCollectionValue(String collectionId) async {
+    final collection = await getCollection(collectionId);
+    if (collection == null) return 0.0;
+    
+    final storage = await StorageService.init();
+    final cards = await storage.getCards();
+    
+    double total = 0.0;
+    for (final card in cards) {
+      if (collection.cardIds.contains(card.id)) {
+        total += card.price ?? 0.0;
+      }
+    }
+    return total;
   }
 
   void dispose() {

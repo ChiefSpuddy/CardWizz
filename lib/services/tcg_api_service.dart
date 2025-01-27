@@ -23,14 +23,14 @@ class TcgApiService {
   };
 
   static const Map<String, String> setSearchQueries = {
+    'Surging Sparks': 'set.id:sv8',  // Updated correct ID
+    'Prismatic Evolution': 'set.id:sv9',  // Updated correct ID
     'Paldea Evolved': 'set.id:sv2',
     'Crown Zenith': 'set.id:swsh12pt5',
     'Silver Tempest': 'set.id:swsh12',
     'Lost Origin': 'set.id:swsh11',
     'Scarlet & Violet': 'set.id:sv1',
     'Paradox Rift': 'set.id:sv4',
-    'Surging Sparks': 'set.id:sv5', // Updated set
-    'Prismatic Evolution': 'set.id:pgo',  // Update when set is released
   };
 
   static const Map<String, String> sortOptions = {
@@ -46,47 +46,53 @@ class TcgApiService {
     'X-Api-Key': _apiKey,
   };
 
-  Future<Map<String, dynamic>> searchCards(String query, {
-    String? customQuery,
-    String sortBy = 'cardmarket.prices.averageSellPrice',  // Default to price high to low
-    bool ascending = false,
+  // Update the searchCards method to handle different search patterns
+  Future<Map<String, dynamic>> searchCards(
+    String query, {
+    String? sortBy,
+    bool ascending = true,
     int page = 1,
-    int pageSize = 30,
+    int pageSize = 60,
+    String? customQuery,
   }) async {
     try {
-      final searchQuery = customQuery ?? 
-          popularSearchQueries[query] ?? 
-          setSearchQueries[query] ??
-          'name:"*$query*"';
+      String finalQuery;
+      
+      // Handle custom queries (like quick searches) differently
+      if (customQuery != null) {
+        finalQuery = customQuery;
+      } else {
+        final cleanQuery = query.trim();
+        if (RegExp(r'\d+').hasMatch(cleanQuery)) {
+          final nameParts = cleanQuery.split(RegExp(r'[\s/]+'));
+          if (nameParts.length > 1) {
+            finalQuery = 'name:"${nameParts[0]}*" number:${nameParts[1]}';
+          } else {
+            finalQuery = 'number:$cleanQuery';
+          }
+        } else {
+          finalQuery = 'name:"*$cleanQuery*"';
+        }
+      }
 
+      // Build query parameters
       final queryParams = {
-        'q': searchQuery,
-        'select': 'id,name,images,cardmarket,number,set,rarity', // Added rarity
-        'orderBy': sortBy,
+        'q': finalQuery,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
       };
 
-      if (!ascending) {
-        queryParams['orderBy'] = '-${queryParams['orderBy']}';
+      // Add sorting if specified
+      if (sortBy != null) {
+        // Keep the original sorting format that was working
+        queryParams['orderBy'] = ascending ? sortBy : '-$sortBy';
       }
 
-      final url = Uri.https(
-        'api.pokemontcg.io',
-        '/v2/cards',
-        queryParams,
-      );
-
-      final response = await http.get(url, headers: _headers);
-
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      }
-      
-      throw Exception('Failed to search cards');
+      print('API Query: $queryParams');
+      return await _get('cards', queryParams);
     } catch (e) {
-      print('Search error: $e');
-      throw Exception('Error searching cards');
+      print('API Error: $e');
+      rethrow;
     }
   }
 
@@ -103,5 +109,16 @@ class TcgApiService {
   String getEbaySearchUrl(String cardName, {String? setName}) {
     final searchTerms = [cardName, if (setName != null) setName, 'pokemon card'].join(' ');
     return 'https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(searchTerms)}';
+  }
+
+  Future<Map<String, dynamic>> _get(String endpoint, [Map<String, String>? queryParams]) async {
+    final uri = Uri.parse('$_baseUrl/$endpoint').replace(queryParameters: queryParams);
+    final response = await http.get(uri, headers: _headers);
+    
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('Failed to load data: ${response.statusCode}');
+    }
   }
 }

@@ -2,87 +2,103 @@ class TcgCard {
   final String id;
   final String name;
   final String imageUrl;
-  final String? setName;
-  final String? number;
   final double? price;
-  final Map<String, dynamic>? cardmarket;
+  final String number;
+  final CardSet? set;
   final String? rarity;
-  final String? type;    // Add this field
+  final String? supertype;
+  final List<String>? subtypes;
+  final Map<String, String>? legalities;
+
+  static const String DEFAULT_IMAGE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png';
+
+  String get setName => set?.name ?? 'Unknown Set';
 
   TcgCard({
     required this.id,
     required this.name,
-    required this.imageUrl,
-    this.setName,
-    this.number,
+    String? imageUrl,
     this.price,
-    this.cardmarket,
+    this.number = '',
+    this.set,
     this.rarity,
-    this.type,    // Add this
-  });
-
-  String get setNumber => number != null ? '#$number' : '';
+    this.supertype,
+    this.subtypes,
+    this.legalities,
+  }) : imageUrl = imageUrl ?? '';  // Simply use the provided URL or empty string
 
   factory TcgCard.fromJson(Map<String, dynamic> json) {
-    // Handle both API response and stored data formats
-    final images = json['images'] as Map<String, dynamic>?;
-    final set = json['set'] as Map<String, dynamic>?;
-    final market = json['cardmarket'] as Map<String, dynamic>?;
-    final prices = market?['prices'] as Map<String, dynamic>?;
-
-    // If imageUrl is directly stored, use it; otherwise get it from images map
-    final imageUrl = json['imageUrl'] as String? ?? images?['small'] as String?;
+    String? imageUrl;
     
-    if (imageUrl == null) {
-      throw ArgumentError('Card data must include an image URL');
+    // Handle different image URL formats
+    if (json['images'] is Map<String, dynamic>) {
+      imageUrl = json['images']['small'] ?? json['images']['large'];
+    } else if (json['imageUrl'] is String) {
+      // Handle old storage format
+      imageUrl = json['imageUrl'];
     }
-
+    
     return TcgCard(
-      id: json['id'] as String,
-      name: json['name'] as String,
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
       imageUrl: imageUrl,
-      setName: json['setName'] as String? ?? set?['name'] as String?,
-      number: json['number']?.toString(),
-      price: json['price']?.toDouble() ?? prices?['averageSellPrice']?.toDouble(),
-      cardmarket: market,
-      rarity: json['rarity'] as String?,
-      type: json['type'] as String?,      // Add this
+      price: json['cardmarket']?['prices']?['averageSellPrice']?.toDouble(),
+      number: json['number']?.toString() ?? '',
+      set: json['set'] != null ? CardSet.fromJson(json['set']) : null,
+      rarity: json['rarity'],
+      supertype: json['supertype'],
+      subtypes: json['subtypes'] != null 
+          ? List<String>.from(json['subtypes'])
+          : null,
+      legalities: json['legalities'] != null 
+          ? Map<String, String>.from(json['legalities'])
+          : null,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
-    'imageUrl': imageUrl,
-    'setName': setName,
+    'images': {
+      'small': imageUrl,
+      'large': imageUrl,
+    },
+    'cardmarket': {'prices': {'averageSellPrice': price}},
     'number': number,
-    'price': price,
-    'cardmarket': cardmarket,
+    'set': set?.toJson(),
     'rarity': rarity,
-    'type': type,      // Add this
+    'supertype': supertype,
+    'subtypes': subtypes,
+    'legalities': legalities,
   };
+}
 
-  TcgCard copyWith({
-    String? id,
-    String? name,
-    String? imageUrl,
-    String? setName,
-    String? number,
-    double? price,
-    Map<String, dynamic>? cardmarket,
-    String? rarity,  // Add this
-    String? type,    // Add this
-  }) {
-    return TcgCard(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      imageUrl: imageUrl ?? this.imageUrl,
-      setName: setName ?? this.setName,
-      number: number ?? this.number,
-      price: price ?? this.price,
-      cardmarket: cardmarket ?? this.cardmarket,
-      rarity: rarity ?? this.rarity,  // Add this
-      type: type ?? this.type,        // Add this
+class CardSet {
+  final String id;
+  final String name;
+  final String? series;
+  final String? releaseDate;
+
+  CardSet({
+    required this.id,
+    required this.name,
+    this.series,
+    this.releaseDate,
+  });
+
+  factory CardSet.fromJson(Map<String, dynamic> json) {
+    return CardSet(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      series: json['series'],
+      releaseDate: json['releaseDate'],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'series': series,
+    'releaseDate': releaseDate,
+  };
 }

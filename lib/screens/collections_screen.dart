@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../services/storage_service.dart';
+import '../services/collection_service.dart';  // Add this
 import '../models/tcg_card.dart';
+import '../models/custom_collection.dart';  // Add this
 import '../widgets/collection_grid.dart';
-import '../widgets/custom_collections_grid.dart';  // Add this import
-import 'analytics_screen.dart';  // Add this import
-import 'home_screen.dart';  // Add this import
+import '../widgets/custom_collections_grid.dart';
+import '../widgets/create_collection_sheet.dart';
+import 'analytics_screen.dart';
+import 'home_screen.dart';
+import 'custom_collection_detail_screen.dart';  // Add this
 
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
@@ -25,6 +29,101 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
       return '€${(value / 1000).toStringAsFixed(1)}K';
     }
     return '€${value.toStringAsFixed(2)}';
+  }
+
+  Widget _buildToggle() {
+    return Container(
+      height: 36,
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12), // Added more bottom margin
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => setState(() => _showCustomCollections = false),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: !_showCustomCollections 
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.style,
+                      size: 16,
+                      color: !_showCustomCollections
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Main',  // Fixed text
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: !_showCustomCollections
+                          ? Theme.of(context).colorScheme.onPrimary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: () => setState(() => _showCustomCollections = true),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _showCustomCollections 
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.collections_bookmark,
+                      size: 16,
+                      color: _showCustomCollections
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Binders',  // Fixed text
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _showCustomCollections
+                          ? Theme.of(context).colorScheme.onPrimary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createCollection(BuildContext context) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => const CreateCollectionSheet(),
+    );
   }
 
   @override
@@ -93,17 +192,39 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
         return Scaffold(
           appBar: AppBar(
+            toolbarHeight: 72, // Increased from default 56
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('My Collection'),
                 if (cards.isNotEmpty)
-                  Text(
-                    '${cards.length} cards · ${_formatValue(totalValue)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? Colors.grey[300] : Colors.grey[600],
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${cards.length} cards',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatValue(totalValue),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -132,17 +253,86 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                 },
               ),
             ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(48), // Increased from 36
+              child: _buildToggle(),
+            ),
           ),
-          body: Stack(
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: _showCustomCollections
-                    ? const CustomCollectionsGrid()
-                    : const CollectionGrid(),
-              ),
-            ],
+          drawer: Drawer(
+            child: ListView(
+              children: [
+                const DrawerHeader(
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                  ),
+                  child: Text('Menu'),
+                ),
+                // Custom Collections section
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Binders',  // Updated text
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                FutureBuilder<CollectionService>(
+                  future: CollectionService.getInstance(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox();
+                    
+                    return StreamBuilder<List<CustomCollection>>(
+                      stream: snapshot.data!.getCustomCollectionsStream(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) return const SizedBox();
+                        
+                        final collections = snapshot.data!;
+                        return Column(
+                          children: collections.map((collection) => ListTile(
+                            leading: const Icon(Icons.folder_outlined),
+                            title: Text(collection.name),
+                            subtitle: Text('${collection.cardIds.length} cards'),
+                            trailing: collection.totalValue != null
+                                ? Text('€${collection.totalValue!.toStringAsFixed(2)}')
+                                : null,
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CustomCollectionDetailScreen(
+                                    collection: collection,
+                                  ),
+                                ),
+                              );
+                            },
+                          )).toList(),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
+          body: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: _showCustomCollections
+                ? const CustomCollectionsGrid()
+                : const CollectionGrid(),
+          ),
+          floatingActionButton: _showCustomCollections
+              ? FloatingActionButton.extended(
+                  onPressed: () => _createCollection(context),
+                  elevation: 4,
+                  backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                  foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
+                  label: const Text('New Binder'),
+                  icon: const Icon(Icons.add),
+                )
+              : null,
         );
       },
     );

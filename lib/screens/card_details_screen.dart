@@ -7,6 +7,13 @@ import '../services/storage_service.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+extension StringExtension on String {
+  String capitalize() {
+    if (isEmpty) return this;
+    return "${this[0].toUpperCase()}${substring(1)}";
+  }
+}
+
 class CardDetailsScreen extends StatefulWidget {
   final TcgCard card;
 
@@ -318,12 +325,80 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            '$label: ',
+            label,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           Text(value),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardInfo() {
+    final card = widget.card;
+    final setInfo = _additionalData?['set'] ?? {};
+    final legalities = _additionalData?['legalities'] as Map<dynamic, dynamic>? ?? {};
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark 
+            ? Colors.grey[900] 
+            : Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Card Information',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildDetailRow('Number', '${card.number} / ${setInfo['printedTotal'] ?? 'Unknown'}'),
+          const Divider(),
+          _buildDetailRow('Rarity', card.rarity ?? 'Unknown'),
+          const Divider(),
+          _buildDetailRow('Set', card.setName),
+          if (setInfo['releaseDate'] != null) ...[
+            const Divider(),
+            _buildDetailRow(
+              'Release Date', 
+              _formatDate(setInfo['releaseDate']?.toString())
+            ),
+          ],
+          if (setInfo['series'] != null) ...[
+            const Divider(),
+            _buildDetailRow('Series', setInfo['series']),
+          ],
+          if (legalities.isNotEmpty) ...[
+            const Divider(),
+            _buildDetailRow(
+              'Format', 
+              legalities.entries
+                  .where((e) => e.value == 'Legal')
+                  .map((e) => e.key.toString())
+                  .join(', ')
+                  .capitalize()
+            ),
+          ],
+          if (_additionalData?['supertype'] != null) ...[
+            const Divider(),
+            _buildDetailRow('Type', _additionalData!['supertype']),
+          ],
+          if (_additionalData?['subtypes'] != null && 
+              (_additionalData!['subtypes'] as List).isNotEmpty) ...[
+            const Divider(),
+            _buildDetailRow(
+              'Subtypes',
+              (_additionalData!['subtypes'] as List).join(', ')
+            ),
+          ],
         ],
       ),
     );
@@ -336,54 +411,41 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.card.name)),
       body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Container(
-              color: isDark ? Colors.black : Colors.grey[100],
-              child: Hero(
-                tag: 'card_${widget.card.id}',
-                child: Image.network(
-                  widget.card.imageUrl,
-                  fit: BoxFit.contain,
-                  height: 400,
+        child: Padding(  // Add padding here
+          padding: const EdgeInsets.only(bottom: 80), // Space for FAB
+          child: Column(
+            children: [
+              Container(
+                color: isDark ? Colors.black : Colors.grey[100],
+                child: Hero(
+                  tag: 'card_${widget.card.id}',
+                  child: Image.network(
+                    widget.card.imageUrl,
+                    fit: BoxFit.contain,
+                    height: 400,
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.card.name,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildPricingSection(),
-                  const SizedBox(height: 24),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.grey[900] : Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.card.name,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildDetailRow('Set', widget.card.setName ?? 'Unknown'),
-                        const Divider(),
-                        _buildDetailRow('Rarity', widget.card.rarity ?? 'Unknown'),
-                        const Divider(),
-                        _buildDetailRow('Card ID', widget.card.id),
-                      ],
-                    ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    _buildPricingSection(),
+                    const SizedBox(height: 24),
+                    _buildCardInfo(),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -394,5 +456,16 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
         foregroundColor: Colors.white,
       ),
     );
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return 'Unknown';
+    try {
+      final date = DateTime.parse(dateStr);
+      // Format as DD/MM/YYYY with leading zeros
+      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    } catch (e) {
+      return dateStr.split('T')[0].split('-').reversed.join('/');  // Fallback format
+    }
   }
 }

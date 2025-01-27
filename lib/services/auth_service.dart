@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:math';
-
+import '../services/collection_service.dart';  // Add this import
 // Add this import for String.characters
 import 'package:characters/characters.dart';
 
@@ -29,6 +29,10 @@ class AuthService {
         name: prefs.getString('user_name'),
         avatarPath: prefs.getString('user_avatar'),
       );
+      
+      // Initialize CollectionService with saved user ID
+      final collectionService = await CollectionService.getInstance();
+      await collectionService.setCurrentUser(savedUserId);
     }
     _isInitialized = true;
   }
@@ -95,6 +99,11 @@ class AuthService {
         );
         _isAuthenticated = true;
         await _saveUserData(_currentUser!);
+
+        // Update CollectionService with new user
+        final collectionService = await CollectionService.getInstance();
+        await collectionService.setCurrentUser(credential.userIdentifier);
+
         return _currentUser;
       }
       return null;
@@ -110,6 +119,11 @@ class AuthService {
     await prefs.remove('user_email');
     await prefs.remove('user_name');
     await prefs.remove('user_avatar');  // Add this line
+
+    // Clear CollectionService user
+    final collectionService = await CollectionService.getInstance();
+    await collectionService.setCurrentUser(null);
+
     _isAuthenticated = false;
     _currentUser = null;
   }
