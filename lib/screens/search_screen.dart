@@ -6,6 +6,7 @@ import '../screens/card_details_screen.dart';
 import '../models/tcg_card.dart';
 import '../widgets/card_grid_item.dart';
 import 'package:shimmer/shimmer.dart';
+import '../constants/card_styles.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -34,13 +35,13 @@ class _SearchScreenState extends State<SearchScreen> {
   ];
 
   static const recentSets = [
-    {'name': 'Surging Sparks', 'icon': '⚡'},
-    {'name': 'Prismatic Evolution', 'icon': '🌈'},
-    {'name': 'Paradox Rift', 'icon': '🌀'},
     {'name': 'Paldea Evolved', 'icon': '🌟'},
+    {'name': 'Scarlet & Violet', 'icon': '⚡'},
     {'name': 'Crown Zenith', 'icon': '👑'},
     {'name': 'Silver Tempest', 'icon': '🌪'},
     {'name': 'Lost Origin', 'icon': '🌌'},
+    {'name': 'Astral Radiance', 'icon': '✨'},
+    {'name': 'Brilliant Stars', 'icon': '⭐'},
   ];
 
   static const popularSearches = [
@@ -141,6 +142,11 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
     return;
   }
 
+  // Don't load more if we're already loading or there are no more pages
+  if (isLoadingMore && (_isLoading || !_hasMorePages)) {
+    return;
+  }
+
   if (!isLoadingMore) {
     _currentPage = 1;
     _hasMorePages = true;
@@ -223,6 +229,7 @@ Widget _buildMainContent() {
         
         if (_searchResults == null && !_isLoading) ...[
           _buildRecentSearches(),
+          const SizedBox(height: 16), // Add extra padding here
         ] else if (_isLoading && _searchResults == null) ...[
           _buildLoadingState(), // Show loading state
         ] else if (_searchResults != null) ...[
@@ -368,146 +375,222 @@ void _onSearchChanged(String query) {
     }
   }
 
-  Widget _buildQuickSearches() {
-    return Column(
+// Add this new widget method for scroll indicators
+Widget _buildHorizontalScrollView({
+  required List<Widget> children,
+  required Color indicatorColor,
+}) {
+  return Stack(
+    children: [
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 8, 40, 8), // Reduced vertical padding
+        child: Row(children: children),
+      ),
+      Positioned(
+        right: 0,
+        top: 0,
+        bottom: 0,
+        child: Container(
+          width: 40,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                indicatorColor.withOpacity(0.0),
+                indicatorColor.withOpacity(0.5),
+              ],
+            ),
+          ),
+          child: Center(
+            child: Icon(
+              Icons.chevron_right,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+// Update _buildQuickSearches method to use the new scroll indicator
+Widget _buildQuickSearches() {
+  return Container(
+    margin: const EdgeInsets.all(16),
+    decoration: CardStyles.cardDecoration(context),
+    child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Popular Searches section
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Text(
-            'Popular Searches',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
-        SizedBox(
-          height: 48,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: popularSearches.length,
-            itemBuilder: (context, index) {
-              final search = popularSearches[index];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ActionChip(
-                  avatar: Text(search['icon']!, style: const TextStyle(fontSize: 14)),
-                  label: Text(search['name']!),
-                  onPressed: () => _performQuickSearch(search['name']!),
-                ),
-              );
-            },
-          ),
-        ),
-
-        // Recent Sets section
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-          child: Text(
-            'Recent Sets',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
-        SizedBox(
-          height: 48,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: TcgApiService.setSearchQueries.length,
-            itemBuilder: (context, index) {
-              final setEntry = TcgApiService.setSearchQueries.entries.elementAt(index);
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ActionChip(
-                  avatar: Text(_getSetIcon(setEntry.key), style: const TextStyle(fontSize: 14)),
-                  label: Text(setEntry.key),
-                  onPressed: () => _performQuickSearch(setEntry.key),
-                ),
-              );
-            },
-          ),
-        ),
-        const Divider(height: 24),
-      ],
-    );
-  }
-
-  String _getSetIcon(String setName) {
-    switch (setName) {
-      case 'Paldea Evolved':
-        return '🌟';
-      case 'Crown Zenith':
-        return '👑';
-      case 'Silver Tempest':
-        return '🌪';
-      case 'Lost Origin':
-        return '🌌';
-      case 'Scarlet & Violet':
-        return '🔴';
-      case 'Paradox Rift':
-        return '🌀';
-      case 'Surging Sparks':
-        return '⚡'; // New icon
-      case 'Prismatic Evolution':
-        return '🌈'; // New icon
-      default:
-        return '📦';
-    }
-  }
-
-  Widget _buildRecentSearches() {
-    if (_isHistoryLoading || _searchHistory == null) {
-      return const SizedBox.shrink();
-    }
-
-    final searches = _searchHistory!.getRecentSearches();
-    if (searches.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
+        // Popular Searches header and content
+        Container(
           padding: const EdgeInsets.all(16),
+          decoration: CardStyles.gradientDecoration(context),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Recent Searches',
-                style: Theme.of(context).textTheme.titleMedium,
+                'Popular Searches',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
               ),
-              TextButton(
-                onPressed: () {
-                  _searchHistory?.clearHistory();
-                  setState(() {});
-                },
-                child: const Text('Clear'),
+              const Spacer(),
+              Icon(
+                Icons.local_fire_department,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
               ),
             ],
           ),
         ),
-        Column(
-          children: searches.map((search) => ListTile(
-            leading: search['imageUrl'] != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.network(
-                      search['imageUrl']!,
-                      width: 32,
-                      height: 45,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                : const Icon(Icons.search),
-            title: Text(search['query']!),
-            onTap: () {
-              _searchController.text = search['query']!;
-              _performSearch(search['query']!);
-            },
+        _buildHorizontalScrollView(
+          indicatorColor: Theme.of(context).colorScheme.surface,
+          children: popularSearches.map((search) => Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ActionChip(
+              avatar: Text(search['icon']!, style: const TextStyle(fontSize: 14)),
+              label: Text(search['name']!),
+              onPressed: () => _performQuickSearch(search['name']!),
+              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+              side: BorderSide.none,
+            ),
+          )).toList(),
+        ),
+        const Divider(height: 1),
+        // Recent Sets header and content - updated styling
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.5),
+                Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.5),
+              ],
+            ),
+          ),
+          child: Row(
+            children: [
+              Text(
+                'Recent Sets',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                Icons.diamond_outlined,  // Changed from new_releases to diamond_outlined
+                size: 20,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ],
+          ),
+        ),
+        _buildHorizontalScrollView(
+          indicatorColor: Theme.of(context).colorScheme.surface,
+          children: recentSets.map((set) => Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ActionChip(
+              avatar: Text(set['icon']!, style: const TextStyle(fontSize: 14)),
+              label: Text(set['name']!),
+              onPressed: () => _performQuickSearch(set['name']!),
+              backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+              side: BorderSide.none,
+              labelStyle: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           )).toList(),
         ),
       ],
-    );
+    ),
+  );
+}
+
+// Update _buildRecentSearches to improve styling
+Widget _buildRecentSearches() {
+  if (_isHistoryLoading || _searchHistory == null) {
+    return const SizedBox.shrink();
   }
+
+  final searches = _searchHistory!.getRecentSearches();
+  if (searches.isEmpty) return const SizedBox.shrink();
+
+  return Container(
+    margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    decoration: CardStyles.cardDecoration(context),
+    child: Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: CardStyles.gradientDecoration(context),
+          child: Row(
+            children: [
+              const Icon(Icons.history),
+              const SizedBox(width: 8),
+              Text(
+                'Recent Searches',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () {
+                  _searchHistory?.clearHistory();
+                  setState(() {});
+                },
+                icon: const Icon(Icons.delete_outline, size: 20),
+                label: const Text('Clear'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: searches.length,
+          separatorBuilder: (context, index) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final search = searches[index];
+            return ListTile(
+              leading: Container(
+                width: 32,
+                height: 45,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: Theme.of(context).colorScheme.surfaceVariant,
+                ),
+                child: search['imageUrl'] != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Image.network(
+                          search['imageUrl']!,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : const Icon(Icons.search),
+              ),
+              title: Text(
+                search['query']!,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                _searchController.text = search['query']!;
+                _performSearch(search['query']!);
+              },
+            );
+          },
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildLoadingShimmer() {
     return GridView.builder(
@@ -533,13 +616,16 @@ void _onSearchChanged(String query) {
   }
 
   Widget _buildShimmerItem() {
-    return Shimmer.fromColors(
-      baseColor: Theme.of(context).colorScheme.surfaceVariant,
-      highlightColor: Theme.of(context).colorScheme.surface,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
+    return Container(
+      decoration: CardStyles.cardDecoration(context),
+      child: Shimmer.fromColors(
+        baseColor: Theme.of(context).colorScheme.surfaceVariant,
+        highlightColor: Theme.of(context).colorScheme.surface,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );
@@ -667,39 +753,78 @@ void _onSearchChanged(String query) {
     );
   }
 
+  String _getSetIcon(String setName) {
+    // Find matching set in recentSets
+    final matchingSet = recentSets.firstWhere(
+      (set) => set['name'] == setName,
+      orElse: () => {'icon': '📦'}, // Default icon if not found
+    );
+    return matchingSet['icon']!;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false, // Remove automatic leading widget
-        title: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => Scaffold.of(context).openDrawer(),
+        automaticallyImplyLeading: false, // Keep this
+        leading: Container(), // Add this to prevent automatic drawer toggle
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Theme.of(context).colorScheme.primaryContainer,
+                Theme.of(context).colorScheme.secondaryContainer,
+              ],
             ),
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Search cards...',
-                  border: InputBorder.none,
-                ),
-                onChanged: _onSearchChanged, // Add this line
-                textInputAction: TextInputAction.search,  // Add this to show search action on keyboard
+          ),
+        ),
+        title: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  decoration: const InputDecoration(
+                    hintText: 'Search cards...',
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  onChanged: _onSearchChanged,
+                  textInputAction: TextInputAction.search,
+                ),
+              ),
+              if (_searchController.text.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.clear, size: 20),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchResults = null);
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                ),
+            ],
+          ),
         ),
         actions: [
-          if (_searchController.text.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                _searchController.clear();
-                setState(() => _searchResults = null);
-              },
-            ),
           IconButton(
             icon: Icon(_getSortIcon(_currentSort)),
             tooltip: TcgApiService.sortOptions[_currentSort],

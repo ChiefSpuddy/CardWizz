@@ -372,87 +372,69 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            ConstrainedBox(  // Wrap in ConstrainedBox
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        SizedBox(  // Fixed width for pie chart
-                          width: 140,
-                          child: PieChart(
-                            PieChartData(
-                              sections: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
-                                return PieChartSectionData(
-                                  value: entry.value.value.toDouble(),
-                                  title: '',
-                                  radius: 65,  // Reduced radius
-                                  color: colors[entry.key % colors.length],
-                                );
-                              }).toList(),
-                              sectionsSpace: 2,
-                              centerSpaceRadius: 25,
-                              startDegreeOffset: -90,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: ListView(  // Changed to ListView
-                            padding: const EdgeInsets.only(left: 16),
-                            children: [
-                              ...sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
-                                final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: colors[entry.key % colors.length],
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          entry.value.key,
-                                          style: const TextStyle(fontSize: 13),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        '${entry.value.value} (${percentage}%)',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (hasMore) ...[
-                    const Divider(height: 32),
-                    TextButton(
-                      onPressed: () => _showAllSets(context, sortedSets, colors, cards.length),
-                      child: Text('Show All Sets (${sortedSets.length})'),
-                    ),
-                  ],
-                ],
+            // Pie Chart
+            SizedBox(
+              height: 160,  // Reduced from 200
+              child: PieChart(
+                PieChartData(
+                  sections: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
+                    return PieChartSectionData(
+                      value: entry.value.value.toDouble(),
+                      title: '',
+                      radius: 70,  // Reduced from 100
+                      color: colors[entry.key % colors.length],
+                    );
+                  }).toList(),
+                  sectionsSpace: 2,
+                  centerSpaceRadius: 30,  // Reduced from 40
+                  startDegreeOffset: -90,
+                ),
               ),
             ),
+            const SizedBox(height: 24),
+            // Legend
+            ...sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
+              final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: colors[entry.key % colors.length],
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        entry.value.key,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${entry.value.value} (${percentage}%)',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            if (hasMore) ...[
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: () => _showAllSets(context, sortedSets, colors, cards.length),
+                  child: Text('Show All Sets (${sortedSets.length})'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -756,15 +738,36 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildTopMovers(List<TcgCard> cards) {
-    // Mock some price changes for testing
-    final mockChanges = cards.take(3).map((card) => PriceChange(
-      card: card,
-      currentPrice: card.price ?? 0,
-      previousPrice: (card.price ?? 0) * 0.9,  // Simulate 10% change
-      percentageChange: 10.0,
-    )).toList();
+    // Use real price history for calculations
+    final now = DateTime.now();
+    final oneDayAgo = now.subtract(const Duration(days: 1));
     
-    final hasMore = cards.length > 3;
+    final changes = cards.where((card) => card.price != null && card.priceHistory.isNotEmpty)
+      .map((card) {
+        // Find the price from ~24 hours ago
+        final previousPrice = card.priceHistory
+          .lastWhere(
+            (entry) => entry.date.isBefore(oneDayAgo),
+            orElse: () => PriceHistoryEntry(
+              date: oneDayAgo,
+              price: card.price! * 0.95  // Fallback: assume 5% change if no history
+            ),
+          ).price;
+
+        final percentageChange = ((card.price! - previousPrice) / previousPrice) * 100;
+        return PriceChange(
+          card: card,
+          currentPrice: card.price!,
+          previousPrice: previousPrice,
+          percentageChange: percentageChange,
+        );
+      })
+      .where((change) => change.percentageChange.abs() > 0)  // Only show cards with price changes
+      .toList()
+      ..sort((a, b) => b.percentageChange.abs().compareTo(a.percentageChange.abs()));
+
+    final topChanges = changes.take(3).toList();
+    final hasMore = changes.length > 3;
 
     return Card(
       child: Padding(
@@ -781,13 +784,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 const Spacer(),
                 if (hasMore)
                   TextButton(
-                    onPressed: () => _showAllMovers(context, mockChanges),
+                    onPressed: () => _showAllMovers(context, topChanges),
                     child: const Text('Show All'),
                   ),
               ],
             ),
             const SizedBox(height: 16),
-            ...mockChanges.map((change) => ListTile(
+            ...topChanges.map((change) => ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Image.network(
                 change.card.imageUrl,

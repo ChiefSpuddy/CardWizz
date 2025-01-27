@@ -75,6 +75,17 @@ class TcgCard {
       set: set ?? this.set,
     );
   }
+
+  void addPriceHistoryEntry(double price) {
+    priceHistory.add(PriceHistoryEntry(
+      date: DateTime.now(),
+      price: price,
+    ));
+    
+    // Keep only last 30 days of history
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    priceHistory.removeWhere((entry) => entry.date.isBefore(thirtyDaysAgo));
+  }
 }
 
 class PriceHistoryEntry {

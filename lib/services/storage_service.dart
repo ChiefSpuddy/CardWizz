@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/tcg_card.dart';
+import 'package:collection/collection.dart';  // Add this import at the top
 
 class StorageService {
   late final SharedPreferences _prefs;
@@ -159,8 +160,43 @@ class StorageService {
 
   // Make saveCard public method async
   Future<void> saveCard(TcgCard card) async {
-    if (!_isInitialized) return;
-    await _saveCard(card);
+    if (_currentUserId == null) {
+      print('No user ID when saving card');
+      return;
+    }
+
+    try {
+      final cardsKey = _getUserKey('cards');
+      print('Saving card ${card.name} to key: $cardsKey');
+      
+      // Get existing cards
+      final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
+      final existingCards = existingCardsJson
+          .map((json) => TcgCard.fromJson(jsonDecode(json)))
+          .toList();
+      
+      // Check if card already exists
+      if (!existingCards.any((c) => c.id == card.id)) {
+        existingCards.add(card);
+        
+        // Save updated list
+        final updatedCardsJson = existingCards
+            .map((c) => jsonEncode(c.toJson()))
+            .toList();
+        
+        await _prefs.setStringList(cardsKey, updatedCardsJson);
+        
+        // Update stream with new cards
+        _cardsController.add(existingCards);
+        
+        print('Added card: ${card.name}. Total cards: ${existingCards.length}');
+      } else {
+        print('Card ${card.name} already exists in collection');
+      }
+    } catch (e) {
+      print('Error saving card: $e');
+      rethrow;
+    }
   }
 
   final Map<String, TcgCard> _removedCards = {};
@@ -240,6 +276,18 @@ class StorageService {
       print('Error loading cards: $e');
       return [];
     }
+  }
+
+  // Update the debug method to use proper stream handling
+  Future<void> debugStorage() async {
+    print('Current user ID: $_currentUserId');
+    final cardsKey = _getUserKey('cards');
+    final cards = _prefs.getStringList(cardsKey) ?? [];
+    print('Total cards in storage: ${cards.length}');
+    
+    // Get current cards from storage instead of trying to access stream value
+    final currentCards = _getCards();
+    print('Current cards in memory: ${currentCards.length}');
   }
 
   void dispose() {

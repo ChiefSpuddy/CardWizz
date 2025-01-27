@@ -24,23 +24,28 @@ class _CardGridItemState extends State<CardGridItem> {
   bool _hasError = false;
 
   Future<void> _addToCollection(BuildContext context) async {
+    final storage = Provider.of<StorageService>(context, listen: false);
+    
     try {
-      final service = Provider.of<StorageService>(context, listen: false);
-      await service.saveCard(widget.card);
+      print('Adding card to collection: ${widget.card.name}');
+      await storage.saveCard(widget.card);
+      await storage.debugStorage(); // Add this debug call
+      
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Added ${widget.card.name} to collection'),
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 1),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
+      print('Error adding card: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to add card'),
+          SnackBar(
+            content: Text('Failed to add card: $e'),
             behavior: SnackBarBehavior.floating,
           ),
         );

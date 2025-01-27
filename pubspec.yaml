@@ -8,7 +8,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Add these new dependencies
+  collection: ^1.17.0
   sign_in_with_apple: ^5.0.0
   crypto: ^3.0.3
   provider: ^6.0.0
