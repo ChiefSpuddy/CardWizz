@@ -29,8 +29,8 @@ class TcgApiService {
     'Lost Origin': 'set.id:swsh11',
     'Scarlet & Violet': 'set.id:sv1',
     'Paradox Rift': 'set.id:sv4',
-    'Surging Sparks': 'set.id:sv5pt5', // Added new set
-    'Prismatic Evolution': 'set.id:sv5', // Added new set
+    'Surging Sparks': 'set.id:sv5', // Updated set
+    'Prismatic Evolution': 'set.id:pgo',  // Update when set is released
   };
 
   static const Map<String, String> sortOptions = {
@@ -50,6 +50,8 @@ class TcgApiService {
     String? customQuery,
     String sortBy = 'cardmarket.prices.averageSellPrice',  // Default to price high to low
     bool ascending = false,
+    int page = 1,
+    int pageSize = 30,
   }) async {
     try {
       final searchQuery = customQuery ?? 
@@ -57,18 +59,25 @@ class TcgApiService {
           setSearchQueries[query] ??
           'name:"*$query*"';
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/cards').replace(
-          queryParameters: {
-            'q': searchQuery,
-            'select': 'id,name,images,cardmarket,number,set,rarity', // Added rarity
-            'orderBy': ascending ? sortBy : '-$sortBy',
-            'page': '1',
-            'pageSize': '30',
-          },
-        ),
-        headers: _headers,
+      final queryParams = {
+        'q': searchQuery,
+        'select': 'id,name,images,cardmarket,number,set,rarity', // Added rarity
+        'orderBy': sortBy,
+        'page': page.toString(),
+        'pageSize': pageSize.toString(),
+      };
+
+      if (!ascending) {
+        queryParams['orderBy'] = '-${queryParams['orderBy']}';
+      }
+
+      final url = Uri.https(
+        'api.pokemontcg.io',
+        '/v2/cards',
+        queryParams,
       );
+
+      final response = await http.get(url, headers: _headers);
 
       if (response.statusCode == 200) {
         return json.decode(response.body);

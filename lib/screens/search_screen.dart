@@ -80,8 +80,10 @@ class _SearchScreenState extends State<SearchScreen> {
     if (query.isEmpty) return;
 
     setState(() {
+      if (_currentPage == 1) {
+        _searchResults = null;
+      }
       _isLoading = true;
-      _searchResults = null;
     });
 
     try {
@@ -89,24 +91,37 @@ class _SearchScreenState extends State<SearchScreen> {
         query,
         sortBy: _currentSort,
         ascending: _sortAscending,
+        page: _currentPage,
       );
       
       if (mounted) {
-        // Save to history if search successful
-        if (results['data'] is List && (results['data'] as List).isNotEmpty) {
-          final firstCard = results['data'][0];
-          await _searchHistory?.addSearch(
-            query,
-            imageUrl: firstCard['images']?['small'],
-          );
+        if (_currentPage == 1) {
+          // Save to history if search successful
+          if (results['data'] is List && (results['data'] as List).isNotEmpty) {
+            final firstCard = results['data'][0];
+            await _searchHistory?.addSearch(
+              query,
+              imageUrl: firstCard['images']?['small'],
+            );
+          }
+          
+          setState(() {
+            _searchResults = (results['data'] as List)
+                .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+                .toList();
+            _isLoading = false;
+          });
+        } else {
+          // Append new results for pagination
+          setState(() {
+            _searchResults = [
+              ...?_searchResults,
+              ...(results['data'] as List)
+                  .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+            ];
+            _isLoading = false;
+          });
         }
-        
-        setState(() {
-          _searchResults = (results['data'] as List)
-              .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
-              .toList();
-          _isLoading = false;
-        });
       }
     } catch (e) {
       if (mounted) {
@@ -431,13 +446,27 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: TextField(
-          controller: _searchController,
-          decoration: const InputDecoration(
-            hintText: 'Search cards...',
-            border: InputBorder.none,
-          ),
-          onSubmitted: _performSearch,
+        automaticallyImplyLeading: false, // Remove automatic leading widget
+        title: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Search cards...',
+                  border: InputBorder.none,
+                ),
+                onSubmitted: (query) {
+                  _currentPage = 1;
+                  _performSearch(query);
+                },
+              ),
+            ),
+          ],
         ),
         actions: [
           if (_searchController.text.isNotEmpty)

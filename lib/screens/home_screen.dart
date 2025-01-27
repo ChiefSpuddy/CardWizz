@@ -25,6 +25,10 @@ class HomeScreenState extends State<HomeScreen> {
     ProfileScreen(),
   ];
 
+  void setSelectedIndex(int index) {
+    setState(() => _selectedIndex = index);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -6,6 +6,7 @@ import '../models/tcg_card.dart';
 import '../widgets/collection_grid.dart';
 import '../widgets/custom_collections_grid.dart';  // Add this import
 import 'analytics_screen.dart';  // Add this import
+import 'home_screen.dart';  // Add this import
 
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
@@ -14,26 +15,8 @@ class CollectionsScreen extends StatefulWidget {
   State<CollectionsScreen> createState() => _CollectionsScreenState();
 }
 
-class _CollectionsScreenState extends State<CollectionsScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController _animationController;
+class _CollectionsScreenState extends State<CollectionsScreen> {
   bool _showCustomCollections = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 8),
-    );
-    _animationController.forward();
-    _animationController.repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
 
   String _formatValue(double value) {
     if (value >= 1000000) {
@@ -51,7 +34,58 @@ class _CollectionsScreenState extends State<CollectionsScreen> with SingleTicker
     return StreamBuilder<List<TcgCard>>(
       stream: Provider.of<StorageService>(context).watchCards(),
       builder: (context, snapshot) {
-        final cards = snapshot.data ?? [];
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final cards = snapshot.data!;
+        if (cards.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.style_outlined,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Start Your Collection',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Add cards to your collection to track their value and see detailed analytics',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  FilledButton.icon(
+                    onPressed: () {
+                      if (context.mounted) {
+                        final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                        homeState?.setSelectedIndex(2); // Switch to search tab
+                      }
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Your First Card'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         final totalValue = cards.fold<double>(
           0,
           (sum, card) => sum + (card.price ?? 0),
@@ -101,18 +135,6 @@ class _CollectionsScreenState extends State<CollectionsScreen> with SingleTicker
           ),
           body: Stack(
             children: [
-              Positioned.fill(
-                child: Opacity(
-                  opacity: 0.3,
-                  child: Lottie.asset(
-                    'assets/animations/background.json',
-                    fit: BoxFit.cover,
-                    repeat: true,
-                    frameRate: FrameRate(30),
-                    controller: _animationController,
-                  ),
-                ),
-              ),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
                 child: _showCustomCollections

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/storage_service.dart';
+import '../services/tcg_api_service.dart';  // Add this import
 import '../providers/app_state.dart';
 import '../models/tcg_card.dart';
 import '../screens/card_details_screen.dart';
@@ -156,8 +157,93 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
         ),
       ),
       body: !isSignedIn 
-        ? const SignInButton(
-            message: 'Sign in to track your collection value and stats',
+        ? SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SignInButton(
+                  message: 'Sign in to track your collection value and stats',
+                ),
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Popular Cards',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 200,
+                  child: FutureBuilder(
+                    future: Provider.of<TcgApiService>(context).searchCards('', 
+                      customQuery: TcgApiService.popularSearchQueries['Charizard']),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final cards = (snapshot.data?['data'] as List?) ?? [];
+                      return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: cards.length.clamp(0, 10),
+                        itemBuilder: (context, index) {
+                          final card = cards[index];
+                          return Container(
+                            width: 140,
+                            margin: const EdgeInsets.only(right: 8),
+                            child: Image.network(
+                              card['images']['small'],
+                              fit: BoxFit.contain,
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'Latest Sets',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 200,
+                  child: FutureBuilder(
+                    future: Provider.of<TcgApiService>(context).searchCards('', 
+                      customQuery: TcgApiService.setSearchQueries['Paldea Evolved']),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final cards = (snapshot.data?['data'] as List?) ?? [];
+                      return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: cards.length.clamp(0, 10),
+                        itemBuilder: (context, index) {
+                          final card = cards[index];
+                          return Container(
+                            width: 140,
+                            margin: const EdgeInsets.only(right: 8),
+                            child: Image.network(
+                              card['images']['small'],
+                              fit: BoxFit.contain,
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           )
         : Stack(
         children: [
