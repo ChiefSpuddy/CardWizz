@@ -43,3 +43,4 @@ flutter:
     - assets/animations/
     - assets/names.json
     - assets/avatars/    # Add this line
+    - assets/animations/background.json

@@ -7,6 +7,7 @@ import '../models/tcg_card.dart';  // Add this
 import '../services/collection_service.dart';
 import '../services/storage_service.dart';  // Add this
 import '../screens/custom_collection_detail_screen.dart';
+import '../widgets/animated_background.dart';
 
 class BinderCard extends StatefulWidget {
   final CustomCollection collection;
@@ -313,75 +314,77 @@ class CustomCollectionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<CollectionService>(
-      future: CollectionService.getInstance(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return AnimatedBackground(
+      child: FutureBuilder<CollectionService>(
+        future: CollectionService.getInstance(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        final service = snapshot.data!;
+          final service = snapshot.data!;
 
-        return StreamBuilder<List<CustomCollection>>(
-          stream: service.getCustomCollectionsStream(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
+          return StreamBuilder<List<CustomCollection>>(
+            stream: service.getCustomCollectionsStream(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            final collections = snapshot.data ?? [];
-            if (collections.isEmpty) {
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.collections_bookmark_outlined,
-                      size: 64,
-                      color: Colors.grey,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'No custom collections yet',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Create one using the + button',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            return GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.85,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: collections.length,
-              itemBuilder: (context, index) {
-                final collection = collections[index];
-                return BinderCard(
-                  collection: collection,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CustomCollectionDetailScreen(
-                        collection: collection,
+              final collections = snapshot.data ?? [];
+              if (collections.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.collections_bookmark_outlined,
+                        size: 64,
+                        color: Colors.grey,
                       ),
-                    ),
+                      SizedBox(height: 16),
+                      Text(
+                        'No custom collections yet',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Create one using the + button',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
                   ),
                 );
-              },
-            );
-          },
-        );
-      },
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.85,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: collections.length,
+                itemBuilder: (context, index) {
+                  final collection = collections[index];
+                  return BinderCard(
+                    collection: collection,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CustomCollectionDetailScreen(
+                          collection: collection,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

@@ -321,7 +321,9 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
     }
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(String label, String? value) {  // Make value parameter nullable
+    if (value == null || value.isEmpty) return const SizedBox.shrink();  // Skip empty values
+    
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -329,9 +331,16 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            ),
           ),
-          Text(value),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );
