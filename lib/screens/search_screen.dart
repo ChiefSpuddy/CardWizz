@@ -232,14 +232,16 @@ Widget _buildMainContent() {
       children: [
         const SizedBox(height: 8), // Add top padding
         _buildQuickSearches(),
+        const SizedBox(height: 16),
         
-        if (_searchResults == null && !_isLoading) ...[
-          const SizedBox(height: 16), // Consistent spacing
+        // Update this section to always show recent searches when no results
+        if (_searchResults == null) 
           _buildRecentSearches(),
-          const SizedBox(height: 16),
-        ] else if (_isLoading && _searchResults == null) ...[
-          _buildLoadingState(), // Show loading state
-        ] else if (_searchResults != null) ...[
+        
+        if (_isLoading && _searchResults == null)
+          _buildLoadingState(),
+        
+        if (_searchResults != null) ...[
           const SizedBox(height: 16), // Consistent spacing before search results
           // ... existing search results code ...
           Padding(
@@ -425,10 +427,19 @@ Widget _buildHorizontalScrollView({
 
 // Update _buildQuickSearches method to use the new scroll indicator
 Widget _buildQuickSearches() {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
   return Container(
     margin: const EdgeInsets.symmetric(horizontal: 16), // Remove vertical margin
     decoration: BoxDecoration(
-      gradient: AppColors.cardGradient,
+      gradient: isDark 
+          ? LinearGradient(
+              colors: [
+                Theme.of(context).colorScheme.surface,
+                Theme.of(context).colorScheme.surface.withOpacity(0.8),
+              ],
+            )
+          : AppColors.cardGradient,
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
@@ -445,7 +456,14 @@ Widget _buildQuickSearches() {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
+            gradient: isDark
+                ? LinearGradient(
+                    colors: [
+                      Theme.of(context).colorScheme.primaryContainer,
+                      Theme.of(context).colorScheme.secondaryContainer,
+                    ],
+                  )
+                : AppColors.primaryGradient,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: Row(
@@ -470,7 +488,9 @@ Widget _buildQuickSearches() {
               avatar: Text(search['icon']!, style: const TextStyle(fontSize: 14)),
               label: Text(search['name']!),
               onPressed: () => _performQuickSearch(search['name']!),
-              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+              backgroundColor: isDark
+                  ? Theme.of(context).colorScheme.surfaceVariant
+                  : Theme.of(context).colorScheme.secondaryContainer,
               side: BorderSide.none,
             ),
           )).toList(),
@@ -481,10 +501,15 @@ Widget _buildQuickSearches() {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.5),
-                Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.5),
-              ],
+              colors: isDark
+                  ? [
+                      Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                      Theme.of(context).colorScheme.surface.withOpacity(0.5),
+                    ]
+                  : [
+                      Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.5),
+                      Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.5),
+                    ],
             ),
           ),
           child: Row(
@@ -513,7 +538,9 @@ Widget _buildQuickSearches() {
                 avatar: Text(set['icon']!, style: const TextStyle(fontSize: 14)),
                 label: Text(set['name']!),
                 onPressed: () => _performQuickSearch(set['name']!),
-                backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                backgroundColor: isDark
+                    ? Theme.of(context).colorScheme.surfaceVariant
+                    : Theme.of(context).colorScheme.secondaryContainer,
                 side: BorderSide.none,
               ),
             ),

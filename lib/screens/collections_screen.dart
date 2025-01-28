@@ -249,14 +249,17 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.euro,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
-                        const SizedBox(width: 6),
                         Text(
-                          currencyProvider.formatValue(totalValue),
+                          currencyProvider.symbol,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          (totalValue * currencyProvider.rate).toStringAsFixed(2),
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
