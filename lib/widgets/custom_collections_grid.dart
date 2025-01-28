@@ -8,6 +8,7 @@ import '../services/collection_service.dart';
 import '../services/storage_service.dart';  // Add this
 import '../screens/custom_collection_detail_screen.dart';
 import '../widgets/animated_background.dart';
+import '../providers/currency_provider.dart';  // Add this import
 
 class BinderCard extends StatefulWidget {
   final CustomCollection collection;
@@ -91,6 +92,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final currencyProvider = context.watch<CurrencyProvider>();
     final binderColor = widget.collection.color;
     final isLightColor = ThemeData.estimateBrightnessForColor(binderColor) == Brightness.light;
     final textColor = isLightColor ? Colors.black87 : Colors.white;
@@ -245,7 +247,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '€${widget.collection.totalValue!.toStringAsFixed(2)}',
+                          currencyProvider.formatValue(widget.collection.totalValue!),
                           style: TextStyle(
                             color: Colors.green[700],
                             fontWeight: FontWeight.bold,

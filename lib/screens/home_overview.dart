@@ -9,6 +9,7 @@ import '../providers/app_state.dart';
 import '../models/tcg_card.dart';
 import '../screens/card_details_screen.dart';
 import '../widgets/sign_in_button.dart';  // Remove sign_in_prompt import
+import '../providers/currency_provider.dart';  // Add this import
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -38,6 +39,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   }
 
   Widget _buildPriceChart(List<TcgCard> cards) {
+    final currencyProvider = context.watch<CurrencyProvider>();
     if (cards.isEmpty) return const SizedBox.shrink();
 
     // Calculate cumulative value points
@@ -101,20 +103,30 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 50,
+                reservedSize: 60,
                 interval: maxY > 100 ? maxY / 5 : maxY / 4,
-                getTitlesWidget: (value, _) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    value >= 1000
-                        ? '€${(value/1000).toStringAsFixed(1)}k'
-                        : '€${value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 1)}',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
+                getTitlesWidget: (value, _) {
+                  final convertedValue = value * currencyProvider.rate;
+                  String label;
+                  if (convertedValue >= 1000000) {
+                    label = '${currencyProvider.symbol}${(convertedValue / 1000000).toStringAsFixed(1)}M';
+                  } else if (convertedValue >= 1000) {
+                    label = '${currencyProvider.symbol}${(convertedValue / 1000).toStringAsFixed(0)}K';
+                  } else {
+                    label = '${currencyProvider.symbol}${convertedValue.toStringAsFixed(0)}';
+                  }
+                  
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 11,
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ),
@@ -265,8 +277,10 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
             stream: Provider.of<StorageService>(context).watchCards(),
             initialData: const [],
             builder: (context, snapshot) {
+              final currencyProvider = context.watch<CurrencyProvider>();
               final cards = snapshot.data ?? [];
               final reversedCards = cards.reversed.toList();  // Add this line
+              final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
               
               return ListView(
                 children: [
@@ -288,7 +302,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                           child: _buildSummaryCard(
                             context,
                             'Collection Value',
-                            '€${cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0)).toStringAsFixed(2)}',
+                            currencyProvider.formatValue(totalValue),  // Update this line
                             Icons.euro,
                           ),
                         ),
@@ -380,7 +394,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                                     Padding(
                                       padding: const EdgeInsets.all(4),
                                       child: Text(
-                                        '€${card.price!.toStringAsFixed(2)}',
+                                        currencyProvider.formatValue(card.price!),  // Update this line
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                         ),

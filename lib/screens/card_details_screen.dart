@@ -6,6 +6,7 @@ import '../services/tcg_api_service.dart';
 import '../services/storage_service.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../providers/currency_provider.dart';  // Add this import
 
 extension StringExtension on String {
   String capitalize() {
@@ -78,6 +79,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
   }
 
   Widget _buildPriceChart(Map<String, dynamic> prices) {
+    final currencyProvider = context.watch<CurrencyProvider>();
     if (prices.isEmpty) return const SizedBox.shrink();
     
     final pricePoints = [
@@ -131,7 +133,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
                     showTitles: true,
                     getTitlesWidget: (value, meta) {
                       return Text(
-                        '€${value.toStringAsFixed(2)}',
+                        currencyProvider.formatValue(value),
                         style: TextStyle(
                           color: isDark ? Colors.grey[400] : Colors.grey[600],
                           fontSize: 10,
@@ -171,7 +173,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
                   getTooltipItems: (spots) {
                     return spots.map((spot) {
                       return LineTooltipItem(
-                        '€${spot.y.toStringAsFixed(2)}',
+                        currencyProvider.formatValue(spot.y),
                         TextStyle(
                           color: isDark ? Colors.white : Colors.black,
                           fontWeight: FontWeight.bold,
@@ -297,6 +299,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
   }
 
   Widget _buildPriceRow(String label, dynamic price) {
+    final currencyProvider = context.watch<CurrencyProvider>();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -304,7 +307,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
         children: [
           Text(label),
           Text(
-            '€${(price as num).toStringAsFixed(2)}',
+            currencyProvider.formatValue(price.toDouble()),
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,

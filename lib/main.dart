@@ -8,6 +8,7 @@ import 'constants/colors.dart';
 import 'constants/text_styles.dart';
 import 'services/tcg_api_service.dart';
 import 'services/auth_service.dart'; // Add this import
+import 'providers/currency_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,9 @@ void main() async {
         ChangeNotifierProvider.value(value: appState),
         Provider<StorageService>.value(value: storageService),
         Provider<TcgApiService>(create: (_) => TcgApiService()),
+        ChangeNotifierProvider<CurrencyProvider>(
+          create: (_) => CurrencyProvider(),
+        ),
       ],
       child: const CardWizzApp(),
     ),

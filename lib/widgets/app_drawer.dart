@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
+import '../providers/currency_provider.dart';  // Add this import
 import '../routes.dart';
 
 class AppDrawer extends StatelessWidget {
@@ -16,6 +17,7 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final currencyProvider = context.watch<CurrencyProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Drawer(
@@ -92,6 +94,23 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           const Divider(),
+          ExpansionTile(
+            leading: const Icon(Icons.currency_exchange),
+            title: const Text('Currency'),
+            subtitle: Text(currencyProvider.currentCurrency),
+            children: currencyProvider.currencies.entries.map((entry) {
+              return ListTile(
+                dense: true,
+                leading: const SizedBox(width: 16),
+                title: Text('${entry.key} (${entry.value.$1})'),
+                selected: currencyProvider.currentCurrency == entry.key,
+                onTap: () {
+                  currencyProvider.setCurrency(entry.key);
+                  Navigator.pop(context);
+                },
+              );
+            }).toList(),
+          ),
           ListTile(
             leading: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
             title: Text(isDark ? 'Light Mode' : 'Dark Mode'),

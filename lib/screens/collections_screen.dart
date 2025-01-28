@@ -14,6 +14,7 @@ import 'custom_collection_detail_screen.dart';  // Add this
 import '../widgets/animated_background.dart';
 import '../constants/card_styles.dart';
 import '../widgets/app_drawer.dart';  // Add this import at the top
+import '../providers/currency_provider.dart';
 
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
@@ -24,15 +25,6 @@ class CollectionsScreen extends StatefulWidget {
 
 class _CollectionsScreenState extends State<CollectionsScreen> {
   bool _showCustomCollections = false;
-
-  String _formatValue(double value) {
-    if (value >= 1000000) {
-      return '€${(value / 1000000).toStringAsFixed(1)}M';
-    } else if (value >= 1000) {
-      return '€${(value / 1000).toStringAsFixed(1)}K';
-    }
-    return '€${value.toStringAsFixed(2)}';
-  }
 
   Widget _buildToggle() {
     return Container(
@@ -132,6 +124,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currencyProvider = context.watch<CurrencyProvider>();
 
     return AnimatedBackground(
       child: StreamBuilder<List<TcgCard>>(
@@ -263,7 +256,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          _formatValue(totalValue),
+                          currencyProvider.formatValue(totalValue),
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,

@@ -6,6 +6,7 @@ import 'package:flutter/gestures.dart';  // Add this import for PointerExitEvent
 import '../services/storage_service.dart';
 import '../models/tcg_card.dart';
 import '../widgets/animated_background.dart';
+import '../providers/currency_provider.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -15,16 +16,8 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  String _formatValue(double value) {
-    if (value >= 1000000) {
-      return '€${(value / 1000000).toStringAsFixed(1)}M';
-    } else if (value >= 1000) {
-      return '€${(value / 1000).toStringAsFixed(1)}K';
-    }
-    return '€${value.toStringAsFixed(2)}';
-  }
-
   Widget _buildOverviewCard(List<TcgCard> cards) {
+    final currencyProvider = context.watch<CurrencyProvider>();
     final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
     final mostValuableCard = cards.reduce((a, b) => 
       (a.price ?? 0) > (b.price ?? 0) ? a : b);
@@ -43,12 +36,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            _buildStatRow('Total Value', _formatValue(totalValue)),
+            _buildStatRow('Total Value', currencyProvider.formatValue(totalValue)),
             _buildStatRow('Total Cards', '${cards.length} cards'),
             _buildStatRow('Most Valuable', 
-              '${mostValuableCard.name} (${_formatValue(mostValuableCard.price ?? 0)})'),
+              '${mostValuableCard.name} (${currencyProvider.formatValue(mostValuableCard.price ?? 0)})'),
             _buildStatRow('Average Value', 
-              _formatValue(totalValue / cards.length)),
+              currencyProvider.formatValue(totalValue / cards.length)),
           ],
         ),
       ),
@@ -145,6 +138,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildTopCardsCard(List<TcgCard> cards) {
+    final currencyProvider = context.watch<CurrencyProvider>();
     final sortedCards = List<TcgCard>.from(cards)
       ..sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
     final topCards = sortedCards.take(5).toList();
@@ -195,7 +189,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   ),
                   Text(
-                    _formatValue(card.price ?? 0),
+                    currencyProvider.formatValue(card.price ?? 0),
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                     ),
@@ -210,6 +204,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildValueTrendCard(List<TcgCard> cards) {
+    final currencyProvider = context.watch<CurrencyProvider>();
     if (cards.isEmpty) return const SizedBox.shrink();
 
     // Sort cards by value for trend analysis
@@ -248,7 +243,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
                 const Spacer(),
                 Text(
-                  _formatValue(maxY),
+                  currencyProvider.formatValue(maxY),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -293,7 +288,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         reservedSize: 60,
                         interval: maxY / 5,
                         getTitlesWidget: (value, _) => Text(
-                          _formatValue(value),
+                          currencyProvider.formatValue(value),
                           style: const TextStyle(fontSize: 10),
                         ),
                       ),
@@ -537,7 +532,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       '${entry.value} (${percentage}%)',
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
-                  );
+                  );  // Add semicolon here
                 },
               ),
             ),
@@ -548,12 +543,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildPriceRangeDistribution(List<TcgCard> cards) {
+    final currencyProvider = context.watch<CurrencyProvider>();
     final ranges = [
-      (0.0, 1.0, '< €1'),
-      (1.0, 5.0, '€1-5'),
-      (5.0, 10.0, '€5-10'),
-      (10.0, 50.0, '€10-50'),
-      (50.0, double.infinity, '> €50'),
+      (0.0, 1.0, '< ${currencyProvider.symbol}1'),
+      (1.0, 5.0, '${currencyProvider.symbol}1-5'),
+      (5.0, 10.0, '${currencyProvider.symbol}5-10'),
+      (10.0, 50.0, '${currencyProvider.symbol}10-50'),
+      (50.0, double.infinity, '> ${currencyProvider.symbol}50'),
     ];
 
     final distribution = List.filled(ranges.length, 0);
@@ -734,6 +730,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildValueSummary(List<TcgCard> cards) {
+    final currencyProvider = context.watch<CurrencyProvider>();
     final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
     final weeklyChange = 5.8; // TODO: Implement real calculation
 
@@ -765,7 +762,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              _formatValue(totalValue),
+              currencyProvider.formatValue(totalValue),
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -777,6 +774,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildTopMovers(List<TcgCard> cards) {
+    final currencyProvider = context.watch<CurrencyProvider>();
     // Use real price history for calculations
     final now = DateTime.now();
     final oneDayAgo = now.subtract(const Duration(days: 1));
@@ -840,7 +838,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               title: Text(change.card.name),
               trailing: _buildPriceChangeIndicator(
                 change.percentageChange,
-                _formatValue(change.currentPrice),
+                currencyProvider.formatValue(change.currentPrice),
               ),
             )),
           ],
@@ -876,6 +874,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   void _showAllMovers(BuildContext context, List<PriceChange> changes) {
+    final currencyProvider = context.watch<CurrencyProvider>();  // Add this line
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -884,58 +884,61 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         minChildSize: 0.5,
         maxChildSize: 0.9,
         expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Text(
-                    'All Price Changes',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                itemCount: changes.length,
-                itemBuilder: (context, index) {
-                  final change = changes[index];
-                  return ListTile(
-                    leading: Image.network(
-                      change.card.imageUrl,
-                      height: 40,
-                      width: 28,
-                      fit: BoxFit.contain,
-                    ),
-                    title: Text(change.card.name),
-                    subtitle: Text(
-                      'Previous: ${_formatValue(change.previousPrice)}',
+        builder: (context, scrollController) {
+          final currencyProvider = context.watch<CurrencyProvider>();  // Add this line inside builder
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Text(
+                      'All Price Changes',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    trailing: _buildPriceChangeIndicator(
-                      change.percentageChange,
-                      _formatValue(change.currentPrice),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: changes.length,
+                  itemBuilder: (context, index) {
+                    final change = changes[index];
+                    return ListTile(
+                      leading: Image.network(
+                        change.card.imageUrl,
+                        height: 40,
+                        width: 28,
+                        fit: BoxFit.contain,
+                      ),
+                      title: Text(change.card.name),
+                      subtitle: Text(
+                        'Previous: ${currencyProvider.formatValue(change.previousPrice)}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      trailing: _buildPriceChangeIndicator(
+                        change.percentageChange,
+                        currencyProvider.formatValue(change.currentPrice),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -7,6 +7,8 @@ import '../models/tcg_card.dart';
 import '../widgets/card_grid_item.dart';
 import 'package:shimmer/shimmer.dart';
 import '../constants/card_styles.dart';
+import 'package:provider/provider.dart';
+import '../providers/currency_provider.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -766,6 +768,33 @@ Widget _buildRecentSearches() {
       orElse: () => {'icon': '📦'}, // Default icon if not found
     );
     return matchingSet['icon']!;
+  }
+
+  Widget _buildCard(TcgCard card) {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    return ListTile(
+      // ...existing tile code...
+      trailing: Text(
+        currencyProvider.formatValue(card.price ?? 0),
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildGridItem(TcgCard card) {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    return Card(
+      // ...existing card code...
+      child: Column(
+        children: [
+          // ...existing column code...
+          Text(
+            currencyProvider.formatValue(card.price ?? 0),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

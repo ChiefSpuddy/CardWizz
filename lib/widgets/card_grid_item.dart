@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/tcg_card.dart';
 import '../services/storage_service.dart';
+import '../providers/currency_provider.dart';  // Add this import
 
 class CardGridItem extends StatefulWidget {
   final TcgCard card;
@@ -92,6 +93,8 @@ class _CardGridItemState extends State<CardGridItem> {
 
   @override
   Widget build(BuildContext context) {
+    final currencyProvider = context.watch<CurrencyProvider>();
+
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 300),
       opacity: _isLoaded ? 1.0 : 0.0,
@@ -158,7 +161,9 @@ class _CardGridItemState extends State<CardGridItem> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               color: Colors.black87,
               child: Text(
-                widget.card.price != null ? '€${widget.card.price!.toStringAsFixed(2)}' : 'No price',
+                widget.card.price != null 
+                    ? currencyProvider.formatValue(widget.card.price!)
+                    : 'No price',
                 style: TextStyle(
                   color: widget.card.price != null ? Colors.white : Colors.grey[400],
                   fontSize: 12,

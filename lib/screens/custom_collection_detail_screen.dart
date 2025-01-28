@@ -6,6 +6,7 @@ import '../services/collection_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/card_grid_item.dart';
 import '../screens/card_details_screen.dart';  // Add this import
+import '../providers/currency_provider.dart';  // Add this import
 
 class CustomCollectionDetailScreen extends StatefulWidget {
   final CustomCollection collection;
@@ -135,6 +136,8 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
 
   @override
   Widget build(BuildContext context) {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -165,7 +168,7 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '€${totalValue.toStringAsFixed(2)}',
+                      currencyProvider.formatValue(totalValue),  // Update this line
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
