@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:math' show max;
+import 'package:flutter/gestures.dart';  // Add this import for PointerExitEvent
 import '../services/storage_service.dart';
 import '../models/tcg_card.dart';
 import '../widgets/animated_background.dart';
@@ -342,12 +343,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final hasMore = sortedSets.length > initialDisplayCount;
 
     final colors = [
-      Theme.of(context).colorScheme.primary,
-      Theme.of(context).colorScheme.secondary,
-      Theme.of(context).colorScheme.tertiary,
-      Theme.of(context).colorScheme.primaryContainer,
-      Theme.of(context).colorScheme.secondaryContainer,
+      Colors.blue,
+      Colors.red,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+      Colors.pink,
+      Colors.indigo,
+      Colors.amber,
+      Colors.cyan,
     ];
+
+    int? touchedIndex;
 
     return Card(
       child: Padding(
@@ -374,60 +382,91 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             const SizedBox(height: 24),
             // Pie Chart
             SizedBox(
-              height: 160,  // Reduced from 200
-              child: PieChart(
-                PieChartData(
-                  sections: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
-                    return PieChartSectionData(
-                      value: entry.value.value.toDouble(),
-                      title: '',
-                      radius: 70,  // Reduced from 100
-                      color: colors[entry.key % colors.length],
-                    );
-                  }).toList(),
-                  sectionsSpace: 2,
-                  centerSpaceRadius: 30,  // Reduced from 40
-                  startDegreeOffset: -90,
-                ),
+              height: 140,  // Reduced height
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PieChart(
+                      PieChartData(
+                        sections: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
+                          final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
+                          return PieChartSectionData(
+                            color: colors[entry.key % colors.length],
+                            value: entry.value.value.toDouble(),
+                            title: '$percentage%',
+                            radius: 60,  // Fixed smaller radius
+                            titleStyle: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            titlePositionPercentageOffset: 0.55,
+                          );
+                        }).toList(),
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 30,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  // Single legend
+                  Expanded(
+                    child: ShaderMask(
+                      shaderCallback: (Rect rect) {
+                        return LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.purple.withOpacity(0),
+                            Colors.purple.withOpacity(1),
+                          ],
+                          stops: const [0.9, 1.0],
+                        ).createShader(rect);
+                      },
+                      blendMode: BlendMode.dstOut,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
+                            final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: colors[entry.key % colors.length],
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Theme.of(context).colorScheme.outline,
+                                        width: 1,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      '${entry.value.key}\n${entry.value.value} cards ($percentage%)',
+                                      style: const TextStyle(fontSize: 12),
+                                      maxLines: 2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            // Legend
-            ...sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
-              final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: colors[entry.key % colors.length],
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        entry.value.key,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${entry.value.value} (${percentage}%)',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
             if (hasMore) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               Center(
                 child: TextButton(
                   onPressed: () => _showAllSets(context, sortedSets, colors, cards.length),
@@ -910,13 +949,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
+            // Make background more opaque
+            color: (isPositive ? Colors.green : Colors.red).withOpacity(0.15),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             '${isPositive ? '+' : ''}${percentage.toStringAsFixed(1)}%',
             style: TextStyle(
-              color: isPositive ? Colors.green : Colors.red,
+              // Use more contrasting colors
+              color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
               fontWeight: FontWeight.bold,
               fontSize: 13,
             ),
@@ -936,7 +977,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
+        // Make background more opaque for better contrast
+        color: (isPositive ? Colors.green : Colors.red).withOpacity(0.15),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -945,13 +987,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           Icon(
             isPositive ? Icons.trending_up : Icons.trending_down,
             size: 16,
-            color: isPositive ? Colors.green : Colors.red,
+            // Use more contrasting colors
+            color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
           ),
           const SizedBox(width: 4),
           Text(
             '${isPositive ? '+' : ''}${change.toStringAsFixed(1)}%',
             style: TextStyle(
-              color: isPositive ? Colors.green : Colors.red,
+              // Use more contrasting colors
+              color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
               fontWeight: FontWeight.bold,
             ),
           ),

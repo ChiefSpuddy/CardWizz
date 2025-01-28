@@ -46,7 +46,7 @@ class CardWizzApp extends StatelessWidget {
         return MaterialApp(
           title: 'CardWizz',
           debugShowCheckedModeBanner: false,
-          themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light, // This will use light by default
           theme: ThemeData(
             primaryColor: AppColors.primary,
             colorScheme: const ColorScheme.light(

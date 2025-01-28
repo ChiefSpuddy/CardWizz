@@ -225,14 +225,17 @@ Widget _buildMainContent() {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 8), // Add top padding
         _buildQuickSearches(),
         
         if (_searchResults == null && !_isLoading) ...[
+          const SizedBox(height: 16), // Consistent spacing
           _buildRecentSearches(),
-          const SizedBox(height: 16), // Add extra padding here
+          const SizedBox(height: 16),
         ] else if (_isLoading && _searchResults == null) ...[
           _buildLoadingState(), // Show loading state
         ] else if (_searchResults != null) ...[
+          const SizedBox(height: 16), // Consistent spacing before search results
           // ... existing search results code ...
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),  // Added top padding
@@ -418,7 +421,7 @@ Widget _buildHorizontalScrollView({
 // Update _buildQuickSearches method to use the new scroll indicator
 Widget _buildQuickSearches() {
   return Container(
-    margin: const EdgeInsets.all(16),
+    margin: const EdgeInsets.symmetric(horizontal: 16), // Remove vertical margin
     decoration: CardStyles.cardDecoration(context),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,78 +519,81 @@ Widget _buildRecentSearches() {
   final searches = _searchHistory!.getRecentSearches();
   if (searches.isEmpty) return const SizedBox.shrink();
 
-  return Container(
-    margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-    decoration: CardStyles.cardDecoration(context),
-    child: Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: CardStyles.gradientDecoration(context),
-          child: Row(
-            children: [
-              const Icon(Icons.history),
-              const SizedBox(width: 8),
-              Text(
-                'Recent Searches',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Container(
+      decoration: CardStyles.cardDecoration(context),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: CardStyles.gradientDecoration(context),
+            child: Row(
+              children: [
+                const Icon(Icons.history),
+                const SizedBox(width: 8),
+                Text(
+                  'Recent Searches',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () {
-                  _searchHistory?.clearHistory();
-                  setState(() {});
-                },
-                icon: const Icon(Icons.delete_outline, size: 20),
-                label: const Text('Clear'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () {
+                    _searchHistory?.clearHistory();
+                    setState(() {});
+                  },
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  label: const Text('Clear'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: searches.length,
-          separatorBuilder: (context, index) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final search = searches[index];
-            return ListTile(
-              leading: Container(
-                width: 32,
-                height: 45,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(4),
-                  color: Theme.of(context).colorScheme.surfaceVariant,
+          const SizedBox(height: 12), // Increased padding here
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: searches.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final search = searches[index];
+              return ListTile(
+                leading: Container(
+                  width: 32,
+                  height: 45,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    color: Theme.of(context).colorScheme.surfaceVariant,
+                  ),
+                  child: search['imageUrl'] != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Image.network(
+                            search['imageUrl']!,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : const Icon(Icons.search),
                 ),
-                child: search['imageUrl'] != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: Image.network(
-                          search['imageUrl']!,
-                          fit: BoxFit.cover,
-                        ),
-                      )
-                    : const Icon(Icons.search),
-              ),
-              title: Text(
-                search['query']!,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () {
-                _searchController.text = search['query']!;
-                _performSearch(search['query']!);
-              },
-            );
-          },
-        ),
-      ],
+                title: Text(
+                  search['query']!,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () {
+                  _searchController.text = search['query']!;
+                  _performSearch(search['query']!);
+                },
+              );
+            },
+          ),
+        ],
+      ),
     ),
   );
 }

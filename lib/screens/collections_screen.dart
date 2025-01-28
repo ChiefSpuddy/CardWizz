@@ -13,6 +13,7 @@ import 'home_screen.dart';
 import 'custom_collection_detail_screen.dart';  // Add this
 import '../widgets/animated_background.dart';
 import '../constants/card_styles.dart';
+import '../widgets/app_drawer.dart';  // Add this import at the top
 
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
@@ -195,11 +196,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
 
           return Scaffold(
             appBar: AppBar(
-              automaticallyImplyLeading: false, // Change this to false
-              leading: IconButton( // Add this custom leading
-                icon: const Icon(Icons.menu),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
+              // Remove both automaticallyImplyLeading and leading properties entirely
               toolbarHeight: 72,
               centerTitle: false,
               title: cards.isNotEmpty ? Row(
@@ -302,65 +299,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                 child: _buildToggle(),
               ),
             ),
-            drawer: Drawer(
-              child: ListView(
-                children: [
-                  const DrawerHeader(
-                    decoration: BoxDecoration(
-                      color: Colors.blue,
-                    ),
-                    child: Text('Menu'),
-                  ),
-                  // Custom Collections section
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Binders',  // Updated text
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  FutureBuilder<CollectionService>(
-                    future: CollectionService.getInstance(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) return const SizedBox();
-                      
-                      return StreamBuilder<List<CustomCollection>>(
-                        stream: snapshot.data!.getCustomCollectionsStream(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) return const SizedBox();
-                          
-                          final collections = snapshot.data!;
-                          return Column(
-                            children: collections.map((collection) => ListTile(
-                              leading: const Icon(Icons.folder_outlined),
-                              title: Text(collection.name),
-                              subtitle: Text('${collection.cardIds.length} cards'),
-                              trailing: collection.totalValue != null
-                                  ? Text('€${collection.totalValue!.toStringAsFixed(2)}')
-                                  : null,
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => CustomCollectionDetailScreen(
-                                      collection: collection,
-                                    ),
-                                  ),
-                                );
-                              },
-                            )).toList(),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
+            drawer: const AppDrawer(), // Replace the existing drawer with this line
             body: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               child: _showCustomCollections
