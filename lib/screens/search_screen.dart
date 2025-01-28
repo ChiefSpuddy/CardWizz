@@ -113,39 +113,34 @@ Widget _buildLoadingState() {
   final localizations = AppLocalizations.of(context);
   return Center(  // Add this wrapper
     child: Padding(
-      padding: const EdgeInsets.only(top: 120.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              children: [
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
+      padding: const EdgeInsets.only(top: 80.0), // Changed from 120.0 to 80.0
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 32.0), // Added vertical padding
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            SizedBox(
+              width: 48,
+              height: 48,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Theme.of(context).colorScheme.primary,
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  localizations.translate('searching'),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              localizations.translate('searching'),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -246,11 +241,14 @@ Widget _buildMainContent() {
         const SizedBox(height: 8),  // Reduced from 16 to 8
         
         // Update this section to always show recent searches when no results
-        if (_searchResults == null) 
+        if (_searchResults == null && !_isLoading) 
           _buildRecentSearches(),
         
         if (_isLoading && _searchResults == null)
-          _buildLoadingState(),
+          Padding(
+            padding: const EdgeInsets.only(top: 120.0),
+            child: _buildLoadingState(),
+          ),
         
         if (_searchResults != null) ...[
           const SizedBox(height: 8),  // Reduced from 16 to 8
@@ -352,6 +350,7 @@ void _onSearchChanged(String query) {
       _searchResults = null;
       _currentPage = 1;
       _hasMorePages = true;
+      _isInitialSearch = false;  // Add this line to show loading state
     });
 
     try {

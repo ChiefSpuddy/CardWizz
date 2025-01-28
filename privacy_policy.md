@@ -1,21 +1,19 @@
-# CardWizz Privacy Policy
+# Privacy Policy
 
 ## Data Collection
-CardWizz collects minimal user data:
-- Search history (stored locally)
-- Collection data (stored locally)
-- Authentication information (email only when signed in)
-- Anonymous usage statistics
+CardWizz collects minimal user data necessary for app functionality:
+- Card collection data
+- Authentication information
+- Camera and photo library access (with user permission)
+
+## Data Usage
+We use your data solely for:
+- Managing your card collection
+- Providing price updates
+- Improving app functionality
 
 ## Data Storage
-- All card collection data is stored locally on your device
-- Optional cloud backup requires authentication
-- No personal data is shared with third parties
-
-## Permissions
-- Camera (optional): For scanning cards
-- Internet: For card database access
-- Storage: For saving collection data
+All data is stored securely and not shared with third parties.
 
 ## Contact
-For privacy concerns, contact: [your-email]
+For privacy concerns, contact: support@cardwizz.com

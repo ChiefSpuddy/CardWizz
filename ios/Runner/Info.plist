@@ -40,9 +40,9 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Access to photo library is required to select profile images</string>
+	<string>Photo library access is required to import card images</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Access to camera is required to take profile photos</string>
+	<string>Camera access is required to scan cards</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Access to contacts is required to save business cards</string>
 	<key>com.apple.developer.icloud-container-identifiers</key>
@@ -78,6 +78,11 @@
 			<key>CFBundleURLName</key>
 			<string>com.cardwizz.app</string>
 		</dict>
+	</array>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<!-- Add other supported languages -->
 	</array>
 </dict>
 </plist>

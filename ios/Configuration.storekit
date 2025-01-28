@@ -1,0 +1,29 @@
+{
+  "identifier": "com.cardwizz.app.storekit",
+  "products": [
+    {
+      "id": "com.cardwizz.app.premium_monthly",
+      "type": "subscription",
+      "duration": "1 month",
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "subscriptionGroup": "premium_features",
+      "localizations": [
+        {
+          "locale": "en_US",
+          "description": "Full access to all premium features",
+          "title": "CardWizz Premium"
+        }
+      ]
+    }
+  ],
+  "subscriptionGroups": [
+    {
+      "id": "premium_features",
+      "type": "subscription_group",
+      "subscriptions": [
+        "com.cardwizz.app.premium_monthly"
+      ]
+    }
+  ]
+}
