@@ -10,6 +10,7 @@ import '../constants/card_styles.dart';
 import '../constants/colors.dart';  // Add this import
 import 'package:provider/provider.dart';
 import '../providers/currency_provider.dart';
+import '../l10n/app_localizations.dart';  // Add this import
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -109,6 +110,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
 // Add this new method for a more stylish loading indicator
 Widget _buildLoadingState() {
+  final localizations = AppLocalizations.of(context);
   return Center(  // Add this wrapper
     child: Padding(
       padding: const EdgeInsets.only(top: 120.0),
@@ -135,7 +137,7 @@ Widget _buildLoadingState() {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Searching...',
+                  localizations.translate('searching'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -436,6 +438,7 @@ Widget _buildHorizontalScrollView({
 
 // Update _buildQuickSearches method to use the new scroll indicator
 Widget _buildQuickSearches() {
+  final localizations = AppLocalizations.of(context);
   final isDark = Theme.of(context).brightness == Brightness.dark;
   
   return Container(
@@ -478,7 +481,7 @@ Widget _buildQuickSearches() {
           child: Row(
             children: [
               Text(
-                'Popular Searches',
+                localizations.translate('popularSearches'),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -524,7 +527,7 @@ Widget _buildQuickSearches() {
           child: Row(
             children: [
               Text(
-                'Recent Sets',
+                localizations.translate('recentSets'),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -562,6 +565,7 @@ Widget _buildQuickSearches() {
 
 // Update _buildRecentSearches to improve styling
 Widget _buildRecentSearches() {
+  final localizations = AppLocalizations.of(context);
   if (_isHistoryLoading || _searchHistory == null) {
     return const SizedBox.shrink();
   }
@@ -583,7 +587,7 @@ Widget _buildRecentSearches() {
                 const Icon(Icons.history),
                 const SizedBox(width: 8),
                 Text(
-                  'Recent Searches',
+                  localizations.translate('recentSearches'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.onPrimaryContainer,
@@ -596,7 +600,7 @@ Widget _buildRecentSearches() {
                     setState(() {});
                   },
                   icon: const Icon(Icons.delete_outline, size: 20),
-                  label: const Text('Clear'),
+                  label: Text(localizations.translate('clear')),
                   style: TextButton.styleFrom(
                     foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
@@ -688,6 +692,7 @@ Widget _buildRecentSearches() {
   }
 
   void _showSortOptions() {
+    final localizations = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -695,10 +700,13 @@ Widget _buildRecentSearches() {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              title: const Text('Sort By', style: TextStyle(fontWeight: FontWeight.bold)),
+              title: Text(
+                localizations.translate('sortBy'),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               trailing: TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Done'),
+                child: Text(localizations.translate('done')),
               ),
             ),
             const Divider(height: 0),
@@ -772,39 +780,38 @@ Widget _buildRecentSearches() {
   }
 
   Widget _buildNoResultsMessage() {
+    final localizations = AppLocalizations.of(context);
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 48,
-              color: Theme.of(context).colorScheme.secondary,
-            ),
-            const SizedBox(height: 16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 48,
+            color: Theme.of(context).colorScheme.secondary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            localizations.translate('noCardsFound'),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          if (_currentSort.contains('cardmarket.prices'))
             Text(
-              'No cards found',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            if (_currentSort.contains('cardmarket.prices'))
-              Text(
-                'Try removing price sorting as not all cards have prices',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                ),
-              )
-            else
-              Text(
-                'Try adjusting your search terms',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                ),
+              'Try removing price sorting as not all cards have prices',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
               ),
-          ],
-        ),
+            )
+          else
+            Text(
+              localizations.translate('tryAdjustingSearch'),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -845,6 +852,72 @@ Widget _buildRecentSearches() {
     );
   }
 
+  Widget _buildSearchBar(BuildContext context) {
+    final localizations = AppLocalizations.of(context);
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: localizations.translate('searchCards'),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: 16),
+              ),
+              onChanged: _onSearchChanged,
+              textInputAction: TextInputAction.search,
+            ),
+          ),
+          if (_searchController.text.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.clear, size: 20),
+              onPressed: () {
+                _searchController.clear();
+                setState(() => _searchResults = null);
+              },
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                minWidth: 40,
+                minHeight: 40,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    final localizations = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            localizations.translate('searchResults'),
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        // ...existing results grid...
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(  // Add this wrapper
@@ -864,51 +937,7 @@ Widget _buildRecentSearches() {
               ),
             ),
           ),
-          title: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Search cards...',
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    onChanged: _onSearchChanged,
-                    textInputAction: TextInputAction.search,
-                  ),
-                ),
-                if (_searchController.text.isNotEmpty)
-                  IconButton(
-                    icon: const Icon(Icons.clear, size: 20),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _searchResults = null);
-                    },
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 40,
-                    ),
-                  ),
-              ],
-            ),
-          ),
+          title: _buildSearchBar(context),
           actions: [
             IconButton(
               icon: Icon(_getSortIcon(_currentSort)),

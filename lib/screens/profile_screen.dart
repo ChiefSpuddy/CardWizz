@@ -4,10 +4,11 @@ import 'package:lottie/lottie.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../providers/app_state.dart';
 import '../services/auth_service.dart';
-import '../services/storage_service.dart';  // Add this import
-import '../models/tcg_card.dart';  // Add this import
-import '../providers/currency_provider.dart';  // Add this import
+import '../services/storage_service.dart';
+import '../models/tcg_card.dart';
+import '../providers/currency_provider.dart';
 import '../widgets/avatar_picker_dialog.dart';
+import '../l10n/app_localizations.dart';  // Fix this import path
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -55,7 +56,41 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     }
   }
 
+  Future<void> _showLanguageDialog(BuildContext context) async {
+    final appState = context.read<AppState>();
+    final currentLocale = appState.locale.languageCode;
+
+    final Map<String, String> languages = {
+      'en': 'English',
+      'es': 'Español',
+      'ja': '日本語',
+    };
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Language'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: languages.entries.map((entry) {
+            return ListTile(
+              title: Text(entry.value),
+              trailing: currentLocale == entry.key
+                  ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                  : null,
+              onTap: () {
+                appState.setLocale(entry.key);
+                Navigator.pop(context);
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatsCard(String title, String value, Color color) {
+    final localizations = AppLocalizations.of(context);
     return Card(
       elevation: 2,
       child: Padding(
@@ -77,7 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ),
             const SizedBox(height: 4),
             Text(
-              title,
+              localizations.translate(title),  // Use translation here
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey[600],
@@ -90,6 +125,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Widget _buildProfileContent(BuildContext context, AuthUser user) {
+    final localizations = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final currencyProvider = context.watch<CurrencyProvider>();
     final displayName = user.name ?? '';
@@ -128,38 +164,62 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     offset: const Offset(0, -30), // Adjusted for smaller header
                     child: Column(
                       children: [
-                        GestureDetector(
-                          onTap: () => _selectAvatar(context),
-                          child: CircleAvatar(
-                            radius: 35, // Smaller avatar
-                            backgroundColor: Colors.white,
-                            child: CircleAvatar(
-                              radius: 33,
-                              backgroundColor: colorScheme.primary,
-                              child: user.avatarPath != null
-                                  ? ClipOval(
-                                      child: Image.asset(
-                                        user.avatarPath!,
-                                        width: 66,
-                                        height: 66,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : initial.isNotEmpty
-                                      ? Text(
-                                          initial,
-                                          style: const TextStyle(
-                                            fontSize: 24,
-                                            color: Colors.white,
+                        Stack(
+                          children: [
+                            GestureDetector(
+                              onTap: () => _selectAvatar(context),
+                              child: CircleAvatar(
+                                radius: 35, // Smaller avatar
+                                backgroundColor: Colors.white,
+                                child: CircleAvatar(
+                                  radius: 33,
+                                  backgroundColor: colorScheme.primary,
+                                  child: user.avatarPath != null
+                                      ? ClipOval(
+                                          child: Image.asset(
+                                            user.avatarPath!,
+                                            width: 66,
+                                            height: 66,
+                                            fit: BoxFit.cover,
                                           ),
                                         )
-                                      : const Icon(
-                                          Icons.person,
-                                          size: 30,
-                                          color: Colors.white,
-                                        ),
+                                      : initial.isNotEmpty
+                                          ? Text(
+                                              initial,
+                                              style: const TextStyle(
+                                                fontSize: 24,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.person,
+                                              size: 30,
+                                              color: Colors.white,
+                                            ),
+                                ),
+                              ),
                             ),
-                          ),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.edit,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         if (displayName.isNotEmpty) ...[
                           const SizedBox(height: 8),
@@ -195,7 +255,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               children: [
                 Expanded(
                   child: _buildStatsCard(
-                    'Total Cards',
+                    'totalCards',  // Use translation key instead of direct string
                     cards.length.toString(),
                     Colors.blue,
                   ),
@@ -203,7 +263,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildStatsCard(
-                    'Collections',
+                    'collections',  // Use translation key
                     (cards.isEmpty ? '0' : '1'),
                     Colors.green,
                   ),
@@ -211,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildStatsCard(
-                    'Value',
+                    'value',  // Use translation key
                     currencyProvider.formatValue(totalValue),
                     Colors.orange,
                   ),
@@ -229,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(
-                      'Settings',
+                      localizations.translate('settings'),  // Translate settings title
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -240,7 +300,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.notifications_outlined),
-                    title: const Text('Notifications'),
+                    title: Text(localizations.translate('notifications')),  // Add new translation
                     trailing: Switch(
                       value: true,
                       onChanged: (value) {
@@ -251,16 +311,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.language),
-                    title: const Text('Language'),
-                    trailing: const Text('English'),
-                    onTap: () {
-                      // TODO: Implement language selection
-                    },
+                    title: Text(localizations.translate('language')),
+                    trailing: Text(
+                      context.select((AppState state) => 
+                        state.locale.languageCode == 'es' ? 'Español' :
+                        state.locale.languageCode == 'ja' ? '日本語' :
+                        'English'
+                      ),
+                    ),
+                    onTap: () => _showLanguageDialog(context),
                   ),
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.backup_outlined),
-                    title: const Text('Backup Collection'),
+                    title: Text(localizations.translate('backupCollection')),  // Add new translation
                     onTap: () {
                       // TODO: Implement backup
                     },
@@ -268,7 +332,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.currency_exchange),
-                    title: const Text('Currency'),
+                    title: Text(localizations.translate('currency')),  // Add new translation
                     trailing: DropdownButton<String>(
                       value: currencyProvider.currentCurrency,
                       onChanged: (String? value) {
@@ -290,7 +354,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       context.watch<AppState>().isDarkMode ? Icons.dark_mode : Icons.light_mode,
                       color: Colors.grey,
                     ),
-                    title: const Text('Dark Mode'),
+                    title: Text(localizations.translate('darkMode')),  // Add new translation
                     trailing: Switch(
                       value: context.watch<AppState>().isDarkMode,
                       onChanged: (bool value) => context.read<AppState>().toggleTheme(),
@@ -311,7 +375,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(
-                      'Account',
+                      localizations.translate('account'),  // Add new translation
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -322,7 +386,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.edit_outlined),
-                    title: const Text('Edit Profile'),
+                    title: Text(localizations.translate('editProfile')),  // Add new translation
                     onTap: () {
                       // TODO: Implement profile editing
                     },
@@ -330,7 +394,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.security),
-                    title: const Text('Privacy Settings'),
+                    title: Text(localizations.translate('privacySettings')),  // Add new translation
                     onTap: () {
                       // TODO: Implement privacy settings
                     },
@@ -338,9 +402,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.logout, color: Colors.red),
-                    title: const Text(
-                      'Sign Out',
-                      style: TextStyle(color: Colors.red),
+                    title: Text(
+                      localizations.translate('signOut'),  // Add new translation
+                      style: const TextStyle(color: Colors.red),
                     ),
                     onTap: () {
                       context.read<AppState>().signOut();

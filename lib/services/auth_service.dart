@@ -28,6 +28,7 @@ class AuthService {
         email: prefs.getString('${savedUserId}_email'),
         name: prefs.getString('${savedUserId}_name'),
         avatarPath: prefs.getString('${savedUserId}_avatar'),
+        locale: prefs.getString('${savedUserId}_locale') ?? 'en',  // Add this
       );
       
       // Initialize CollectionService with saved user ID
@@ -42,6 +43,7 @@ class AuthService {
     await prefs.setString('user_id', user.id);
     await prefs.setString('${user.id}_email', user.email ?? '');
     await prefs.setString('${user.id}_name', user.name ?? '');
+    await prefs.setString('${user.id}_locale', user.locale);  // Add this
     if (user.avatarPath != null) {
       await prefs.setString('${user.id}_avatar', user.avatarPath!);
     }
@@ -52,6 +54,14 @@ class AuthService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('${_currentUser!.id}_avatar', avatarPath);
       _currentUser = _currentUser!.copyWith(avatarPath: avatarPath); // Add this method to AuthUser
+    }
+  }
+
+  Future<void> updateLocale(String locale) async {
+    if (_currentUser != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('${_currentUser!.id}_locale', locale);
+      _currentUser = _currentUser!.copyWith(locale: locale);
     }
   }
 
@@ -134,26 +144,29 @@ class AuthUser {
   final String? email;
   final String? name;
   final String? avatarPath;
+  final String locale;  // Add this
 
   AuthUser({
     required this.id,
     this.email,
     this.name,
     this.avatarPath,
+    this.locale = 'en',  // Default to English
   });
 
-  // Add this method
   AuthUser copyWith({
     String? id,
     String? email,
     String? name,
     String? avatarPath,
+    String? locale,
   }) {
     return AuthUser(
       id: id ?? this.id,
       email: email ?? this.email,
       name: name ?? this.name,
       avatarPath: avatarPath ?? this.avatarPath,
+      locale: locale ?? this.locale,
     );
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';  // Add this import
 import 'package:provider/provider.dart';
 import 'routes.dart';
 import 'providers/app_state.dart';
@@ -130,6 +132,14 @@ class CardWizzApp extends StatelessWidget {
             useMaterial3: true,
             brightness: Brightness.dark,
           ),
+          locale: appState.locale,
+          supportedLocales: AppState.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizationsDelegate(),
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           initialRoute: AppRoutes.home,
           routes: AppRoutes.routes,
           navigatorKey: GlobalKey<NavigatorState>(),

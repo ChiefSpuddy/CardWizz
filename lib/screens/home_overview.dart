@@ -10,6 +10,7 @@ import '../models/tcg_card.dart';
 import '../screens/card_details_screen.dart';
 import '../widgets/sign_in_button.dart';  // Remove sign_in_prompt import
 import '../providers/currency_provider.dart';  // Add this import
+import '../l10n/app_localizations.dart';  // Add this import
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -373,10 +374,11 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final isSignedIn = appState.isAuthenticated;
+    final localizations = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Overview'),
+        title: Text(localizations.translate('overview')),  // Add translation
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
@@ -389,14 +391,14 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SignInButton(
-                  message: 'Sign in to track your collection value and stats',
+                SignInButton(
+                  message: localizations.translate('signInToTrack'),  // Add translation
                 ),
-                const Padding(
-                  padding: EdgeInsets.all(16),
+                Padding(
+                  padding: const EdgeInsets.all(16),
                   child: Text(
-                    'Popular Cards',
-                    style: TextStyle(
+                    localizations.translate('popularCards'),  // Add translation
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
@@ -519,7 +521,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                             context,
                             'Collection Value',
                             currencyProvider.formatValue(totalValue),  // Update this line
-                            Icons.euro,
+                            Icons.currency_exchange,  // This will be overridden by the logic above
                           ),
                         ),
                       ],
@@ -647,15 +649,22 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     String value,
     IconData icon,
   ) {
+    final localizations = AppLocalizations.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Icon(icon, size: 32),
+            // Replace the euro icon with a more generic currency icon
+            Icon(
+              title.toLowerCase().contains('value') 
+                  ? Icons.currency_exchange  // Use currency_exchange for value cards
+                  : icon,
+              size: 32
+            ),
             const SizedBox(height: 8),
             Text(
-              title,
+              localizations.translate(title),  // Add translation
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,

@@ -9,6 +9,7 @@ class AppState with ChangeNotifier {
   CollectionService? _collectionService;  // Add this
   bool _isDarkMode = false;
   bool _isLoading = true;
+  Locale _locale = const Locale('en');
 
   AppState(this._storageService, this._authService);
 
@@ -35,10 +36,20 @@ class AppState with ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _authService.isAuthenticated;
   AuthUser? get currentUser => _authService.currentUser;
+  Locale get locale => _locale;
 
   Future<void> toggleTheme() async {
     _isDarkMode = !_isDarkMode;
     await _storageService.setBool('darkMode', _isDarkMode);
+    notifyListeners();
+  }
+
+  Future<void> setLocale(String languageCode) async {
+    _locale = Locale(languageCode);
+    if (_authService.currentUser != null) {
+      await _authService.updateLocale(languageCode);
+    }
+    await _storageService.setString('languageCode', languageCode);
     notifyListeners();
   }
 
@@ -73,4 +84,11 @@ class AppState with ChangeNotifier {
     await _authService.updateAvatar(avatarPath);
     notifyListeners();
   }
+
+  static const supportedLocales = [
+    Locale('en'), // English
+    Locale('es'), // Spanish
+    Locale('ja'), // Japanese
+    // Add more supported locales
+  ];
 }
