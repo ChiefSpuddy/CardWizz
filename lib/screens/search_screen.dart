@@ -70,6 +70,15 @@ class _SearchScreenState extends State<SearchScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     _initSearchHistory();
+    
+    // Handle initial search if provided
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['initialSearch'] != null) {
+        _searchController.text = args['initialSearch'] as String;
+        _performSearch(_searchController.text);
+      }
+    });
   }
 
   Future<void> _initSearchHistory() async {

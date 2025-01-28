@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../providers/currency_provider.dart';  // Add this import
 import '../routes.dart';
+import '../screens/collections_screen.dart';  // Add this import
+import '../screens/analytics_screen.dart';  // Add this import
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -68,23 +70,47 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(Icons.home),
             title: const Text('Home'),
+            onTap: () => _navigateAndClose(context, '/'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.style),
+            title: const Text('Collection'),
+            onTap: () => _navigateAndClose(context, AppRoutes.collection),
+          ),
+          ListTile(
+            leading: const Icon(Icons.collections_bookmark),
+            title: const Text('Binders'),
             onTap: () {
-              _navigateAndClose(context, '/');
+              Navigator.pop(context); // Close drawer
+              // Navigate to collections screen and set showCustomCollections to true
+              Navigator.pushNamed(context, AppRoutes.collection).then((_) {
+                if (context.mounted) {
+                  final collectionsState = context
+                      .findAncestorStateOfType<CollectionsScreenState>();
+                  if (collectionsState != null) {
+                    collectionsState.showCustomCollections = true;
+                  }
+                }
+              });
             },
           ),
           ListTile(
-            leading: const Icon(Icons.collections),
-            title: const Text('Collection'),
+            leading: const Icon(Icons.analytics_outlined),
+            title: const Text('Analytics'),
             onTap: () {
-              _navigateAndClose(context, '/collection');
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AnalyticsScreen(),
+                ),
+              );
             },
           ),
           ListTile(
             leading: const Icon(Icons.search),
             title: const Text('Search'),
-            onTap: () {
-              _navigateAndClose(context, '/search');
-            },
+            onTap: () => _navigateAndClose(context, '/search'),
           ),
           ListTile(
             leading: const Icon(Icons.settings),

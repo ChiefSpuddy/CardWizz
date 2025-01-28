@@ -20,11 +20,19 @@ class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
 
   @override
-  State<CollectionsScreen> createState() => _CollectionsScreenState();
+  State<CollectionsScreen> createState() => CollectionsScreenState(); // Remove underscore
 }
 
-class _CollectionsScreenState extends State<CollectionsScreen> {
+class CollectionsScreenState extends State<CollectionsScreen> { // Remove underscore
   bool _showCustomCollections = false;
+
+  // Add this getter to allow access from AppDrawer
+  bool get showCustomCollections => _showCustomCollections;
+  set showCustomCollections(bool value) {
+    setState(() {
+      _showCustomCollections = value;
+    });
+  }
 
   Widget _buildToggle() {
     return Container(

@@ -8,6 +8,7 @@ import 'card_grid_item.dart';
 import '../models/custom_collection.dart';
 import '../providers/app_state.dart';
 import '../widgets/sign_in_button.dart';
+import '../utils/notification_manager.dart';
 
 class CollectionGrid extends StatefulWidget {
   const CollectionGrid({super.key});
@@ -132,10 +133,9 @@ class _CollectionGridState extends State<CollectionGrid> {
                         await service.addCardToCollection(collection.id, cardId);
                       }
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Added ${_selectedCards.length} cards to ${collection.name}'),
-                          ),
+                        NotificationManager.show(
+                          context,
+                          message: 'Added ${_selectedCards.length} cards to ${collection.name}',
                         );
                         _exitMultiSelectMode();
                       }

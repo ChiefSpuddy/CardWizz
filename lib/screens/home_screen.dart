@@ -50,36 +50,46 @@ class HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Overview',
+      bottomNavigationBar: Theme(
+        data: Theme.of(context).copyWith(
+          textTheme: Theme.of(context).textTheme.copyWith(
+            labelSmall: const TextStyle(fontSize: 11), // This will affect the nav bar labels
           ),
-          NavigationDestination(
-            icon: Icon(Icons.collections_outlined),
-            selectedIcon: Icon(Icons.collections),
-            label: 'Collection',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.search),
-            selectedIcon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.analytics_outlined),
-            selectedIcon: Icon(Icons.analytics),
-            label: 'Analytics',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+        ),
+        child: NavigationBar(
+          height: 60,  // Keep nav bar compact
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined, size: 22),
+              selectedIcon: Icon(Icons.home, size: 22),
+              label: 'Overview',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.collections_outlined, size: 22),
+              selectedIcon: Icon(Icons.collections, size: 22),
+              label: 'Collection',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.search, size: 22),
+              selectedIcon: Icon(Icons.search, size: 22),
+              label: 'Search',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.analytics_outlined, size: 22),
+              selectedIcon: Icon(Icons.analytics, size: 22),
+              label: 'Analytics',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline, size: 22),
+              selectedIcon: Icon(Icons.person, size: 22),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }

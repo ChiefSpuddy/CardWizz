@@ -106,20 +106,10 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 reservedSize: 60,
                 interval: maxY > 100 ? maxY / 5 : maxY / 4,
                 getTitlesWidget: (value, _) {
-                  final convertedValue = value * currencyProvider.rate;
-                  String label;
-                  if (convertedValue >= 1000000) {
-                    label = '${currencyProvider.symbol}${(convertedValue / 1000000).toStringAsFixed(1)}M';
-                  } else if (convertedValue >= 1000) {
-                    label = '${currencyProvider.symbol}${(convertedValue / 1000).toStringAsFixed(0)}K';
-                  } else {
-                    label = '${currencyProvider.symbol}${convertedValue.toStringAsFixed(0)}';
-                  }
-                  
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: Text(
-                      label,
+                      currencyProvider.formatChartValue(value),  // Use chart-specific formatting
                       style: TextStyle(
                         color: Colors.grey[600],
                         fontSize: 11,
@@ -136,7 +126,9 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
           lineBarsData: [
             LineChartBarData(
               spots: List.generate(valuePoints.length, (i) {
-                return FlSpot(i.toDouble(), valuePoints[i]);
+                // Round to 2 decimal places to avoid floating point precision issues
+                final roundedValue = (valuePoints[i] * 100).round() / 100;
+                return FlSpot(i.toDouble(), roundedValue);
               }),
               isCurved: true,
               color: Colors.green,
@@ -150,6 +142,230 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTopCards(List<TcgCard> cards) {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    final sortedCards = List<TcgCard>.from(cards)
+      ..sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
+    final topCards = sortedCards.take(10).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Text(
+                'Your Most Valuable Cards',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () {
+                  if (context.mounted) {
+                    Navigator.pushNamed(context, '/collection');
+                  }
+                },
+                child: const Text('View All'),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 200,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: topCards.length,
+            itemBuilder: (context, index) {
+              final card = topCards[index];
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CardDetailsScreen(card: card),
+                  ),
+                ),
+                child: Container(
+                  width: 140,
+                  margin: const EdgeInsets.only(right: 8),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Hero(
+                          tag: 'topcard_${card.id}',
+                          child: Image.network(
+                            card.imageUrl,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      if (card.price != null)
+                        Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Text(
+                            currencyProvider.formatValue(card.price!),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'Card Name',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'Value',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 16),
+                ...topCards.take(5).map((card) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          card.name,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          currencyProvider.formatValue(card.price ?? 0),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade600,  // Modern green color
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLatestSetCards(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Latest Set',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Surging Sparks',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 200,
+          child: FutureBuilder(
+            future: Provider.of<TcgApiService>(context).searchSet('sv8'),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final cards = (snapshot.data?['data'] as List?) ?? [];
+              
+              // Sort cards by price
+              cards.sort((a, b) {
+                final priceA = a['cardmarket']?['prices']?['averageSellPrice'] ?? 0.0;
+                final priceB = b['cardmarket']?['prices']?['averageSellPrice'] ?? 0.0;
+                return (priceB as num).compareTo(priceA as num);
+              });
+
+              return ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: cards.length.clamp(0, 10),
+                itemBuilder: (context, index) {
+                  final card = cards[index];
+                  return Container(
+                    width: 140,
+                    margin: const EdgeInsets.only(right: 8),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Image.network(
+                            card['images']['small'],
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        if (card['cardmarket']?['prices']?['averageSellPrice'] != null)
+                          Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Text(
+                              '€${card['cardmarket']['prices']['averageSellPrice'].toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -286,7 +502,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 children: [
                   // Summary Cards
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),  // Reduced padding
                     child: Row(
                       children: [
                         Expanded(
@@ -313,7 +529,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                   // Price Trend Chart
                   if (cards.isNotEmpty) ...[
                     Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),  // Reduced padding
                       child: Card(
                         child: Padding(
                           padding: const EdgeInsets.all(16),
@@ -336,10 +552,18 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                     ),
                   ],
 
+                  // Most Valuable Cards
+                  if (cards.isNotEmpty) ...[
+                    _buildTopCards(cards),  // Add this line before Recent Additions
+                    const SizedBox(height: 8),  // Reduced spacing
+                    _buildLatestSetCards(context),  // Add this line
+                    const SizedBox(height: 8),  // Reduced spacing
+                  ],
+
                   // Recent Cards
                   if (cards.isNotEmpty) ...[
                     Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),  // Reduced padding
                       child: Row(
                         children: [
                           const Text(

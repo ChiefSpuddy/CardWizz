@@ -23,14 +23,15 @@ class TcgApiService {
   };
 
   static const Map<String, String> setSearchQueries = {
-    'Surging Sparks': 'set.id:sv8',  // Updated correct ID
-    'Prismatic Evolution': 'set.id:sv9',  // Updated correct ID
+    'Surging Sparks': 'set.id:sv8',
+    'Paradox Rift': 'set.id:sv4',
+    'Prismatic Evolution': 'set.id:sv9',
     'Paldea Evolved': 'set.id:sv2',
     'Crown Zenith': 'set.id:swsh12pt5',
     'Silver Tempest': 'set.id:swsh12',
     'Lost Origin': 'set.id:swsh11',
     'Scarlet & Violet': 'set.id:sv1',
-    'Paradox Rift': 'set.id:sv4',
+    'Obsidian Flames': 'set.id:sv3',
   };
 
   static const Map<String, String> sortOptions = {
@@ -40,6 +41,19 @@ class TcgApiService {
     '-name': 'Name (Z to A)',
     'set.releaseDate': 'Release Date (Newest)',
     '-set.releaseDate': 'Release Date (Oldest)',
+  };
+
+  // Add these new maps for better set matching
+  static const Map<String, List<String>> setAliases = {
+    'sv8': ['Surging Sparks', 'Surging', 'Sparks'],
+    'sv4': ['Paradox Rift', 'Paradox', 'Rift'],
+    'sv9': ['Temporal Forces', 'Temporal', 'Forces'],
+    'sv2': ['Paldea Evolved', 'Paldea'],
+    'swsh12pt5': ['Crown Zenith', 'Crown', 'Zenith'],
+    'swsh12': ['Silver Tempest', 'Silver', 'Tempest'],
+    'swsh11': ['Lost Origin', 'Lost', 'Origin'],
+    'sv1': ['Scarlet & Violet', 'Scarlet', 'Violet', 'SV Base'],
+    'sv3': ['Obsidian Flames', 'Obsidian', 'Flames'],
   };
 
   final _headers = {
@@ -71,7 +85,34 @@ class TcgApiService {
     return {'q': 'name:"*$searchTerm*"'};
   }
 
-  // Update the searchCards method to handle different search patterns
+  String? _getSetIdFromName(String query) {
+    query = query.trim().toLowerCase();
+    
+    // First try exact match from setSearchQueries
+    for (final entry in setSearchQueries.entries) {
+      if (entry.key.toLowerCase() == query) {
+        return entry.value.replaceAll('set.id:', '');
+      }
+    }
+
+    // Then try aliases and partial matches
+    for (final entry in setAliases.entries) {
+      final aliases = entry.value.map((e) => e.toLowerCase()).toList();
+      // Check if query matches any alias completely
+      if (aliases.contains(query)) {
+        return entry.key;
+      }
+      // Check if query is part of any alias
+      for (final alias in aliases) {
+        if (alias.contains(query) || query.contains(alias)) {
+          return entry.key;
+        }
+      }
+    }
+
+    return null;
+  }
+
   Future<Map<String, dynamic>> searchCards(
     String query, {
     String? sortBy,
@@ -86,36 +127,34 @@ class TcgApiService {
       if (customQuery != null) {
         finalQuery = customQuery;
       } else {
-        // First split by space to separate name from number
-        final parts = query.trim().split(RegExp(r'\s+'));
-        
-        // Check if the last part contains a number
-        final lastPart = parts.last;
-        final numberMatch = RegExp(r'(\d+)(?:/(\d+))?').firstMatch(lastPart);
-        
-        if (numberMatch != null) {
-          // Extract just the card number (before the slash)
-          final cardNumber = numberMatch.group(1)!;
-          
-          // Get the name part if it exists (everything before the number)
-          final name = parts.length > 1 
-              ? parts.sublist(0, parts.length - 1).join(' ')
-              : '';
-              
-          // Try all possible number formats (regular, padded)
-          final paddedNumber = cardNumber.padLeft(3, '0');
-          final unPaddedNumber = cardNumber.replaceFirst(RegExp(r'^0+'), '');
-          
-          if (name.isNotEmpty) {
-            // Search with name and both number formats
-            finalQuery = 'name:"$name" (number:"$cardNumber" OR number:"$paddedNumber" OR number:"$unPaddedNumber")';
-          } else {
-            // Number only search with both formats
-            finalQuery = '(number:"$cardNumber" OR number:"$paddedNumber" OR number:"$unPaddedNumber")';
-          }
+        // Check if query matches a set name or alias
+        final setId = _getSetIdFromName(query);
+        if (setId != null) {
+          finalQuery = 'set.id:$setId';
+          print('Matched set ID: $setId for query: $query'); // Add debug print
         } else {
-          // Regular name search
-          finalQuery = 'name:"*${query.trim()}*"';
+          // Use existing name/number search logic
+          final parts = query.trim().split(RegExp(r'\s+'));
+          final lastPart = parts.last;
+          final numberMatch = RegExp(r'(\d+)(?:/(\d+))?').firstMatch(lastPart);
+          
+          if (numberMatch != null) {
+            final cardNumber = numberMatch.group(1)!;
+            final name = parts.length > 1 
+                ? parts.sublist(0, parts.length - 1).join(' ')
+                : '';
+                
+            final paddedNumber = cardNumber.padLeft(3, '0');
+            final unPaddedNumber = cardNumber.replaceFirst(RegExp(r'^0+'), '');
+            
+            if (name.isNotEmpty) {
+              finalQuery = 'name:"$name" (number:"$cardNumber" OR number:"$paddedNumber" OR number:"$unPaddedNumber")';
+            } else {
+              finalQuery = '(number:"$cardNumber" OR number:"$paddedNumber" OR number:"$unPaddedNumber")';
+            }
+          } else {
+            finalQuery = 'name:"*${query.trim()}*"';
+          }
         }
       }
 
@@ -160,6 +199,21 @@ class TcgApiService {
       return json.decode(response.body);
     } else {
       throw Exception('Failed to load data: ${response.statusCode}');
+    }
+  }
+
+  // Add this new method
+  Future<Map<String, dynamic>> searchSet(String setId) async {
+    try {
+      final queryParams = {
+        'q': 'set.id:$setId',
+        'orderBy': '-cardmarket.prices.averageSellPrice',
+        'pageSize': '60',  // Increased to show more cards
+      };
+      return await _get('cards', queryParams);
+    } catch (e) {
+      print('Set search error: $e');
+      rethrow;
     }
   }
 }

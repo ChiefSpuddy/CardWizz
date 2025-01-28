@@ -41,13 +41,21 @@ class CurrencyProvider extends ChangeNotifier {
   double get rate => _currencies[_currentCurrency]!.$2;
   Map<String, (String, double)> get currencies => _currencies;
 
+  // For general use (exact values)
   String formatValue(double value) {
+    final convertedValue = value * rate;
+    return '${symbol}${convertedValue.toStringAsFixed(2)}';
+  }
+
+  // For chart axes (with K/M formatting)
+  String formatChartValue(double value) {
     final convertedValue = value * rate;
     if (convertedValue >= 1000000) {
       return '${symbol}${(convertedValue / 1000000).toStringAsFixed(1)}M';
     } else if (convertedValue >= 1000) {
-      return '${symbol}${(convertedValue / 1000).toStringAsFixed(1)}K';
+      return '${symbol}${(convertedValue / 1000).toStringAsFixed(0)}K';
+    } else {
+      return '${symbol}${convertedValue.toStringAsFixed(0)}';
     }
-    return '${symbol}${convertedValue.toStringAsFixed(2)}';
   }
 }

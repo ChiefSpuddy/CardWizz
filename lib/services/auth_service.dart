@@ -25,9 +25,9 @@ class AuthService {
       _isAuthenticated = true;
       _currentUser = AuthUser(
         id: savedUserId,
-        email: prefs.getString('user_email'),
-        name: prefs.getString('user_name'),
-        avatarPath: prefs.getString('user_avatar'),
+        email: prefs.getString('${savedUserId}_email'),
+        name: prefs.getString('${savedUserId}_name'),
+        avatarPath: prefs.getString('${savedUserId}_avatar'),
       );
       
       // Initialize CollectionService with saved user ID
@@ -94,7 +94,7 @@ class AuthService {
         _currentUser = AuthUser(
           id: credential.userIdentifier!,
           email: credential.email,
-          name: displayName,
+          name: displayName.isEmpty ? defaultUsername : displayName,
           avatarPath: existingAvatarPath,
         );
         _isAuthenticated = true;
@@ -114,11 +114,11 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_id');
-    await prefs.remove('user_email');
-    await prefs.remove('user_name');
-    await prefs.remove('user_avatar');  // Add this line
+    if (_currentUser != null) {
+      final prefs = await SharedPreferences.getInstance();
+      // Don't remove user data on sign out, just clear the current session
+      await prefs.remove('user_id');
+    }
 
     // Clear CollectionService user
     final collectionService = await CollectionService.getInstance();
