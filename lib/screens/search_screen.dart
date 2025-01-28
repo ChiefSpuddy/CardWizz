@@ -232,7 +232,7 @@ Widget _buildMainContent() {
       children: [
         const SizedBox(height: 8), // Add top padding
         _buildQuickSearches(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),  // Reduced from 16 to 8
         
         // Update this section to always show recent searches when no results
         if (_searchResults == null) 
@@ -242,7 +242,7 @@ Widget _buildMainContent() {
           _buildLoadingState(),
         
         if (_searchResults != null) ...[
-          const SizedBox(height: 16), // Consistent spacing before search results
+          const SizedBox(height: 8),  // Reduced from 16 to 8
           // ... existing search results code ...
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),  // Added top padding
@@ -838,75 +838,78 @@ Widget _buildRecentSearches() {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false, // Keep this
-        leading: Container(), // Add this to prevent automatic drawer toggle
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.primaryContainer,
-                Theme.of(context).colorScheme.secondaryContainer,
+    return GestureDetector(  // Add this wrapper
+      onTap: () => FocusScope.of(context).unfocus(),  // Dismiss keyboard on tap
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false, // Keep this
+          leading: Container(), // Add this to prevent automatic drawer toggle
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Theme.of(context).colorScheme.primaryContainer,
+                  Theme.of(context).colorScheme.secondaryContainer,
+                ],
+              ),
+            ),
+          ),
+          title: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Search cards...',
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    onChanged: _onSearchChanged,
+                    textInputAction: TextInputAction.search,
+                  ),
+                ),
+                if (_searchController.text.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear, size: 20),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchResults = null);
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
+                  ),
               ],
             ),
           ),
+          actions: [
+            IconButton(
+              icon: Icon(_getSortIcon(_currentSort)),
+              tooltip: TcgApiService.sortOptions[_currentSort],
+              onPressed: _showSortOptions,
+            ),
+          ],
         ),
-        title: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  decoration: const InputDecoration(
-                    hintText: 'Search cards...',
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16),
-                  ),
-                  onChanged: _onSearchChanged,
-                  textInputAction: TextInputAction.search,
-                ),
-              ),
-              if (_searchController.text.isNotEmpty)
-                IconButton(
-                  icon: const Icon(Icons.clear, size: 20),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchResults = null);
-                  },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 40,
-                    minHeight: 40,
-                  ),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(_getSortIcon(_currentSort)),
-            tooltip: TcgApiService.sortOptions[_currentSort],
-            onPressed: _showSortOptions,
-          ),
-        ],
+        body: _buildMainContent(),
       ),
-      body: _buildMainContent(),
     );
   }
 

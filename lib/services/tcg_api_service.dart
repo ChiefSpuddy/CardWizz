@@ -46,6 +46,31 @@ class TcgApiService {
     'X-Api-Key': _apiKey,
   };
 
+  Map<String, String> _buildSearchQuery(String searchTerm) {
+    searchTerm = searchTerm.trim();
+    
+    // First try to match a card number pattern (e.g., "048/091" or "48/91" or just "048" or "48")
+    final numberMatch = RegExp(r'(\d+)(?:/\d+)?$').firstMatch(searchTerm);
+    
+    if (numberMatch != null) {
+      final number = numberMatch.group(1)!;
+      final name = searchTerm.substring(0, numberMatch.start).trim();
+      
+      // For the Pokemon TCG API, we need to match the exact number format
+      // Don't modify the number at all - use it exactly as provided
+      if (name.isNotEmpty) {
+        // If we have a name and number
+        return {'q': 'name:"$name" number:"$number"'};
+      } else {
+        // Number only search - use exact number
+        return {'q': 'number:"$number"'};
+      }
+    }
+    
+    // Name only search
+    return {'q': 'name:"*$searchTerm*"'};
+  }
+
   // Update the searchCards method to handle different search patterns
   Future<Map<String, dynamic>> searchCards(
     String query, {
@@ -58,33 +83,49 @@ class TcgApiService {
     try {
       String finalQuery;
       
-      // Handle custom queries (like quick searches) differently
       if (customQuery != null) {
         finalQuery = customQuery;
       } else {
-        final cleanQuery = query.trim();
-        if (RegExp(r'\d+').hasMatch(cleanQuery)) {
-          final nameParts = cleanQuery.split(RegExp(r'[\s/]+'));
-          if (nameParts.length > 1) {
-            finalQuery = 'name:"${nameParts[0]}*" number:${nameParts[1]}';
+        // First split by space to separate name from number
+        final parts = query.trim().split(RegExp(r'\s+'));
+        
+        // Check if the last part contains a number
+        final lastPart = parts.last;
+        final numberMatch = RegExp(r'(\d+)(?:/(\d+))?').firstMatch(lastPart);
+        
+        if (numberMatch != null) {
+          // Extract just the card number (before the slash)
+          final cardNumber = numberMatch.group(1)!;
+          
+          // Get the name part if it exists (everything before the number)
+          final name = parts.length > 1 
+              ? parts.sublist(0, parts.length - 1).join(' ')
+              : '';
+              
+          // Try all possible number formats (regular, padded)
+          final paddedNumber = cardNumber.padLeft(3, '0');
+          final unPaddedNumber = cardNumber.replaceFirst(RegExp(r'^0+'), '');
+          
+          if (name.isNotEmpty) {
+            // Search with name and both number formats
+            finalQuery = 'name:"$name" (number:"$cardNumber" OR number:"$paddedNumber" OR number:"$unPaddedNumber")';
           } else {
-            finalQuery = 'number:$cleanQuery';
+            // Number only search with both formats
+            finalQuery = '(number:"$cardNumber" OR number:"$paddedNumber" OR number:"$unPaddedNumber")';
           }
         } else {
-          finalQuery = 'name:"*$cleanQuery*"';
+          // Regular name search
+          finalQuery = 'name:"*${query.trim()}*"';
         }
       }
 
-      // Build query parameters
       final queryParams = {
         'q': finalQuery,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
       };
 
-      // Add sorting if specified
       if (sortBy != null) {
-        // Keep the original sorting format that was working
         queryParams['orderBy'] = ascending ? sortBy : '-$sortBy';
       }
 
