@@ -980,9 +980,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        // Make background more opaque for better contrast
-        color: (isPositive ? Colors.green : Colors.red).withOpacity(0.15),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: (isPositive ? Colors.green : Colors.red).withOpacity(0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -990,15 +999,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           Icon(
             isPositive ? Icons.trending_up : Icons.trending_down,
             size: 16,
-            // Use more contrasting colors
-            color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
+            color: isPositive ? Colors.green.shade600 : Colors.red.shade600,
           ),
           const SizedBox(width: 4),
           Text(
             '${isPositive ? '+' : ''}${change.toStringAsFixed(1)}%',
             style: TextStyle(
-              // Use more contrasting colors
-              color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
+              color: isPositive ? Colors.green.shade600 : Colors.red.shade600,
               fontWeight: FontWeight.bold,
             ),
           ),

@@ -52,24 +52,77 @@ class CardWizzApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light, // This will use light by default
           theme: ThemeData(
+            useMaterial3: true,
             primaryColor: AppColors.primary,
-            colorScheme: const ColorScheme.light(
+            colorScheme: ColorScheme.light(
               primary: AppColors.primary,
               secondary: AppColors.secondary,
-              surface: Colors.white,
+              surface: AppColors.surface,
+              background: AppColors.background,
+              error: AppColors.error,
+              onPrimary: Colors.white,
+              onSecondary: Colors.white,
+              onSurface: AppColors.text,
+              onBackground: AppColors.text,
             ),
             scaffoldBackgroundColor: AppColors.background,
+            appBarTheme: AppBarTheme(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.text,
+              elevation: 0,
+              centerTitle: true,
+              scrolledUnderElevation: 0,
+              shape: Border(
+                bottom: BorderSide(
+                  color: Colors.grey.shade100,
+                  width: 1,
+                ),
+              ),
+            ),
+            cardTheme: CardTheme(
+              color: AppColors.surface,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              shadowColor: AppColors.primary.withOpacity(0.04),
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                backgroundColor: AppColors.primary,
+              ).copyWith(
+                backgroundColor: MaterialStateProperty.resolveWith((states) {
+                  if (states.contains(MaterialState.pressed)) {
+                    return AppColors.primary.withOpacity(0.9);
+                  }
+                  return AppColors.primary;
+                }),
+              ),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            iconTheme: const IconThemeData(
+              color: AppColors.text,
+            ),
             textTheme: const TextTheme(
               displayLarge: AppTextStyles.heading1,
               displayMedium: AppTextStyles.heading2,
               bodyLarge: AppTextStyles.body,
-            ),
-            useMaterial3: true,
-            elevatedButtonTheme: ElevatedButtonThemeData(
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.all(AppColors.primary),
-                foregroundColor: WidgetStateProperty.all(Colors.white),
-              ),
+            ).apply(
+              bodyColor: AppColors.text,
+              displayColor: AppColors.text,
             ),
           ),
           darkTheme: ThemeData(

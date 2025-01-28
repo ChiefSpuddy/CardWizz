@@ -7,6 +7,7 @@ import '../models/tcg_card.dart';
 import '../widgets/card_grid_item.dart';
 import 'package:shimmer/shimmer.dart';
 import '../constants/card_styles.dart';
+import '../constants/colors.dart';  // Add this import
 import 'package:provider/provider.dart';
 import '../providers/currency_provider.dart';
 
@@ -37,6 +38,8 @@ class _SearchScreenState extends State<SearchScreen> {
   ];
 
   static const recentSets = [
+    {'name': 'Prismatic Evolution', 'icon': '🌈'},
+    {'name': 'Surging Sparks', 'icon': '⚡'},
     {'name': 'Paldea Evolved', 'icon': '🌟'},
     {'name': 'Scarlet & Violet', 'icon': '⚡'},
     {'name': 'Crown Zenith', 'icon': '👑'},
@@ -424,28 +427,38 @@ Widget _buildHorizontalScrollView({
 Widget _buildQuickSearches() {
   return Container(
     margin: const EdgeInsets.symmetric(horizontal: 16), // Remove vertical margin
-    decoration: CardStyles.cardDecoration(context),
+    decoration: BoxDecoration(
+      gradient: AppColors.cardGradient,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Popular Searches header and content
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: CardStyles.gradientDecoration(context),
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          ),
           child: Row(
             children: [
               Text(
                 'Popular Searches',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  color: Colors.white,
                 ),
               ),
               const Spacer(),
-              Icon(
-                Icons.local_fire_department,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
+              const Icon(Icons.local_fire_department, color: Colors.white),
             ],
           ),
         ),
@@ -493,19 +506,18 @@ Widget _buildQuickSearches() {
         ),
         _buildHorizontalScrollView(
           indicatorColor: Theme.of(context).colorScheme.surface,
-          children: recentSets.map((set) => Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ActionChip(
-              avatar: Text(set['icon']!, style: const TextStyle(fontSize: 14)),
-              label: Text(set['name']!),
-              onPressed: () => _performQuickSearch(set['name']!),
-              backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-              side: BorderSide.none,
-              labelStyle: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+          children: recentSets.map((set) => 
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(
+                avatar: Text(set['icon']!, style: const TextStyle(fontSize: 14)),
+                label: Text(set['name']!),
+                onPressed: () => _performQuickSearch(set['name']!),
+                backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                side: BorderSide.none,
               ),
             ),
-          )).toList(),
+          ).toList(),
         ),
       ],
     ),
