@@ -67,5 +67,17 @@
 	<!-- Optional: Add this if you want to use Sign in with Apple in your entitlements -->
 	<key>com.apple.developer.accounts.authentication-services.autofill-credential-provider</key>
 	<true/>
+
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>cardwizz</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.cardwizz.app</string>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -300,6 +300,31 @@ class StorageService {
     return prefs.getString(key);
   }
 
+  Future<void> clearSearchHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('search_history');
+  }
+
+  Future<void> clearAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+  }
+
+  Future<Map<String, dynamic>> exportUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Implement data export logic
+    return {
+      'user_settings': {
+        'analytics_enabled': prefs.getBool('analytics_enabled'),
+        'search_history_enabled': prefs.getBool('search_history_enabled'),
+        'profile_visible': prefs.getBool('profile_visible'),
+        'show_prices': prefs.getBool('show_prices'),
+      },
+      'search_history': prefs.getStringList('search_history'),
+      // Add other user data as needed
+    };
+  }
+
   void dispose() {
     _cardsController.close();
   }

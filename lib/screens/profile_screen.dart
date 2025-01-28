@@ -9,6 +9,7 @@ import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/avatar_picker_dialog.dart';
 import '../l10n/app_localizations.dart';  // Fix this import path
+import '../screens/privacy_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,6 +20,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _animationController;
+  String _deleteConfirmation = '';
 
   @override
   void initState() {
@@ -158,6 +160,67 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to update username')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showDeleteAccountDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Delete Account',
+          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('This action cannot be undone. Please type "DELETE" to confirm.'),
+            const SizedBox(height: 16),
+            TextField(
+              decoration: const InputDecoration(
+                hintText: 'Type DELETE to confirm',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _deleteConfirmation = value;
+                });
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          TextButton(
+            child: Text(
+              'Delete Account',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            onPressed: _deleteConfirmation == 'DELETE'
+                ? () => Navigator.pop(context, true)
+                : null,
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await context.read<AppState>().deleteAccount();
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
           );
         }
       }
@@ -543,9 +606,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ListTile(
                     leading: const Icon(Icons.security),
                     title: Text(localizations.translate('privacySettings')),  // Add new translation
-                    onTap: () {
-                      // TODO: Implement privacy settings
-                    },
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PrivacySettingsScreen(),
+                      ),
+                    ),
                   ),
                   const Divider(height: 1),
                   ListTile(
@@ -562,9 +628,73 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               ),
             ),
             const SizedBox(height: 32),
+            _buildDangerZone(),
+            const SizedBox(height: 32),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildDangerZone() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return _buildSection(
+      context: context,
+      title: 'Danger Zone',
+      titleColor: colorScheme.error,
+      backgroundColor: colorScheme.errorContainer.withOpacity(0.1),
+      children: [
+        ListTile(
+          leading: Icon(
+            Icons.delete_forever,
+            color: colorScheme.error,
+          ),
+          title: Text(
+            'Delete Account',
+            style: TextStyle(
+              color: colorScheme.error,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: Text(
+            'This will permanently delete your account and all data',
+            style: TextStyle(
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          onTap: _showDeleteAccountDialog,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSection({
+    required BuildContext context,
+    required String title,
+    required List<Widget> children,
+    Color? titleColor,
+    Color? backgroundColor,
+  }) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      color: backgroundColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: titleColor ?? Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+          ),
+          const Divider(height: 1),
+          ...children,
+        ],
+      ),
     );
   }
 

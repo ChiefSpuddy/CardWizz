@@ -151,6 +151,26 @@ class AuthService {
     _isAuthenticated = false;
     _currentUser = null;
   }
+
+  Future<void> deleteAccount() async {
+    if (_currentUser != null) {
+      final prefs = await SharedPreferences.getInstance();
+      // Remove all user data
+      await prefs.remove('${_currentUser!.id}_email');
+      await prefs.remove('${_currentUser!.id}_name');
+      await prefs.remove('${_currentUser!.id}_avatar');
+      await prefs.remove('${_currentUser!.id}_locale');
+      await prefs.remove('${_currentUser!.id}_username');
+      await prefs.remove('user_id');
+
+      // Clear CollectionService user
+      final collectionService = await CollectionService.getInstance();
+      await collectionService.deleteUserData(_currentUser!.id);
+
+      _isAuthenticated = false;
+      _currentUser = null;
+    }
+  }
 }
 
 class AuthUser {

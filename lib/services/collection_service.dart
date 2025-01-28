@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 import 'package:flutter/material.dart';  // Add this import for Color
+import 'package:shared_preferences/shared_preferences.dart';  // Add this import
 import '../models/custom_collection.dart';
 import '../services/storage_service.dart';  // Add this import
 
@@ -266,6 +267,15 @@ class CollectionService {
       }
     }
     return total;
+  }
+
+  Future<void> deleteUserData(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    // Remove all collection data for the user
+    await prefs.remove('${userId}_collections');
+    await prefs.remove('${userId}_binders');
+    await prefs.remove('${userId}_cards');
+    // Add any other user-specific data that needs to be removed
   }
 
   void dispose() {

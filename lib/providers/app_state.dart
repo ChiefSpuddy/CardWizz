@@ -10,6 +10,10 @@ class AppState with ChangeNotifier {
   bool _isDarkMode = false;
   bool _isLoading = true;
   Locale _locale = const Locale('en');
+  bool _analyticsEnabled = true;
+  bool _searchHistoryEnabled = true;
+  bool _profileVisible = false;
+  bool _showPrices = true;
 
   AppState(this._storageService, this._authService);
 
@@ -28,6 +32,8 @@ class AppState with ChangeNotifier {
     final darkMode = await _storageService.getBool('darkMode');
     _isDarkMode = darkMode ?? false;
 
+    await _initializePrivacySettings();
+
     _isLoading = false;
     notifyListeners();
   }
@@ -37,6 +43,10 @@ class AppState with ChangeNotifier {
   bool get isAuthenticated => _authService.isAuthenticated;
   AuthUser? get currentUser => _authService.currentUser;
   Locale get locale => _locale;
+  bool get analyticsEnabled => _analyticsEnabled;
+  bool get searchHistoryEnabled => _searchHistoryEnabled;
+  bool get profileVisible => _profileVisible;
+  bool get showPrices => _showPrices;
 
   Future<void> toggleTheme() async {
     _isDarkMode = !_isDarkMode;
@@ -90,6 +100,80 @@ class AppState with ChangeNotifier {
     await _authService.updateUsername(username);
     // Use more specific notification
     notifyListeners();
+  }
+
+  Future<void> setAnalyticsEnabled(bool value) async {
+    _analyticsEnabled = value;
+    await _storageService.setBool('analytics_enabled', value);
+    notifyListeners();
+  }
+
+  Future<void> setSearchHistoryEnabled(bool value) async {
+    _searchHistoryEnabled = value;
+    await _storageService.setBool('search_history_enabled', value);
+    notifyListeners();
+  }
+
+  Future<void> setProfileVisibility(bool value) async {
+    _profileVisible = value;
+    await _storageService.setBool('profile_visible', value);
+    notifyListeners();
+  }
+
+  Future<void> setShowPrices(bool value) async {
+    _showPrices = value;
+    await _storageService.setBool('show_prices', value);
+    notifyListeners();
+  }
+
+  Future<void> exportUserData() async {
+    // Implement export functionality
+    // This could generate a JSON file with user's data
+    final userData = await _storageService.exportUserData();
+    // Implement file saving logic here
+  }
+
+  Future<void> clearSearchHistory() async {
+    await _storageService.clearSearchHistory();
+    notifyListeners();
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      // Delete user data from storage
+      await _storageService.clearAllData();
+      
+      // Sign out user
+      await signOut();
+      
+      // Delete authentication data
+      await _authService.deleteAccount();
+      
+      notifyListeners();
+    } catch (e) {
+      print('Error deleting account: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _initializePrivacySettings() async {
+    _analyticsEnabled = await _storageService.getBool('analytics_enabled') ?? true;
+    _searchHistoryEnabled = await _storageService.getBool('search_history_enabled') ?? true;
+    _profileVisible = await _storageService.getBool('profile_visible') ?? false;
+    _showPrices = await _storageService.getBool('show_prices') ?? true;
+  }
+
+  Future<bool> verifyPrivacySettings() async {
+    // Verify current state matches stored preferences
+    final storedAnalytics = await _storageService.getBool('analytics_enabled') ?? true;
+    final storedSearchHistory = await _storageService.getBool('search_history_enabled') ?? true;
+    final storedProfileVisible = await _storageService.getBool('profile_visible') ?? false;
+    final storedShowPrices = await _storageService.getBool('show_prices') ?? true;
+
+    return storedAnalytics == _analyticsEnabled &&
+           storedSearchHistory == _searchHistoryEnabled &&
+           storedProfileVisible == _profileVisible &&
+           storedShowPrices == _showPrices;
   }
 
   static const supportedLocales = [
