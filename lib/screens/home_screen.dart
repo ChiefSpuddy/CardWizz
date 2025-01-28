@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Add this import
 import '../providers/app_state.dart';
 import 'home_overview.dart';
 import 'collections_screen.dart';
@@ -42,8 +43,28 @@ class HomeScreenState extends State<HomeScreen> {
     ProfileScreen(),
   ];
 
-  void setSelectedIndex(int index) {
+  @override
+  void initState() {
+    super.initState();
+    // Restore selected index from storage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSelectedIndex();
+    });
+  }
+
+  Future<void> _loadSelectedIndex() async {
+    final prefs = await SharedPreferences.getInstance();
+    final index = prefs.getInt('selected_tab_index') ?? 0;
+    if (mounted) {
+      setState(() => _selectedIndex = index);
+    }
+  }
+
+  void setSelectedIndex(int index) async {
     setState(() => _selectedIndex = index);
+    // Save selected index
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('selected_tab_index', index);
   }
 
   Widget _buildBottomNavItem(BuildContext context, int index) {
@@ -125,7 +146,7 @@ class HomeScreenState extends State<HomeScreen> {
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             backgroundColor: Theme.of(context).colorScheme.surface,
             selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+            onDestinationSelected: (index) => setSelectedIndex(index),
             destinations: List.generate(
               _navItems.length,
               (index) => NavigationDestination(

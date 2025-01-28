@@ -29,6 +29,7 @@ class AuthService {
         name: prefs.getString('${savedUserId}_name'),
         avatarPath: prefs.getString('${savedUserId}_avatar'),
         locale: prefs.getString('${savedUserId}_locale') ?? 'en',  // Add this
+        username: prefs.getString('${savedUserId}_username'),  // Add this
       );
       
       // Initialize CollectionService with saved user ID
@@ -47,6 +48,9 @@ class AuthService {
     if (user.avatarPath != null) {
       await prefs.setString('${user.id}_avatar', user.avatarPath!);
     }
+    if (user.username != null) {
+      await prefs.setString('${user.id}_username', user.username!);
+    }
   }
 
   Future<void> updateAvatar(String avatarPath) async {
@@ -62,6 +66,14 @@ class AuthService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('${_currentUser!.id}_locale', locale);
       _currentUser = _currentUser!.copyWith(locale: locale);
+    }
+  }
+
+  Future<void> updateUsername(String username) async {
+    if (_currentUser != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('${_currentUser!.id}_username', username);
+      _currentUser = _currentUser!.copyWith(username: username);
     }
   }
 
@@ -95,6 +107,7 @@ class AuthService {
         // Get existing user data if available
         final existingAvatarPath = prefs.getString('${credential.userIdentifier!}_avatar');
         final existingName = prefs.getString('${credential.userIdentifier!}_name');
+        final existingUsername = prefs.getString('${credential.userIdentifier!}_username');
         
         final displayName = existingName ?? [
           credential.givenName,
@@ -106,6 +119,7 @@ class AuthService {
           email: credential.email,
           name: displayName.isEmpty ? defaultUsername : displayName,
           avatarPath: existingAvatarPath,
+          username: existingUsername,  // Add this
         );
         _isAuthenticated = true;
         await _saveUserData(_currentUser!);
@@ -145,6 +159,7 @@ class AuthUser {
   final String? name;
   final String? avatarPath;
   final String locale;  // Add this
+  final String? username;  // Add this
 
   AuthUser({
     required this.id,
@@ -152,6 +167,7 @@ class AuthUser {
     this.name,
     this.avatarPath,
     this.locale = 'en',  // Default to English
+    this.username,  // Add this
   });
 
   AuthUser copyWith({
@@ -160,6 +176,7 @@ class AuthUser {
     String? name,
     String? avatarPath,
     String? locale,
+    String? username,  // Add this
   }) {
     return AuthUser(
       id: id ?? this.id,
@@ -167,6 +184,7 @@ class AuthUser {
       name: name ?? this.name,
       avatarPath: avatarPath ?? this.avatarPath,
       locale: locale ?? this.locale,
+      username: username ?? this.username,  // Add this
     );
   }
 }

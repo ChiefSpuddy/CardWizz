@@ -82,6 +82,13 @@ class AppState with ChangeNotifier {
 
   Future<void> updateAvatar(String avatarPath) async {
     await _authService.updateAvatar(avatarPath);
+    // Use more specific notification
+    notifyListeners();
+  }
+
+  Future<void> updateUsername(String username) async {
+    await _authService.updateUsername(username);
+    // Use more specific notification
     notifyListeners();
   }
 
