@@ -17,10 +17,12 @@ extension StringExtension on String {
 
 class CardDetailsScreen extends StatefulWidget {
   final TcgCard card;
+  final String? heroTagPrefix; // Add this parameter
 
   const CardDetailsScreen({
     super.key,
     required this.card,
+    this.heroTagPrefix, // Add this parameter
   });
 
   @override
@@ -85,12 +87,45 @@ Widget _buildPriceChart(Map<String, dynamic> prices) {
   // Collect and sort price points
   final pricePoints = [
     {'label': '30d', 'value': prices['avg30']},
-    {'label': '7d', 'value': prices['avg7']},
+    {'label': '21d', 'value': _calculateAverage(prices['avg30'], prices['avg7'])},
+    {'label': '14d', 'value': prices['avg7']},
+    {'label': '7d', 'value': _calculateAverage(prices['avg7'], prices['avg1'])},
     {'label': '1d', 'value': prices['avg1']},
     {'label': 'Now', 'value': prices['market'] ?? prices['averageSellPrice']},
   ].where((p) => p['value'] != null).toList();
 
-  if (pricePoints.length < 2) return const SizedBox.shrink();
+  // Modify the price points collection to always include current price
+  final currentPrice = prices['market'] ?? prices['averageSellPrice'];
+  if (currentPrice != null && pricePoints.length == 1) {
+    // If we only have one price point, duplicate it to show a flat line
+    pricePoints.add({'label': 'Now', 'value': currentPrice});
+  }
+
+  // Show placeholder if we don't have enough data
+  if (pricePoints.length < 2) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Price History',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          height: 200,
+          alignment: Alignment.center,
+          child: Text(
+            'Price history not available yet',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -99,9 +134,18 @@ Widget _buildPriceChart(Map<String, dynamic> prices) {
   final minValue = values.reduce(min);
   final maxValue = values.reduce(max);
   final range = maxValue - minValue;
-  final minY = (max(0, minValue - (range * 0.1))).toDouble(); // Convert to double
-  final maxY = (maxValue + (range * 0.1)).toDouble(); // Convert to double
-  final interval = (maxY - minY) / 4;
+  
+  // Use 20% of the range for padding instead of starting at 0
+  final minY = (minValue - (range * 0.2)).clamp(0.0, double.infinity);
+  final maxY = maxValue + (range * 0.1);
+  
+  // Ensure interval is never zero
+  final interval = ((maxY - minY) / 4).clamp(0.1, double.infinity);
+
+  // Validate price data
+  if (interval <= 0 || maxY <= minY) {
+    return const Center(child: Text('Insufficient Price Data'));
+  }
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,132 +159,186 @@ Widget _buildPriceChart(Map<String, dynamic> prices) {
               fontWeight: FontWeight.bold,
             ),
           ),
-          Text(
-            currencyProvider.formatValue(maxValue),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.green.shade600,
-              fontWeight: FontWeight.w600,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'Highest: ${currencyProvider.formatValue(maxValue)}',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.green.shade600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                'Current: ${currencyProvider.formatValue(currentPrice)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ],
       ),
       const SizedBox(height: 24),
       SizedBox(
         height: 200,
-        child: LineChart(
-          LineChartData(
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              horizontalInterval: interval,
-              getDrawingHorizontalLine: (value) => FlLine(
-                color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
-                strokeWidth: 1,
-              ),
-            ),
-            titlesData: FlTitlesData(
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 60,
-                  interval: interval,
-                  getTitlesWidget: (value, meta) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Text(
-                        currencyProvider.formatValue(value),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? Colors.grey[400] : Colors.grey[600],
-                        ),
-                      ),
-                    );
-                  },
+        child: Padding(
+          padding: const EdgeInsets.only(right: 16, top: 8), // Add padding to prevent overlap
+          child: LineChart(
+            LineChartData(
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: interval,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
+                  strokeWidth: 1,
                 ),
               ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 30,
-                  getTitlesWidget: (value, meta) {
-                    final index = value.toInt();
-                    if (index >= 0 && index < pricePoints.length) {
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          pricePoints[index]['label'] as String,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+              titlesData: FlTitlesData(
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles: AxisTitles(
+                  axisNameSize: 24, // Add space between title and chart
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 64, // Increased from 60 to give more space
+                    interval: (maxY - minY) / 2, // Show only 3 labels
+                    getTitlesWidget: (value, meta) {
+                      // Calculate if this is bottom, middle, or top value
+                      final isBottom = (value - minY).abs() < 0.0001;
+                      final isTop = (value - maxY).abs() < 0.0001;
+                      final isMiddle = ((value - ((maxY + minY) / 2)).abs() < interval / 2);
+
+                      if (isBottom || isMiddle || isTop) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Text(
+                            currencyProvider.formatValue(value),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            ),
                           ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: max(1, (pricePoints.length / 3).ceil()).toDouble(), // Show fewer labels
+                    getTitlesWidget: (value, meta) {
+                      final index = value.toInt();
+                      if (index >= 0 && index < pricePoints.length &&
+                          index % 2 == 0) { // Only show every other label
+                        final date = DateTime.now().subtract(
+                          Duration(days: (pricePoints.length - 1 - index) * 7)
+                        );
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              minY: minY.toDouble(), // Ensure double
+              maxY: maxY.toDouble(), // Ensure double
+              lineTouchData: LineTouchData(
+                enabled: true,
+                touchTooltipData: LineTouchTooltipData(
+                  tooltipBgColor: Theme.of(context).cardColor,
+                  tooltipRoundedRadius: 8,
+                  tooltipMargin: 28, // Increased margin to show above finger
+                  tooltipPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  tooltipHorizontalAlignment: FLHorizontalAlignment.center,
+                  tooltipHorizontalOffset: 0,
+                  getTooltipItems: (spots) {
+                    return spots.map((spot) {
+                      final index = spot.x.toInt();
+                      final date = DateTime.now().subtract(
+                        Duration(days: (pricePoints.length - 1 - index) * 7)
+                      );
+                      return LineTooltipItem(
+                        '${currencyProvider.formatValue(spot.y)}\n${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
+                        TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w500,
                         ),
                       );
-                    }
-                    return const SizedBox.shrink();
+                    }).toList();
                   },
+                  fitInsideHorizontally: true,
+                  fitInsideVertically: true,
                 ),
-              ),
-            ),
-            borderData: FlBorderData(show: false),
-            minY: minY.toDouble(), // Ensure double
-            maxY: maxY.toDouble(), // Ensure double
-            lineTouchData: LineTouchData(
-              enabled: true,
-              touchTooltipData: LineTouchTooltipData(
-                tooltipBgColor: Theme.of(context).cardColor,
-                tooltipRoundedRadius: 8,
-                getTooltipItems: (spots) {
-                  return spots.map((spot) {
-                    return LineTooltipItem(
-                      currencyProvider.formatValue(spot.y),
-                      TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    );
-                  }).toList();
+                handleBuiltInTouches: true,
+                touchSpotThreshold: 20,
+                getTouchLineStart: (_, __) => double.infinity,
+                getTouchLineEnd: (_, __) => double.infinity,
+                touchCallback: (event, response) {
+                  if (event is FlTapUpEvent || event is FlPanEndEvent) {
+                    setState(() {}); // Trigger rebuild to update dots
+                  }
                 },
-                fitInsideHorizontally: true,
-                fitInsideVertically: true,
               ),
-              getTouchLineEnd: (_, __) => double.infinity,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: List.generate(pricePoints.length, (i) {
+                    return FlSpot(
+                      i.toDouble(),
+                      (pricePoints[i]['value'] as num).toDouble(),
+                    );
+                  }),
+                  isCurved: true,
+                  curveSmoothness: 0.35,
+                  color: Colors.green.shade600,
+                  barWidth: 2.5,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, barData, index) {
+                      return FlDotCirclePainter(
+                        radius: 3,
+                        color: Colors.white,
+                        strokeWidth: 2,
+                        strokeColor: Colors.green.shade600,
+                      );
+                    },
+                    checkToShowDot: (spot, barData) {
+                      // Show dots at start, end, and every other point
+                      return spot.x == 0 || 
+                             spot.x == barData.spots.length - 1 || 
+                             spot.x.toInt() % 2 == 0 ||
+                             (barData.showingIndicators?.contains(spot.x.toInt()) ?? false);
+                    },
+                  ),
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.green.shade600.withOpacity(0.2),
+                        Colors.green.shade600.withOpacity(0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            lineBarsData: [
-              LineChartBarData(
-                spots: List.generate(pricePoints.length, (i) {
-                  return FlSpot(
-                    i.toDouble(),
-                    (pricePoints[i]['value'] as num).toDouble(),
-                  );
-                }),
-                isCurved: true,
-                curveSmoothness: 0.35,
-                color: Colors.green.shade600,
-                barWidth: 2.5,
-                dotData: FlDotData(
-                  show: true,
-                  getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                    radius: 4,
-                    color: Colors.white,
-                    strokeWidth: 2,
-                    strokeColor: Colors.green.shade600,
-                  ),
-                ),
-                belowBarData: BarAreaData(
-                  show: true,
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.green.shade600.withOpacity(0.2),
-                      Colors.green.shade600.withOpacity(0.0),
-                    ],
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),
@@ -401,6 +499,54 @@ Widget _buildPricingSection() {
   final prices = _additionalData!['tcgplayer']?['prices']?['normal'] ?? 
                 _additionalData!['cardmarket']?['prices'] ??
                 {};
+
+  // Early validation of price data
+  if (prices.isEmpty || (prices['market'] == null && prices['averageSellPrice'] == null)) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[900] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          const Text('No price data available'),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _launchUrl(_additionalData!['cardmarket']?['url'] ?? 
+                    'https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${Uri.encodeComponent(widget.card.name)}'),
+                  icon: const Icon(Icons.shopping_cart),
+                  label: const Text('Cardmarket'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? Colors.green[700] : Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _launchUrl(_apiService.getEbaySearchUrl(
+                    widget.card.name,
+                    setName: widget.card.setName,
+                  )),
+                  icon: const Icon(Icons.search),
+                  label: const Text('eBay'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0064D2),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   return Container(
     padding: const EdgeInsets.all(16),
@@ -597,7 +743,9 @@ Widget _buildPricingSection() {
               Container(
                 color: isDark ? Colors.black : Colors.grey[100],
                 child: Hero(
-                  tag: 'card_${widget.card.id}',
+                  tag: widget.heroTagPrefix != null 
+                      ? '${widget.heroTagPrefix}_${widget.card.id}'
+                      : 'card_${widget.card.id}',
                   child: Image.network(
                     widget.card.imageUrl,
                     fit: BoxFit.contain,
@@ -627,12 +775,37 @@ Widget _buildPricingSection() {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addToCollection(context),
-        icon: const Icon(Icons.add_to_photos),
-        label: const Text('Add to Collection'),
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
+      floatingActionButton: Container(
+        height: 46, // Reduced height
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(23),
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(context).primaryColor,
+              Theme.of(context).colorScheme.secondary,
+            ],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).primaryColor.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: FloatingActionButton.extended(
+          onPressed: () => _addToCollection(context),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          icon: const Icon(Icons.add_to_photos, size: 20), // Smaller icon
+          label: const Text(
+            'Add to Collection',
+            style: TextStyle(fontSize: 14), // Smaller text
+          ),
+          heroTag: null, // Add this to prevent hero animation conflicts
+        ),
       ),
     );
   }
@@ -646,5 +819,10 @@ Widget _buildPricingSection() {
     } catch (e) {
       return dateStr.split('T')[0].split('-').reversed.join('/');  // Fallback format
     }
+  }
+
+  double? _calculateAverage(double? a, double? b) {
+    if (a == null || b == null) return null;
+    return (a + b) / 2;
   }
 }

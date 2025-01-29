@@ -10,6 +10,7 @@ import '../providers/currency_provider.dart';
 import '../widgets/sign_in_view.dart';
 import '../providers/app_state.dart';
 import '../l10n/app_localizations.dart';  // Add this import
+import '../screens/card_details_screen.dart';  // Add this import
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -163,44 +164,57 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            ...topCards.map((card) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Image.network(
-                    card.imageUrl,
-                    height: 50,
-                    width: 36,
-                    fit: BoxFit.contain,
+            ...topCards.map((card) => InkWell( // Add InkWell here
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CardDetailsScreen(card: card),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          card.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          card.rarity ?? localizations.translate('unknownRarity'),
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Hero( // Add Hero widget for smooth transition
+                      tag: 'analytics_card_${card.id}', // Updated unique tag
+                      child: Image.network(
+                        card.imageUrl,
+                        height: 50,
+                        width: 36,
+                        fit: BoxFit.contain,
+                      ),
                     ),
-                  ),
-                  Text(
-                    currencyProvider.formatValue(card.price ?? 0),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            card.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            card.rarity ?? localizations.translate('unknownRarity'),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                    Text(
+                      currencyProvider.formatValue(card.price ?? 0),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             )),
           ],
@@ -1082,3 +1096,4 @@ class PriceChange {
     required this.percentageChange,
   });
 }
+

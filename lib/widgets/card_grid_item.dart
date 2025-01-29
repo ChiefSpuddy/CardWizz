@@ -111,7 +111,7 @@ class _CardGridItemState extends State<CardGridItem> {
                   Expanded(
                     flex: 5, // Adjust image size ratio
                     child: Hero(
-                      tag: 'card_${widget.card.id}',
+                      tag: 'collection_${widget.card.id}',  // Add 'collection_' prefix
                       child: _buildImage(),
                     ),
                   ),
