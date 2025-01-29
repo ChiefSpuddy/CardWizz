@@ -4,8 +4,10 @@ import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 import 'package:flutter/material.dart';  // Add this import for Color
 import 'package:shared_preferences/shared_preferences.dart';  // Add this import
+import 'package:provider/provider.dart';  // Add this
 import '../models/custom_collection.dart';
 import '../services/storage_service.dart';  // Add this import
+import '../providers/sort_provider.dart';  // Add this
 
 class CollectionService {
   static CollectionService? _instance;
@@ -102,7 +104,7 @@ class CollectionService {
     return _collectionsController.stream;
   }
 
-  Future<List<CustomCollection>> getCustomCollections() async {
+  Future<List<CustomCollection>> getCustomCollections([CollectionSortOption? sortOption]) async {
     if (_currentUserId == null) return [];
     
     final List<Map<String, dynamic>> maps = await _db.query(
@@ -127,8 +129,39 @@ class CollectionService {
         return collection.copyWith(totalValue: value);
       }),
     );
-    
-    return enrichedCollections;
+
+    // Use provided sort option or default to newest
+    return sortCollections(enrichedCollections, sortOption ?? CollectionSortOption.newest);
+  }
+
+  List<CustomCollection> sortCollections(
+    List<CustomCollection> collections,
+    CollectionSortOption sortOption,
+  ) {
+    switch (sortOption) {
+      case CollectionSortOption.nameAZ:
+        return collections..sort((a, b) => a.name.compareTo(b.name));
+      case CollectionSortOption.nameZA:
+        return collections..sort((a, b) => b.name.compareTo(a.name));
+      case CollectionSortOption.valueHighLow:
+        return collections..sort((a, b) => 
+          (b.totalValue ?? 0).compareTo(a.totalValue ?? 0));
+      case CollectionSortOption.valueLowHigh:
+        return collections..sort((a, b) => 
+          (a.totalValue ?? 0).compareTo(b.totalValue ?? 0));
+      case CollectionSortOption.newest:
+        return collections..sort((a, b) => 
+          b.createdAt.compareTo(a.createdAt));
+      case CollectionSortOption.oldest:
+        return collections..sort((a, b) => 
+          a.createdAt.compareTo(b.createdAt));
+      case CollectionSortOption.countHighLow:
+        return collections..sort((a, b) => 
+          b.cardIds.length.compareTo(a.cardIds.length));
+      case CollectionSortOption.countLowHigh:
+        return collections..sort((a, b) => 
+          a.cardIds.length.compareTo(b.cardIds.length));
+    }
   }
 
   Future<CustomCollection?> getCollection(String id) async {

@@ -10,6 +10,7 @@ import 'profile_screen.dart';
 import '../widgets/app_drawer.dart';
 import 'analytics_screen.dart';  // Add this import
 import '../services/purchase_service.dart';  // Add this import
+import '../providers/sort_provider.dart';  // Add this import
 
 // Add NavItem class at the top level
 class NavItem {
@@ -107,14 +108,8 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        if (_selectedIndex != 0) {
-          setState(() => _selectedIndex = 0);
-          return false;
-        }
-        return true;
-      },
+    return ChangeNotifierProvider(
+      create: (_) => SortProvider(),
       child: Scaffold(
         key: _scaffoldKey,
         drawer: const AppDrawer(),

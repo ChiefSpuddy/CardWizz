@@ -18,6 +18,7 @@ import '../widgets/app_drawer.dart';  // Add this import at the top
 import '../providers/currency_provider.dart';
 import '../widgets/sign_in_view.dart';
 import '../providers/app_state.dart';
+import '../providers/sort_provider.dart';  // Add this import
 
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
@@ -149,6 +150,78 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
       isScrollControlled: true,
       builder: (context) => const CreateCollectionSheet(),
     );
+  }
+
+  void _showSortMenu(BuildContext context) {
+    final sortProvider = Provider.of<SortProvider>(context, listen: false);
+    
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.only(top: 24),  // Remove bottom padding
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              child: Row(
+                children: [
+                  const Icon(Icons.sort),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Sort by',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            // Wrap options in Flexible and SingleChildScrollView
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var option in CollectionSortOption.values)
+                      RadioListTile<CollectionSortOption>(
+                        value: option,
+                        groupValue: sortProvider.currentSort,
+                        onChanged: (value) {
+                          sortProvider.setSort(value!);
+                          Navigator.pop(context);
+                        },
+                        title: Text(_getSortOptionLabel(option)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getSortOptionLabel(CollectionSortOption option) {
+    switch (option) {
+      case CollectionSortOption.nameAZ:
+        return 'Name (A-Z)';
+      case CollectionSortOption.nameZA:
+        return 'Name (Z-A)';
+      case CollectionSortOption.valueHighLow:
+        return 'Value (High to Low)';
+      case CollectionSortOption.valueLowHigh:
+        return 'Value (Low to High)';
+      case CollectionSortOption.newest:
+        return 'Date Added (Newest First)';
+      case CollectionSortOption.oldest:
+        return 'Date Added (Oldest First)';
+      case CollectionSortOption.countHighLow:
+        return 'Card Count (High to Low)';
+      case CollectionSortOption.countLowHigh:
+        return 'Card Count (Low to High)';
+    }
   }
 
   @override
@@ -311,9 +384,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
           ),
           IconButton(
             icon: const Icon(Icons.sort),
-            onPressed: () {
-              // TODO: Implement sorting
-            },
+            onPressed: () => _showSortMenu(context),
           ),
         ],
         bottom: PreferredSize(
