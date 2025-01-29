@@ -43,14 +43,16 @@ class CurrencyProvider extends ChangeNotifier {
 
   // For general use (exact values)
   String formatValue(double value) {
-    return '$symbol${value.toStringAsFixed(2)}';
+    final convertedValue = value * rate;  // Apply rate here
+    return '$symbol${convertedValue.toStringAsFixed(2)}';
   }
 
   // For chart axes (with K/M formatting)
   String formatChartValue(double value) {
-    if (value >= 1000) {
-      return '$symbol${(value / 1000).round()}k';  // Changed to round() instead of toStringAsFixed(1)
+    final convertedValue = value * rate;  // Apply rate here
+    if (convertedValue >= 1000) {
+      return '$symbol${(convertedValue / 1000).round()}k';
     }
-    return '$symbol${value.round()}';  // Changed to round() instead of toStringAsFixed(2)
+    return '$symbol${convertedValue.round()}';
   }
 }

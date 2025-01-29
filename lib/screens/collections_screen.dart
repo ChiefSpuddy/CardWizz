@@ -170,7 +170,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
             final totalValue = cards.fold<double>(
               0,
               (sum, card) => sum + (card.price ?? 0),
-            );
+            );  // Remove the rate multiplication here
 
             if (cards.isEmpty) return const SizedBox.shrink();
             
@@ -280,7 +280,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              (totalValue * currencyProvider.rate).toStringAsFixed(2),
+                              currencyProvider.formatValue(totalValue),  // Just change this line to use formatValue
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,

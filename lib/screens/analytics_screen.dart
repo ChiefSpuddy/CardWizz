@@ -253,7 +253,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       return FlSpot(i.toDouble(), roundedValue);
     });
 
-    return Card(  // Changed from Padding to Card
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -756,8 +756,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           floating: true,
                         ),
                         SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
+                          child: Padding(  // Add this Padding widget
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: Column(
                               children: [
                                 _buildValueSummary(cards),
@@ -766,11 +766,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 const SizedBox(height: 16),
                                 _buildTopCardsCard(cards),
                                 const SizedBox(height: 16),
-                                _buildTopMovers(cards),  // Add this line
+                                _buildTopMovers(cards),  // This should now be visible
                                 const SizedBox(height: 16),
                                 _buildSetDistribution(cards),
                                 const SizedBox(height: 16),
                                 _buildPriceRangeDistribution(cards),
+                                const SizedBox(height: 32),  // Add bottom padding
                               ],
                             ),
                           ),
@@ -831,30 +832,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildTopMovers(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
+    print('Building top movers with ${cards.length} cards');
     
     // Get cards with price history
     final cardsWithHistory = cards.where((card) => 
       card.price != null && card.priceHistory.isNotEmpty
     ).toList();
+    print('Cards with history: ${cardsWithHistory.length}');
 
-    if (cardsWithHistory.isEmpty) {
-      return const SizedBox.shrink(); // Don't show section if no price history
-    }
-
-    final now = DateTime.now();
-    final oneDayAgo = now.subtract(const Duration(days: 1));
-    
+    // Always create changes list, even with one card
     final changes = cardsWithHistory.map((card) {
-      // Find the oldest price within last 24 hours
-      final oldPrice = card.priceHistory
-        .where((entry) => entry.date.isAfter(oneDayAgo))
-        .fold<double?>(null, (prev, entry) => 
-          prev == null || entry.date.isBefore(oneDayAgo) ? entry.price : prev
-        );
-
-      if (oldPrice == null) return null;
-
       final currentPrice = card.price!;
+      final oldPrice = card.priceHistory.first.price;
       final percentageChange = ((currentPrice - oldPrice) / oldPrice) * 100;
       
       return PriceChange(
@@ -863,38 +852,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         previousPrice: oldPrice,
         percentageChange: double.parse(percentageChange.toStringAsFixed(2)),
       );
-    })
-    .whereType<PriceChange>() // Remove nulls
-    .where((change) => change.percentageChange.abs() > 0) // Only show actual changes
-    .toList()
-    ..sort((a, b) => b.percentageChange.abs().compareTo(a.percentageChange.abs()));
+    }).toList();
 
-    if (changes.isEmpty) {
-      return const SizedBox.shrink(); // Don't show section if no changes
-    }
+    print('Found ${changes.length} price changes');
 
-    final topChanges = changes.take(3).toList();
+    // Sort by absolute percentage change
+    changes.sort((a, b) => b.percentageChange.abs().compareTo(a.percentageChange.abs()));
+    
+    final topChanges = changes.take(changes.length).toList(); // Show all changes
     final hasMore = changes.length > 3;
 
+    // Always return the card widget
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Text(
-                  'Top Movers (24h)',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                if (hasMore)
-                  TextButton(
-                    onPressed: () => _showAllMovers(context, topChanges),
-                    child: const Text('Show All'),
-                  ),
-              ],
+            const Text(
+              'Top Movers (24h)',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             ...topChanges.map((change) => ListTile(
