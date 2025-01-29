@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';  // Add this import
 import '../services/storage_service.dart';
 import '../services/collection_service.dart';  // Add this
 import '../models/tcg_card.dart';
@@ -37,6 +38,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
   }
 
   Widget _buildToggle() {
+    final localizations = AppLocalizations.of(context);
     return Container(
       height: 36,
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 12), // Added more bottom margin
@@ -69,7 +71,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'Main',  // Fixed text
+                      localizations.translate('main'),
                       style: TextStyle(
                         fontSize: 13,
                         color: !_showCustomCollections
@@ -105,7 +107,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'Binders',  // Fixed text
+                      localizations.translate('binders'),
                       style: TextStyle(
                         fontSize: 13,
                         color: _showCustomCollections
@@ -304,14 +306,14 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                             ),
                             const SizedBox(height: 24),
                             Text(
-                              'Your Collection is Empty',
+                              AppLocalizations.of(context).translate('emptyCollection'),
                               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'Start by adding your first card or create a new binder',
+                              AppLocalizations.of(context).translate('addFirstCard'),
                               textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),

@@ -9,6 +9,10 @@ class AppColors {
   static const error = Color(0xFFF43F5E);      // Soft rose
   static const text = Color(0xFF1E293B);       // Slate
   static const textSecondary = Color(0xFF64748B);
+  static const onSurface = Color(0xFF1E293B);  // Add this
+  static const onBackground = Color(0xFF1E293B);  // Add this
+  static const onPrimary = Colors.white;  // Add this
+  static const onSecondary = Colors.white;  // Add this
 
   // Gradients
   static const primaryGradient = LinearGradient(
@@ -25,6 +29,25 @@ class AppColors {
 
   static const accentGradient = LinearGradient(
     colors: [Color(0xFF38BDF8), Color(0xFF818CF8)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  // Dark mode specific colors
+  static final darkSurface = Color(0xFF1E1E1E);
+  static final darkBackground = Color(0xFF121212);
+  static final darkPrimaryContainer = primary.withOpacity(0.12);
+  static final darkSecondaryContainer = secondary.withOpacity(0.12);
+
+  // Dark mode gradients
+  static final darkCardGradient = LinearGradient(
+    colors: [darkSurface, darkBackground],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static final darkAccentGradient = LinearGradient(
+    colors: [primary.withOpacity(0.3), secondary.withOpacity(0.3)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );

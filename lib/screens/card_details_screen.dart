@@ -78,240 +78,407 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
     }
   }
 
-  Widget _buildPriceChart(Map<String, dynamic> prices) {
-    final currencyProvider = context.watch<CurrencyProvider>();
-    if (prices.isEmpty) return const SizedBox.shrink();
-    
-    final pricePoints = [
-      {'label': '30d Avg', 'value': prices['avg30']},
-      {'label': '7d Avg', 'value': prices['avg7']},
-      {'label': 'Current', 'value': prices['market'] ?? prices['averageSellPrice']},
-    ].where((p) => p['value'] != null).toList();
+Widget _buildPriceChart(Map<String, dynamic> prices) {
+  final currencyProvider = context.watch<CurrencyProvider>();
+  if (prices.isEmpty) return const SizedBox.shrink();
+  
+  // Collect and sort price points
+  final pricePoints = [
+    {'label': '30d', 'value': prices['avg30']},
+    {'label': '7d', 'value': prices['avg7']},
+    {'label': '1d', 'value': prices['avg1']},
+    {'label': 'Now', 'value': prices['market'] ?? prices['averageSellPrice']},
+  ].where((p) => p['value'] != null).toList();
 
-    if (pricePoints.length < 2) return const SizedBox.shrink();
+  if (pricePoints.length < 2) return const SizedBox.shrink();
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Find min and max for better scaling
-    final values = pricePoints.map((p) => p['value'] as num).toList();
-    final minY = (values.reduce(min) * 0.9);
-    final maxY = (values.reduce(max) * 1.1);
+  // Calculate min/max with padding
+  final values = pricePoints.map((p) => (p['value'] as num).toDouble()).toList();
+  final minValue = values.reduce(min);
+  final maxValue = values.reduce(max);
+  final range = maxValue - minValue;
+  final minY = (max(0, minValue - (range * 0.1))).toDouble(); // Convert to double
+  final maxY = (maxValue + (range * 0.1)).toDouble(); // Convert to double
+  final interval = (maxY - minY) / 4;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Price Trend',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Price History',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 200,
-          child: LineChart(
-            LineChartData(
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: (maxY - minY) / 5,
-                getDrawingHorizontalLine: (value) => FlLine(
-                  color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
-                  strokeWidth: 1,
-                ),
+          Text(
+            currencyProvider.formatValue(maxValue),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Colors.green.shade600,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 24),
+      SizedBox(
+        height: 200,
+        child: LineChart(
+          LineChartData(
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: interval,
+              getDrawingHorizontalLine: (value) => FlLine(
+                color: isDark ? Colors.grey[800]! : Colors.grey[300]!,
+                strokeWidth: 1,
               ),
-              titlesData: FlTitlesData(
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (value, meta) {
-                      return Text(
+            ),
+            titlesData: FlTitlesData(
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 60,
+                  interval: interval,
+                  getTitlesWidget: (value, meta) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(
                         currencyProvider.formatValue(value),
                         style: TextStyle(
+                          fontSize: 11,
                           color: isDark ? Colors.grey[400] : Colors.grey[600],
-                          fontSize: 10,
                         ),
-                      );
-                    },
-                    reservedSize: 50,
-                  ),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      if (index >= 0 && index < pricePoints.length) {
-                        return Padding(
-                          padding: const EdgeInsets.all(4.0),
-                          child: Text(
-                            pricePoints[index]['label'] as String,
-                            style: TextStyle(
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
-                              fontSize: 12,
-                            ),
-                          ),
-                        );
-                      }
-                      return const Text('');
-                    },
-                  ),
-                ),
-              ),
-              minY: minY,
-              maxY: maxY,
-              lineTouchData: LineTouchData(
-                touchTooltipData: LineTouchTooltipData(
-                  tooltipBgColor: isDark ? Colors.grey[800]! : Colors.white,
-                  getTooltipItems: (spots) {
-                    return spots.map((spot) {
-                      return LineTooltipItem(
-                        currencyProvider.formatValue(spot.y),
-                        TextStyle(
-                          color: isDark ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      );
-                    }).toList();
+                      ),
+                    );
                   },
                 ),
               ),
-              borderData: FlBorderData(show: false),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: List.generate(pricePoints.length, (index) {
-                    return FlSpot(
-                      index.toDouble(),
-                      (pricePoints[index]['value'] as num).toDouble(),
-                    );
-                  }),
-                  isCurved: true,
-                  color: isDark ? Colors.green[300] : Colors.green[600],
-                  barWidth: 3,
-                  dotData: FlDotData(
-                    show: true,
-                    getDotPainter: (spot, percent, barData, index) {
-                      return FlDotCirclePainter(
-                        radius: 6,
-                        color: isDark ? Colors.green[300]! : Colors.green[600]!,
-                        strokeWidth: 2,
-                        strokeColor: isDark ? Colors.black : Colors.white,
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 30,
+                  getTitlesWidget: (value, meta) {
+                    final index = value.toInt();
+                    if (index >= 0 && index < pricePoints.length) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          pricePoints[index]['label'] as String,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          ),
+                        ),
                       );
-                    },
-                  ),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    color: (isDark ? Colors.green[300] : Colors.green[600])?.withOpacity(0.2),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Update the price rows to show only available information
-  List<Widget> _buildPriceInfo(Map<String, dynamic> prices) {
-    final relevantPrices = {
-      'Market Price': prices['market'] ?? prices['averageSellPrice'],
-      'Lowest Price': prices['low'] ?? prices['lowPrice'],
-      '30 Day Average': prices['avg30'] ?? prices['avg1'],
-    };
-
-    return relevantPrices.entries
-        .where((e) => e.value != null)
-        .map((e) => _buildPriceRow(e.key, e.value))
-        .toList();
-  }
-
-  Widget _buildPricingSection() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_additionalData == null) {
-      return const Center(child: Text('Price data unavailable'));
-    }
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final prices = _additionalData!['tcgplayer']?['prices']?['normal'] ?? 
-                  _additionalData!['cardmarket']?['prices'] ??
-                  {};
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[900] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (prices.isNotEmpty) ...[
-            _buildPriceChart(prices),
-            const Divider(height: 32),
-            ..._buildPriceInfo(prices),
-            const SizedBox(height: 24),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _launchUrl(_additionalData!['cardmarket']?['url'] ?? 
-                    'https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${Uri.encodeComponent(widget.card.name)}'),
-                  icon: const Icon(Icons.shopping_cart),
-                  label: const Text('Cardmarket'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark ? Colors.green[700] : Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
+                    }
+                    return const SizedBox.shrink();
+                  },
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _launchUrl(_apiService.getEbaySearchUrl(
-                    widget.card.name,
-                    setName: widget.card.setName,
-                  )),
-                  icon: const Icon(Icons.search),
-                  label: const Text('eBay'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0064D2),
-                    foregroundColor: Colors.white,
+            ),
+            borderData: FlBorderData(show: false),
+            minY: minY.toDouble(), // Ensure double
+            maxY: maxY.toDouble(), // Ensure double
+            lineTouchData: LineTouchData(
+              enabled: true,
+              touchTooltipData: LineTouchTooltipData(
+                tooltipBgColor: Theme.of(context).cardColor,
+                tooltipRoundedRadius: 8,
+                getTooltipItems: (spots) {
+                  return spots.map((spot) {
+                    return LineTooltipItem(
+                      currencyProvider.formatValue(spot.y),
+                      TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    );
+                  }).toList();
+                },
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+              ),
+              getTouchLineEnd: (_, __) => double.infinity,
+            ),
+            lineBarsData: [
+              LineChartBarData(
+                spots: List.generate(pricePoints.length, (i) {
+                  return FlSpot(
+                    i.toDouble(),
+                    (pricePoints[i]['value'] as num).toDouble(),
+                  );
+                }),
+                isCurved: true,
+                curveSmoothness: 0.35,
+                color: Colors.green.shade600,
+                barWidth: 2.5,
+                dotData: FlDotData(
+                  show: true,
+                  getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+                    radius: 4,
+                    color: Colors.white,
+                    strokeWidth: 2,
+                    strokeColor: Colors.green.shade600,
+                  ),
+                ),
+                belowBarData: BarAreaData(
+                  show: true,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.green.shade600.withOpacity(0.2),
+                      Colors.green.shade600.withOpacity(0.0),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
-    );
+    ],
+  );
+}
+
+Widget _buildPriceInfo(Map<String, dynamic> prices) {
+  final currencyProvider = context.watch<CurrencyProvider>();
+  
+  // Extract and format price data
+  final currentPrice = prices['market'] ?? prices['averageSellPrice'];
+  final lowPrice = prices['low'] ?? prices['lowPrice'];
+  final highPrice = prices['high'] ?? prices['highPrice'];
+  final avg30 = prices['avg30'];
+  final avg7 = prices['avg7'];
+  final avg1 = prices['avg1'];
+  
+  // Calculate price changes
+  double? calculateChange(double? current, double? previous) {
+    if (current == null || previous == null) return null;
+    return ((current - previous) / previous) * 100;
   }
 
-  Widget _buildPriceRow(String label, dynamic price) {
+  final day1Change = calculateChange(currentPrice, avg1);
+  final day7Change = calculateChange(currentPrice, avg7);
+  final day30Change = calculateChange(currentPrice, avg30);
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Price ranges
+      _buildPriceRow(
+        'Current Price',
+        currentPrice,
+        isHighlight: true,
+      ),
+      if (lowPrice != null && highPrice != null) ...[
+        const Divider(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: _buildPriceDetail(
+                'Low',
+                lowPrice,
+                subtitle: '24h',
+                textColor: Colors.red.shade700,
+              ),
+            ),
+            Expanded(
+              child: _buildPriceDetail(
+                'High',
+                highPrice,
+                subtitle: '24h',
+                textColor: Colors.green.shade700,
+              ),
+            ),
+          ],
+        ),
+      ],
+
+      // Price changes
+      if (day1Change != null || day7Change != null || day30Change != null) ...[
+        const Divider(height: 24),
+        Text(
+          'Price Changes',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            if (day1Change != null)
+              Expanded(
+                child: _buildPriceChange('24h', day1Change),
+              ),
+            if (day7Change != null)
+              Expanded(
+                child: _buildPriceChange('7d', day7Change),
+              ),
+            if (day30Change != null)
+              Expanded(
+                child: _buildPriceChange('30d', day30Change),
+              ),
+          ],
+        ),
+      ],
+    ],
+  );
+}
+
+Widget _buildPriceDetail(String label, double value, {
+  String? subtitle,
+  Color? textColor,
+}) {
+  final currencyProvider = context.watch<CurrencyProvider>();
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        currencyProvider.formatValue(value),
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
+      ),
+      if (subtitle != null)
+        Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+          ),
+        ),
+    ],
+  );
+}
+
+Widget _buildPriceChange(String period, double change) {
+  final isPositive = change >= 0;
+  final color = isPositive ? Colors.green.shade600 : Colors.red.shade600;
+  
+  return Column(
+    children: [
+      Text(
+        period,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        '${isPositive ? '+' : ''}${change.toStringAsFixed(1)}%',
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildPricingSection() {
+  if (_isLoading) {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  if (_additionalData == null) {
+    return const Center(child: Text('Price data unavailable'));
+  }
+
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final prices = _additionalData!['tcgplayer']?['prices']?['normal'] ?? 
+                _additionalData!['cardmarket']?['prices'] ??
+                {};
+
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: isDark ? Colors.grey[900] : Colors.grey[100],
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (prices.isNotEmpty) ...[
+          _buildPriceChart(prices),
+          const Divider(height: 32),
+          _buildPriceInfo(prices),  // Remove spread operator
+          const SizedBox(height: 24),
+        ],
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _launchUrl(_additionalData!['cardmarket']?['url'] ?? 
+                  'https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${Uri.encodeComponent(widget.card.name)}'),
+                icon: const Icon(Icons.shopping_cart),
+                label: const Text('Cardmarket'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark ? Colors.green[700] : Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _launchUrl(_apiService.getEbaySearchUrl(
+                  widget.card.name,
+                  setName: widget.card.setName,
+                )),
+                icon: const Icon(Icons.search),
+                label: const Text('eBay'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0064D2),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+  Widget _buildPriceRow(String label, dynamic price, {bool isHighlight = false}) {
     final currencyProvider = context.watch<CurrencyProvider>();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
+          Text(
+            label,
+            style: isHighlight
+                ? Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    )
+                : Theme.of(context).textTheme.bodyLarge,
+          ),
           Text(
             currencyProvider.formatValue(price.toDouble()),
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+            style: isHighlight
+                ? Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade600,
+                    )
+                : Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
           ),
         ],
       ),

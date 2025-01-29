@@ -65,21 +65,32 @@ class CardWizzApp extends StatelessWidget {
         return MaterialApp(
           title: 'CardWizz',
           debugShowCheckedModeBanner: false,
-          themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light, // This will use light by default
+          themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
           theme: ThemeData(
-            useMaterial3: true,
-            primaryColor: AppColors.primary,
             colorScheme: ColorScheme.light(
               primary: AppColors.primary,
               secondary: AppColors.secondary,
               surface: AppColors.surface,
               background: AppColors.background,
               error: AppColors.error,
-              onPrimary: Colors.white,
-              onSecondary: Colors.white,
-              onSurface: AppColors.text,
-              onBackground: AppColors.text,
+              onPrimary: AppColors.onPrimary,
+              onSecondary: AppColors.onSecondary,
+              onSurface: AppColors.onSurface,
+              onBackground: AppColors.onBackground,
             ),
+            textTheme: TextTheme(
+              titleLarge: TextStyle(color: AppColors.text),
+              titleMedium: TextStyle(color: AppColors.text),
+              bodyLarge: TextStyle(color: AppColors.text),
+              bodyMedium: TextStyle(color: AppColors.text),
+              labelLarge: TextStyle(color: AppColors.text),
+              labelMedium: TextStyle(color: AppColors.text),
+              displayLarge: TextStyle(color: AppColors.text),
+              displayMedium: TextStyle(color: AppColors.text),
+              displaySmall: TextStyle(color: AppColors.text),
+            ),
+            useMaterial3: true,
+            primaryColor: AppColors.primary,
             scaffoldBackgroundColor: AppColors.background,
             appBarTheme: AppBarTheme(
               backgroundColor: Colors.white,
@@ -131,19 +142,14 @@ class CardWizzApp extends StatelessWidget {
             iconTheme: const IconThemeData(
               color: AppColors.text,
             ),
-            textTheme: const TextTheme(
-              displayLarge: AppTextStyles.heading1,
-              displayMedium: AppTextStyles.heading2,
-              bodyLarge: AppTextStyles.body,
-            ).apply(
-              bodyColor: AppColors.text,
-              displayColor: AppColors.text,
-            ),
           ),
-          darkTheme: ThemeData(
-            primarySwatch: Colors.blue,
+          darkTheme: ThemeData.dark().copyWith(
             useMaterial3: true,
-            brightness: Brightness.dark,
+            primaryColor: AppColors.primary,
+            colorScheme: ColorScheme.dark(
+              primary: AppColors.primary,
+              secondary: AppColors.secondary,
+            ),
           ),
           locale: appState.locale,
           supportedLocales: AppState.supportedLocales,

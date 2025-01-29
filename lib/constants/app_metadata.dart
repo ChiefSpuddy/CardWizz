@@ -11,7 +11,7 @@ Track your Pokémon card collection with ease. Features:
 • Scan cards to add them quickly
 ''';
   
-  static const Map<String, String> storeMetadata = {
+  static const Map<String, Map<String, String>> storeMetadata = {
     'android': {
       'package': 'com.cardwizz.app',
       'minSdkVersion': '21',

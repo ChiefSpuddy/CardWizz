@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Add this import
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/app_state.dart';
+import '../l10n/app_localizations.dart';  // Add this import
 import 'home_overview.dart';
 import 'collections_screen.dart';
 import 'search_screen.dart';
@@ -29,11 +30,11 @@ class HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   final List<NavItem> _navItems = const [
-    NavItem(icon: Icons.home_outlined, label: 'Home'),
-    NavItem(icon: Icons.style_outlined, label: 'Collection'),
-    NavItem(icon: Icons.search_outlined, label: 'Search'),
-    NavItem(icon: Icons.analytics_outlined, label: 'Analytics'),
-    NavItem(icon: Icons.person_outline, label: 'Profile'),
+    NavItem(icon: Icons.home_outlined, label: 'home'),
+    NavItem(icon: Icons.style_outlined, label: 'collections'),
+    NavItem(icon: Icons.search_outlined, label: 'search'),  // This will now use the 'search' translation key
+    NavItem(icon: Icons.analytics_outlined, label: 'analytics'),
+    NavItem(icon: Icons.person_outline, label: 'profile'), // This will use the 'profile' translation
   ];
 
   final List<Widget> _pages = const [
@@ -152,7 +153,7 @@ class HomeScreenState extends State<HomeScreen> {
               _navItems.length,
               (index) => NavigationDestination(
                 icon: _buildBottomNavItem(context, index),
-                label: _navItems[index].label,
+                label: AppLocalizations.of(context).translate(_navItems[index].label),
               ),
             ),
           ),

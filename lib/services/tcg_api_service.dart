@@ -17,21 +17,21 @@ class TcgApiService {
     'Charizard': 'name:"charizard"',
     'Pikachu': 'name:"pikachu"',
     'Mew': 'name:"mew"',
-    'Ex Cards': 'supertype:"pokemon ex"',
-    'VMAX': 'supertype:"VMAX"',
-    'Trainer Gallery': 'set.id:swsh12tg OR set.id:swsh11tg',
+    'Ex Cards': 'subtypes:"Pokemon ex"',  // Fixed query
+    'VMAX': 'subtypes:"VMAX"',  // Fixed query
+    'Special Illustration Rare': 'rarity:"Special Illustration Rare"',  // New query replacing Trainer Gallery
   };
 
   static const Map<String, String> setSearchQueries = {
+    'Prismatic Evolution': 'set.id:sv10',
     'Surging Sparks': 'set.id:sv8',
-    'Paradox Rift': 'set.id:sv4',
-    'Prismatic Evolution': 'set.id:sv9',
-    'Paldea Evolved': 'set.id:sv2',
-    'Crown Zenith': 'set.id:swsh12pt5',
-    'Silver Tempest': 'set.id:swsh12',
-    'Lost Origin': 'set.id:swsh11',
-    'Scarlet & Violet': 'set.id:sv1',
-    'Obsidian Flames': 'set.id:sv3',
+    'Stellar Crown': 'set.id:sv7',
+    'Twilight Masquerade': 'set.id:sv6',
+    'Paldean Fates': 'set.id:sv5',      // Corrected ID
+    'Paradox Rift': 'set.id:sv4',       // Corrected ID
+    'Obsidian Flames': 'set.id:sv3',    // Verified ID
+    'Temporal Forces': 'set.id:sv3p5',   // Corrected ID
+    'Paldea Evolved': 'set.id:sv2',     // Corrected ID
   };
 
   static const Map<String, String> sortOptions = {
@@ -45,15 +45,15 @@ class TcgApiService {
 
   // Add these new maps for better set matching
   static const Map<String, List<String>> setAliases = {
+    'sv10': ['Prismatic Evolution', 'Prismatic', 'Evolution'],
     'sv8': ['Surging Sparks', 'Surging', 'Sparks'],
+    'sv7': ['Stellar Crown', 'Stellar', 'Crown'],
+    'sv6': ['Twilight Masquerade', 'Twilight', 'Masquerade'],
+    'sv5': ['Paldean Fates', 'Paldean', 'Fates'],
     'sv4': ['Paradox Rift', 'Paradox', 'Rift'],
-    'sv9': ['Temporal Forces', 'Temporal', 'Forces'],
-    'sv2': ['Paldea Evolved', 'Paldea'],
-    'swsh12pt5': ['Crown Zenith', 'Crown', 'Zenith'],
-    'swsh12': ['Silver Tempest', 'Silver', 'Tempest'],
-    'swsh11': ['Lost Origin', 'Lost', 'Origin'],
-    'sv1': ['Scarlet & Violet', 'Scarlet', 'Violet', 'SV Base'],
     'sv3': ['Obsidian Flames', 'Obsidian', 'Flames'],
+    'sv3p5': ['Temporal Forces', 'Temporal', 'Forces'],
+    'sv2': ['Paldea Evolved', 'Paldea', 'Evolved'],
   };
 
   final _headers = {

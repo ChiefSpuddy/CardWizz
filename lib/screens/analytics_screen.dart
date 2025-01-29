@@ -9,6 +9,7 @@ import '../widgets/animated_background.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/sign_in_view.dart';
 import '../providers/app_state.dart';
+import '../l10n/app_localizations.dart';  // Add this import
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -19,6 +20,7 @@ class AnalyticsScreen extends StatefulWidget {
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildOverviewCard(List<TcgCard> cards) {
+    final localizations = AppLocalizations.of(context);
     final currencyProvider = context.watch<CurrencyProvider>();
     final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
     final mostValuableCard = cards.reduce((a, b) => 
@@ -30,9 +32,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Collection Overview',
-              style: TextStyle(
+            Text(
+              localizations.translate('collectionOverview'),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -75,11 +77,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildTimeFrameCard(List<TcgCard> cards) {
+    final localizations = AppLocalizations.of(context);
     final timeframes = {
-      '24h': 2.5,
-      '7d': 5.8,
-      '30d': 15.2,
-      'YTD': 45.7,
+      localizations.translate('timeframe_24h'): 2.5,
+      localizations.translate('timeframe_7d'): 5.8,
+      localizations.translate('timeframe_30d'): 15.2,
+      localizations.translate('timeframe_YTD'): 45.7,
     };
 
     return Card(
@@ -140,6 +143,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildTopCardsCard(List<TcgCard> cards) {
+    final localizations = AppLocalizations.of(context);
     final currencyProvider = context.watch<CurrencyProvider>();
     final sortedCards = List<TcgCard>.from(cards)
       ..sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
@@ -151,9 +155,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Most Valuable Cards',
-              style: TextStyle(
+            Text(
+              localizations.translate('mostValuable'),
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -181,7 +185,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           ),
                         ),
                         Text(
-                          card.rarity ?? 'Unknown Rarity',
+                          card.rarity ?? localizations.translate('unknownRarity'),
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
@@ -207,6 +211,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildValueTrendCard(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
+    final localizations = AppLocalizations.of(context);
     if (cards.isEmpty) return const SizedBox.shrink();
 
     // Sort cards by value for trend analysis
@@ -228,103 +233,129 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final minY = 0.0;
     final padding = maxY * 0.1;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  'Collection Growth',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  currencyProvider.formatValue(maxY),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
-                  ),
-                ),
-              ],
+    final spots = List.generate(valuePoints.length, (i) {
+      // Add proper rounding to 2 decimal places
+      final roundedValue = double.parse(valuePoints[i].toStringAsFixed(2));
+      return FlSpot(i.toDouble(), roundedValue);
+    });
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            localizations.translate('valueOverTime'),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    getDrawingHorizontalLine: (value) => FlLine(
-                      color: Colors.grey.withOpacity(0.2),
-                      strokeWidth: 1,
-                    ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            currencyProvider.formatValue(maxY),
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Colors.green.shade600,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 200,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: maxY / 4,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: Colors.grey.withOpacity(0.1),
+                    strokeWidth: 1,
                   ),
-                  titlesData: FlTitlesData(
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: max(1, (valuePoints.length / 5).floor()).toDouble(),
-                        getTitlesWidget: (value, _) => Text(
-                          '${value.toInt() + 1}',
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 60,
-                        interval: maxY / 5,
-                        getTitlesWidget: (value, _) => Text(
-                          currencyProvider.formatValue(value),
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                      ),
-                    ),
-                  ),
-                  minY: minY,
-                  maxY: maxY + padding,
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: valuePoints.asMap().entries.map((entry) {
-                        final roundedValue = double.parse(entry.value.toStringAsFixed(2));
-                        return FlSpot(entry.key.toDouble(), roundedValue);
-                      }).toList(),
-                      isCurved: true,
-                      curveSmoothness: 0.3,
-                      color: Colors.green,
-                      barWidth: 2,
-                      dotData: const FlDotData(show: false),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: Colors.green.withOpacity(0.1),
-                      ),
-                    ),
-                  ],
                 ),
+                titlesData: FlTitlesData(
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: max(1, valuePoints.length / 4).toDouble(),
+                      getTitlesWidget: (value, _) {
+                        if (value.toInt() >= valuePoints.length) {
+                          return const SizedBox.shrink();
+                        }
+                        final date = DateTime.now().subtract(
+                          Duration(days: valuePoints.length - 1 - value.toInt())
+                        );
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            '${date.day}/${date.month}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 46,
+                      interval: maxY / 4,
+                      getTitlesWidget: (value, _) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          currencyProvider.formatChartValue(value),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                minY: 0,
+                maxY: maxY + padding,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    curveSmoothness: 0.35,
+                    preventCurveOverShooting: true,
+                    color: Colors.green.shade600,
+                    barWidth: 2.5,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.green.shade600.withOpacity(0.2),
+                          Colors.green.shade600.withOpacity(0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildSetDistribution(List<TcgCard> cards) {
+    final localizations = AppLocalizations.of(context);
     // Group cards by set
     final setMap = <String, int>{};
     for (final card in cards) {
@@ -362,13 +393,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           children: [
             Row(
               children: [
-                const Text(
-                  'Set Distribution',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                Text(
+                  localizations.translate('setDistribution'),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 Text(
-                  '${sortedSets.length} sets',
+                  '${sortedSets.length} ${localizations.translate('sets')}',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w500,
@@ -545,6 +576,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildPriceRangeDistribution(List<TcgCard> cards) {
+    final localizations = AppLocalizations.of(context);
     final currencyProvider = context.watch<CurrencyProvider>();
     final ranges = [
       (0.0, 1.0, '< ${currencyProvider.symbol}1'),
@@ -573,13 +605,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           children: [
             Row(
               children: [
-                const Text(
-                  'Price Distribution',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                Text(
+                  localizations.translate('priceRange'),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 Text(
-                  'Total: ${cards.length} cards',
+                  '${localizations.translate('total')}: ${cards.length} ${localizations.translate('cards')}',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w500,
@@ -679,6 +711,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   @override
   Widget build(BuildContext context) {
     final isSignedIn = context.watch<AppState>().isAuthenticated;
+    final localizations = AppLocalizations.of(context);
 
     return Scaffold(
       body: AnimatedBackground(
@@ -694,15 +727,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                     final cards = snapshot.data!;
                     if (cards.isEmpty) {
-                      return const Center(
-                        child: Text('Add some cards to see analytics'),
+                      return Center(
+                        child: Text(localizations.translate('addCardsForAnalytics')),
                       );
                     }
 
                     return CustomScrollView(
                       slivers: [
                         SliverAppBar(
-                          title: const Text('Analytics'),
+                          title: Text(localizations.translate('analytics')),
                           pinned: true,
                           floating: true,
                         ),
@@ -715,13 +748,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 const SizedBox(height: 16),
                                 _buildValueTrendCard(cards),
                                 const SizedBox(height: 16),
-                                _buildTopCardsCard(cards),  // Moved up
+                                _buildTopCardsCard(cards),
+                                const SizedBox(height: 16),
+                                _buildTopMovers(cards),  // Add this line
                                 const SizedBox(height: 16),
                                 _buildSetDistribution(cards),
                                 const SizedBox(height: 16),
                                 _buildPriceRangeDistribution(cards),
-                                const SizedBox(height: 16),
-                                _buildTopMovers(cards),
                               ],
                             ),
                           ),
@@ -737,6 +770,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildValueSummary(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
+    final localizations = AppLocalizations.of(context);
     final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
     final weeklyChange = 5.8; // TODO: Implement real calculation
 
@@ -760,7 +794,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Portfolio Value',
+                  localizations.translate('portfolioValue'),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 _buildChangeIndicator(weeklyChange),
@@ -781,33 +815,47 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildTopMovers(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
-    // Use real price history for calculations
+    
+    // Get cards with price history
+    final cardsWithHistory = cards.where((card) => 
+      card.price != null && card.priceHistory.isNotEmpty
+    ).toList();
+
+    if (cardsWithHistory.isEmpty) {
+      return const SizedBox.shrink(); // Don't show section if no price history
+    }
+
     final now = DateTime.now();
     final oneDayAgo = now.subtract(const Duration(days: 1));
     
-    final changes = cards.where((card) => card.price != null && card.priceHistory.isNotEmpty)
-      .map((card) {
-        // Find the price from ~24 hours ago
-        final previousPrice = card.priceHistory
-          .lastWhere(
-            (entry) => entry.date.isBefore(oneDayAgo),
-            orElse: () => PriceHistoryEntry(
-              date: oneDayAgo,
-              price: card.price! * 0.95  // Fallback: assume 5% change if no history
-            ),
-          ).price;
-
-        final percentageChange = ((card.price! - previousPrice) / previousPrice) * 100;
-        return PriceChange(
-          card: card,
-          currentPrice: card.price!,
-          previousPrice: previousPrice,
-          percentageChange: percentageChange,
+    final changes = cardsWithHistory.map((card) {
+      // Find the oldest price within last 24 hours
+      final oldPrice = card.priceHistory
+        .where((entry) => entry.date.isAfter(oneDayAgo))
+        .fold<double?>(null, (prev, entry) => 
+          prev == null || entry.date.isBefore(oneDayAgo) ? entry.price : prev
         );
-      })
-      .where((change) => change.percentageChange.abs() > 0)  // Only show cards with price changes
-      .toList()
-      ..sort((a, b) => b.percentageChange.abs().compareTo(a.percentageChange.abs()));
+
+      if (oldPrice == null) return null;
+
+      final currentPrice = card.price!;
+      final percentageChange = ((currentPrice - oldPrice) / oldPrice) * 100;
+      
+      return PriceChange(
+        card: card,
+        currentPrice: currentPrice,
+        previousPrice: oldPrice,
+        percentageChange: double.parse(percentageChange.toStringAsFixed(2)),
+      );
+    })
+    .whereType<PriceChange>() // Remove nulls
+    .where((change) => change.percentageChange.abs() > 0) // Only show actual changes
+    .toList()
+    ..sort((a, b) => b.percentageChange.abs().compareTo(a.percentageChange.abs()));
+
+    if (changes.isEmpty) {
+      return const SizedBox.shrink(); // Don't show section if no changes
+    }
 
     final topChanges = changes.take(3).toList();
     final hasMore = changes.length > 3;

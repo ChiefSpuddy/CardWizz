@@ -109,9 +109,36 @@ class _CardGridItemState extends State<CardGridItem> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
+                    flex: 5, // Adjust image size ratio
                     child: Hero(
                       tag: 'card_${widget.card.id}',
                       child: _buildImage(),
+                    ),
+                  ),
+                  // Add card name section
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      border: Border(
+                        top: BorderSide(
+                          color: Theme.of(context).dividerColor.withOpacity(0.1),
+                        ),
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                    child: Text(
+                      widget.card.name,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ],
@@ -119,11 +146,11 @@ class _CardGridItemState extends State<CardGridItem> {
             ),
           ),
           
-          // Set info overlay
+          // Set info overlay - moved up slightly to accommodate name
           Positioned(
             left: 0,
             right: 0,
-            bottom: 24,
+            bottom: 44, // Adjusted position
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -152,11 +179,11 @@ class _CardGridItemState extends State<CardGridItem> {
             ),
           ),
 
-          // Price bar
+          // Price bar - moved up slightly
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: 24, // Adjusted position
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               color: Colors.black87,

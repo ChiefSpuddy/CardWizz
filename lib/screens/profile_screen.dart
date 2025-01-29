@@ -24,10 +24,16 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   late final AnimationController _animationController;
   String _deleteConfirmation = '';
+  late final ScrollController _scrollController;
+  double? _scrollPosition;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(() {
+      _scrollPosition = _scrollController.position.pixels;
+    });
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 8),
@@ -38,6 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   @override
   void dispose() {
+    _scrollController.dispose();  // Add this
     _animationController.dispose();
     super.dispose();
   }
@@ -269,6 +276,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final colorScheme = Theme.of(context).colorScheme;
     final displayName = user.name ?? '';
     final initial = user.name?.isNotEmpty == true ? user.name![0].toUpperCase() : '';
+    final localizations = AppLocalizations.of(context); // Add this line
 
     return Card(
       elevation: 0,
@@ -354,7 +362,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Welcome, ${user.username ?? user.name ?? ''}',
+                      localizations.translate('welcomeUser').replaceAll('{user}', user.username ?? user.name ?? ''),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -461,6 +469,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         );
 
         return ListView(
+          controller: _scrollController,  // Add this
           padding: const EdgeInsets.all(16),
           children: [
             _buildProfileHeader(context, user),
@@ -567,13 +576,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   const Divider(height: 1),
                   ListTile(
                     leading: Icon(
-                      context.watch<AppState>().isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                      color: Colors.grey,
+                      Theme.of(context).brightness == Brightness.dark 
+                          ? Icons.dark_mode 
+                          : Icons.light_mode,
                     ),
-                    title: Text(localizations.translate('darkMode')),  // Add new translation
+                    title: const Text('Dark Mode'),
                     trailing: Switch(
-                      value: context.watch<AppState>().isDarkMode,
-                      onChanged: (bool value) => context.read<AppState>().toggleTheme(),
+                      value: Theme.of(context).brightness == Brightness.dark,
+                      onChanged: (_) => context.read<AppState>().toggleTheme(),
                     ),
                   ),
                   const Divider(height: 1),
@@ -686,6 +696,21 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         );
       },
     );
+  }
+
+  void _handleThemeChange(bool value) {
+    // Store current scroll position
+    final scrollOffset = _scrollController.offset;
+    
+    // Toggle theme
+    context.read<AppState>().toggleTheme();
+    
+    // Restore scroll position on next frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients && _scrollController.positions.isNotEmpty) {
+        _scrollController.jumpTo(scrollOffset);
+      }
+    });
   }
 
   Widget _buildDangerZone() {

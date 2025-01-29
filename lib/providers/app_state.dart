@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';  // Fix the import
 import '../services/storage_service.dart';
 import '../services/auth_service.dart';
 import '../services/collection_service.dart';  // Add this import
@@ -6,7 +7,8 @@ import '../services/collection_service.dart';  // Add this import
 class AppState with ChangeNotifier {
   final StorageService _storageService;
   final AuthService _authService;
-  CollectionService? _collectionService;  // Add this
+  CollectionService? _collectionService;
+  SharedPreferences? _prefs;  // Add this
   bool _isDarkMode = false;
   bool _isLoading = true;
   Locale _locale = const Locale('en');
@@ -21,16 +23,16 @@ class AppState with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
+    _prefs = await SharedPreferences.getInstance();  // Initialize prefs
     await _authService.initialize();
-    _collectionService = await CollectionService.getInstance();  // Add this
+    _collectionService = await CollectionService.getInstance();
     
     if (_authService.isAuthenticated) {
       _storageService.setCurrentUser(_authService.currentUser!.id);
       _collectionService?.setCurrentUser(_authService.currentUser!.id);
     }
     
-    final darkMode = await _storageService.getBool('darkMode');
-    _isDarkMode = darkMode ?? false;
+    _isDarkMode = _prefs?.getBool('darkMode') ?? false;
 
     await _initializePrivacySettings();
 
@@ -48,9 +50,9 @@ class AppState with ChangeNotifier {
   bool get profileVisible => _profileVisible;
   bool get showPrices => _showPrices;
 
-  Future<void> toggleTheme() async {
+  void toggleTheme() {
     _isDarkMode = !_isDarkMode;
-    await _storageService.setBool('darkMode', _isDarkMode);
+    _prefs?.setBool('darkMode', _isDarkMode);
     notifyListeners();
   }
 

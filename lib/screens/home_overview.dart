@@ -75,28 +75,34 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: interval,
+            horizontalInterval: maxY / 4,
             getDrawingHorizontalLine: (value) => FlLine(
-              color: Colors.grey.withOpacity(0.2),
+              color: Colors.grey.withOpacity(0.1),
               strokeWidth: 1,
             ),
-            checkToShowHorizontalLine: (value) => value >= 0, // Only show lines above 0
           ),
           titlesData: FlTitlesData(
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                interval: max(1, valuePoints.length / 6).toDouble(),
+                interval: max(1, valuePoints.length / 4).toDouble(),
                 getTitlesWidget: (value, _) {
                   if (value.toInt() >= cards.length) return const SizedBox.shrink();
                   final date = DateTime.now().subtract(Duration(days: cards.length - 1 - value.toInt()));
                   return Padding(
-                    padding: const EdgeInsets.only(top: 5),
+                    padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       '${date.day}/${date.month}',
-                      style: const TextStyle(fontSize: 10),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      ),
                     ),
                   );
                 },
@@ -105,40 +111,87 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 60,
-                interval: maxY > 100 ? maxY / 5 : maxY / 4,
-                getTitlesWidget: (value, _) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Text(
-                      currencyProvider.formatChartValue(value),  // Use chart-specific formatting
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 11,
-                      ),
+                reservedSize: 46,
+                interval: maxY / 4,
+                getTitlesWidget: (value, _) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    currencyProvider.formatChartValue(value),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
             ),
           ),
-          minY: 0, // Force minimum to zero
+          borderData: FlBorderData(show: false),
+          minY: 0,
           maxY: maxY + padding,
-          clipData: FlClipData.all(), // Add clipping
+          lineTouchData: LineTouchData(
+            enabled: true,
+            touchTooltipData: LineTouchTooltipData(
+              tooltipBgColor: Theme.of(context).cardColor,
+              tooltipRoundedRadius: 8,
+              getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                return touchedSpots.map((LineBarSpot spot) {
+                  return LineTooltipItem(
+                    currencyProvider.formatValue(spot.y),
+                    TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  );
+                }).toList();
+              },
+              fitInsideHorizontally: true,
+              fitInsideVertically: true,
+            ),
+            getTouchedSpotIndicator: (LineChartBarData barData, List<int> indicators) {
+              return indicators.map((int index) {
+                return TouchedSpotIndicatorData(
+                  FlLine(
+                    color: Colors.green.shade600,
+                    strokeWidth: 2,
+                    dashArray: [3, 3],
+                  ),
+                  FlDotData(
+                    getDotPainter: (spot, percent, barData, index) {
+                      return FlDotCirclePainter(
+                        radius: 4,
+                        color: Colors.white,
+                        strokeWidth: 2,
+                        strokeColor: Colors.green.shade600,
+                      );
+                    },
+                  ),
+                );
+              }).toList();
+            },
+          ),
           lineBarsData: [
             LineChartBarData(
               spots: List.generate(valuePoints.length, (i) {
-                // Round to 2 decimal places to avoid floating point precision issues
-                final roundedValue = (valuePoints[i] * 100).round() / 100;
-                return FlSpot(i.toDouble(), roundedValue);
+                final value = double.parse(valuePoints[i].toStringAsFixed(2));
+                return FlSpot(i.toDouble(), value);
               }),
               isCurved: true,
-              color: Colors.green,
-              barWidth: 3,
+              curveSmoothness: 0.35,
+              preventCurveOverShooting: true,
+              color: Colors.green.shade600,
+              barWidth: 2.5,
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: Colors.green.withOpacity(0.2),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.green.shade600.withOpacity(0.2),
+                    Colors.green.shade600.withOpacity(0.0),
+                  ],
+                ),
               ),
             ),
           ],
@@ -148,6 +201,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   }
 
   Widget _buildTopCards(List<TcgCard> cards) {
+    final localizations = AppLocalizations.of(context);
     final currencyProvider = context.watch<CurrencyProvider>();
     final sortedCards = List<TcgCard>.from(cards)
       ..sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
@@ -160,9 +214,9 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              const Text(
-                'Your Most Valuable Cards',
-                style: TextStyle(
+              Text(
+                localizations.translate('mostValuable'),
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -174,7 +228,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                     Navigator.pushNamed(context, '/collection');
                   }
                 },
-                child: const Text('View All'),
+                child: Text(localizations.translate('viewAll')),
               ),
             ],
           ),
@@ -237,7 +291,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                     Expanded(
                       flex: 2,
                       child: Text(
-                        'Card Name',
+                        localizations.translate('cardName'),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).colorScheme.primary,
@@ -246,7 +300,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                     ),
                     Expanded(
                       child: Text(
-                        'Value',
+                        localizations.translate('value'),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).colorScheme.primary,
@@ -290,6 +344,8 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   }
 
   Widget _buildLatestSetCards(BuildContext context) {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    final localizations = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -298,15 +354,15 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Latest Set',
-                style: TextStyle(
+              Text(
+                localizations.translate('latestSet'),
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
-                'Surging Sparks',
+                localizations.translate('surgingSparks'),
                 style: TextStyle(
                   color: Colors.grey[600],
                   fontSize: 14,
@@ -338,28 +394,50 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 itemCount: cards.length.clamp(0, 10),
                 itemBuilder: (context, index) {
                   final card = cards[index];
-                  return Container(
-                    width: 140,
-                    margin: const EdgeInsets.only(right: 8),
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: Image.network(
-                            card['images']['small'],
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                        if (card['cardmarket']?['prices']?['averageSellPrice'] != null)
-                          Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: Text(
-                              '€${card['cardmarket']['prices']['averageSellPrice'].toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                  // Convert API card data to TcgCard model
+                  final tcgCard = TcgCard(
+                    id: card['id'],
+                    name: card['name'],
+                    number: card['number'],
+                    imageUrl: card['images']['small'],
+                    rarity: card['rarity'],
+                    setName: card['set']?['name'],
+                    price: card['cardmarket']?['prices']?['averageSellPrice'],
+                  );
+                  
+                  return GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => CardDetailsScreen(card: tcgCard),
+                      ),
+                    ),
+                    child: Container(
+                      width: 140,
+                      margin: const EdgeInsets.only(right: 8),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Hero(
+                              tag: 'latest_${tcgCard.id}',
+                              child: Image.network(
+                                tcgCard.imageUrl,
+                                fit: BoxFit.contain,
                               ),
                             ),
                           ),
-                      ],
+                          if (tcgCard.price != null)
+                            Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Text(
+                                currencyProvider.formatValue(tcgCard.price!),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -463,25 +541,22 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                   // Price Trend Chart
                   if (cards.isNotEmpty) ...[
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),  // Reduced padding
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Collection Value Trend',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              _buildPriceChart(cards),
-                            ],
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,  // Changed from start
+                        children: [
+                          Text(
+                            localizations.translate('collectionValueTrend'),
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.5,
+                              height: 1.2,
+                            ),
+                            textAlign: TextAlign.center,  // Add this
                           ),
-                        ),
+                          const SizedBox(height: 24),  // Adjusted spacing
+                          _buildPriceChart(cards),
+                        ],
                       ),
                     ),
                   ],
@@ -500,9 +575,9 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),  // Reduced padding
                       child: Row(
                         children: [
-                          const Text(
-                            'Recent Additions',
-                            style: TextStyle(
+                          Text(
+                            localizations.translate('recentAdditions'),
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -514,7 +589,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                                 Navigator.pushNamed(context, '/collection');
                               }
                             },
-                            child: const Text('View All'),
+                            child: Text(localizations.translate('viewAll')),
                           ),
                         ],
                       ),
@@ -582,32 +657,37 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     IconData icon,
   ) {
     final localizations = AppLocalizations.of(context);
+    final translationKey = title == 'Total Cards' ? 'totalCards' : 
+                          title == 'Collection Value' ? 'portfolioValue' : 
+                          title.toLowerCase().replaceAll(' ', '_');
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Replace the euro icon with a more generic currency icon
             Icon(
               title.toLowerCase().contains('value') 
-                  ? Icons.currency_exchange  // Use currency_exchange for value cards
+                  ? Icons.currency_exchange
                   : icon,
-              size: 32
+              size: 32,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(height: 8),
             Text(
-              localizations.translate(title),  // Add translation
-              style: const TextStyle(
+              localizations.translate(translationKey),
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ],

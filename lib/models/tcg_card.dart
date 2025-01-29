@@ -77,9 +77,11 @@ class TcgCard {
   }
 
   void addPriceHistoryEntry(double price) {
+    // Round price to 2 decimal places when adding to history
+    final roundedPrice = double.parse(price.toStringAsFixed(2));
     priceHistory.add(PriceHistoryEntry(
       date: DateTime.now(),
-      price: price,
+      price: roundedPrice,
     ));
     
     // Keep only last 30 days of history

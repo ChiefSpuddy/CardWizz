@@ -41,22 +41,20 @@ class _SearchScreenState extends State<SearchScreen> {
   static const recentSets = [
     {'name': 'Prismatic Evolution', 'icon': '🌈'},
     {'name': 'Surging Sparks', 'icon': '⚡'},
+    {'name': 'Stellar Crown', 'icon': '👑'},
+    {'name': 'Twilight Masquerade', 'icon': '🎭'},  // Updated name
+    {'name': 'Paradox Rift', 'icon': '🌀'},
+    {'name': 'Obsidian Flames', 'icon': '🔥'},
+    {'name': 'Temporal Forces', 'icon': '⏳'},
     {'name': 'Paldea Evolved', 'icon': '🌟'},
-    {'name': 'Scarlet & Violet', 'icon': '⚡'},
-    {'name': 'Crown Zenith', 'icon': '👑'},
-    {'name': 'Silver Tempest', 'icon': '🌪'},
-    {'name': 'Lost Origin', 'icon': '🌌'},
-    {'name': 'Astral Radiance', 'icon': '✨'},
-    {'name': 'Brilliant Stars', 'icon': '⭐'},
   ];
 
   static const popularSearches = [
     {'name': 'Charizard', 'icon': '🔥'},
     {'name': 'Pikachu', 'icon': '⚡'},
     {'name': 'Mew', 'icon': '✨'},
-    {'name': 'Ex Cards', 'icon': '⭐'},
     {'name': 'VMAX', 'icon': '🌟'},
-    {'name': 'Trainer Gallery', 'icon': '🎨'},
+    {'name': 'Special Illustration Rare', 'icon': '🎨'},  // Updated from Trainer Gallery
   ];
 
   // Add these fields after other declarations
@@ -236,9 +234,9 @@ Widget _buildMainContent() {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 8), // Add top padding
+        const SizedBox(height: 16),  // Increased from 8 to 16
         _buildQuickSearches(),
-        const SizedBox(height: 8),  // Reduced from 16 to 8
+        const SizedBox(height: 16),  // Reduced from 24 to 16
         
         // Update this section to always show recent searches when no results
         if (_searchResults == null && !_isLoading) 
@@ -400,6 +398,9 @@ Widget _buildHorizontalScrollView({
   required List<Widget> children,
   required Color indicatorColor,
 }) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final colorScheme = Theme.of(context).colorScheme;
+
   return Stack(
     children: [
       SingleChildScrollView(
@@ -419,14 +420,18 @@ Widget _buildHorizontalScrollView({
               end: Alignment.centerRight,
               colors: [
                 indicatorColor.withOpacity(0.0),
-                indicatorColor.withOpacity(0.5),
+                isDark 
+                    ? colorScheme.surface.withOpacity(0.8)
+                    : indicatorColor.withOpacity(0.5),
               ],
             ),
           ),
           child: Center(
             child: Icon(
               Icons.chevron_right,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              color: isDark
+                  ? colorScheme.onSurface.withOpacity(0.7)
+                  : colorScheme.onSurface.withOpacity(0.5),
             ),
           ),
         ),
@@ -439,26 +444,24 @@ Widget _buildHorizontalScrollView({
 Widget _buildQuickSearches() {
   final localizations = AppLocalizations.of(context);
   final isDark = Theme.of(context).brightness == Brightness.dark;
+  final colorScheme = Theme.of(context).colorScheme;
   
   return Container(
-    margin: const EdgeInsets.symmetric(horizontal: 16), // Remove vertical margin
+    margin: const EdgeInsets.symmetric(horizontal: 8), // Reduced from 16 to 8 to increase width
     decoration: BoxDecoration(
       gradient: isDark 
           ? LinearGradient(
               colors: [
-                Theme.of(context).colorScheme.surface,
-                Theme.of(context).colorScheme.surface.withOpacity(0.8),
+                colorScheme.surface.withOpacity(0.8),
+                colorScheme.surface.withOpacity(0.6),
               ],
             )
           : AppColors.cardGradient,
       borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
-      ],
+      border: isDark ? Border.all(
+        color: colorScheme.onSurface.withOpacity(0.12),
+        width: 1,
+      ) : null,
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -467,14 +470,17 @@ Widget _buildQuickSearches() {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: isDark
-                ? LinearGradient(
-                    colors: [
-                      Theme.of(context).colorScheme.primaryContainer,
-                      Theme.of(context).colorScheme.secondaryContainer,
+            gradient: LinearGradient(
+              colors: isDark
+                  ? [
+                      colorScheme.primaryContainer,
+                      colorScheme.primary.withOpacity(0.7),
+                    ]
+                  : [
+                      colorScheme.primary,
+                      colorScheme.secondary,
                     ],
-                  )
-                : AppColors.primaryGradient,
+            ),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: Row(
@@ -483,30 +489,44 @@ Widget _buildQuickSearches() {
                 localizations.translate('popularSearches'),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: isDark 
+                      ? colorScheme.onPrimaryContainer
+                      : Colors.white,
                 ),
               ),
               const Spacer(),
-              const Icon(Icons.local_fire_department, color: Colors.white),
+              Icon(
+                Icons.local_fire_department,
+                color: isDark 
+                    ? colorScheme.onPrimaryContainer
+                    : Colors.white,
+              ),
             ],
           ),
         ),
         _buildHorizontalScrollView(
-          indicatorColor: Theme.of(context).colorScheme.surface,
+          indicatorColor: colorScheme.surface,
           children: popularSearches.map((search) => Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(right: 12), // Increased from 8 to 12
             child: ActionChip(
               avatar: Text(search['icon']!, style: const TextStyle(fontSize: 14)),
               label: Text(search['name']!),
               onPressed: () => _performQuickSearch(search['name']!),
               backgroundColor: isDark
-                  ? Theme.of(context).colorScheme.surfaceVariant
-                  : Theme.of(context).colorScheme.secondaryContainer,
+                  ? colorScheme.primaryContainer.withOpacity(0.7)
+                  : colorScheme.secondaryContainer,
+              labelStyle: TextStyle(
+                color: isDark 
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSecondaryContainer,
+              ),
               side: BorderSide.none,
             ),
           )).toList(),
         ),
+        const SizedBox(height: 8), // Added padding before divider
         const Divider(height: 1),
+        const SizedBox(height: 8), // Added padding after divider
         // Recent Sets header and content - updated styling
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -514,12 +534,12 @@ Widget _buildQuickSearches() {
             gradient: LinearGradient(
               colors: isDark
                   ? [
-                      Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-                      Theme.of(context).colorScheme.surface.withOpacity(0.5),
+                      colorScheme.surfaceVariant.withOpacity(0.5),
+                      colorScheme.surface.withOpacity(0.5),
                     ]
                   : [
-                      Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.5),
-                      Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.5),
+                      colorScheme.secondaryContainer.withOpacity(0.5),
+                      colorScheme.tertiaryContainer.withOpacity(0.5),
                     ],
             ),
           ),
@@ -529,34 +549,45 @@ Widget _buildQuickSearches() {
                 localizations.translate('recentSets'),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: isDark 
+                      ? colorScheme.onSurfaceVariant
+                      : colorScheme.onSecondaryContainer,
                 ),
               ),
               const Spacer(),
               Icon(
                 Icons.diamond_outlined,  // Changed from new_releases to diamond_outlined
                 size: 20,
-                color: Theme.of(context).colorScheme.onSurface,
+                color: isDark 
+                    ? colorScheme.onSurfaceVariant
+                    : colorScheme.onSecondaryContainer,
               ),
             ],
           ),
         ),
         _buildHorizontalScrollView(
-          indicatorColor: Theme.of(context).colorScheme.surface,
+          indicatorColor: colorScheme.surface,
           children: recentSets.map((set) => 
             Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.only(right: 12), // Increased from 8 to 12
               child: ActionChip(
                 avatar: Text(set['icon']!, style: const TextStyle(fontSize: 14)),
                 label: Text(set['name']!),
                 onPressed: () => _performQuickSearch(set['name']!),
                 backgroundColor: isDark
-                    ? Theme.of(context).colorScheme.surfaceVariant
-                    : Theme.of(context).colorScheme.secondaryContainer,
+                    ? colorScheme.secondaryContainer.withOpacity(0.7)
+                    : colorScheme.secondaryContainer,
+                labelStyle: TextStyle(
+                  color: isDark 
+                      ? colorScheme.onSecondaryContainer
+                      : colorScheme.onSecondaryContainer,
+                ),
                 side: BorderSide.none,
               ),
             ),
           ).toList(),
         ),
+        const SizedBox(height: 8), // Added bottom padding
       ],
     ),
   );
@@ -573,7 +604,7 @@ Widget _buildRecentSearches() {
   if (searches.isEmpty) return const SizedBox.shrink();
 
   return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16),
+    padding: const EdgeInsets.symmetric(horizontal: 8), // Reduced from 16 to 8 to increase width
     child: Container(
       decoration: CardStyles.cardDecoration(context),
       child: Column(
@@ -607,7 +638,7 @@ Widget _buildRecentSearches() {
               ],
             ),
           ),
-          const SizedBox(height: 12), // Increased padding here
+          const SizedBox(height: 16), // Increased from 12 to 16
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -645,6 +676,7 @@ Widget _buildRecentSearches() {
               );
             },
           ),
+          const SizedBox(height: 8), // Added bottom padding
         ],
       ),
     ),
@@ -724,26 +756,14 @@ Widget _buildRecentSearches() {
             ListTile(
               title: const Text('Name (A to Z)'),
               leading: const Icon(Icons.sort_by_alpha),
-              selected: _currentSort == 'name' && !_sortAscending,
-              onTap: () => _updateSort('name', false),
-            ),
-            ListTile(
-              title: const Text('Name (Z to A)'),
-              leading: const Icon(Icons.sort_by_alpha),
               selected: _currentSort == 'name' && _sortAscending,
               onTap: () => _updateSort('name', true),
             ),
             ListTile(
-              title: const Text('Release Date (Newest)'),
-              leading: const Icon(Icons.calendar_today),
-              selected: _currentSort == 'set.releaseDate' && !_sortAscending,
-              onTap: () => _updateSort('set.releaseDate', false),
-            ),
-            ListTile(
-              title: const Text('Release Date (Oldest)'),
-              leading: const Icon(Icons.calendar_today_outlined),
-              selected: _currentSort == 'set.releaseDate' && _sortAscending,
-              onTap: () => _updateSort('set.releaseDate', true),
+              title: const Text('Name (Z to A)'),
+              leading: const Icon(Icons.sort_by_alpha),
+              selected: _currentSort == 'name' && !_sortAscending,
+              onTap: () => _updateSort('name', false),
             ),
           ],
         ),
