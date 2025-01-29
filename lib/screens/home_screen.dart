@@ -8,6 +8,7 @@ import 'search_screen.dart';
 import 'profile_screen.dart';
 import '../widgets/app_drawer.dart';
 import 'analytics_screen.dart';  // Add this import
+import '../services/purchase_service.dart';  // Add this import
 
 // Add NavItem class at the top level
 class NavItem {
@@ -105,7 +106,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(  // Add this wrapper
+    return WillPopScope(
       onWillPop: () async {
         if (_selectedIndex != 0) {
           setState(() => _selectedIndex = 0);
@@ -123,7 +124,7 @@ class HomeScreenState extends State<HomeScreen> {
                 index: _selectedIndex,
                 children: _pages,
               ),
-              Positioned(  // Add custom menu button
+              Positioned(
                 top: MediaQuery.of(context).padding.top,
                 left: 0,
                 child: IconButton(
@@ -138,11 +139,11 @@ class HomeScreenState extends State<HomeScreen> {
         bottomNavigationBar: Theme(
           data: Theme.of(context).copyWith(
             textTheme: Theme.of(context).textTheme.copyWith(
-              labelSmall: const TextStyle(fontSize: 11), // This will affect the nav bar labels
+              labelSmall: const TextStyle(fontSize: 11),
             ),
           ),
           child: NavigationBar(
-            height: 60,  // Keep nav bar compact
+            height: 60,
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             backgroundColor: Theme.of(context).colorScheme.surface,
             selectedIndex: _selectedIndex,

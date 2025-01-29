@@ -10,6 +10,9 @@ import '../providers/currency_provider.dart';
 import '../widgets/avatar_picker_dialog.dart';
 import '../l10n/app_localizations.dart';  // Fix this import path
 import '../screens/privacy_settings_screen.dart';
+import '../services/purchase_service.dart';  // Make sure this is added
+import 'package:flutter/foundation.dart';  // Add this import for kDebugMode
+import '../widgets/sign_in_view.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -349,12 +352,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Text(
-                      'Avatar',
+                      'Welcome, ${user.username ?? user.name ?? ''}',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.9),
                       ),
                     ),
                   ],
@@ -445,6 +449,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final localizations = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final currencyProvider = context.watch<CurrencyProvider>();
+    final purchaseService = context.watch<PurchaseService>();  // Move this outside StreamBuilder
     
     return StreamBuilder<List<TcgCard>>(
       stream: Provider.of<StorageService>(context).watchCards(),
@@ -596,14 +601,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ),
                   const Divider(height: 1),
                   ListTile(
-                    leading: const Icon(Icons.edit_outlined),
-                    title: Text(localizations.translate('editProfile')),  // Add new translation
-                    onTap: () {
-                      // TODO: Implement profile editing
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
                     leading: const Icon(Icons.security),
                     title: Text(localizations.translate('privacySettings')),  // Add new translation
                     onTap: () => Navigator.push(
@@ -612,6 +609,61 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         builder: (context) => const PrivacySettingsScreen(),
                       ),
                     ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.diamond_outlined),
+                    title: Row(
+                      children: [
+                        const Text('Premium'),
+                        const SizedBox(width: 8),
+                        const Text('💎', style: TextStyle(fontSize: 16)),
+                      ],
+                    ),
+                    subtitle: purchaseService.error != null
+                        ? Text(
+                            purchaseService.error!,
+                            style: TextStyle(color: colorScheme.error),
+                          )
+                        : null,
+                    trailing: purchaseService.isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : purchaseService.isPremium
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.check_circle, color: Colors.green),
+                                  if (kDebugMode) ...[
+                                    const SizedBox(width: 8),
+                                    IconButton(
+                                      icon: const Icon(Icons.refresh),
+                                      onPressed: () => purchaseService.clearPremiumStatus(),
+                                    ),
+                                  ],
+                                ],
+                              )
+                            : null,
+                    onTap: () async {
+                      if (purchaseService.isLoading) return;
+                      
+                      try {
+                        if (!purchaseService.isPremium) {
+                          await purchaseService.purchasePremium();
+                        } else {
+                          await purchaseService.restorePurchases();
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')),
+                          );
+                        }
+                      }
+                    },
                   ),
                   const Divider(height: 1),
                   ListTile(
@@ -698,60 +750,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildSignInView(BuildContext context) {
-    return Center(  // Add this wrapper
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,  // Add this
-          children: [
-            Icon(
-              Icons.account_circle,
-              size: 80, // Reduced from 100
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Sign in to view your profile',
-              style: TextStyle(
-                fontSize: 18, // Reduced from 20
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: 250, // Fixed width for the button
-              height: 44, // Fixed height for the button
-              child: SignInWithAppleButton(
-                onPressed: () => _handleSignIn(context),
-                style: SignInWithAppleButtonStyle.black,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handleSignIn(BuildContext context) async {
-    try {
-      final user = await Provider.of<AppState>(context, listen: false)
-          .signInWithApple();
-      if (user == null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sign in failed')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
@@ -760,7 +758,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
+        // Remove the title property completely
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
@@ -785,7 +783,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           SafeArea(
             child: isSignedIn && user != null
                 ? _buildProfileContent(context, user)
-                : _buildSignInView(context),
+                : const SignInView(),
           ),
         ],
       ),

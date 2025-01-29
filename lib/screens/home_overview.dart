@@ -11,6 +11,7 @@ import '../screens/card_details_screen.dart';
 import '../widgets/sign_in_button.dart';  // Remove sign_in_prompt import
 import '../providers/currency_provider.dart';  // Add this import
 import '../l10n/app_localizations.dart';  // Add this import
+import '../widgets/sign_in_view.dart';  // Add this import
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -387,93 +388,24 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
         ),
       ),
       body: !isSignedIn 
-        ? SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SignInButton(
-                  message: localizations.translate('signInToTrack'),  // Add translation
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    localizations.translate('popularCards'),  // Add translation
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+        ? Stack(
+            children: [
+              // Background animation
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.3,
+                  child: Lottie.asset(
+                    'assets/animations/background.json',
+                    fit: BoxFit.cover,
+                    repeat: true,
+                    frameRate: FrameRate(30),
+                    controller: _animationController,
                   ),
                 ),
-                SizedBox(
-                  height: 200,
-                  child: FutureBuilder(
-                    future: Provider.of<TcgApiService>(context).searchCards('', 
-                      customQuery: TcgApiService.popularSearchQueries['Charizard']),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final cards = (snapshot.data?['data'] as List?) ?? [];
-                      return ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: cards.length.clamp(0, 10),
-                        itemBuilder: (context, index) {
-                          final card = cards[index];
-                          return Container(
-                            width: 140,
-                            margin: const EdgeInsets.only(right: 8),
-                            child: Image.network(
-                              card['images']['small'],
-                              fit: BoxFit.contain,
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    'Latest Sets',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 200,
-                  child: FutureBuilder(
-                    future: Provider.of<TcgApiService>(context).searchCards('', 
-                      customQuery: TcgApiService.setSearchQueries['Paldea Evolved']),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final cards = (snapshot.data?['data'] as List?) ?? [];
-                      return ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: cards.length.clamp(0, 10),
-                        itemBuilder: (context, index) {
-                          final card = cards[index];
-                          return Container(
-                            width: 140,
-                            margin: const EdgeInsets.only(right: 8),
-                            child: Image.network(
-                              card['images']['small'],
-                              fit: BoxFit.contain,
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+              ),
+              // Sign in view on top of animation
+              const SignInView(),
+            ],
           )
         : Stack(
         children: [

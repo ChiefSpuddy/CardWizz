@@ -15,6 +15,8 @@ import '../widgets/animated_background.dart';
 import '../constants/card_styles.dart';
 import '../widgets/app_drawer.dart';  // Add this import at the top
 import '../providers/currency_provider.dart';
+import '../widgets/sign_in_view.dart';
+import '../providers/app_state.dart';
 
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
@@ -133,6 +135,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currencyProvider = context.watch<CurrencyProvider>();
+    final isSignedIn = context.watch<AppState>().isAuthenticated;
 
     return Scaffold(
       appBar: AppBar(
@@ -256,76 +259,100 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
       ),
       drawer: const AppDrawer(),
       body: AnimatedBackground(
-        child: StreamBuilder<List<TcgCard>>(
-          stream: Provider.of<StorageService>(context).watchCards(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            final cards = snapshot.data!;
-            if (cards.isEmpty) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.style_outlined,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.secondary,
+        child: !isSignedIn
+            ? const SignInView()
+            : StreamBuilder<List<TcgCard>>(
+                stream: Provider.of<StorageService>(context).watchCards(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Something went wrong',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              // Add refresh logic
+                            },
+                            child: const Text('Try Again'),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Start Your Collection',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                    );
+                  }
+
+                  if (snapshot.data?.isEmpty ?? true) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.style_outlined,
+                              size: 64,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              'Your Collection is Empty',
+                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Start by adding your first card or create a new binder',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: () => _createCollection(context),
+                                  icon: const Icon(Icons.create_new_folder),
+                                  label: const Text('New Binder'),
+                                ),
+                                const SizedBox(width: 16),
+                                FilledButton.icon(
+                                  onPressed: () {
+                                    final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                                    homeState?.setSelectedIndex(2);
+                                  },
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Add Card'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Add cards to your collection to track their value and see detailed analytics',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      FilledButton.icon(
-                        onPressed: () {
-                          if (context.mounted) {
-                            final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                            homeState?.setSelectedIndex(2); // Switch to search tab
-                          }
-                        },
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Your First Card'),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
+                    );
+                  }
 
-            final totalValue = cards.fold<double>(
-              0,
-              (sum, card) => sum + (card.price ?? 0),
-            );
-
-            return AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: _showCustomCollections
-                  ? const CustomCollectionsGrid()
-                  : const CollectionGrid(),
-            );
-          },
-        ),
+                  return AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: _showCustomCollections
+                        ? const CustomCollectionsGrid()
+                        : const CollectionGrid(),
+                  );
+                },
+              ),
       ),
-      floatingActionButton: _showCustomCollections
+      floatingActionButton: isSignedIn && _showCustomCollections
           ? FloatingActionButton.extended(
               onPressed: () => _createCollection(context),
               elevation: 4,

@@ -11,33 +11,46 @@ import 'constants/text_styles.dart';
 import 'services/tcg_api_service.dart';
 import 'services/auth_service.dart'; // Add this import
 import 'providers/currency_provider.dart';
+import 'services/purchase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Set orientation
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
 
-  // Initialize storage service
+  // Initialize services
+  final purchaseService = PurchaseService();
   final storageService = await StorageService.init();
-  final authService = AuthService(); // Add this line
-  final appState = AppState(storageService, authService); // Fix constructor call
-  await appState.initialize();
+  final authService = AuthService();
+  final appState = AppState(storageService, authService);
+  
+  // Initialize services
+  await Future.wait([
+    purchaseService.initialize(),
+    appState.initialize(),
+  ]);
 
   runApp(
     MultiProvider(
       providers: [
+        // Core providers
+        ChangeNotifierProvider<PurchaseService>.value(value: purchaseService),
         ChangeNotifierProvider.value(value: appState),
         Provider<StorageService>.value(value: storageService),
+        Provider<AuthService>.value(value: authService),
+        
+        // Feature providers
         Provider<TcgApiService>(create: (_) => TcgApiService()),
         ChangeNotifierProvider<CurrencyProvider>(
           create: (_) => CurrencyProvider(),
         ),
       ],
-      child: const CardWizzApp(),
+      child: Builder(
+        builder: (context) {
+          // Verify provider is accessible
+          final purchaseService = Provider.of<PurchaseService>(context, listen: false);
+          print('PurchaseService initialized: ${purchaseService.isLoading}');
+          return const CardWizzApp();
+        },
+      ),
     ),
   );
 }

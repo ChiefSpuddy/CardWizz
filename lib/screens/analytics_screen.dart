@@ -7,6 +7,8 @@ import '../services/storage_service.dart';
 import '../models/tcg_card.dart';
 import '../widgets/animated_background.dart';
 import '../providers/currency_provider.dart';
+import '../widgets/sign_in_view.dart';
+import '../providers/app_state.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -676,54 +678,58 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isSignedIn = context.watch<AppState>().isAuthenticated;
+
     return Scaffold(
       body: AnimatedBackground(
         child: SafeArea(
-          child: StreamBuilder<List<TcgCard>>(
-            stream: Provider.of<StorageService>(context).watchCards(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
+          child: !isSignedIn
+              ? const SignInView()
+              : StreamBuilder<List<TcgCard>>(
+                  stream: Provider.of<StorageService>(context).watchCards(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-              final cards = snapshot.data!;
-              if (cards.isEmpty) {
-                return const Center(
-                  child: Text('Add some cards to see analytics'),
-                );
-              }
+                    final cards = snapshot.data!;
+                    if (cards.isEmpty) {
+                      return const Center(
+                        child: Text('Add some cards to see analytics'),
+                      );
+                    }
 
-              return CustomScrollView(
-                slivers: [
-                  SliverAppBar(
-                    title: const Text('Analytics'),
-                    pinned: true,
-                    floating: true,
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          _buildValueSummary(cards),
-                          const SizedBox(height: 16),
-                          _buildValueTrendCard(cards),
-                          const SizedBox(height: 16),
-                          _buildTopCardsCard(cards),  // Moved up
-                          const SizedBox(height: 16),
-                          _buildSetDistribution(cards),
-                          const SizedBox(height: 16),
-                          _buildPriceRangeDistribution(cards),
-                          const SizedBox(height: 16),
-                          _buildTopMovers(cards),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+                    return CustomScrollView(
+                      slivers: [
+                        SliverAppBar(
+                          title: const Text('Analytics'),
+                          pinned: true,
+                          floating: true,
+                        ),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                _buildValueSummary(cards),
+                                const SizedBox(height: 16),
+                                _buildValueTrendCard(cards),
+                                const SizedBox(height: 16),
+                                _buildTopCardsCard(cards),  // Moved up
+                                const SizedBox(height: 16),
+                                _buildSetDistribution(cards),
+                                const SizedBox(height: 16),
+                                _buildPriceRangeDistribution(cards),
+                                const SizedBox(height: 16),
+                                _buildTopMovers(cards),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
         ),
       ),
     );
