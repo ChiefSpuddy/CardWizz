@@ -41,7 +41,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
     final localizations = AppLocalizations.of(context);
     return Container(
       height: 36,
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12), // Added more bottom margin
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8), // Removed top margin
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
@@ -141,8 +141,10 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 72,
+        // Remove toolbarHeight as it's causing layout issues
         centerTitle: false,
+        automaticallyImplyLeading: true,
+        titleSpacing: 0, // Add this to fix spacing
         title: StreamBuilder<List<TcgCard>>(
           stream: Provider.of<StorageService>(context).watchCards(),
           builder: (context, snapshot) {
@@ -255,8 +257,8 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48), // Increased from 36
-          child: _buildToggle(),
+          preferredSize: const Size.fromHeight(44), // Single value for height
+          child: _buildToggle(), // Remove Column wrapper
         ),
       ),
       drawer: const AppDrawer(),
