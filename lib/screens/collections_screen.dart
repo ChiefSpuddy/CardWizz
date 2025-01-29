@@ -39,6 +39,8 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
 
   Widget _buildToggle() {
     final localizations = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       height: 36,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8), // Removed top margin
@@ -53,9 +55,17 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
               onTap: () => setState(() => _showCustomCollections = false),
               child: Container(
                 decoration: BoxDecoration(
-                  color: !_showCustomCollections 
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.transparent,
+                  gradient: !_showCustomCollections
+                    ? LinearGradient(
+                        colors: isDark ? [
+                          Colors.blue[900]!,
+                          Colors.blue[800]!,
+                        ] : [
+                          Theme.of(context).colorScheme.primary,
+                          Theme.of(context).colorScheme.secondary,
+                        ],
+                      )
+                    : null,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -66,7 +76,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                       Icons.style,
                       size: 16,
                       color: !_showCustomCollections
-                        ? Theme.of(context).colorScheme.onPrimary
+                        ? Colors.white
                         : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 4),
@@ -75,7 +85,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                       style: TextStyle(
                         fontSize: 13,
                         color: !_showCustomCollections
-                          ? Theme.of(context).colorScheme.onPrimary
+                          ? Colors.white
                           : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -89,9 +99,17 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
               onTap: () => setState(() => _showCustomCollections = true),
               child: Container(
                 decoration: BoxDecoration(
-                  color: _showCustomCollections 
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.transparent,
+                  gradient: _showCustomCollections
+                    ? LinearGradient(
+                        colors: isDark ? [
+                          Colors.blue[900]!,
+                          Colors.blue[800]!,
+                        ] : [
+                          Theme.of(context).colorScheme.primary,
+                          Theme.of(context).colorScheme.secondary,
+                        ],
+                      )
+                    : null,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -102,7 +120,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                       Icons.collections_bookmark,
                       size: 16,
                       color: _showCustomCollections
-                        ? Theme.of(context).colorScheme.onPrimary
+                        ? Colors.white
                         : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 4),
@@ -111,7 +129,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                       style: TextStyle(
                         fontSize: 13,
                         color: _showCustomCollections
-                          ? Theme.of(context).colorScheme.onPrimary
+                          ? Colors.white
                           : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -154,86 +172,130 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
               (sum, card) => sum + (card.price ?? 0),
             );
 
-            if (cards.isEmpty) return const SizedBox.shrink(); // Fix here
+            if (cards.isEmpty) return const SizedBox.shrink();
+            
+            final isDark = Theme.of(context).brightness == Brightness.dark;
 
-            return Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Theme.of(context).colorScheme.primaryContainer,
-                        Theme.of(context).colorScheme.primary.withOpacity(0.7),
-                      ],
+            return Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: () {
+                      final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                      if (homeState != null) {
+                        homeState.setSelectedIndex(3); // Assuming 3 is analytics tab index
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isDark ? [
+                            Colors.grey[800]!,
+                            Colors.grey[700]!,
+                          ] : [
+                            Theme.of(context).colorScheme.primaryContainer,
+                            Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.style_outlined,
+                            size: 16,
+                            color: isDark 
+                              ? Colors.white.withOpacity(0.9)
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${cards.length}',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                ? Colors.white.withOpacity(0.9)
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: () {
+                      final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                      if (homeState != null) {
+                        homeState.setSelectedIndex(3); // Assuming 3 is analytics tab index
+                      }
+                    },
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isDark ? [
+                            Colors.green[900]!,
+                            Colors.green[800]!,
+                          ] : [
+                            Colors.green[200]!,
+                            Colors.green[400]!,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.style_outlined,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${cards.length}',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      child: Consumer<CurrencyProvider>(
+                        builder: (context, currencyProvider, _) => Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              currencyProvider.symbol,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                  ? Colors.white.withOpacity(0.9)
+                                  : Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              (totalValue * currencyProvider.rate).toStringAsFixed(2),
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                  ? Colors.white.withOpacity(0.9)
+                                  : Theme.of(context).colorScheme.onPrimaryContainer,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        currencyProvider.symbol,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        (totalValue * currencyProvider.rate).toStringAsFixed(2),
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             );
           },
         ),
@@ -241,12 +303,10 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
           IconButton(
             icon: const Icon(Icons.analytics_outlined),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AnalyticsScreen(),
-                ),
-              );
+              final homeState = context.findAncestorStateOfType<HomeScreenState>();
+              if (homeState != null) {
+                homeState.setSelectedIndex(3); // Assuming 3 is analytics tab index
+              }
             },
           ),
           IconButton(
@@ -357,13 +417,43 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
               ),
       ),
       floatingActionButton: isSignedIn && _showCustomCollections
-          ? FloatingActionButton.extended(
-              onPressed: () => _createCollection(context),
-              elevation: 4,
-              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-              foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
-              label: const Text('New Binder'),
-              icon: const Icon(Icons.add),
+          ? Container(
+              height: 46, // Smaller height
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(23),
+                gradient: LinearGradient(
+                  colors: isDark ? [
+                    Colors.blue[900]!,
+                    Colors.blue[800]!,
+                  ] : [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: FloatingActionButton.extended(
+                onPressed: () => _createCollection(context),
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                extendedPadding: const EdgeInsets.symmetric(horizontal: 20),
+                icon: const Icon(Icons.add, size: 20), // Smaller icon
+                label: const Text(
+                  'New Binder',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
             )
           : null,
     );

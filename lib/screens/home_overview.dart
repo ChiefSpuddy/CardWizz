@@ -116,9 +116,9 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 getTitlesWidget: (value, _) => Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: Text(
-                    currencyProvider.formatChartValue(value),
+                    currencyProvider.formatChartValue(value.toInt().toDouble()),  // Convert to int
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 10,  // Reduced from 12
                       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                     ),
                   ),
@@ -491,7 +491,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
           Positioned.fill(
             child: Opacity(
               opacity: 0.3,
-              child: Lottie.asset(
+              child: Lottie.asset( 
                 'assets/animations/background.json',
                 fit: BoxFit.cover,
                 repeat: true,

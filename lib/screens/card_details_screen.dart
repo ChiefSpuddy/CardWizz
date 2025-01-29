@@ -1,4 +1,4 @@
-import 'dart:math' show min, max;
+import 'dart:math' show min, max, sin, pi;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/tcg_card.dart';
@@ -29,7 +29,9 @@ class CardDetailsScreen extends StatefulWidget {
   State<CardDetailsScreen> createState() => _CardDetailsScreenState();
 }
 
-class _CardDetailsScreenState extends State<CardDetailsScreen> {
+class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _wobbleController;
+  final _cardKey = GlobalKey();
   final _apiService = TcgApiService();
   bool _isLoading = true;
   Map<String, dynamic>? _additionalData;
@@ -37,7 +39,21 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
   @override
   void initState() {
     super.initState();
+    _wobbleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
     _loadAdditionalData();
+  }
+
+  @override
+  void dispose() {
+    _wobbleController.dispose();
+    super.dispose();
+  }
+
+  void _wobbleCard() {
+    _wobbleController.forward().then((_) => _wobbleController.reverse());
   }
 
   Future<void> _loadAdditionalData() async {
@@ -742,14 +758,34 @@ Widget _buildPricingSection() {
             children: [
               Container(
                 color: isDark ? Colors.black : Colors.grey[100],
-                child: Hero(
-                  tag: widget.heroTagPrefix != null 
-                      ? '${widget.heroTagPrefix}_${widget.card.id}'
-                      : 'card_${widget.card.id}',
-                  child: Image.network(
-                    widget.card.imageUrl,
-                    fit: BoxFit.contain,
-                    height: 400,
+                child: GestureDetector(
+                  onTapDown: (_) => _wobbleCard(),
+                  child: AnimatedBuilder(
+                    animation: _wobbleController,
+                    builder: (context, child) {
+                      return Transform.rotate(
+                        angle: sin(_wobbleController.value * pi) * 0.02,
+                        child: child,
+                      );
+                    },
+                    child: Hero(
+                      tag: widget.heroTagPrefix != null 
+                          ? '${widget.heroTagPrefix}_${widget.card.id}'
+                          : 'card_${widget.card.id}',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.network(
+                          widget.card.imageUrl.replaceAll('/small/', '/large/'), // Try to get higher quality image
+                          fit: BoxFit.contain,
+                          height: 400,
+                          errorBuilder: (context, _, __) => Image.network(
+                            widget.card.imageUrl,
+                            fit: BoxFit.contain,
+                            height: 400,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),

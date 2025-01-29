@@ -49,8 +49,8 @@ class CurrencyProvider extends ChangeNotifier {
   // For chart axes (with K/M formatting)
   String formatChartValue(double value) {
     if (value >= 1000) {
-      return '$symbol${(value / 1000).toStringAsFixed(1)}k';
+      return '$symbol${(value / 1000).round()}k';  // Changed to round() instead of toStringAsFixed(1)
     }
-    return '$symbol${value.toStringAsFixed(2)}';
+    return '$symbol${value.round()}';  // Changed to round() instead of toStringAsFixed(2)
   }
 }

@@ -253,117 +253,119 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       return FlSpot(i.toDouble(), roundedValue);
     });
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            localizations.translate('valueOverTime'),
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
+    return Card(  // Changed from Padding to Card
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              localizations.translate('valueOverTime'),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            currencyProvider.formatValue(maxY),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.green.shade600,
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 8),
+            Text(
+              currencyProvider.formatValue(maxY),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Colors.green.shade600,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 200,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: maxY / 4,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: Colors.grey.withOpacity(0.1),
-                    strokeWidth: 1,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: max(1, valuePoints.length / 4).toDouble(),
-                      getTitlesWidget: (value, _) {
-                        if (value.toInt() >= valuePoints.length) {
-                          return const SizedBox.shrink();
-                        }
-                        final date = DateTime.now().subtract(
-                          Duration(days: valuePoints.length - 1 - value.toInt())
-                        );
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            '${date.day}/${date.month}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                            ),
-                          ),
-                        );
-                      },
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: maxY / 4,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.grey.withOpacity(0.1),
+                      strokeWidth: 1,
                     ),
                   ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 46,
-                      interval: maxY / 4,
-                      getTitlesWidget: (value, _) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Text(
-                          currencyProvider.formatChartValue(value),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  titlesData: FlTitlesData(
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: max(1, valuePoints.length / 4).toDouble(),
+                        getTitlesWidget: (value, _) {
+                          if (value.toInt() >= valuePoints.length) {
+                            return const SizedBox.shrink();
+                          }
+                          final date = DateTime.now().subtract(
+                            Duration(days: valuePoints.length - 1 - value.toInt())
+                          );
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              '${date.day}/${date.month}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 46,
+                        interval: maxY / 4,
+                        getTitlesWidget: (value, _) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Text(
+                            currencyProvider.formatChartValue(value.toInt().toDouble()),  // Convert to int
+                            style: TextStyle(
+                              fontSize: 10,  // Reduced from 12
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                borderData: FlBorderData(show: false),
-                minY: 0,
-                maxY: maxY + padding,
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    curveSmoothness: 0.35,
-                    preventCurveOverShooting: true,
-                    color: Colors.green.shade600,
-                    barWidth: 2.5,
-                    dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.green.shade600.withOpacity(0.2),
-                          Colors.green.shade600.withOpacity(0.0),
-                        ],
+                  borderData: FlBorderData(show: false),
+                  minY: 0,
+                  maxY: maxY + padding,
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      curveSmoothness: 0.35,
+                      preventCurveOverShooting: true,
+                      color: Colors.green.shade600,
+                      barWidth: 2.5,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.green.shade600.withOpacity(0.2),
+                            Colors.green.shade600.withOpacity(0.0),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
