@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';  // Add this for StreamSubscription
 
 class PurchaseService extends ChangeNotifier {
-  static const _kProductId = 'com.sammay.cardwizz.premium_monthly';
+  static const _kProductId = '1Month';  // Updated product ID
   
   final _inAppPurchase = InAppPurchase.instance;
   bool _isLoading = false;
@@ -106,13 +106,11 @@ class PurchaseService extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      // Check if store is available
       final available = await _inAppPurchase.isAvailable();
       if (!available) {
         throw 'Store not available';
       }
 
-      // Query product details first
       final ProductDetailsResponse response = 
           await _inAppPurchase.queryProductDetails({_kProductId});
       
@@ -120,10 +118,19 @@ class PurchaseService extends ChangeNotifier {
         throw 'Product not found';
       }
 
-      final PurchaseParam purchaseParam = 
-          PurchaseParam(productDetails: response.productDetails.first);
-      
-      await _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
+      final productDetails = response.productDetails.first;
+      final PurchaseParam purchaseParam = PurchaseParam(
+        productDetails: productDetails,
+      );
+
+      // Use buyNonConsumable for subscriptions
+      final bool success = await _inAppPurchase.buyNonConsumable(
+        purchaseParam: purchaseParam,
+      );
+
+      if (!success) {
+        throw 'Purchase failed to initialize';
+      }
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
