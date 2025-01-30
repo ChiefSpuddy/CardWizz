@@ -37,6 +37,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     Colors.cyan,
   ];
 
+  bool _isRefreshing = false;
+
   List<MapEntry<String, int>> _getSetDistribution(List<TcgCard> cards) {
     // Group cards by set
     final setMap = <String, int>{};
@@ -882,6 +884,155 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  Widget _buildTopMovers(List<TcgCard> cards) {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    final localizations = AppLocalizations.of(context);
+    
+    // Filter cards with price history
+    final cardsWithHistory = cards.where((card) => 
+      card.price != null && card.priceHistory.isNotEmpty
+    ).toList();
+    
+    // Show placeholder if no price history
+    if (cardsWithHistory.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                localizations.translate('topMovers'),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Checking for price changes...\nCheck back in 24 hours',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Rest of existing _buildTopMovers implementation
+    // ...
+
+    // Calculate 24h changes
+    final periodChanges = cardsWithHistory.map((card) {
+      final change = card.getPriceChange(const Duration(hours: 24));
+      return (card, change);
+    }).where((tuple) => tuple.$2 != null)
+      .toList()
+      ..sort((a, b) => (b.$2 ?? 0).abs().compareTo((a.$2 ?? 0).abs()));
+
+    final topMovers = periodChanges.take(5).toList();
+    
+    if (topMovers.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              localizations.translate('topMovers'),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            ...topMovers.map((tuple) {
+              final card = tuple.$1;
+              final change = tuple.$2 ?? 0;
+              final isPositive = change >= 0;
+              
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Image.network(
+                  card.imageUrl,
+                  height: 40,
+                  width: 28,
+                  fit: BoxFit.contain,
+                ),
+                title: Text(card.name),
+                subtitle: Text(
+                  currencyProvider.formatValue(card.price ?? 0),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: (isPositive ? Colors.green : Colors.red)
+                        .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${isPositive ? '+' : ''}${change.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      color: isPositive ? Colors.green : Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CardDetailsScreen(card: card),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _refreshPrices() async {
+    if (_isRefreshing) return;
+    
+    setState(() => _isRefreshing = true);
+    
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      if (storage.backgroundService != null) {
+        await storage.backgroundService!.refreshPrices();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Prices updated successfully')),
+          );
+        }
+      } else {
+        throw Exception('Background service not initialized');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating prices: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSignedIn = context.watch<AppState>().isAuthenticated;
@@ -912,6 +1063,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           title: Text(localizations.translate('analytics')),
                           pinned: true,
                           floating: true,
+                          actions: [
+                            IconButton(
+                              icon: _isRefreshing 
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.refresh),
+                              onPressed: _isRefreshing ? null : _refreshPrices,
+                            ),
+                          ],
                         ),
                         SliverToBoxAdapter(
                           child: Padding(  // Add this Padding widget
@@ -922,9 +1087,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 const SizedBox(height: 16),
                                 _buildValueTrendCard(cards),
                                 const SizedBox(height: 16),
-                                _buildTopCardsCard(cards),
+                                _buildTopMovers(cards), // Add this line
                                 const SizedBox(height: 16),
-                                _buildTopMovers(cards),  // This should now be visible
+                                _buildTopCardsCard(cards),
                                 const SizedBox(height: 16),
                                 _buildSetDistribution(cards),
                                 const SizedBox(height: 16),
@@ -988,198 +1153,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _buildTopMovers(List<TcgCard> cards) {
-    final currencyProvider = context.watch<CurrencyProvider>();
-    print('Building top movers with ${cards.length} cards');
-    
-    // Get cards with price history
-    final cardsWithHistory = cards.where((card) => 
-      card.price != null && card.priceHistory.isNotEmpty
-    ).toList();
-    print('Cards with history: ${cardsWithHistory.length}');
-
-    // Always create changes list, even with one card
-    final changes = cardsWithHistory.map((card) {
-      final currentPrice = card.price!;
-      final oldPrice = card.priceHistory.first.price;
-      final percentageChange = ((currentPrice - oldPrice) / oldPrice) * 100;
-      
-      return PriceChange(
-        card: card,
-        currentPrice: currentPrice,
-        previousPrice: oldPrice,
-        percentageChange: double.parse(percentageChange.toStringAsFixed(2)),
-      );
-    }).toList();
-
-    print('Found ${changes.length} price changes');
-
-    // Sort by absolute percentage change
-    changes.sort((a, b) => b.percentageChange.abs().compareTo(a.percentageChange.abs()));
-    
-    final topChanges = changes.take(changes.length).toList(); // Show all changes
-    final hasMore = changes.length > 3;
-
-    // Always return the card widget
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Top Movers (24h)',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            ...topChanges.map((change) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Image.network(
-                change.card.imageUrl,
-                height: 40,
-                width: 28,
-                fit: BoxFit.contain,
-              ),
-              title: Text(change.card.name),
-              trailing: _buildPriceChangeIndicator(
-                change.percentageChange,
-                currencyProvider.formatValue(change.currentPrice),
-              ),
-            )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<PriceChange> _calculatePriceChanges(List<TcgCard> cards) {
-    final changes = <PriceChange>[];
-    final now = DateTime.now();
-    
-    for (final card in cards) {
-      if (card.price != null && card.priceHistory.isNotEmpty) {
-        // Find the most recent price within the last 24 hours
-        final recentPrice = card.priceHistory
-            .where((entry) => now.difference(entry.date).inHours <= 24)
-            .lastOrNull;
-            
-        if (recentPrice != null && recentPrice.price > 0) {
-          final percentageChange = ((card.price! - recentPrice.price) / recentPrice.price) * 100;
-          changes.add(PriceChange(
-            card: card,
-            currentPrice: card.price!,
-            previousPrice: recentPrice.price,
-            percentageChange: percentageChange,
-          ));
-        }
-      }
-    }
-    
-    return changes;
-  }
-
-  void _showAllMovers(BuildContext context, List<PriceChange> changes) {
-    final currencyProvider = context.watch<CurrencyProvider>();  // Add this line
-    
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) {
-          final currencyProvider = context.watch<CurrencyProvider>();  // Add this line inside builder
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const Text(
-                      'All Price Changes',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: changes.length,
-                  itemBuilder: (context, index) {
-                    final change = changes[index];
-                    return ListTile(
-                      leading: Image.network(
-                        change.card.imageUrl,
-                        height: 40,
-                        width: 28,
-                        fit: BoxFit.contain,
-                      ),
-                      title: Text(change.card.name),
-                      subtitle: Text(
-                        'Previous: ${currencyProvider.formatValue(change.previousPrice)}',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      trailing: _buildPriceChangeIndicator(
-                        change.percentageChange,
-                        currencyProvider.formatValue(change.currentPrice),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildPriceChangeIndicator(double percentage, String currentPrice) {
-    final isPositive = percentage >= 0;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            // Make background more opaque
-            color: (isPositive ? Colors.green : Colors.red).withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            '${isPositive ? '+' : ''}${percentage.toStringAsFixed(1)}%',
-            style: TextStyle(
-              // Use more contrasting colors
-              color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          currentPrice,
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        ),
-      ],
-    );
-  }
-
   Widget _buildChangeIndicator(double change) {
     final isPositive = change >= 0;
     return Container(
@@ -1218,19 +1191,5 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
     );
   }
-}
-
-class PriceChange {
-  final TcgCard card;
-  final double currentPrice;
-  final double previousPrice;
-  final double percentageChange;
-
-  PriceChange({
-    required this.card,
-    required this.currentPrice,
-    required this.previousPrice,
-    required this.percentageChange,
-  });
 }
 

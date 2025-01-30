@@ -88,15 +88,32 @@ class TcgCard {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     priceHistory.removeWhere((entry) => entry.date.isBefore(thirtyDaysAgo));
   }
+
+  // Add method to calculate price change
+  double? getPriceChange(Duration period) {
+    if (priceHistory.isEmpty || price == null) return null;
+    
+    final now = DateTime.now();
+    final comparison = priceHistory
+        .where((entry) => now.difference(entry.date) <= period)
+        .fold<double?>(null, (prev, entry) => 
+          prev == null || entry.date.isBefore(DateTime.fromMillisecondsSinceEpoch(prev.toInt()))
+              ? entry.price
+              : prev);
+              
+    if (comparison == null) return null;
+    
+    return ((price! - comparison) / comparison) * 100;
+  }
 }
 
 class PriceHistoryEntry {
-  final DateTime date;
   final double price;
+  final DateTime date;
 
   PriceHistoryEntry({
-    required this.date,
     required this.price,
+    required this.date,
   });
 
   factory PriceHistoryEntry.fromJson(Map<String, dynamic> json) {

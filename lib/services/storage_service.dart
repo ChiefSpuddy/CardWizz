@@ -3,13 +3,18 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/tcg_card.dart';
-import 'package:collection/collection.dart';  // Add this import at the top
-import '../services/purchase_service.dart';  // Add this import
+import 'package:collection/collection.dart';
+import '../services/purchase_service.dart';
+import '../services/tcg_api_service.dart';
+import '../services/background_service.dart';
 
 class StorageService {
   static const int _freeUserCardLimit = 10;
   final PurchaseService _purchaseService;
   static StorageService? _instance;
+
+  // Change from late final to nullable
+  BackgroundService? backgroundService;
 
   // Private constructor with purchase service
   StorageService._(this._purchaseService);
@@ -21,9 +26,25 @@ class StorageService {
         await purchase.initialize();
       }
       _instance = StorageService._(purchase);
-      await _instance!._init();
+      
+      // Initialize in sequence
+      await _instance!._init();  // First initialize storage
+      await _instance!._initializeBackgroundService();  // Then initialize background service
     }
     return _instance!;
+  }
+
+  // Rename method to be more specific
+  Future<void> _initializeBackgroundService() async {
+    try {
+      final apiService = TcgApiService();
+      backgroundService = BackgroundService(this, apiService);
+      // Don't await the startPriceUpdates, let it run in the background
+      backgroundService?.startPriceUpdates();
+    } catch (e) {
+      print('Error initializing background service: $e');
+      // Don't rethrow - we want the app to work even if background service fails
+    }
   }
 
   late final SharedPreferences _prefs;
@@ -169,24 +190,41 @@ class StorageService {
 
   // Make saveCard public method async
   Future<void> saveCard(TcgCard card) async {
-    if (_currentUserId == null) {
-      print('No user ID when saving card');
-      return;
-    }
+    if (_currentUserId == null) return;
 
     try {
       final cardsKey = _getUserKey('cards');
-      print('Saving card ${card.name} to key: $cardsKey');
-      
-      // Get existing cards
       final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
       final existingCards = existingCardsJson
           .map((json) => TcgCard.fromJson(jsonDecode(json)))
           .toList();
       
-      // Check if card already exists
-      if (!existingCards.any((c) => c.id == card.id)) {
-        existingCards.add(card);
+      // Find existing card to update price history
+      final existingCard = existingCards.firstWhere(
+        (c) => c.id == card.id,
+        orElse: () => card,
+      );
+      
+      // If card exists and price changed, add to history
+      if (existingCard.price != card.price) {
+        final updatedCard = existingCard.copyWith(
+          price: card.price,
+          priceHistory: [
+            ...existingCard.priceHistory,
+            PriceHistoryEntry(
+              price: existingCard.price ?? 0,
+              date: DateTime.now(),
+            ),
+          ],
+        );
+        
+        // Update or add card
+        final index = existingCards.indexWhere((c) => c.id == card.id);
+        if (index >= 0) {
+          existingCards[index] = updatedCard;
+        } else {
+          existingCards.add(updatedCard);
+        }
         
         // Save updated list
         final updatedCardsJson = existingCards
@@ -194,13 +232,7 @@ class StorageService {
             .toList();
         
         await _prefs.setStringList(cardsKey, updatedCardsJson);
-        
-        // Update stream with new cards
         _cardsController.add(existingCards);
-        
-        print('Added card: ${card.name}. Total cards: ${existingCards.length}');
-      } else {
-        print('Card ${card.name} already exists in collection');
       }
     } catch (e) {
       print('Error saving card: $e');
@@ -359,8 +391,11 @@ class StorageService {
     };
   }
 
+  // Remove the await from dispose since dispose is synchronous
+  @override
   void dispose() {
     _cardsController.close();
+    backgroundService?.dispose();
   }
 
   // Add public getter for premium status

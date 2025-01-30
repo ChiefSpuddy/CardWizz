@@ -92,5 +92,14 @@
 		<false/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>BGTaskSchedulerPermittedIdentifiers</key>
+		<array>
+			<string>com.transistorsoft.fetch</string>
+		</array>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>fetch</string>
+			<string>processing</string>
+		</array>
 	</dict>
 </plist>
