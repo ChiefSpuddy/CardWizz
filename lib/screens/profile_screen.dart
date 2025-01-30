@@ -26,6 +26,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   String _deleteConfirmation = '';
   late final ScrollController _scrollController;
   double? _scrollPosition;
+  bool _showSensitiveInfo = false;
+  bool _notificationsEnabled = false;
 
   @override
   void initState() {
@@ -379,13 +381,31 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (displayName.isNotEmpty)
-                        Text(
-                          displayName,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 200),
+                                opacity: _showSensitiveInfo ? 1.0 : 0.0,
+                                child: Text(
+                                  _showSensitiveInfo ? displayName : '••••••',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                _showSensitiveInfo ? Icons.visibility : Icons.visibility_off,
+                                color: Colors.white70,
+                                size: 20,
+                              ),
+                              onPressed: () => setState(() => _showSensitiveInfo = !_showSensitiveInfo),
+                            ),
+                          ],
                         ),
                       const SizedBox(height: 8),
                       // Username section with its own edit button
@@ -434,11 +454,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       ),
                       if (user.email != null) ...[
                         const SizedBox(height: 8),
-                        Text(
-                          user.email!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.7),
+                        AnimatedOpacity(
+                          duration: const Duration(milliseconds: 200),
+                          opacity: _showSensitiveInfo ? 1.0 : 0.0,
+                          child: Text(
+                            _showSensitiveInfo ? user.email! : '••••••@••••.•••',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.7),
+                            ),
                           ),
                         ),
                       ],
@@ -525,12 +549,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.notifications_outlined),
-                    title: Text(localizations.translate('notifications')),  // Add new translation
+                    title: Text(localizations.translate('notifications')),
+                    subtitle: const Text('Coming soon'), // Add this
                     trailing: Switch(
-                      value: true,
-                      onChanged: (value) {
-                        // TODO: Implement notifications toggle
-                      },
+                      value: _notificationsEnabled,
+                      onChanged: null, // Disable for now
                     ),
                   ),
                   const Divider(height: 1),

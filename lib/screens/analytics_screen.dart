@@ -925,7 +925,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
-                    'Checking for price changes...\nCheck back in 24 hours',
+                    'Updates run daily. Last checked: ${_lastUpdateTime != null 
+                      ? _formatDateTime(_lastUpdateTime!) 
+                      : 'Not yet'}',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
