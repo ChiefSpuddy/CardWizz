@@ -60,6 +60,71 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
     _controller.reverse();
   }
 
+  Future<void> _showDeleteDialog(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Binder?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to delete "${widget.collection.name}"?'),
+            const SizedBox(height: 8),
+            Text(
+              '${widget.collection.cardIds.length} cards will be removed from this binder.',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.delete_forever),
+            label: const Text('Delete'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        final service = await CollectionService.getInstance();
+        await service.deleteCollection(widget.collection.id);
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${widget.collection.name} deleted'),
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  // TODO: Implement undo functionality
+                },
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting binder: $e')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<TcgCard>>(
@@ -92,6 +157,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
             onTapDown: _onTapDown,
             onTapUp: _onTapUp,
             onTapCancel: _onTapCancel,
+            onLongPress: () => _showDeleteDialog(context),  // Add this line
             child: Container(
               decoration: BoxDecoration(
                 color: binderColor,
