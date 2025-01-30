@@ -37,34 +37,81 @@ class _CardGridItemState extends State<CardGridItem> {
     } catch (e) {
       if (!context.mounted) return;
 
+      final colorScheme = Theme.of(context).colorScheme;
+      final storage = Provider.of<StorageService>(context, listen: false);
+      final remainingSlots = storage.remainingFreeSlots;
+
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Premium Required'),
+          title: Row(
+            children: [
+              Icon(Icons.diamond_outlined, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('Premium Required'),
+            ],
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(e.toString()),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () async {
-                  Navigator.pop(context);
-                  final purchaseService = context.read<PurchaseService>();
-                  await purchaseService.purchasePremium();
-                },
-                child: const Text('Upgrade to Premium'),
+              Text(
+                'Free users can add up to 10 cards',
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
               ),
+              Text(
+                'You have $remainingSlots slots remaining',
+                style: TextStyle(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text('Premium features include:'),
+              const SizedBox(height: 8),
+              _buildFeatureRow('Unlimited card collection'),
+              _buildFeatureRow('Price history tracking'),
+              _buildFeatureRow('Advanced analytics'),
+              _buildFeatureRow('Multiple binders'),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: const Text('Maybe Later'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                Navigator.pop(context);
+                final purchaseService = context.read<PurchaseService>();
+                await purchaseService.purchasePremium();
+              },
+              icon: const Text('💎'),
+              label: const Text('Upgrade Now'),
             ),
           ],
         ),
       );
     }
+  }
+
+  Widget _buildFeatureRow(String feature) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            Icons.check_circle_outline,
+            size: 16,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Text(feature),
+        ],
+      ),
+    );
   }
 
   Widget _buildImage() {
