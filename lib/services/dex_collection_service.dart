@@ -14,20 +14,35 @@ class DexCollectionService {
 
   DexCollectionService(this._storage) :
     _namesService = DexNamesService(),
-    _pokeApi = PokeApiService();
+    _pokeApi = PokeApiService() {
+    // Listen for card changes
+    _storage.onCardsChanged.listen((_) {
+      refreshCollection();
+    });
+  }
 
   Future<void> initialize() async {
     if (_isInitialized) return;
     
     try {
-      // Load all cards once
       _allCards = await _storage.getCards();
       
-      // Pre-cache collection status and cards in single pass
+      // Clear existing caches
+      _collectionCache.clear();
+      _cardCache.clear();
+      
+      // Build new caches
       for (final card in _allCards!) {
-        final baseName = card.name.split(' ')[0].toLowerCase();
+        final baseName = _normalizeCardName(card.name);
         _collectionCache[baseName] = true;
-        _cardCache.putIfAbsent(baseName, () => []).add(card);
+        
+        // Ensure we don't add duplicate cards
+        if (!_cardCache.containsKey(baseName)) {
+          _cardCache[baseName] = [];
+        }
+        if (!_cardCache[baseName]!.any((c) => c.id == card.id)) {
+          _cardCache[baseName]!.add(card);
+        }
       }
       
       _isInitialized = true;
@@ -37,16 +52,48 @@ class DexCollectionService {
     }
   }
 
+  String _normalizeCardName(String cardName) {
+    final specialCases = {
+      'mr.': 'mr',
+      'mr ': 'mr',
+      'farfetch\'d': 'farfetchd',
+      'mime jr.': 'mime jr',
+      'mime jr ': 'mime jr',
+    };
+
+    String normalized = cardName.toLowerCase().trim();
+    
+    for (final entry in specialCases.entries) {
+      if (normalized.startsWith(entry.key)) {
+        normalized = normalized.replaceFirst(entry.key, entry.value);
+      }
+    }
+
+    final baseNamePattern = RegExp(r'^([a-zA-Z\-]+)');
+    final match = baseNamePattern.firstMatch(normalized);
+    return match?.group(1) ?? normalized;
+  }
+
+  // Add refresh method
+  Future<void> refreshCollection() async {
+    _isInitialized = false;  // Force re-initialization
+    await initialize();
+  }
+
   bool isPokemonCollected(String pokemonName) {
-    return _collectionCache[pokemonName.toLowerCase()] ?? false;
+    final normalized = _normalizeCardName(pokemonName);
+    final isCollected = _collectionCache[normalized] ?? false;
+    return isCollected;
   }
 
   List<TcgCard> getCardsForPokemon(String pokemonName) {
-    return _cardCache[pokemonName.toLowerCase()] ?? [];
+    final normalized = _normalizeCardName(pokemonName);
+    return _cardCache[normalized] ?? [];
   }
 
+  // Update getGenerationStats to refresh first
   Future<Map<String, dynamic>> getGenerationStats(int startNum, int endNum) async {
-    if (!_isInitialized) await initialize();
+    await refreshCollection();  // Refresh before getting stats
 
     final stats = {
       'cardCount': 0,

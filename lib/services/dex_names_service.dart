@@ -10,6 +10,17 @@ class DexNamesService {
   // Add cached generation ranges
   final Map<int, List<String>> _generationCache = {};
 
+  // Add mapping for special cases
+  final Map<String, String> _specialNameMappings = {
+    'nidoran-f': 'Nidoran♀',
+    'nidoran-m': 'Nidoran♂',
+    'farfetchd': 'Farfetch\'d',
+    'mr-mime': 'Mr. Mime',
+    'ho-oh': 'Ho-Oh',
+    'mime-jr': 'Mime Jr.',
+    // Add more mappings as needed
+  };
+
   Future<List<String>> loadDexNames() async {
     if (_isLoaded) return _dexMap.values.toList();
     try {
@@ -46,7 +57,7 @@ class DexNamesService {
       for (var i = 0; i < results.length; i++) {
         final data = results[i];
         if (data != null) {
-          final name = _capitalize(data['name']);
+          final name = _formatPokemonName(data['name']); // Use new format method
           names.add(name);
           _dexMap[start + i] = name;  // Store in map for reverse lookup
         }
@@ -63,6 +74,22 @@ class DexNamesService {
   String _capitalize(String text) {
     if (text.isEmpty) return text;
     return text[0].toUpperCase() + text.substring(1);
+  }
+
+  String _formatPokemonName(String name) {
+    // Check special mappings first
+    if (_specialNameMappings.containsKey(name.toLowerCase())) {
+      return _specialNameMappings[name.toLowerCase()]!;
+    }
+
+    // Handle hyphenated names
+    if (name.contains('-')) {
+      return name.split('-')
+          .map((part) => _capitalize(part))
+          .join('-');
+    }
+
+    return _capitalize(name);
   }
 
   // Update to use map lookup

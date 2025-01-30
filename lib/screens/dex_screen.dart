@@ -45,6 +45,8 @@ class _DexScreenState extends State<DexScreen> {
   static const double _aspectRatio = 0.9;  // Slightly wider for better sprite alignment
   static const int _gridCrossAxisCount = 3;
 
+  bool _isInitialized = false;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +57,18 @@ class _DexScreenState extends State<DexScreen> {
     _initialize();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _refreshIfNeeded();
+  }
+
+  void _refreshIfNeeded() {
+    if (_isInitialized && mounted) {
+      _refreshDex();
+    }
+  }
+
   Future<void> _initialize() async {
     if (!mounted) return;
     
@@ -63,6 +77,7 @@ class _DexScreenState extends State<DexScreen> {
     try {
       // Initialize collection service
       await _collectionService.initialize();
+      _isInitialized = true;  // Mark as initialized
       
       // Load first generation by default
       _selectedGeneration = 'Gen 1';
@@ -91,6 +106,26 @@ class _DexScreenState extends State<DexScreen> {
           _allDexNames = [];  // Ensure we have an empty list rather than null
         });
       }
+    }
+  }
+
+  Future<void> _refreshDex() async {
+    if (!mounted) return;
+    
+    try {
+      await _collectionService.refreshCollection();
+      
+      if (_selectedGeneration != null) {
+        final (start, end) = _generations[_selectedGeneration]!;
+        final stats = await _collectionService.getGenerationStats(start, end);
+        if (mounted) {
+          setState(() {
+            _updateGenerationStats(_selectedGeneration!, stats);
+          });
+        }
+      }
+    } catch (e) {
+      print('Error refreshing dex: $e');
     }
   }
 

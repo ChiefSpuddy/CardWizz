@@ -97,11 +97,26 @@ class StorageService {
 
   void _loadInitialData() {
     if (_currentUserId == null) {
+      print('No user ID during load'); // Debug
       _cardsController.add([]);
       return;
     }
-    final cards = _getCards();
-    _cardsController.add(cards);
+
+    final cardsKey = _getUserKey('cards');
+    print('Loading cards with key: $cardsKey'); // Debug
+    
+    final cardsJson = _prefs.getStringList(cardsKey) ?? [];
+    print('Found ${cardsJson.length} cards in storage'); // Debug
+
+    try {
+      final cards = cardsJson
+          .map((json) => TcgCard.fromJson(jsonDecode(json)))
+          .toList();
+      _cardsController.add(cards);
+    } catch (e) {
+      print('Error loading cards: $e');
+      _cardsController.add([]);
+    }
   }
 
   Stream<List<TcgCard>> watchCards() {
@@ -195,45 +210,30 @@ class StorageService {
     try {
       final cardsKey = _getUserKey('cards');
       final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
+      
+      // Parse all cards and remove duplicates by ID
       final existingCards = existingCardsJson
           .map((json) => TcgCard.fromJson(jsonDecode(json)))
           .toList();
       
-      // Find existing card to update price history
-      final existingCard = existingCards.firstWhere(
-        (c) => c.id == card.id,
-        orElse: () => card,
-      );
+      // Remove any existing versions of this card
+      existingCards.removeWhere((c) => c.id == card.id);
       
-      // If card exists and price changed, add to history
-      if (existingCard.price != card.price) {
-        final updatedCard = existingCard.copyWith(
-          price: card.price,
-          priceHistory: [
-            ...existingCard.priceHistory,
-            PriceHistoryEntry(
-              price: existingCard.price ?? 0,
-              date: DateTime.now(),
-            ),
-          ],
-        );
-        
-        // Update or add card
-        final index = existingCards.indexWhere((c) => c.id == card.id);
-        if (index >= 0) {
-          existingCards[index] = updatedCard;
-        } else {
-          existingCards.add(updatedCard);
-        }
-        
-        // Save updated list
-        final updatedCardsJson = existingCards
-            .map((c) => jsonEncode(c.toJson()))
-            .toList();
-        
-        await _prefs.setStringList(cardsKey, updatedCardsJson);
-        _cardsController.add(existingCards);
-      }
+      // Add the new card
+      existingCards.add(card);
+
+      // Save back to storage
+      final updatedCardsJson = existingCards
+          .map((c) => jsonEncode(c.toJson()))
+          .toList();
+
+      await _prefs.setStringList(cardsKey, updatedCardsJson);
+      
+      // Update stream and notify listeners
+      _cardsController.add(existingCards);
+      
+      // Broadcast a notification that cards have changed
+      _notifyCardChange();
     } catch (e) {
       print('Error saving card: $e');
       rethrow;
@@ -391,10 +391,19 @@ class StorageService {
     };
   }
 
+  // Add notification mechanism
+  final _cardChangeController = StreamController<void>.broadcast();
+  Stream<void> get onCardsChanged => _cardChangeController.stream;
+
+  void _notifyCardChange() {
+    _cardChangeController.add(null);
+  }
+
   // Remove the await from dispose since dispose is synchronous
   @override
   void dispose() {
     _cardsController.close();
+    _cardChangeController.close();
     backgroundService?.dispose();
   }
 
