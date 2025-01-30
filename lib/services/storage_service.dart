@@ -362,4 +362,7 @@ class StorageService {
   void dispose() {
     _cardsController.close();
   }
+
+  // Add public getter for premium status
+  bool get isPremium => _purchaseService.isPremium;
 }

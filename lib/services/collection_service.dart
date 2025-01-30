@@ -11,11 +11,13 @@ import '../providers/sort_provider.dart';  // Add this
 import '../services/purchase_service.dart';
 
 class CollectionService {
+  static const int _freeUserBinderLimit = 10;  // Add this constant
   static CollectionService? _instance;
   final Database _db;
   final StorageService _storage;  // Add this
   final _collectionsController = StreamController<List<CustomCollection>>.broadcast();
   String? _currentUserId;
+  List<CustomCollection> _collections = [];  // Add this field
 
   // Update constructor to take both dependencies
   CollectionService._(this._db, this._storage);
@@ -200,6 +202,11 @@ class CollectionService {
   }) async {
     if (_currentUserId == null) return;
 
+    final collections = await getCustomCollections();
+    if (!_storage.isPremium && collections.length >= _freeUserBinderLimit) {
+      throw 'Free users can only create up to $_freeUserBinderLimit binders. Upgrade to Premium for unlimited binders!';
+    }
+
     await _db.insert('collections', {
       'id': DateTime.now().millisecondsSinceEpoch.toString(),
       'name': name,
@@ -211,6 +218,19 @@ class CollectionService {
     });
 
     await _refreshCollections();
+  }
+
+  // Fix return type for binder limit methods
+  Future<bool> canCreateMoreBinders() async {
+    if (_storage.isPremium) return true;
+    final collections = await getCustomCollections();
+    return collections.length < _freeUserBinderLimit;
+  }
+
+  Future<int> get remainingBinderSlots async {
+    if (_storage.isPremium) return -1; // -1 indicates unlimited
+    final collections = await getCustomCollections();
+    return _freeUserBinderLimit - collections.length;
   }
 
   Future<void> updateCollectionDetails(

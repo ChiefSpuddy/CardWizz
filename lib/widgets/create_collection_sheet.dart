@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';  // Add this import
 import '../services/collection_service.dart';
+import '../services/purchase_service.dart';  // Add this import
 
 class CreateCollectionSheet extends StatefulWidget {
   const CreateCollectionSheet({super.key});
@@ -33,35 +35,96 @@ class _CreateCollectionSheetState extends State<CreateCollectionSheet> {
   }
 
   Future<void> _createCollection() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_formKey.currentState?.validate() ?? false) {
+      _formKey.currentState!.save();
+      
+      try {
+        final service = await CollectionService.getInstance();
+        final remainingSlots = await service.remainingBinderSlots;
 
-    setState(() => _isCreating = true);
-
-    try {
-      final service = await CollectionService.getInstance();
-      await service.createCustomCollection(
-        _nameController.text,
-        _descriptionController.text,
-        color: _selectedColor,  // Pass the selected color
-      );
-
-      if (mounted) {
+        await service.createCustomCollection(
+          _nameController.text,
+          _descriptionController.text,
+          color: _selectedColor,
+        );
+        
+        if (!context.mounted) return;
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Created binder "${_nameController.text}"')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create binder')),
-        );
+      } catch (e) {
+        if (!context.mounted) return;
+        
+        showPremiumDialog(context, e.toString());
       }
     }
+  }
 
-    if (mounted) {
-      setState(() => _isCreating = false);
-    }
+  void showPremiumDialog(BuildContext context, String error) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.diamond_outlined, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('Premium Required'),
+          ],
+        ),
+        content: SingleChildScrollView(  // Add this wrapper
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(error),
+              const SizedBox(height: 16),
+              Text(
+                'Free users can create up to 10 binders',
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 8),
+              const Text('Premium features include:'),
+              const SizedBox(height: 8),
+              _buildFeatureRow('Unlimited binders'),
+              _buildFeatureRow('Price history tracking'),
+              _buildFeatureRow('Advanced analytics'),
+              _buildFeatureRow('Unlimited cards'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Maybe Later'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              Provider.of<PurchaseService>(context, listen: false).purchasePremium();
+            },
+            icon: const Text('💎'),
+            label: const Text('Upgrade Now'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureRow(String feature) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            Icons.check_circle_outline,
+            size: 16,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Text(feature),
+        ],
+      ),
+    );
   }
 
   @override
