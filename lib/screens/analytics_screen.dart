@@ -13,6 +13,7 @@ import '../l10n/app_localizations.dart';  // Add this import
 import '../screens/card_details_screen.dart';  // Add this import
 import 'dart:ui';  // Add this for ImageFilter
 import '../services/purchase_service.dart';  // Add this import
+import 'package:flutter/services.dart'; // Add this import at the top
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -748,7 +749,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         Text(
                           '${localizations.translate('total')}: ${cards.length} ${localizations.translate('cards')}',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.w500,
                           ),
                         ),

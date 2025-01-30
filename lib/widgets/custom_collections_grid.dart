@@ -106,6 +106,12 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('${widget.collection.name} deleted'),
+              duration: const Duration(seconds: 2), // Reduced from default 4
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               action: SnackBarAction(
                 label: 'Undo',
                 onPressed: () {
