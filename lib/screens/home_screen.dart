@@ -8,6 +8,7 @@ import 'home_overview.dart';
 import 'collections_screen.dart';
 import 'search_screen.dart';
 import 'profile_screen.dart';
+import 'dex_screen.dart';  // Add this import
 import '../widgets/app_drawer.dart';
 import 'analytics_screen.dart';  // Add this import
 import '../services/purchase_service.dart';  // Add this import
@@ -33,17 +34,19 @@ class HomeScreenState extends State<HomeScreen> {
 
   final List<NavItem> _navItems = const [
     NavItem(icon: Icons.home_outlined, label: 'home'),
-    NavItem(icon: Icons.style_outlined, label: 'collections'),
-    NavItem(icon: Icons.search_outlined, label: 'search'),  // This will now use the 'search' translation key
+    NavItem(icon: Icons.style_outlined, label: 'Collection'),
+    NavItem(icon: Icons.search_outlined, label: 'search'),
     NavItem(icon: Icons.analytics_outlined, label: 'analytics'),
-    NavItem(icon: Icons.person_outline, label: 'profile'), // This will use the 'profile' translation
+    NavItem(icon: Icons.catching_pokemon_outlined, label: 'Dex'),
+    NavItem(icon: Icons.person_outline, label: 'profile'),
   ];
 
   final List<Widget> _pages = const [
     HomeOverview(),
     CollectionsScreen(),
     SearchScreen(),
-    AnalyticsScreen(),  // Add Analytics page
+    AnalyticsScreen(),
+    DexScreen(),
     ProfileScreen(),
   ];
 
@@ -77,8 +80,8 @@ class HomeScreenState extends State<HomeScreen> {
     final appState = context.watch<AppState>();
     final user = appState.currentUser;
     
-    // Custom profile icon/avatar for the profile tab
-    if (index == 4) { // Assuming 4 is the index for the profile tab
+    // Custom profile icon/avatar for the profile tab (index 5 is profile now)
+    if (index == 5) {  // Changed from 4 to 5
       if (user != null && user.avatarPath != null) {
         return CircleAvatar(
           radius: 14,
@@ -138,7 +141,7 @@ class HomeScreenState extends State<HomeScreen> {
         bottomNavigationBar: Theme(
           data: Theme.of(context).copyWith(
             textTheme: Theme.of(context).textTheme.copyWith(
-              labelSmall: const TextStyle(fontSize: 11),
+              labelSmall: const TextStyle(fontSize: 10),  // Even smaller text
             ),
           ),
           child: NavigationBar(
@@ -147,7 +150,7 @@ class HomeScreenState extends State<HomeScreen> {
             backgroundColor: Theme.of(context).colorScheme.surface,
             selectedIndex: _selectedIndex,
             onDestinationSelected: (index) {
-              HapticFeedback.selectionClick();  // Add haptic feedback
+              HapticFeedback.selectionClick();
               setSelectedIndex(index);
             },
             destinations: List.generate(

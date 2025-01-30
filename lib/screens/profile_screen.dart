@@ -612,8 +612,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.sync),
-                    title: const Text('Background Price Updates'),
-                    subtitle: const Text('Automatically check prices every 24 hours'),
+                    title: const Text('Background Refresh'),
                     trailing: Switch(
                       value: context.select((StorageService s) => 
                         s.backgroundService?.isEnabled ?? false),
@@ -713,7 +712,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         ],
       ),
       subtitle: Text(
-        purchaseService.error ?? 'Unlock unlimited collections and more',
+        purchaseService.error ?? 'Access to unrestricted collections, analytics, and more!',
         style: TextStyle(
           color: purchaseService.error != null 
               ? colorScheme.error 
@@ -797,7 +796,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ),
           ),
           subtitle: Text(
-            'This will permanently delete your account and all data',
+            'Warning - This will permanently delete your account and all associated data.',
             style: TextStyle(
               color: colorScheme.onSurface.withOpacity(0.7),
             ),
