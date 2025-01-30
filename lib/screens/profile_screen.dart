@@ -622,20 +622,38 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ),
                   const Divider(height: 1),
                   ListTile(
-                    leading: const Icon(Icons.diamond_outlined),
+                    leading: const Icon(Icons.diamond_outlined, color: Colors.amber),
                     title: Row(
                       children: [
                         const Text('Premium'),
                         const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '£1.99/month',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
                         const Text('💎', style: TextStyle(fontSize: 16)),
                       ],
                     ),
-                    subtitle: purchaseService.error != null
-                        ? Text(
-                            purchaseService.error!,
-                            style: TextStyle(color: colorScheme.error),
-                          )
-                        : null,
+                    subtitle: Text(
+                      purchaseService.error ?? 'Unlock unlimited collections and more',
+                      style: TextStyle(
+                        color: purchaseService.error != null 
+                            ? colorScheme.error 
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                     trailing: purchaseService.isLoading
                         ? const SizedBox(
                             width: 20,
