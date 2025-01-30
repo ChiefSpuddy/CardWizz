@@ -5,6 +5,7 @@ import 'dart:async';  // Add this for StreamSubscription
 
 class PurchaseService extends ChangeNotifier {
   static const _kProductId = '1Month';  // Updated product ID
+  static bool debugForcePremium = false;  // Add this flag
   
   final _inAppPurchase = InAppPurchase.instance;
   bool _isLoading = false;
@@ -14,7 +15,12 @@ class PurchaseService extends ChangeNotifier {
 
   bool get isLoading => _isLoading;
   String? get error => _error;
-  bool get isPremium => _isPremium;
+  bool get isPremium {
+    if (kDebugMode && debugForcePremium) {
+      return true;
+    }
+    return _isPremium;
+  }
 
   Future<void> initialize() async {
     try {
@@ -152,6 +158,23 @@ class PurchaseService extends ChangeNotifier {
       await prefs.remove('is_premium');
       _isPremium = false;
       notifyListeners();
+    }
+  }
+
+  // Add debug methods
+  void enableTestMode() {
+    if (kDebugMode) {
+      debugForcePremium = true;
+      notifyListeners();
+      print('DEBUG: Premium test mode enabled');
+    }
+  }
+
+  void disableTestMode() {
+    if (kDebugMode) {
+      debugForcePremium = false;
+      notifyListeners();
+      print('DEBUG: Premium test mode disabled');
     }
   }
 }

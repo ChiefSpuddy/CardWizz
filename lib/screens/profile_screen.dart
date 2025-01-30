@@ -621,78 +621,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                   ),
                   const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.diamond_outlined, color: Colors.amber),
-                    title: Row(
-                      children: [
-                        const Text('Premium'),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '£1.99/month',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Text('💎', style: TextStyle(fontSize: 16)),
-                      ],
-                    ),
-                    subtitle: Text(
-                      purchaseService.error ?? 'Unlock unlimited collections and more',
-                      style: TextStyle(
-                        color: purchaseService.error != null 
-                            ? colorScheme.error 
-                            : colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    trailing: purchaseService.isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : purchaseService.isPremium
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.check_circle, color: Colors.green),
-                                  if (kDebugMode) ...[
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      icon: const Icon(Icons.refresh),
-                                      onPressed: () => purchaseService.clearPremiumStatus(),
-                                    ),
-                                  ],
-                                ],
-                              )
-                            : null,
-                    onTap: () async {
-                      if (purchaseService.isLoading) return;
-                      
-                      try {
-                        if (!purchaseService.isPremium) {
-                          await purchaseService.purchasePremium();
-                        } else {
-                          await purchaseService.restorePurchases();
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: $e')),
-                          );
-                        }
-                      }
-                    },
-                  ),
+                  _buildPremiumTile(context),
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.logout, color: Colors.red),
@@ -712,6 +641,80 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             const SizedBox(height: 32),
           ],
         );
+      },
+    );
+  }
+
+  Widget _buildPremiumTile(BuildContext context) {
+    final purchaseService = context.watch<PurchaseService>();
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListTile(
+      leading: const Icon(Icons.diamond_outlined, color: Colors.amber),
+      title: Row(
+        children: [
+          const Text('Premium'),
+          if (kDebugMode) ...[  // Add debug controls
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.bug_report),
+              onPressed: () {
+                if (purchaseService.isPremium) {
+                  purchaseService.disableTestMode();
+                } else {
+                  purchaseService.enableTestMode();
+                }
+              },
+              tooltip: 'Toggle test mode',
+            ),
+          ],
+        ],
+      ),
+      subtitle: Text(
+        purchaseService.error ?? 'Unlock unlimited collections and more',
+        style: TextStyle(
+          color: purchaseService.error != null 
+              ? colorScheme.error 
+              : colorScheme.onSurfaceVariant,
+        ),
+      ),
+      trailing: purchaseService.isLoading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : purchaseService.isPremium
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green),
+                    if (kDebugMode) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: () => purchaseService.clearPremiumStatus(),
+                      ),
+                    ],
+                  ],
+                )
+              : null,
+      onTap: () async {
+        if (purchaseService.isLoading) return;
+        
+        try {
+          if (!purchaseService.isPremium) {
+            await purchaseService.purchasePremium();
+          } else {
+            await purchaseService.restorePurchases();
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error: $e')),
+            );
+          }
+        }
       },
     );
   }

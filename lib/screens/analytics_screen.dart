@@ -11,6 +11,8 @@ import '../widgets/sign_in_view.dart';
 import '../providers/app_state.dart';
 import '../l10n/app_localizations.dart';  // Add this import
 import '../screens/card_details_screen.dart';  // Add this import
+import 'dart:ui';  // Add this for ImageFilter
+import '../services/purchase_service.dart';  // Add this import
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -20,6 +22,36 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  // Add these properties at the top of the class
+  static const int initialDisplayCount = 5;
+  final List<Color> colors = [
+    Colors.blue,
+    Colors.red,
+    Colors.green,
+    Colors.orange,
+    Colors.purple,
+    Colors.teal,
+    Colors.pink,
+    Colors.indigo,
+    Colors.amber,
+    Colors.cyan,
+  ];
+
+  List<MapEntry<String, int>> _getSetDistribution(List<TcgCard> cards) {
+    // Group cards by set
+    final setMap = <String, int>{};
+    for (final card in cards) {
+      final set = card.setName ?? 'Unknown Set';
+      setMap[set] = (setMap[set] ?? 0) + 1;
+    }
+
+    // Sort sets by card count
+    final sortedSets = setMap.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return sortedSets;
+  }
+
   Widget _buildOverviewCard(List<TcgCard> cards) {
     final localizations = AppLocalizations.of(context);
     final currencyProvider = context.watch<CurrencyProvider>();
@@ -371,156 +403,210 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildSetDistribution(List<TcgCard> cards) {
+    final purchaseService = context.watch<PurchaseService>();
     final localizations = AppLocalizations.of(context);
-    // Group cards by set
-    final setMap = <String, int>{};
-    for (final card in cards) {
-      final set = card.setName ?? 'Unknown Set';
-      setMap[set] = (setMap[set] ?? 0) + 1;
-    }
-
-    // Sort sets by card count
-    final sortedSets = setMap.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    final initialDisplayCount = 5;
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    // Get sorted sets
+    final sortedSets = _getSetDistribution(cards);
     final hasMore = sortedSets.length > initialDisplayCount;
 
-    final colors = [
-      Colors.blue,
-      Colors.red,
-      Colors.green,
-      Colors.orange,
-      Colors.purple,
-      Colors.teal,
-      Colors.pink,
-      Colors.indigo,
-      Colors.amber,
-      Colors.cyan,
-    ];
-
-    int? touchedIndex;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  localizations.translate('setDistribution'),
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                Text(
-                  '${sortedSets.length} ${localizations.translate('sets')}',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // Pie Chart
-            SizedBox(
-              height: 140,  // Reduced height
-              child: Row(
-                children: [
-                  Expanded(
-                    child: PieChart(
-                      PieChartData(
-                        sections: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
-                          final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
-                          return PieChartSectionData(
-                            color: colors[entry.key % colors.length],
-                            value: entry.value.value.toDouble(),
-                            title: '$percentage%',
-                            radius: 60,  // Fixed smaller radius
-                            titleStyle: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+    return Stack(
+      children: [
+        Card(
+          // Existing card content, but blur it when not premium
+          child: ImageFiltered(
+            imageFilter: purchaseService.isPremium 
+                ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
+                : ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+            child: Opacity(
+              opacity: purchaseService.isPremium ? 1.0 : 0.7,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          localizations.translate('setDistribution'),
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${sortedSets.length} ${localizations.translate('sets')}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // Pie Chart
+                    SizedBox(
+                      height: 140,  // Reduced height
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: PieChart(
+                              PieChartData(
+                                sections: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
+                                  final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
+                                  return PieChartSectionData(
+                                    color: colors[entry.key % colors.length],
+                                    value: entry.value.value.toDouble(),
+                                    title: '$percentage%',
+                                    radius: 60,  // Fixed smaller radius
+                                    titleStyle: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                    titlePositionPercentageOffset: 0.55,
+                                  );
+                                }).toList(),
+                                sectionsSpace: 2,
+                                centerSpaceRadius: 30,
+                              ),
                             ),
-                            titlePositionPercentageOffset: 0.55,
-                          );
-                        }).toList(),
-                        sectionsSpace: 2,
-                        centerSpaceRadius: 30,
+                          ),
+                          const SizedBox(width: 16),
+                          // Single legend
+                          Expanded(
+                            child: ShaderMask(
+                              shaderCallback: (Rect rect) {
+                                return LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.purple.withOpacity(0),
+                                    Colors.purple.withOpacity(1),
+                                  ],
+                                  stops: const [0.9, 1.0],
+                                ).createShader(rect);
+                              },
+                              blendMode: BlendMode.dstOut,
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
+                                    final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 12,
+                                            height: 12,
+                                            decoration: BoxDecoration(
+                                              color: colors[entry.key % colors.length],
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Theme.of(context).colorScheme.outline,
+                                                width: 1,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              '${entry.value.key}\n${entry.value.value} cards ($percentage%)',
+                                              style: const TextStyle(fontSize: 12),
+                                              maxLines: 2,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Single legend
-                  Expanded(
-                    child: ShaderMask(
-                      shaderCallback: (Rect rect) {
-                        return LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.purple.withOpacity(0),
-                            Colors.purple.withOpacity(1),
-                          ],
-                          stops: const [0.9, 1.0],
-                        ).createShader(rect);
-                      },
-                      blendMode: BlendMode.dstOut,
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
-                            final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: colors[entry.key % colors.length],
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Theme.of(context).colorScheme.outline,
-                                        width: 1,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      '${entry.value.key}\n${entry.value.value} cards ($percentage%)',
-                                      style: const TextStyle(fontSize: 12),
-                                      maxLines: 2,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
+                    if (hasMore) ...[
+                      const SizedBox(height: 16),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => _showAllSets(context, sortedSets, colors, cards.length),
+                          child: Text('Show All Sets (${sortedSets.length})'),
                         ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (hasMore) ...[
-              const SizedBox(height: 16),
-              Center(
-                child: TextButton(
-                  onPressed: () => _showAllSets(context, sortedSets, colors, cards.length),
-                  child: Text('Show All Sets (${sortedSets.length})'),
+                    ],
+                  ],
                 ),
               ),
-            ],
-          ],
+            ),
+          ),
         ),
-      ),
+        
+        // Premium lock overlay
+        if (!purchaseService.isPremium)
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () async {
+                  try {
+                    await purchaseService.purchasePremium();
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: $e')),
+                      );
+                    }
+                  }
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.lock_outline,
+                        size: 48,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Premium Feature',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Unlock detailed set analytics\nand more with Premium',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: () => purchaseService.purchasePremium(),
+                        icon: const Text('💎'),
+                        label: const Text('Upgrade Now'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -592,14 +678,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildPriceRangeDistribution(List<TcgCard> cards) {
+    final purchaseService = context.watch<PurchaseService>();
     final localizations = AppLocalizations.of(context);
     final currencyProvider = context.watch<CurrencyProvider>();
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Updated price ranges with more detail
     final ranges = [
       (0.0, 1.0, '< ${currencyProvider.symbol}1'),
       (1.0, 5.0, '${currencyProvider.symbol}1-5'),
       (5.0, 10.0, '${currencyProvider.symbol}5-10'),
-      (10.0, 50.0, '${currencyProvider.symbol}10-50'),
-      (50.0, double.infinity, '> ${currencyProvider.symbol}50'),
+      (10.0, 25.0, '${currencyProvider.symbol}10-25'),
+      (25.0, 50.0, '${currencyProvider.symbol}25-50'),
+      (50.0, 100.0, '${currencyProvider.symbol}50-100'),
+      (100.0, 200.0, '${currencyProvider.symbol}100-200'),
+      (200.0, 500.0, '${currencyProvider.symbol}200-500'),
+      (500.0, double.infinity, '${currencyProvider.symbol}500+'),
     ];
 
     final distribution = List.filled(ranges.length, 0);
@@ -613,114 +707,178 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       }
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  localizations.translate('priceRange'),
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                Text(
-                  '${localizations.translate('total')}: ${cards.length} ${localizations.translate('cards')}',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 200,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: distribution.reduce(max).toDouble(),
-                  barGroups: distribution.asMap().entries.map((entry) {
-                    return BarChartGroupData(
-                      x: entry.key,
-                      barRods: [
-                        BarChartRodData(
-                          toY: entry.value.toDouble(),
-                          color: Theme.of(context).colorScheme.primary,
-                          width: 24,
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              Theme.of(context).colorScheme.primary,
-                              Theme.of(context).colorScheme.primary.withOpacity(0.7),
-                            ],
+    return Stack(
+      children: [
+        Card(
+          child: ImageFiltered(
+            imageFilter: purchaseService.isPremium 
+                ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
+                : ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+            child: Opacity(
+              opacity: purchaseService.isPremium ? 1.0 : 0.7,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          localizations.translate('priceRange'),
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${localizations.translate('total')}: ${cards.length} ${localizations.translate('cards')}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
-                    );
-                  }).toList(),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: 5,
-                    getDrawingHorizontalLine: (value) => FlLine(
-                      color: Theme.of(context).dividerColor.withOpacity(0.2),
-                      strokeWidth: 1,
                     ),
-                  ),
-                  titlesData: FlTitlesData(
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, _) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              ranges[value.toInt()].$3,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 240, // Increased height
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 8), // Add padding for labels
+                        child: BarChart(
+                          BarChartData(
+                            alignment: BarChartAlignment.spaceAround,
+                            maxY: distribution.reduce(max).toDouble(),
+                            barGroups: distribution.asMap().entries.map((entry) {
+                              return BarChartGroupData(
+                                x: entry.key,
+                                barRods: [
+                                  BarChartRodData(
+                                    toY: entry.value.toDouble(),
+                                    color: Theme.of(context).colorScheme.primary,
+                                    width: 20, // Slightly reduced width
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(6)
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
+                            titlesData: FlTitlesData(
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 40,
+                                  interval: 5,
+                                ),
+                              ),
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 40, // More space for labels
+                                  interval: 1,
+                                  getTitlesWidget: (value, _) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Transform.rotate(
+                                        angle: -0.5, // Angle labels slightly
+                                        child: Text(
+                                          ranges[value.toInt()].$3,
+                                          style: const TextStyle(fontSize: 10),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              rightTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              topTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
                               ),
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 40,
-                        interval: 5,
-                        getTitlesWidget: (value, _) {
-                          return Text(
-                            value.toInt().toString(),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                            borderData: FlBorderData(show: false),
+                            gridData: FlGridData(
+                              show: true,
+                              drawVerticalLine: false,
+                              horizontalInterval: 5,
+                              getDrawingHorizontalLine: (value) => FlLine(
+                                color: Theme.of(context).dividerColor.withOpacity(0.2),
+                                strokeWidth: 1,
+                              ),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  backgroundColor: Colors.transparent,
+                  ],
                 ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
+        
+        // Premium lock overlay
+        if (!purchaseService.isPremium)
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () async {
+                  try {
+                    await purchaseService.purchasePremium();
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: $e')),
+                      );
+                    }
+                  }
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.query_stats,
+                        size: 48,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Premium Feature',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Unlock detailed price analytics\nand collection insights',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: () => purchaseService.purchasePremium(),
+                        icon: const Text('💎'),
+                        label: const Text('Upgrade Now'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
