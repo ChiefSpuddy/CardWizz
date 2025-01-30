@@ -16,17 +16,14 @@ import 'services/purchase_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize services
   final purchaseService = PurchaseService();
-  final storageService = await StorageService.init();
+  await purchaseService.initialize();
+  
+  final storageService = await StorageService.init(purchaseService);
   final authService = AuthService();
   final appState = AppState(storageService, authService);
   
-  // Initialize services
-  await Future.wait([
-    purchaseService.initialize(),
-    appState.initialize(),
-  ]);
+  await appState.initialize();
 
   runApp(
     MultiProvider(
@@ -34,7 +31,7 @@ void main() async {
         // Core providers
         ChangeNotifierProvider<PurchaseService>.value(value: purchaseService),
         ChangeNotifierProvider.value(value: appState),
-        Provider<StorageService>.value(value: storageService),
+        Provider<StorageService>.value(value: storageService),  // Changed this line
         Provider<AuthService>.value(value: authService),
         
         // Feature providers

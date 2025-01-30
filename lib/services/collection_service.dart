@@ -8,15 +8,47 @@ import 'package:provider/provider.dart';  // Add this
 import '../models/custom_collection.dart';
 import '../services/storage_service.dart';  // Add this import
 import '../providers/sort_provider.dart';  // Add this
+import '../services/purchase_service.dart';
 
 class CollectionService {
   static CollectionService? _instance;
   final Database _db;
+  final StorageService _storage;  // Add this
   final _collectionsController = StreamController<List<CustomCollection>>.broadcast();
   String? _currentUserId;
 
-  CollectionService._(this._db) {
-    _refreshCollections();
+  // Update constructor to take both dependencies
+  CollectionService._(this._db, this._storage);
+
+  // Single initialization method that others will use
+  static Future<CollectionService> getInstance() async {
+    if (_instance == null) {
+      final purchaseService = PurchaseService();
+      await purchaseService.initialize();
+      
+      final storage = await StorageService.init(purchaseService);
+      
+      final db = await openDatabase(
+        'collections.db',
+        version: 1,
+        onCreate: (db, version) async {
+          await db.execute('''
+            CREATE TABLE collections(
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              description TEXT,
+              created_at INTEGER,
+              card_ids TEXT,
+              user_id TEXT,
+              color INTEGER DEFAULT 4282682873
+            )
+          ''');
+        },
+      );
+
+      _instance = CollectionService._(db, storage);
+    }
+    return _instance!;
   }
 
   Future<void> setCurrentUser(String? userId) async {
@@ -55,32 +87,6 @@ class CollectionService {
     // Remove this method or modify it to not delete data
     _currentUserId = null;
     _collectionsController.add([]);
-  }
-
-  static Future<CollectionService> getInstance() async {
-    if (_instance != null) return _instance!;
-
-    // Open database without deleting
-    final db = await openDatabase(
-      'collections.db',
-      version: 1,
-      onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE collections(
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT,
-            created_at INTEGER,
-            card_ids TEXT,
-            user_id TEXT,
-            color INTEGER DEFAULT 4282682873
-          )
-        ''');
-      },
-    );
-
-    _instance = CollectionService._(db);
-    return _instance!;
   }
 
   Future<void> _refreshCollections() async {
@@ -286,12 +292,12 @@ class CollectionService {
     }
   }
 
+  // Update calculateCollectionValue to use injected StorageService
   Future<double> calculateCollectionValue(String collectionId) async {
     final collection = await getCollection(collectionId);
     if (collection == null) return 0.0;
     
-    final storage = await StorageService.init();
-    final cards = await storage.getCards();
+    final cards = await _storage.getCards();
     
     double total = 0.0;
     for (final card in cards) {

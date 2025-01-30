@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/tcg_card.dart';
 import '../services/storage_service.dart';
 import '../providers/currency_provider.dart';  // Add this import
+import '../services/purchase_service.dart';  // Add this import
 
 class CardGridItem extends StatefulWidget {
   final TcgCard card;
@@ -24,33 +25,45 @@ class _CardGridItemState extends State<CardGridItem> {
   bool _isLoaded = false;
   bool _hasError = false;
 
-  Future<void> _addToCollection(BuildContext context) async {
-    final storage = Provider.of<StorageService>(context, listen: false);
-    
+  Future<void> _addCardToCollection(BuildContext context) async {
     try {
-      print('Adding card to collection: ${widget.card.name}');
-      await storage.saveCard(widget.card);
-      await storage.debugStorage(); // Add this debug call
+      final storage = Provider.of<StorageService>(context, listen: false);
+      await storage.addCard(widget.card);
       
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Added ${widget.card.name} to collection'),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Card added to collection')),
+      );
     } catch (e) {
-      print('Error adding card: $e');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to add card: $e'),
-            behavior: SnackBarBehavior.floating,
+      if (!context.mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Premium Required'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(e.toString()),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  final purchaseService = context.read<PurchaseService>();
+                  await purchaseService.purchasePremium();
+                },
+                child: const Text('Upgrade to Premium'),
+              ),
+            ],
           ),
-        );
-      }
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -208,7 +221,7 @@ class _CardGridItemState extends State<CardGridItem> {
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () => _addToCollection(context),
+                  onTap: () => _addCardToCollection(context),
                   customBorder: const CircleBorder(),
                   child: Container(
                     padding: const EdgeInsets.all(4),

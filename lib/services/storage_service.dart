@@ -4,11 +4,30 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/tcg_card.dart';
 import 'package:collection/collection.dart';  // Add this import at the top
+import '../services/purchase_service.dart';  // Add this import
 
 class StorageService {
+  static const int _freeUserCardLimit = 10;
+  final PurchaseService _purchaseService;
+  static StorageService? _instance;
+
+  // Private constructor with purchase service
+  StorageService._(this._purchaseService);
+
+  static Future<StorageService> init(PurchaseService? purchaseService) async {
+    if (_instance == null) {
+      final purchase = purchaseService ?? PurchaseService();
+      if (purchaseService == null) {
+        await purchase.initialize();
+      }
+      _instance = StorageService._(purchase);
+      await _instance!._init();
+    }
+    return _instance!;
+  }
+
   late final SharedPreferences _prefs;
   late final Database _db;
-  static StorageService? _instance;
   final _cardsController = StreamController<List<TcgCard>>.broadcast();
   bool _isInitialized = false;
   String? _currentUserId;
@@ -45,16 +64,6 @@ class StorageService {
     _cardsController.add([]);
     
     print('Cleared current user, data remains in storage for: $currentId');
-  }
-
-  StorageService._();
-
-  static Future<StorageService> init() async {
-    if (_instance == null) {
-      _instance = StorageService._();
-      await _instance!._init();
-    }
-    return _instance!;
   }
 
   Future<void> _init() async {
@@ -197,6 +206,31 @@ class StorageService {
       print('Error saving card: $e');
       rethrow;
     }
+  }
+
+  Future<void> addCard(TcgCard card) async {
+    final cards = await getCards();
+    final currentCount = cards.length;
+    
+    print('DEBUG: Adding card when count=$currentCount, limit=$_freeUserCardLimit, isPremium=${_purchaseService.isPremium}');
+    
+    if (!_purchaseService.isPremium && currentCount >= _freeUserCardLimit) {
+      throw 'Free users can only add up to $_freeUserCardLimit cards. Upgrade to Premium for unlimited cards!';
+    }
+
+    await saveCard(card);
+  }
+
+  bool canAddMoreCards() {
+    if (_purchaseService.isPremium) return true;
+    final currentCount = _getCards().length;
+    print('Can add more cards? Current count: $currentCount, Limit: $_freeUserCardLimit'); // Debug print
+    return currentCount < _freeUserCardLimit;
+  }
+
+  int get remainingFreeSlots {
+    if (_purchaseService.isPremium) return -1; // -1 indicates unlimited
+    return _freeUserCardLimit - _getCards().length;  // This is correct
   }
 
   final Map<String, TcgCard> _removedCards = {};
