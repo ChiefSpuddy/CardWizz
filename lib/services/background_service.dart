@@ -17,6 +17,8 @@ class BackgroundService {
   final StorageService _storageService;
   final TcgApiService _apiService;
   Timer? _updateTimer;
+  bool _isEnabled = false;
+  bool get isEnabled => _isEnabled;
 
   BackgroundService(this._storageService, this._apiService) {
     _initBackgroundFetch();
@@ -69,12 +71,14 @@ class BackgroundService {
   }
 
   void startPriceUpdates() {
+    _isEnabled = true;
     _updateTimer?.cancel();
     _checkAndUpdate();
     BackgroundFetch.start();
   }
 
   void stopPriceUpdates() {
+    _isEnabled = false;
     _updateTimer?.cancel();
     _updateTimer = null;
     BackgroundFetch.stop();

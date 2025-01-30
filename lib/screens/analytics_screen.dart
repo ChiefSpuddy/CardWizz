@@ -38,6 +38,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   ];
 
   bool _isRefreshing = false;
+  DateTime? _lastUpdateTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateLastRefreshTime();
+  }
+
+  Future<void> _updateLastRefreshTime() async {
+    final storage = Provider.of<StorageService>(context, listen: false);
+    final time = await storage.backgroundService?.getLastUpdateTime();
+    if (mounted) {
+      setState(() => _lastUpdateTime = time);
+    }
+  }
 
   List<MapEntry<String, int>> _getSetDistribution(List<TcgCard> cards) {
     // Group cards by set
@@ -1011,10 +1026,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final storage = Provider.of<StorageService>(context, listen: false);
       if (storage.backgroundService != null) {
         await storage.backgroundService!.refreshPrices();
+        await _updateLastRefreshTime();  // Add this line
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Prices updated successfully')),
+            SnackBar(content: Text(
+              'Prices updated successfully. Changes will appear in Top Movers after 24 hours'
+            )),
           );
         }
       } else {
@@ -1064,17 +1082,38 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           pinned: true,
                           floating: true,
                           actions: [
-                            IconButton(
-                              icon: _isRefreshing 
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.refresh),
-                              onPressed: _isRefreshing ? null : _refreshPrices,
+                            Tooltip(
+                              message: _lastUpdateTime != null 
+                                ? 'Last updated: ${_formatDateTime(_lastUpdateTime!)}\nTap to check for new prices'
+                                : 'Tap to check for new prices',
+                              waitDuration: const Duration(milliseconds: 500), // Add this
+                              showDuration: const Duration(seconds: 2),        // Add this
+                              preferBelow: false,                             // Add this
+                              child: Container(  // Wrap with Container for better tap target
+                                padding: const EdgeInsets.all(8),
+                                child: IconButton(
+                                  icon: _isRefreshing 
+                                      ? Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                            Icon(
+                                              Icons.refresh,
+                                              size: 16,
+                                              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                                            ),
+                                          ],
+                                        )
+                                      : const Icon(Icons.refresh),
+                                  onPressed: _isRefreshing ? null : _refreshPrices,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -1190,6 +1229,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         ],
       ),
     );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    }
   }
 }
 

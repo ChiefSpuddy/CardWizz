@@ -587,6 +587,25 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                   ),
                   const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.sync),
+                    title: const Text('Background Price Updates'),
+                    subtitle: const Text('Automatically check prices every 24 hours'),
+                    trailing: Switch(
+                      value: context.select((StorageService s) => 
+                        s.backgroundService?.isEnabled ?? false),
+                      onChanged: (value) {
+                        final storage = context.read<StorageService>();
+                        if (value) {
+                          storage.backgroundService?.startPriceUpdates();
+                        } else {
+                          storage.backgroundService?.stopPriceUpdates();
+                        }
+                        setState(() {}); // Refresh UI
+                      },
+                    ),
+                  ),
+                  const Divider(height: 1),
                 ],
               ),
             ),
