@@ -338,31 +338,15 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                         ],
                       ),
                       child: Consumer<CurrencyProvider>(
-                        builder: (context, currencyProvider, _) => Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              currencyProvider.symbol,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                  ? Colors.white.withOpacity(0.9)
-                                  : Theme.of(context).colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              currencyProvider.formatValue(totalValue),  // Just change this line to use formatValue
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                  ? Colors.white.withOpacity(0.9)
-                                  : Theme.of(context).colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                          ],
+                        builder: (context, currencyProvider, _) => Text(
+                          currencyProvider.formatValue(totalValue),  // Just use formatValue
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                              ? Colors.white.withOpacity(0.9)
+                              : Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
                         ),
                       ),
                     ),

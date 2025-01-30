@@ -155,7 +155,7 @@ class _CollectionCard extends StatelessWidget {
                   const Spacer(),
                   if (collection.totalValue != null)
                     Text(
-                      '€${collection.totalValue!.toStringAsFixed(2)}',
+                      collection.totalValue!.toStringAsFixed(2), // Removed the '€' symbol
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.green,

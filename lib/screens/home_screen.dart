@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';  // Add this import
 import '../providers/app_state.dart';
 import '../l10n/app_localizations.dart';  // Add this import
 import 'home_overview.dart';
@@ -63,11 +64,13 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void setSelectedIndex(int index) async {
-    setState(() => _selectedIndex = index);
-    // Save selected index
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('selected_tab_index', index);
+  void setSelectedIndex(int index) {
+    if (_selectedIndex != index) {
+      HapticFeedback.selectionClick();  // Add haptic feedback
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
   }
 
   Widget _buildBottomNavItem(BuildContext context, int index) {
@@ -143,7 +146,10 @@ class HomeScreenState extends State<HomeScreen> {
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             backgroundColor: Theme.of(context).colorScheme.surface,
             selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) => setSelectedIndex(index),
+            onDestinationSelected: (index) {
+              HapticFeedback.selectionClick();  // Add haptic feedback
+              setSelectedIndex(index);
+            },
             destinations: List.generate(
               _navItems.length,
               (index) => NavigationDestination(
