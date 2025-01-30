@@ -2,9 +2,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class PokeApiService {
-  static const int _maxConcurrentRequests = 5;
+  static const int _maxConcurrentRequests = 10;  // Increase for faster loading
   final Map<String, String> _spriteCache = {};
-  
+  final Map<String, Map<String, dynamic>> _pokemonCache = {};
+
+  // Optimize sprite URL generation
   String getSpriteUrl(int dexNum) {
     return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$dexNum.png';
   }
@@ -25,6 +27,10 @@ class PokeApiService {
   }
 
   Future<Map<String, dynamic>?> fetchBasicData(String identifier) async {
+    if (_pokemonCache.containsKey(identifier)) {
+      return _pokemonCache[identifier];
+    }
+
     try {
       final response = await http.get(
         Uri.parse('https://pokeapi.co/api/v2/pokemon/$identifier'),
@@ -32,10 +38,14 @@ class PokeApiService {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return {
+        final result = {
           'name': data['name'],
           'sprite': getSpriteUrl(int.parse(identifier)),
+          'types': data['types'],  // Include types for immediate access
+          'stats': data['stats'],  // Include stats for immediate access
         };
+        _pokemonCache[identifier] = result;
+        return result;
       }
     } catch (e) {
       print('Error fetching Pokemon #$identifier: $e');

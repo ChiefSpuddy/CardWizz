@@ -24,7 +24,7 @@ class _DexScreenState extends State<DexScreen> {
   final _pokeApi = PokeApiService();
   List<String> _allDexNames = [];
   bool _isLoading = true;
-  static const int _pageSize = 30;
+  static const int _pageSize = 50;  // Increased page size for smoother scroll
   int _currentPage = 0;
   bool _hasMoreItems = true;
   final ScrollController _scrollController = ScrollController();
@@ -40,6 +40,11 @@ class _DexScreenState extends State<DexScreen> {
     // Add more generations as needed
   };
 
+  // Add grid layout constants
+  static const double _gridSpacing = 8.0;
+  static const double _aspectRatio = 0.9;  // Slightly wider for better sprite alignment
+  static const int _gridCrossAxisCount = 3;
+
   @override
   void initState() {
     super.initState();
@@ -47,28 +52,44 @@ class _DexScreenState extends State<DexScreen> {
       Provider.of<StorageService>(context, listen: false),
     );
     _scrollController.addListener(_onScroll);
-    _loadInitialData();
+    _initialize();
   }
 
-  Future<void> _loadInitialData() async {
+  Future<void> _initialize() async {
+    if (!mounted) return;
+    
     setState(() => _isLoading = true);
     
     try {
-      // Initialize collection service first
+      // Initialize collection service
       await _collectionService.initialize();
       
-      // Then load initial generation data
-      if (_selectedGeneration != null) {
-        final (start, end) = _generations[_selectedGeneration]!;
-        final stats = await _collectionService.getGenerationStats(start, end);
-        _updateGenerationStats(_selectedGeneration!, stats);
+      // Load first generation by default
+      _selectedGeneration = 'Gen 1';
+      final (start, end) = _generations['Gen 1']!;
+      
+      // Load names and update UI immediately when they're available
+      _allDexNames = await _namesService.loadGenerationNames(start, end);
+      
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
       
-      setState(() => _isLoading = false);
-    } catch (e) {
-      print('Error loading initial data: $e');
+      // Load stats after UI is shown
+      final stats = await _collectionService.getGenerationStats(start, end);
       if (mounted) {
-        setState(() => _isLoading = false);
+        _updateGenerationStats('Gen 1', stats);
+      }
+      
+    } catch (e) {
+      print('Error initializing dex: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _allDexNames = [];  // Ensure we have an empty list rather than null
+        });
       }
     }
   }
@@ -93,27 +114,27 @@ class _DexScreenState extends State<DexScreen> {
   }
 
   Future<void> _selectGeneration(String? genKey) async {
-    if (_selectedGeneration == genKey) {
-      setState(() {
-        _selectedGeneration = null;
-        _currentPage = 0;
-      });
-      return;
-    }
-
-    setState(() {
+    if (!mounted) return;
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      if (genKey != null) {
+        final (start, end) = _generations[genKey]!;
+        _allDexNames = await _namesService.loadGenerationNames(start, end);
+      }
+      
       _selectedGeneration = genKey;
       _currentPage = 0;
-      _isLoading = true;
-    });
-
-    // Preload the selected generation data
-    if (genKey != null) {
-      await _preloadGeneration(genKey);
-    }
-
-    if (mounted) {
-      setState(() => _isLoading = false);
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print('Error loading generation: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -156,21 +177,19 @@ class _DexScreenState extends State<DexScreen> {
   Future<void> _loadMoreItems() async {
     if (!_hasMoreItems || _isLoading) return;
     
+    setState(() => _isLoading = true);
+    
     final startIndex = _currentPage * _pageSize;
     if (startIndex >= _allDexNames.length) {
-      setState(() => _hasMoreItems = false);
+      setState(() {
+        _hasMoreItems = false;
+        _isLoading = false;
+      });
       return;
     }
 
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500)); // Prevent rapid scrolling
-    
-    if (mounted) {
-      setState(() {
-        _currentPage++;
-        _isLoading = false;
-      });
-    }
+    _currentPage++;
+    setState(() => _isLoading = false);
   }
 
   Future<void> _loadDexNames() async {
@@ -384,104 +403,92 @@ class _DexScreenState extends State<DexScreen> {
 
   Widget _buildPokemonTile(String pokemonName) {
     final dexNumber = _namesService.getDexNumber(pokemonName);
-    // Use smaller sprites for better performance
-    final spriteUrl = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$dexNumber.png';
+    final spriteUrl = _pokeApi.getSpriteUrl(dexNumber);
+    final stats = _collectionService.getPokemonStats(pokemonName);
     
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return FutureBuilder<Map<String, dynamic>>(
-          future: _collectionService.getPokemonStats(pokemonName),
-          builder: (context, snapshot) {
-            final stats = snapshot.data;
-            final isCollected = stats?['isCollected'] ?? false;
-            final cardCount = stats?['cardCount'] ?? 0;
-
-            return Card(
-              elevation: 2,
-              color: isCollected ? Colors.green.withOpacity(0.1) : null,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: isCollected 
-                  ? () => _showPokemonCards(context, pokemonName, stats?['cards'])
-                  : null,
-                child: Stack(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Expanded(
-                            child: Center(
-                              child: GestureDetector(
-                                onTap: () async {
-                                  final data = _pokemonCache[pokemonName] ?? 
-                                             await _pokeApi.fetchPokemon(pokemonName);
-                                  if (data != null && context.mounted) {
-                                    _showPokemonInfo(context, pokemonName, data);
-                                  }
-                                },
-                                child: Hero(
-                                  tag: 'pokemon-$pokemonName',
-                                  child: CachedNetworkImage(
-                                    imageUrl: spriteUrl,
-                                    width: constraints.maxWidth * 0.6,
-                                    height: constraints.maxWidth * 0.6,
-                                    fit: BoxFit.contain,
-                                    placeholder: (context, url) => const Padding(
-                                      padding: EdgeInsets.all(20),
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+    return Card(
+      elevation: 2,
+      color: stats['isCollected'] ? Colors.green.withOpacity(0.1) : null,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: stats['isCollected'] 
+          ? () => _showPokemonCards(context, pokemonName, stats['cards'])
+          : null,
+        child: Stack(
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,  // Center the content
+              children: [
+                Expanded(
+                  child: Center(  // Center the image
+                    child: GestureDetector( // Add tap handler for Pokemon info
+                      onTap: () async {
+                        final data = await _pokeApi.fetchPokemon(dexNumber.toString());
+                        if (data != null && mounted) {
+                          _showPokemonInfo(context, pokemonName, data);
+                        }
+                      },
+                      child: CachedNetworkImage(
+                        imageUrl: spriteUrl,
+                        fit: BoxFit.contain,
+                        width: 80,  // Fixed width for consistent sizing
+                        height: 80,  // Fixed height for consistent sizing
+                        placeholder: (context, url) => const SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                          Text(
-                            '#${dexNumber.toString().padLeft(3, '0')}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          Text(
-                            pokemonName,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (isCollected)
-                            Text(
-                              '$cardCount cards',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.green,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    if (isCollected)
-                      const Positioned(
-                        top: 8,
-                        right: 8,
-                        child: Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: 20,
                         ),
                       ),
-                  ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Column(
+                    children: [
+                      Text(
+                        '#${dexNumber.toString().padLeft(3, '0')}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      Text(
+                        pokemonName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (stats['isCollected'])
+                        Text(
+                          '${stats['cardCount']} cards',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.green,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (stats['isCollected'])
+              const Positioned(
+                top: 8,
+                right: 8,
+                child: Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 20,
                 ),
               ),
-            );
-          },
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 
@@ -573,30 +580,38 @@ class _DexScreenState extends State<DexScreen> {
   }
 
   Widget _buildPokemonGrid() {
-    final filteredPokemon = _getFilteredPokemon();
-    final itemCount = _hasMoreItems 
-      ? min((_currentPage + 1) * _pageSize, filteredPokemon.length) + 1
-      : filteredPokemon.length;
+    if (_allDexNames.isEmpty) {
+      return const Center(
+        child: Text('No Pokémon found. Please try again.'),
+      );
+    }
 
-    return GridView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(8),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 0.85,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        if (index >= filteredPokemon.length) {
-          return _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : const SizedBox.shrink();
+    final filteredPokemon = _getFilteredPokemon();
+    
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        // Load more when reaching 80% of the list
+        if (notification is ScrollUpdateNotification) {
+          final metrics = notification.metrics;
+          if (metrics.pixels >= metrics.maxScrollExtent * 0.8) {
+            _loadMoreItems();
+          }
         }
-        
-        return _buildPokemonTile(filteredPokemon[index]);
+        return false;
       },
+      child: GridView.builder(
+        key: PageStorageKey('pokemon_grid'),  // Preserve scroll position
+        controller: _scrollController,
+        padding: const EdgeInsets.all(_gridSpacing),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _gridCrossAxisCount,
+          childAspectRatio: _aspectRatio,
+          crossAxisSpacing: _gridSpacing,
+          mainAxisSpacing: _gridSpacing,
+        ),
+        itemCount: filteredPokemon.length,
+        itemBuilder: (context, index) => _buildPokemonTile(filteredPokemon[index]),
+      ),
     );
   }
 
