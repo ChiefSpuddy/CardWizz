@@ -291,9 +291,12 @@ class StorageService {
 
       await _prefs.setStringList(cardsKey, updatedCardsJson);
       
-      // Update the stream
+      // Update the stream and notify listeners
       final updatedCards = await getCards();
       _cardsController.add(updatedCards);
+      
+      // Make sure to notify card changes
+      _notifyCardChange();
       
     } catch (e) {
       print('Error removing card: $e');

@@ -10,6 +10,7 @@ import '../providers/app_state.dart';
 import 'card_details_screen.dart';
 import '../services/poke_api_service.dart';
 import 'dart:math';  // Add this import for min()
+import 'dart:async';  // Add this import for StreamSubscription
 
 class DexScreen extends StatefulWidget {
   const DexScreen({super.key});
@@ -46,6 +47,8 @@ class _DexScreenState extends State<DexScreen> {
   static const int _gridCrossAxisCount = 3;
 
   bool _isInitialized = false;
+  StreamSubscription? _updateSubscription;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -54,6 +57,14 @@ class _DexScreenState extends State<DexScreen> {
       Provider.of<StorageService>(context, listen: false),
     );
     _scrollController.addListener(_onScroll);
+    
+    // Update listener to handle updates more efficiently
+    _updateSubscription = _collectionService.onUpdate.listen((_) {
+      if (mounted && !_isRefreshing) {
+        _refreshDex();
+      }
+    });
+    
     _initialize();
   }
 
@@ -110,14 +121,15 @@ class _DexScreenState extends State<DexScreen> {
   }
 
   Future<void> _refreshDex() async {
-    if (!mounted) return;
+    if (!mounted || _isRefreshing) return;
+    
+    setState(() => _isRefreshing = true);
     
     try {
-      await _collectionService.refreshCollection();
-      
       if (_selectedGeneration != null) {
         final (start, end) = _generations[_selectedGeneration]!;
         final stats = await _collectionService.getGenerationStats(start, end);
+        
         if (mounted) {
           setState(() {
             _updateGenerationStats(_selectedGeneration!, stats);
@@ -126,6 +138,10 @@ class _DexScreenState extends State<DexScreen> {
       }
     } catch (e) {
       print('Error refreshing dex: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
     }
   }
 
@@ -149,7 +165,7 @@ class _DexScreenState extends State<DexScreen> {
   }
 
   Future<void> _selectGeneration(String? genKey) async {
-    if (!mounted) return;
+    if (!mounted || _isRefreshing || genKey == _selectedGeneration) return;
     
     setState(() => _isLoading = true);
     
@@ -157,16 +173,20 @@ class _DexScreenState extends State<DexScreen> {
       if (genKey != null) {
         final (start, end) = _generations[genKey]!;
         _allDexNames = await _namesService.loadGenerationNames(start, end);
-      }
-      
-      _selectedGeneration = genKey;
-      _currentPage = 0;
-      
-      if (mounted) {
-        setState(() => _isLoading = false);
+        _selectedGeneration = genKey;
+        
+        final stats = await _collectionService.getGenerationStats(start, end);
+        
+        if (mounted) {
+          setState(() {
+            _updateGenerationStats(genKey, stats);
+            _currentPage = 0;
+          });
+        }
       }
     } catch (e) {
       print('Error loading generation: $e');
+    } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -199,6 +219,7 @@ class _DexScreenState extends State<DexScreen> {
 
   @override
   void dispose() {
+    _updateSubscription?.cancel();
     _scrollController.dispose();
     super.dispose();
   }

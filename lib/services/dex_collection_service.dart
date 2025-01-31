@@ -2,6 +2,7 @@ import '../models/tcg_card.dart';
 import 'storage_service.dart';
 import 'dex_names_service.dart';
 import 'poke_api_service.dart';
+import 'dart:async';
 
 class DexCollectionService {
   final StorageService _storage;
@@ -11,13 +12,17 @@ class DexCollectionService {
   final Map<String, List<TcgCard>> _cardCache = {};
   List<TcgCard>? _allCards;
   bool _isInitialized = false;
+  final _updateController = StreamController<void>.broadcast();
+  Stream<void> get onUpdate => _updateController.stream;
 
   DexCollectionService(this._storage) :
     _namesService = DexNamesService(),
     _pokeApi = PokeApiService() {
-    // Listen for card changes
+    // Make listener more robust
     _storage.onCardsChanged.listen((_) {
-      refreshCollection();
+      if (!_isRefreshing) {  // Add guard here too
+        _refreshCollection();
+      }
     });
   }
 
@@ -74,10 +79,27 @@ class DexCollectionService {
     return match?.group(1) ?? normalized;
   }
 
-  // Add refresh method
-  Future<void> refreshCollection() async {
-    _isInitialized = false;  // Force re-initialization
-    await initialize();
+  bool _isRefreshing = false;  // Add this flag
+
+  // Make refresh more robust
+  Future<void> _refreshCollection() async {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    
+    try {
+      _isInitialized = false;
+      _cardCache.clear();  // Make sure to clear card cache
+      _collectionCache.clear();  // And collection cache
+      await initialize();
+      _updateController.add(null);
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  // Public refresh method
+  Future<void> refresh() async {
+    await _refreshCollection();
   }
 
   bool isPokemonCollected(String pokemonName) {
@@ -91,9 +113,11 @@ class DexCollectionService {
     return _cardCache[normalized] ?? [];
   }
 
-  // Update getGenerationStats to refresh first
+  // Update getGenerationStats to use the correct method name
   Future<Map<String, dynamic>> getGenerationStats(int startNum, int endNum) async {
-    await refreshCollection();  // Refresh before getting stats
+    if (!_isInitialized) {
+      await refresh();
+    }
 
     final stats = {
       'cardCount': 0,
@@ -145,5 +169,10 @@ class DexCollectionService {
     _cardCache.clear();
     _allCards = null;
     _isInitialized = false;
+  }
+
+  @override
+  void dispose() {
+    _updateController.close();
   }
 }
