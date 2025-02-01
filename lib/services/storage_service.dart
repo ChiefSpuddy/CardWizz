@@ -97,21 +97,40 @@ class StorageService {
 
   void _loadInitialData() {
     if (_currentUserId == null) {
-      print('No user ID during load'); // Debug
+      print('No user ID during load');
       _cardsController.add([]);
       return;
     }
 
     final cardsKey = _getUserKey('cards');
-    print('Loading cards with key: $cardsKey'); // Debug
+    print('Loading cards with key: $cardsKey');
     
     final cardsJson = _prefs.getStringList(cardsKey) ?? [];
-    print('Found ${cardsJson.length} cards in storage'); // Debug
+    print('Found ${cardsJson.length} cards in storage');
 
     try {
-      final cards = cardsJson
-          .map((json) => TcgCard.fromJson(jsonDecode(json)))
-          .toList();
+      final cards = cardsJson.map((json) {
+        try {
+          final data = jsonDecode(json);
+          if (data == null) return null;
+          
+          // Convert to Map<String, dynamic> and validate
+          final cardData = Map<String, dynamic>.from(data);
+          if (cardData['id'] == null || cardData['name'] == null) {
+            print('Invalid card data, skipping: $cardData');
+            return null;
+          }
+          
+          return TcgCard.fromJson(cardData);
+        } catch (e) {
+          print('Error parsing card JSON: $e');
+          return null;
+        }
+      })
+      .where((card) => card != null)
+      .cast<TcgCard>()
+      .toList();
+
       _cardsController.add(cards);
     } catch (e) {
       print('Error loading cards: $e');
@@ -142,9 +161,57 @@ class StorageService {
     print('Found ${cardsJson.length} cards in storage');
     
     try {
-      return cardsJson
-          .map((json) => TcgCard.fromJson(jsonDecode(json)))
-          .toList();
+      return cardsJson.map((json) {
+        try {
+          if (json.isEmpty) {
+            print('Empty JSON string found');
+            return null;
+          }
+          
+          final dynamic decoded = jsonDecode(json);
+          if (decoded == null) {
+            print('Null JSON data found');
+            return null;
+          }
+          
+          if (decoded is! Map<String, dynamic>) {
+            print('Invalid JSON format: $decoded');
+            return null;
+          }
+          
+          // Validate required fields
+          if (decoded['id'] == null || decoded['name'] == null) {
+            print('Missing required fields in card data: $decoded');
+            return null;
+          }
+          
+          // Ensure all string fields are actually strings
+          final sanitizedData = Map<String, dynamic>.fromEntries(
+            decoded.entries.map((e) {
+              if (e.value == null && (
+                  e.key == 'id' || 
+                  e.key == 'name' || 
+                  e.key == 'imageUrl' ||
+                  e.key == 'setName' ||
+                  e.key == 'number'
+                )) {
+                return MapEntry(e.key, '');  // Convert null to empty string for required string fields
+              }
+              return e;
+            }),
+          );
+          
+          return TcgCard.fromJson(sanitizedData);
+        } catch (e, stack) {
+          print('Error parsing card JSON: $e');
+          print('JSON data: $json');
+          print('Stack trace: $stack');
+          return null;
+        }
+      })
+      .where((card) => card != null)
+      .cast<TcgCard>()
+      .toList();
     } catch (e) {
       print('Error loading cards: $e');
       return [];
@@ -211,9 +278,26 @@ class StorageService {
       final cardsKey = _getUserKey('cards');
       final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
       
-      // Parse all cards and remove duplicates by ID
+      // Clean and validate existing cards
       final existingCards = existingCardsJson
-          .map((json) => TcgCard.fromJson(jsonDecode(json)))
+          .map((json) {
+            try {
+              if (json.isEmpty) return null;
+              
+              final data = jsonDecode(json);
+              if (data == null || data is! Map<String, dynamic>) return null;
+              
+              // Validate required fields
+              if (data['id'] == null || data['name'] == null) return null;
+              
+              return TcgCard.fromJson(data);
+            } catch (e) {
+              print('Error parsing existing card: $e');
+              return null;
+            }
+          })
+          .where((card) => card != null)
+          .cast<TcgCard>()
           .toList();
       
       // Remove any existing versions of this card
@@ -222,18 +306,29 @@ class StorageService {
       // Add the new card
       existingCards.add(card);
 
-      // Save back to storage
+      // Save back to storage with validation
       final updatedCardsJson = existingCards
-          .map((c) => jsonEncode(c.toJson()))
+          .map((c) {
+            try {
+              final json = jsonEncode(c.toJson());
+              // Verify the JSON is valid
+              jsonDecode(json);
+              return json;
+            } catch (e) {
+              print('Error encoding card: $e');
+              return null;
+            }
+          })
+          .where((json) => json != null)
+          .cast<String>()
           .toList();
 
       await _prefs.setStringList(cardsKey, updatedCardsJson);
       
       // Update stream and notify listeners
       _cardsController.add(existingCards);
-      
-      // Broadcast a notification that cards have changed
       _notifyCardChange();
+      
     } catch (e) {
       print('Error saving card: $e');
       rethrow;

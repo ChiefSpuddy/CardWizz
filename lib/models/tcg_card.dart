@@ -8,6 +8,7 @@ class TcgCard {
   final double? price;
   final List<PriceHistoryEntry> priceHistory;
   final SetInfo? set;  // Add this field
+  final String? setTotal;  // Add this property
 
   TcgCard({
     required this.id,
@@ -19,22 +20,35 @@ class TcgCard {
     this.price,
     this.priceHistory = const [],
     this.set,
+    this.setTotal,  // Add this to constructor
   });
 
   factory TcgCard.fromJson(Map<String, dynamic> json) {
-    return TcgCard(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      number: json['number'] as String,
-      imageUrl: json['images']?['small'] as String? ?? '',
-      rarity: json['rarity'] as String?,
-      setName: json['set']?['name'] as String?,
-      price: (json['cardmarket']?['prices']?['averageSellPrice'] as num?)?.toDouble(),
-      priceHistory: (json['priceHistory'] as List<dynamic>?)
-          ?.map((e) => PriceHistoryEntry.fromJson(e as Map<String, dynamic>))
-          .toList() ?? [],
-      set: json['set'] != null ? SetInfo.fromJson(json['set'] as Map<String, dynamic>) : null,
-    );
+    try {
+      final setData = json['set'] as Map<String, dynamic>?;
+      final SetInfo? setInfo = setData != null ? SetInfo.fromJson(setData) : null;
+
+      // Handle null values in constructor
+      return TcgCard(
+        id: json['id']?.toString() ?? '',  // Provide default empty string
+        name: json['name']?.toString() ?? '',  // Provide default empty string
+        number: json['number']?.toString() ?? '',  // Provide default empty string
+        imageUrl: json['images']?['small']?.toString() ?? '',
+        rarity: json['rarity']?.toString(),
+        setName: json['set']?['name']?.toString(),
+        price: (json['cardmarket']?['prices']?['averageSellPrice'] as num?)?.toDouble(),
+        priceHistory: (json['priceHistory'] as List<dynamic>?)
+            ?.map((e) => PriceHistoryEntry.fromJson(e as Map<String, dynamic>))
+            .toList() ?? [],
+        set: setInfo,
+        setTotal: json['set']?['total']?.toString(),
+      );
+    } catch (e, stack) {
+      print('Error creating TcgCard from JSON: $e');
+      print('JSON data: $json');
+      print('Stack trace: $stack');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() => {
@@ -43,13 +57,15 @@ class TcgCard {
     'number': number,
     'images': {'small': imageUrl},
     'rarity': rarity,
-    'set': set?.toJson(),
     'cardmarket': {
       'prices': {
         'averageSellPrice': price,
       },
     },
     'priceHistory': priceHistory.map((e) => e.toJson()).toList(),
+    'set': set?.toJson() ?? {
+      'total': setTotal,
+    },
   };
 
   TcgCard copyWith({
@@ -62,6 +78,7 @@ class TcgCard {
     double? price,
     List<PriceHistoryEntry>? priceHistory,
     SetInfo? set,
+    String? setTotal,
   }) {
     return TcgCard(
       id: id ?? this.id,
@@ -73,6 +90,7 @@ class TcgCard {
       price: price ?? this.price,
       priceHistory: priceHistory ?? this.priceHistory,
       set: set ?? this.set,
+      setTotal: setTotal ?? this.setTotal,
     );
   }
 
@@ -130,31 +148,47 @@ class PriceHistoryEntry {
 }
 
 class SetInfo {
-  final String id;
-  final String name;
+  final String? id;
+  final String? name;
   final String? series;
+  final int? total;
   final String? releaseDate;
 
   SetInfo({
-    required this.id,
-    required this.name,
+    this.id,
+    this.name,
     this.series,
+    this.total,
     this.releaseDate,
   });
 
   factory SetInfo.fromJson(Map<String, dynamic> json) {
-    return SetInfo(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      series: json['series'] as String?,
-      releaseDate: json['releaseDate'] as String?,
-    );
+    try {
+      // Convert total to string only if it's not null
+      final totalValue = json['total'];
+      final total = totalValue != null ? int.tryParse(totalValue.toString()) : null;
+      
+      return SetInfo(
+        id: json['id']?.toString(),
+        name: json['name']?.toString(),
+        series: json['series']?.toString(),
+        total: total,
+        releaseDate: json['releaseDate']?.toString(),
+      );
+    } catch (e, stack) {
+      print('Error creating SetInfo from JSON: $e');
+      print('JSON data: $json');
+      print('Stack trace: $stack');
+      // Return a SetInfo with null values rather than throwing
+      return SetInfo();
+    }
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
     'series': series,
+    'total': total?.toString(),  // Only convert to string if not null
     'releaseDate': releaseDate,
   };
 }

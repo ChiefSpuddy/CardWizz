@@ -19,6 +19,7 @@ import '../providers/currency_provider.dart';
 import '../widgets/sign_in_view.dart';
 import '../providers/app_state.dart';
 import '../providers/sort_provider.dart';  // Add this import
+import '../constants/layout.dart';  // Add this import
 
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
@@ -28,7 +29,30 @@ class CollectionsScreen extends StatefulWidget {
 }
 
 class CollectionsScreenState extends State<CollectionsScreen> { // Remove underscore
+  final _pageController = PageController();
   bool _showCustomCollections = false;
+  late bool _pageViewReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Add this to ensure PageView is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() => _pageViewReady = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged(int page) {
+    setState(() {
+      _showCustomCollections = page == 1;
+    });
+  }
 
   // Add this getter to allow access from AppDrawer
   bool get showCustomCollections => _showCustomCollections;
@@ -53,7 +77,15 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
         children: [
           Expanded(
             child: InkWell(
-              onTap: () => setState(() => _showCustomCollections = false),
+              onTap: () {
+                if (_pageViewReady) {
+                  _pageController.animateToPage(
+                    0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
               child: Container(
                 decoration: BoxDecoration(
                   gradient: !_showCustomCollections
@@ -97,7 +129,15 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
           ),
           Expanded(
             child: InkWell(
-              onTap: () => setState(() => _showCustomCollections = true),
+              onTap: () {
+                if (_pageViewReady) {
+                  _pageController.animateToPage(
+                    1,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
               child: Container(
                 decoration: BoxDecoration(
                   gradient: _showCustomCollections
@@ -381,36 +421,14 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
         child: !isSignedIn
             ? const SignInView()
             : StreamBuilder<List<TcgCard>>(
-                stream: Provider.of<StorageService>(context).watchCards(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 64,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Something went wrong',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              // Add refresh logic
-                            },
-                            child: const Text('Try Again'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  if (snapshot.data?.isEmpty ?? true) {
-                    return Center(
+              stream: Provider.of<StorageService>(context).watchCards(),
+              builder: (context, snapshot) {
+                if (snapshot.data?.isEmpty ?? true) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).size.height * LayoutConstants.emptyStatePaddingBottom,
+                    ),
+                    child: Center(
                       child: Padding(
                         padding: const EdgeInsets.all(24.0),
                         child: Column(
@@ -427,6 +445,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),
+                              textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 16),
                             Text(
@@ -459,17 +478,20 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                           ],
                         ),
                       ),
-                    );
-                  }
-
-                  return AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: _showCustomCollections
-                        ? const CustomCollectionsGrid()
-                        : const CollectionGrid(),
+                    ),
                   );
-                },
-              ),
+                }
+                
+                return PageView(
+                  controller: _pageController,
+                  onPageChanged: _onPageChanged,
+                  children: const [
+                    CollectionGrid(),
+                    CustomCollectionsGrid(),
+                  ],
+                );
+              },
+            ),
       ),
       floatingActionButton: isSignedIn && _showCustomCollections
           ? Container(

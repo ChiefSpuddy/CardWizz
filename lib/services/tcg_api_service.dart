@@ -36,7 +36,7 @@ class TcgApiService {
   };
 
   static const Map<String, String> setSearchQueries = {
-    'Prismatic Evolution': 'set.id:sv10',
+    'Prismatic Evolution': 'set.id:pr', // Updated from sv10 to pr
     'Surging Sparks': 'set.id:sv8',
     'Stellar Crown': 'set.id:sv7',
     'Twilight Masquerade': 'set.id:sv6',
@@ -58,7 +58,7 @@ class TcgApiService {
 
   // Add these new maps for better set matching
   static const Map<String, List<String>> setAliases = {
-    'sv10': ['Prismatic Evolution', 'Prismatic', 'Evolution'],
+    'sv8.5': ['Prismatic Evolution', 'Prismatic', 'Evolution', 'PR'], // Updated
     'sv8': ['Surging Sparks', 'Surging', 'Sparks'],
     'sv7': ['Stellar Crown', 'Stellar', 'Crown'],
     'sv6': ['Twilight Masquerade', 'Twilight', 'Masquerade'],

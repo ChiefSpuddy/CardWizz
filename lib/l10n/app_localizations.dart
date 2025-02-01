@@ -61,7 +61,7 @@ class AppLocalizations {
       'setDistribution': 'Set Distribution',
       'priceDistribution': 'Price Distribution',
       'topMovers': 'Top Movers',
-      'addCardsForAnalytics': 'Add some cards to see analytics',
+      'addCardsForAnalytics': 'Add some cards to your collection to see analytics and insights about your portfolio.',
       'collectionOverview': 'Collection Overview',
       'tryAgain': 'Try Again',
       'errorOccurred': 'Something went wrong',
@@ -92,6 +92,7 @@ class AppLocalizations {
       'total': 'Total',
       'profile': 'Profile',
       'welcomeUser': 'Welcome, {user}',
+      'noAnalyticsYet': 'No Analytics Yet',
     },
     'es': {
       'totalCards': 'Total de Cartas',

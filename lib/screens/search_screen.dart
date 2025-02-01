@@ -11,6 +11,7 @@ import '../constants/colors.dart';  // Add this import
 import 'package:provider/provider.dart';
 import '../providers/currency_provider.dart';
 import '../l10n/app_localizations.dart';  // Add this import
+import '../constants/layout.dart';  // Add this import
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -51,6 +52,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   static const popularSearches = [
     {'name': 'Charizard', 'icon': '🔥'},
+    {'name': 'Umbreon', 'icon': '🌙'}, // Added Umbreon
     {'name': 'Pikachu', 'icon': '⚡'},
     {'name': 'Mew', 'icon': '✨'},
     {'name': 'VMAX', 'icon': '🌟'},
@@ -800,37 +802,42 @@ Widget _buildRecentSearches() {
 
   Widget _buildNoResultsMessage() {
     final localizations = AppLocalizations.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off_rounded,
-            size: 48,
-            color: Theme.of(context).colorScheme.secondary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            localizations.translate('noCardsFound'),
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          if (_currentSort.contains('cardmarket.prices'))
-            Text(
-              'Try removing price sorting as not all cards have prices',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              ),
-            )
-          else
-            Text(
-              localizations.translate('tryAdjustingSearch'),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              ),
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).size.height * LayoutConstants.emptyStatePaddingBottom,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_rounded,
+              size: 48,
+              color: Theme.of(context).colorScheme.secondary,
             ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              localizations.translate('noCardsFound'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            if (_currentSort.contains('cardmarket.prices'))
+              Text(
+                'Try removing price sorting as not all cards have prices',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              )
+            else
+              Text(
+                localizations.translate('tryAdjustingSearch'),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -871,59 +878,6 @@ Widget _buildRecentSearches() {
     );
   }
 
-  Widget _buildSearchBar(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    return Container(
-      height: 36, // Reduced height
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.search, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: localizations.translate('searchCards'),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-              onChanged: _onSearchChanged,
-              textInputAction: TextInputAction.search,
-            ),
-          ),
-          if (_searchController.text.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear, size: 18),
-              onPressed: () {
-                _searchController.clear();
-                setState(() => _searchResults = null);
-              },
-              padding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints(
-                minWidth: 32,
-                minHeight: 32,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSearchResults() {
     final localizations = AppLocalizations.of(context);
     return Column(
@@ -943,13 +897,28 @@ Widget _buildRecentSearches() {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(  // Add this wrapper
-      onTap: () => FocusScope.of(context).unfocus(),  // Dismiss keyboard on tap
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
         appBar: AppBar(
-          toolbarHeight: 44,
-          automaticallyImplyLeading: false, // Keep this
-          leading: Container(), // Add this to prevent automatic drawer toggle
+          toolbarHeight: 64,
+          automaticallyImplyLeading: false,
+          leading: Container(
+            margin: const EdgeInsets.only(left: 8),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                onPressed: () => Navigator.pushNamed(context, '/scanner'),
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          ),
           elevation: 0,
           flexibleSpace: Container(
             decoration: BoxDecoration(
@@ -961,19 +930,59 @@ Widget _buildRecentSearches() {
               ),
             ),
           ),
-          title: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.document_scanner),
-                onPressed: () => Navigator.pushNamed(context, '/scanner'),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildSearchBar(context),
-              ),
-            ],
+          title: Container(
+            height: 40,
+            margin: const EdgeInsets.only(top: 8, right: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 12),
+                Icon(
+                  Icons.search,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: AppLocalizations.of(context).translate('searchCards'),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    style: const TextStyle(fontSize: 15),
+                    onChanged: _onSearchChanged,
+                    textInputAction: TextInputAction.search,
+                  ),
+                ),
+                if (_searchController.text.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear, size: 16),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchResults = null);
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+              ],
+            ),
           ),
-          titleSpacing: 0,
           actions: [
             IconButton(
               icon: Icon(_getSortIcon(_currentSort)),

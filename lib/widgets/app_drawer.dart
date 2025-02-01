@@ -35,6 +35,7 @@ class AppDrawer extends StatelessWidget {
               : Colors.white.withOpacity(0.9),
           child: Consumer<AppState>(
             builder: (context, appState, _) {
+              final username = appState.currentUser?.username;  // Get username
               return Column(
                 children: [
                   // Slimmer header with animation
@@ -95,7 +96,7 @@ class AppDrawer extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                appState.currentUser?.name ?? 'Welcome!',
+                                username ?? localizations.translate('welcome'),  // Use username or 'Welcome'
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 18, // Reduced font size

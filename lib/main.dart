@@ -14,6 +14,9 @@ import 'providers/currency_provider.dart';
 import 'services/purchase_service.dart';
 import 'screens/splash_screen.dart';
 import 'services/scanner_service.dart';
+import 'screens/add_to_collection_screen.dart';
+import 'screens/card_details_screen.dart';
+import 'models/tcg_card.dart';  // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -157,6 +160,28 @@ class CardWizzApp extends StatelessWidget {
           routes: {
             '/': (context) => const SplashScreen(),
             ...AppRoutes.routes,
+            '/card-details': (context) => CardDetailsScreen(
+              card: ModalRoute.of(context)!.settings.arguments as TcgCard,
+            ),
+            '/add-to-collection': (context) => AddToCollectionScreen(
+              card: ModalRoute.of(context)!.settings.arguments as TcgCard,
+            ),
+          },
+          onGenerateRoute: (settings) {
+            if (settings.name == '/card-details') {
+              return MaterialPageRoute(
+                builder: (context) => CardDetailsScreen(
+                  card: settings.arguments as TcgCard,
+                ),
+              );
+            } else if (settings.name == '/add-to-collection') {
+              return MaterialPageRoute(
+                builder: (context) => AddToCollectionScreen(
+                  card: settings.arguments as TcgCard,
+                ),
+              );
+            }
+            return null;
           },
         );
       },

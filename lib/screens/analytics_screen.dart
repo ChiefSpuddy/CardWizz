@@ -14,6 +14,8 @@ import '../screens/card_details_screen.dart';  // Add this import
 import 'dart:ui';  // Add this for ImageFilter
 import '../services/purchase_service.dart';  // Add this import
 import 'package:flutter/services.dart'; // Add this import at the top
+import '../screens/home_screen.dart';  // Add this import at the top with other imports
+import '../constants/layout.dart';  // Add this import
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -40,6 +42,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   bool _isRefreshing = false;
   DateTime? _lastUpdateTime;
+
+  // Add this getter
+  AppLocalizations get localizations => AppLocalizations.of(context);
 
   @override
   void initState() {
@@ -290,6 +295,35 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildValueTrendCard(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
     final localizations = AppLocalizations.of(context);
+    
+    if (cards.length < 2) {
+      return Card(
+        child: SizedBox(
+          height: 200,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.show_chart,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  localizations.translate('needMoreCards'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (cards.isEmpty) return const SizedBox.shrink();
 
     // Sort cards by value for trend analysis
@@ -1068,6 +1102,54 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
   }
 
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).size.height * LayoutConstants.emptyStatePaddingBottom,
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.query_stats,
+                size: 64,
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                localizations.translate('noAnalyticsYet'),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                localizations.translate('addCardsForAnalytics'),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 32),
+              FilledButton.icon(
+                onPressed: () {
+                  final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                  homeState?.setSelectedIndex(2); // Navigate to search tab
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Add Cards'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSignedIn = context.watch<AppState>().isAuthenticated;
@@ -1120,9 +1202,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                     final cards = snapshot.data!;
                     if (cards.isEmpty) {
-                      return Center(
-                        child: Text(localizations.translate('addCardsForAnalytics')),
-                      );
+                      return _buildEmptyState();
                     }
 
                     return CustomScrollView(
@@ -1134,17 +1214,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               children: [
                                 _buildValueSummary(cards),
                                 const SizedBox(height: 12),
-                                // ...rest of existing children...
                                 _buildValueTrendCard(cards),
                                 const SizedBox(height: 16),
-                                _buildTopMovers(cards), // Add this line
+                                _buildTopMovers(cards),
                                 const SizedBox(height: 16),
                                 _buildTopCardsCard(cards),
                                 const SizedBox(height: 16),
                                 _buildSetDistribution(cards),
                                 const SizedBox(height: 16),
                                 _buildPriceRangeDistribution(cards),
-                                const SizedBox(height: 32),  // Add bottom padding
+                                const SizedBox(height: 32),
                               ],
                             ),
                           ),
