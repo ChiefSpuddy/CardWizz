@@ -961,7 +961,18 @@ Widget _buildRecentSearches() {
               ),
             ),
           ),
-          title: _buildSearchBar(context),
+          title: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.document_scanner),
+                onPressed: () => Navigator.pushNamed(context, '/scanner'),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildSearchBar(context),
+              ),
+            ],
+          ),
           titleSpacing: 0,
           actions: [
             IconButton(

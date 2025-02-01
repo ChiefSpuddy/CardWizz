@@ -39,6 +39,8 @@ dependencies:
   background_fetch: ^1.2.1
   cached_network_image: ^3.3.0
   dio: ^5.3.3  # Add this line
+  google_mlkit_text_recognition: ^0.8.1
+  camera: ^0.10.5
 
 dev_dependencies:
   flutter_test:

@@ -13,6 +13,7 @@ import 'services/auth_service.dart'; // Add this import
 import 'providers/currency_provider.dart';
 import 'services/purchase_service.dart';
 import 'screens/splash_screen.dart';
+import 'services/scanner_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,7 @@ void main() async {
   final storageService = await StorageService.init(purchaseService);
   final authService = AuthService();
   final appState = AppState(storageService, authService);
+  final scannerService = ScannerService();  // Create instance here
   
   await appState.initialize();
 
@@ -32,8 +34,9 @@ void main() async {
         // Core providers
         ChangeNotifierProvider<PurchaseService>.value(value: purchaseService),
         ChangeNotifierProvider.value(value: appState),
-        Provider<StorageService>.value(value: storageService),  // Changed this line
+        Provider<StorageService>.value(value: storageService),
         Provider<AuthService>.value(value: authService),
+        Provider<ScannerService>.value(value: scannerService),  // Use .value constructor
         
         // Feature providers
         Provider<TcgApiService>(create: (_) => TcgApiService()),
@@ -41,14 +44,7 @@ void main() async {
           create: (_) => CurrencyProvider(),
         ),
       ],
-      child: Builder(
-        builder: (context) {
-          // Verify provider is accessible
-          final purchaseService = Provider.of<PurchaseService>(context, listen: false);
-          print('PurchaseService initialized: ${purchaseService.isLoading}');
-          return const CardWizzApp();
-        },
-      ),
+      child: const CardWizzApp(),  // Remove the Builder widget
     ),
   );
 }

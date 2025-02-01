@@ -119,7 +119,6 @@ class HomeScreenState extends State<HomeScreen> {
       child: Scaffold(
         key: _scaffoldKey,
         drawer: const AppDrawer(),
-        // Remove the Stack and Builder, let each screen handle its own menu button
         body: IndexedStack(
           index: _selectedIndex,
           children: _pages,
