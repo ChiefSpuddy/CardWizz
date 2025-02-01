@@ -11,6 +11,9 @@ import 'card_details_screen.dart';
 import '../services/poke_api_service.dart';
 import 'dart:math';  // Add this import for min()
 import 'dart:async';  // Add this import for StreamSubscription
+import '../widgets/app_drawer.dart';  // Add this import
+import '../providers/currency_provider.dart';  // Add this import
+import '../widgets/sign_in_view.dart';  // Add this import
 
 class DexScreen extends StatefulWidget {
   const DexScreen({super.key});
@@ -675,39 +678,32 @@ class _DexScreenState extends State<DexScreen> {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final isSignedIn = appState.isAuthenticated;
-
-    if (!isSignedIn) {
-      return const SignInButton(
-        message: 'Sign in to view your collection stats',
-      );
-    }
-
-    final filteredPokemon = _getFilteredPokemon();
+    final currencyProvider = context.watch<CurrencyProvider>();
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
+        toolbarHeight: 44, // Match other screens
         title: const Text('Pokédex'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
+        automaticallyImplyLeading: true,
       ),
-      body: Column(
-        children: [
-          _buildGenerationProgress(),
-          Expanded(
-            child: _isLoading && _currentPage == 0
-              ? const Center(child: CircularProgressIndicator())
-              : _buildPokemonGrid(),
-          ),
-        ],
-      ),
+      body: !isSignedIn  // Removed AnimatedBackground
+          ? const SignInView()
+          : Column(
+              children: [
+                _buildGenerationProgress(),
+                Expanded(
+                  child: _isLoading && _currentPage == 0
+                      ? const Center(child: CircularProgressIndicator())
+                      : _buildPokemonGrid(),
+                ),
+              ],
+            ),
     );
   }
 
   void _showPokemonCards(BuildContext context, String pokemonName, List<TcgCard> cards) {
+    final currencyProvider = context.read<CurrencyProvider>();  // Add this
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -755,7 +751,7 @@ class _DexScreenState extends State<DexScreen> {
                             Padding(
                               padding: const EdgeInsets.all(4),
                               child: Text(
-                                '€${card.price!.toStringAsFixed(2)}',
+                                currencyProvider.formatValue(card.price!),  // Update this line
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                 ),

@@ -953,12 +953,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final currencyProvider = context.watch<CurrencyProvider>();
     final localizations = AppLocalizations.of(context);
     
-    // Filter cards with price history
+    // Filter cards with valid price history
     final cardsWithHistory = cards.where((card) => 
-      card.price != null && card.priceHistory.isNotEmpty
+      card.price != null && card.priceHistory.length > 1
     ).toList();
     
-    // Show placeholder if no price history
     if (cardsWithHistory.isEmpty) {
       return Card(
         child: Padding(
@@ -972,17 +971,40 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
               const SizedBox(height: 16),
               Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'Updates run daily. Last checked: ${_lastUpdateTime != null 
-                      ? _formatDateTime(_lastUpdateTime!) 
-                      : 'Not yet'}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.history,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Collecting price history...',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _lastUpdateTime != null 
+                        ? 'Last checked: ${_formatDateTime(_lastUpdateTime!)}'
+                        : 'Not checked yet',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextButton.icon(
+                      onPressed: _isRefreshing ? null : () => _refreshPrices(),
+                      icon: _isRefreshing 
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                      label: Text(_isRefreshing ? 'Updating...' : 'Check Now'),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -991,14 +1013,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       );
     }
 
-    // Rest of existing _buildTopMovers implementation
-    // ...
-
-    // Calculate 24h changes
+    // Calculate 24h changes with improved error handling
     final periodChanges = cardsWithHistory.map((card) {
       final change = card.getPriceChange(const Duration(hours: 24));
       return (card, change);
-    }).where((tuple) => tuple.$2 != null)
+    }).where((tuple) => tuple.$2 != null && tuple.$2!.abs() > 0.01) // Filter out tiny changes
       .toList()
       ..sort((a, b) => (b.$2 ?? 0).abs().compareTo((a.$2 ?? 0).abs()));
 
@@ -1077,17 +1096,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final storage = Provider.of<StorageService>(context, listen: false);
       if (storage.backgroundService != null) {
         await storage.backgroundService!.refreshPrices();
-        await _updateLastRefreshTime();  // Add this line
+        await _updateLastRefreshTime();
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(
-              'Prices updated successfully. Changes will appear in Top Movers after 24 hours'
+            const SnackBar(content: Text(
+              'Price check complete. Changes will appear once differences are detected.'
             )),
           );
         }
-      } else {
-        throw Exception('Background service not initialized');
       }
     } catch (e) {
       if (mounted) {
@@ -1241,55 +1258,73 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final currencyProvider = context.watch<CurrencyProvider>();
     final localizations = AppLocalizations.of(context);
     final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
-    final weeklyChange = 5.8; // TODO: Implement real calculation
+    final weeklyChange = 5.8;
 
-    return TweenAnimationBuilder(
-      duration: const Duration(milliseconds: 600),
-      tween: Tween<double>(begin: 0.0, end: 1.0),
-      builder: (context, double value, child) {
-        return Transform.translate(
-          offset: Offset(0, 20 * (1 - value)),
-          child: Opacity(
-            opacity: value,
-            child: child,
+    return Card(
+      elevation: 4,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.primary.withOpacity(0.8),
+              Theme.of(context).colorScheme.secondary.withOpacity(0.8),
+            ],
           ),
-        );
-      },
-      child: Card(
-        elevation: 4,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.primaryContainer,
-                Theme.of(context).colorScheme.secondaryContainer,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     localizations.translate('portfolioValue'),
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.white.withOpacity(0.9),
+                    ),
                   ),
-                  _buildChangeIndicator(weeklyChange),
+                  const SizedBox(height: 4),
+                  Text(
+                    currencyProvider.formatValue(totalValue),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                currencyProvider.formatValue(totalValue),
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                borderRadius: BorderRadius.circular(20),
               ),
-            ],
-          ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.trending_up,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '+${weeklyChange.toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

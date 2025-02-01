@@ -68,7 +68,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
     
     return Container(
       height: 36,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8), // Removed top margin
+      margin: const EdgeInsets.symmetric(horizontal: 16), // Remove top margin
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
@@ -78,7 +78,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
           Expanded(
             child: InkWell(
               onTap: () {
-                if (_pageViewReady) {
+                if (_pageController.hasClients) {  // Add this check
                   _pageController.animateToPage(
                     0,
                     duration: const Duration(milliseconds: 300),
@@ -130,7 +130,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
           Expanded(
             child: InkWell(
               onTap: () {
-                if (_pageViewReady) {
+                if (_pageController.hasClients) {  // Add this check
                   _pageController.animateToPage(
                     1,
                     duration: const Duration(milliseconds: 300),
@@ -272,7 +272,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
 
     return Scaffold(
       appBar: AppBar(
-        // Remove toolbarHeight as it's causing layout issues
+        toolbarHeight: 44, // Match home screen height
         centerTitle: false,
         automaticallyImplyLeading: true,
         titleSpacing: 0, // Add this to fix spacing
@@ -411,10 +411,13 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
             onPressed: () => _showSortMenu(context),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44), // Single value for height
-          child: _buildToggle(), // Remove Column wrapper
-        ),
+        bottom: isSignedIn ? PreferredSize(  // Add this condition
+          preferredSize: const Size.fromHeight(52),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _buildToggle(),
+          ),
+        ) : null,  // Return null when not signed in
       ),
       drawer: const AppDrawer(),
       body: AnimatedBackground(

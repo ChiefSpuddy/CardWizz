@@ -32,7 +32,7 @@ class CollectionService {
       
       final db = await openDatabase(
         'collections.db',
-        version: 1,
+        version: 2,  // Increase version number from 1 to 2
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE collections(
@@ -45,6 +45,15 @@ class CollectionService {
               color INTEGER DEFAULT 4282682873
             )
           ''');
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 2) {
+            // Add the color column to existing databases
+            await db.execute('''
+              ALTER TABLE collections 
+              ADD COLUMN color INTEGER DEFAULT 4282682873
+            ''');
+          }
         },
       );
 

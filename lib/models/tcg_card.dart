@@ -7,8 +7,9 @@ class TcgCard {
   final String? setName;
   final double? price;
   final List<PriceHistoryEntry> priceHistory;
-  final SetInfo? set;  // Add this field
-  final String? setTotal;  // Add this property
+  final SetInfo? set;
+  final String? setTotal;
+  final List<PricePoint> _priceHistory;
 
   TcgCard({
     required this.id,
@@ -20,19 +21,19 @@ class TcgCard {
     this.price,
     this.priceHistory = const [],
     this.set,
-    this.setTotal,  // Add this to constructor
-  });
+    this.setTotal,
+  }) : _priceHistory = [];
+
+  List<PricePoint> get priceHistoryPoints => List.unmodifiable(_priceHistory);
 
   factory TcgCard.fromJson(Map<String, dynamic> json) {
     try {
       final setData = json['set'] as Map<String, dynamic>?;
       final SetInfo? setInfo = setData != null ? SetInfo.fromJson(setData) : null;
-
-      // Handle null values in constructor
-      return TcgCard(
-        id: json['id']?.toString() ?? '',  // Provide default empty string
-        name: json['name']?.toString() ?? '',  // Provide default empty string
-        number: json['number']?.toString() ?? '',  // Provide default empty string
+      final card = TcgCard(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        number: json['number']?.toString() ?? '',
         imageUrl: json['images']?['small']?.toString() ?? '',
         rarity: json['rarity']?.toString(),
         setName: json['set']?['name']?.toString(),
@@ -43,6 +44,14 @@ class TcgCard {
         set: setInfo,
         setTotal: json['set']?['total']?.toString(),
       );
+
+      // Load price history points
+      final historyPoints = (json['priceHistoryPoints'] as List<dynamic>?)?.map(
+        (p) => PricePoint.fromJson(p as Map<String, dynamic>)
+      ).toList() ?? [];
+      
+      card._priceHistory.addAll(historyPoints);
+      return card;
     } catch (e, stack) {
       print('Error creating TcgCard from JSON: $e');
       print('JSON data: $json');
@@ -63,10 +72,50 @@ class TcgCard {
       },
     },
     'priceHistory': priceHistory.map((e) => e.toJson()).toList(),
+    'priceHistoryPoints': _priceHistory.map((p) => p.toJson()).toList(),
     'set': set?.toJson() ?? {
       'total': setTotal,
     },
   };
+
+  void addPriceHistoryEntry(double price) {
+    final roundedPrice = double.parse(price.toStringAsFixed(2));
+    priceHistory.add(PriceHistoryEntry(
+      date: DateTime.now(),
+      price: roundedPrice,
+    ));
+    
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    priceHistory.removeWhere((entry) => entry.date.isBefore(thirtyDaysAgo));
+  }
+
+  void addPricePoint(double newPrice) {
+    if (_priceHistory.isEmpty || _priceHistory.last.price != newPrice) {
+      _priceHistory.add(PricePoint(
+        price: newPrice,
+        timestamp: DateTime.now(),
+      ));
+      final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+      _priceHistory.removeWhere((point) => point.timestamp.isBefore(thirtyDaysAgo));
+    }
+  }
+
+  double? getPriceChange(Duration period) {
+    if (_priceHistory.length < 2) return null;
+    
+    final now = DateTime.now();
+    final targetTime = now.subtract(period);
+    
+    final oldPrice = _priceHistory
+        .where((point) => point.timestamp.isBefore(targetTime))
+        .lastOrNull
+        ?.price ?? _priceHistory.first.price;
+    
+    final currentPrice = _priceHistory.last.price;
+    
+    if (oldPrice == 0) return 0;
+    return ((currentPrice - oldPrice) / oldPrice) * 100;
+  }
 
   TcgCard copyWith({
     String? id,
@@ -92,36 +141,6 @@ class TcgCard {
       set: set ?? this.set,
       setTotal: setTotal ?? this.setTotal,
     );
-  }
-
-  void addPriceHistoryEntry(double price) {
-    // Round price to 2 decimal places when adding to history
-    final roundedPrice = double.parse(price.toStringAsFixed(2));
-    priceHistory.add(PriceHistoryEntry(
-      date: DateTime.now(),
-      price: roundedPrice,
-    ));
-    
-    // Keep only last 30 days of history
-    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    priceHistory.removeWhere((entry) => entry.date.isBefore(thirtyDaysAgo));
-  }
-
-  // Add method to calculate price change
-  double? getPriceChange(Duration period) {
-    if (priceHistory.isEmpty || price == null) return null;
-    
-    final now = DateTime.now();
-    final comparison = priceHistory
-        .where((entry) => now.difference(entry.date) <= period)
-        .fold<double?>(null, (prev, entry) => 
-          prev == null || entry.date.isBefore(DateTime.fromMillisecondsSinceEpoch(prev.toInt()))
-              ? entry.price
-              : prev);
-              
-    if (comparison == null) return null;
-    
-    return ((price! - comparison) / comparison) * 100;
   }
 }
 
@@ -164,7 +183,6 @@ class SetInfo {
 
   factory SetInfo.fromJson(Map<String, dynamic> json) {
     try {
-      // Convert total to string only if it's not null
       final totalValue = json['total'];
       final total = totalValue != null ? int.tryParse(totalValue.toString()) : null;
       
@@ -179,7 +197,6 @@ class SetInfo {
       print('Error creating SetInfo from JSON: $e');
       print('JSON data: $json');
       print('Stack trace: $stack');
-      // Return a SetInfo with null values rather than throwing
       return SetInfo();
     }
   }
@@ -188,7 +205,24 @@ class SetInfo {
     'id': id,
     'name': name,
     'series': series,
-    'total': total?.toString(),  // Only convert to string if not null
+    'total': total?.toString(),
     'releaseDate': releaseDate,
   };
+}
+
+class PricePoint {
+  final double price;
+  final DateTime timestamp;
+
+  PricePoint({required this.price, required this.timestamp});
+
+  Map<String, dynamic> toJson() => {
+    'price': price,
+    'timestamp': timestamp.toIso8601String(),
+  };
+
+  factory PricePoint.fromJson(Map<String, dynamic> json) => PricePoint(
+    price: json['price'] as double,
+    timestamp: DateTime.parse(json['timestamp'] as String),
+  );
 }

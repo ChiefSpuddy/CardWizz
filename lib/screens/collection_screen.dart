@@ -107,3 +107,9 @@ Widget _buildStatItem(String label, String value, Color color, IconData icon) {
 
 // ...existing code...
 
+body: AnimatedBackground(
+  child: !isSignedIn
+      ? const SignInView()  // Replace SignInButton with SignInView
+      : StreamBuilder<List<TcgCard>>(
+// ...existing code...
+

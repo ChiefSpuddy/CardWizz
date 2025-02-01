@@ -9,7 +9,7 @@ import '../services/tcg_api_service.dart';
 import '../services/background_service.dart';
 
 class StorageService {
-  static const int _freeUserCardLimit = 10;
+  static const int _freeUserCardLimit = 25;  // Changed from 10 to 25
   final PurchaseService _purchaseService;
   static StorageService? _instance;
 
@@ -507,4 +507,27 @@ class StorageService {
 
   // Add public getter for premium status
   bool get isPremium => _purchaseService.isPremium;
+
+  Future<void> updateCard(TcgCard card) async {
+    if (_currentUserId == null) return;  // Changed from _userId to _currentUserId
+
+    final cards = await getCards();
+    
+    // Find and update the existing card
+    final index = cards.indexWhere((c) => c.id == card.id);
+    if (index != -1) {
+      cards[index] = card;
+      
+      // Save all cards back to storage
+      final cardsKey = _getUserKey('cards');
+      final updatedCardsJson = cards
+          .map((c) => jsonEncode(c.toJson()))
+          .toList();
+      
+      await _prefs.setStringList(cardsKey, updatedCardsJson);
+      
+      // Notify listeners
+      _cardsController.add(cards);
+    }
+  }
 }

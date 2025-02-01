@@ -123,29 +123,18 @@ class HomeScreenState extends State<HomeScreen> {  // Changed from _HomeScreenSt
           index: _selectedIndex,
           children: _pages,
         ),
-        bottomNavigationBar: Theme(
-          data: Theme.of(context).copyWith(
-            textTheme: Theme.of(context).textTheme.copyWith(
-              labelSmall: const TextStyle(fontSize: 10),  // Even smaller text
-            ),
-          ),
-          child: NavigationBar(
-            height: 60,
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) {
-              HapticFeedback.selectionClick();
-              setSelectedIndex(index);
-            },
-            destinations: List.generate(
-              _navItems.length,
-              (index) => NavigationDestination(
-                icon: _buildBottomNavItem(context, index),
-                label: AppLocalizations.of(context).translate(_navItems[index].label),
-              ),
-            ),
-          ),
+        bottomNavigationBar: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          currentIndex: _selectedIndex,
+          selectedItemColor: Theme.of(context).colorScheme.primary,
+          unselectedItemColor: Colors.grey,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          onTap: setSelectedIndex,
+          items: _navItems.map((item) => BottomNavigationBarItem(
+            icon: _buildBottomNavItem(context, _navItems.indexOf(item)),
+            label: AppLocalizations.of(context).translate(item.label),
+          )).toList(),
         ),
       ),
     );

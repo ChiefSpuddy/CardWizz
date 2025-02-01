@@ -1,6 +1,6 @@
 name: cardwizz
 description: A TCG card collection management app
-version: 1.0.0+1  # Make sure this matches your App Store version
+version: 1.0.0+2  # Increment either version or build number
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

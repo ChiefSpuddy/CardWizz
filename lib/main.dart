@@ -139,6 +139,19 @@ class CardWizzApp extends StatelessWidget {
             iconTheme: const IconThemeData(
               color: AppColors.text,
             ),
+            bottomNavigationBarTheme: BottomNavigationBarThemeData(
+              selectedLabelStyle: TextStyle(
+                fontSize: 12,
+                overflow: TextOverflow.visible,
+                height: 1.0,
+              ),
+              unselectedLabelStyle: TextStyle(
+                fontSize: 12,
+                overflow: TextOverflow.visible,
+                height: 1.0,
+              ),
+              type: BottomNavigationBarType.fixed,
+            ),
           ),
           darkTheme: ThemeData.dark().copyWith(
             useMaterial3: true,
