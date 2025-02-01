@@ -1,6 +1,6 @@
 name: cardwizz
 description: A TCG card collection management app
-version: 1.0.0+1  # Verify this matches your app store versions
+version: 1.0.0+1  # Make sure this matches your App Store version
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -69,6 +69,8 @@ flutter:
     - assets/names.json
     - assets/avatars/    # Add this line
     - assets/animations/background.json
+    - assets/animations/SplashAnimation.json  # Add this specific file
+    - assets/animations/Loading.json
 
 flutter_launcher_icons:
   android: "launcher_icon"
@@ -78,10 +80,7 @@ flutter_launcher_icons:
   remove_alpha_ios: true
 
 flutter_native_splash:
-  color: "#FFFFFF"
-  image: assets/launch_image/splash.png
-  android_12:
-    color: "#FFFFFF"
-    image: assets/launch_image/splash.png
+  android: false
+  ios: false
 
   # Removed all other configurations to keep it simple

@@ -12,6 +12,7 @@ import 'services/tcg_api_service.dart';
 import 'services/auth_service.dart'; // Add this import
 import 'providers/currency_provider.dart';
 import 'services/purchase_service.dart';
+import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -90,17 +91,17 @@ class CardWizzApp extends StatelessWidget {
             primaryColor: AppColors.primary,
             scaffoldBackgroundColor: AppColors.background,
             appBarTheme: AppBarTheme(
-              backgroundColor: Colors.white,
+              backgroundColor: Colors.transparent,
               foregroundColor: AppColors.text,
               elevation: 0,
-              centerTitle: true,
-              scrolledUnderElevation: 0,
-              shape: Border(
-                bottom: BorderSide(
-                  color: Colors.grey.shade100,
-                  width: 1,
-                ),
+              centerTitle: false,
+              toolbarHeight: 44, // Even smaller height
+              titleSpacing: 16, // Changed back to 16
+              iconTheme: IconThemeData(
+                size: 24, // Back to standard size for menu icon
+                color: AppColors.text,
               ),
+              // Removed actionsIconTheme since we don't need it anymore
             ),
             cardTheme: CardTheme(
               color: AppColors.surface,
@@ -156,18 +157,10 @@ class CardWizzApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          initialRoute: AppRoutes.home,
-          routes: AppRoutes.routes,
-          navigatorKey: GlobalKey<NavigatorState>(),
-          builder: (context, child) {
-            if (appState.isLoading) {
-              return const MaterialApp(
-                home: Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                ),
-              );
-            }
-            return child!;
+          initialRoute: '/', // Add this line
+          routes: {
+            '/': (context) => const SplashScreen(),
+            ...AppRoutes.routes,
           },
         );
       },

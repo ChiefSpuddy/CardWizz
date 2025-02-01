@@ -119,24 +119,10 @@ class HomeScreenState extends State<HomeScreen> {
       child: Scaffold(
         key: _scaffoldKey,
         drawer: const AppDrawer(),
-        body: Builder(
-          builder: (context) => Stack(
-            children: [
-              IndexedStack(
-                index: _selectedIndex,
-                children: _pages,
-              ),
-              Positioned(
-                top: MediaQuery.of(context).padding.top,
-                left: 0,
-                child: IconButton(
-                  icon: const Icon(Icons.menu),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                  padding: const EdgeInsets.all(16),
-                ),
-              ),
-            ],
-          ),
+        // Remove the Stack and Builder, let each screen handle its own menu button
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: _pages,
         ),
         bottomNavigationBar: Theme(
           data: Theme.of(context).copyWith(

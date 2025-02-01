@@ -453,16 +453,35 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final isSignedIn = appState.isAuthenticated;
+    final user = appState.currentUser;
     final localizations = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(localizations.translate('overview')),  // Add translation
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
+        toolbarHeight: 44,
+        automaticallyImplyLeading: false,
+        title: isSignedIn && user != null ? RichText(
+          text: TextSpan(
+            style: Theme.of(context).textTheme.titleMedium,
+            children: [
+              TextSpan(
+                text: '${localizations.translate('welcome')} ',
+              ),
+              TextSpan(
+                text: '@${user.username}',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
+        ) : null,
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          onPressed: () => Scaffold.of(context).openDrawer(),
         ),
       ),
       body: !isSignedIn 
@@ -660,37 +679,49 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     final translationKey = title == 'Total Cards' ? 'totalCards' : 
                           title == 'Collection Value' ? 'portfolioValue' : 
                           title.toLowerCase().replaceAll(' ', '_');
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(
-              title.toLowerCase().contains('value') 
-                  ? Icons.currency_exchange
-                  : icon,
-              size: 32,
-              color: Theme.of(context).colorScheme.primary,
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(0, 0.2),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCubic,
+      )),
+      child: FadeTransition(
+        opacity: _animationController,
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Icon(
+                  title.toLowerCase().contains('value') 
+                      ? Icons.currency_exchange
+                      : icon,
+                  size: 32,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  localizations.translate(translationKey),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              localizations.translate(translationKey),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

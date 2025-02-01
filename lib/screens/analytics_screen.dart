@@ -107,22 +107,38 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
+            flex: 2,
             child: Text(
               label,
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
           const SizedBox(width: 16),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
+          Flexible(  // Changed from Text to Flexible
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Add helper method for better text overflow handling
+  Widget _buildValueText(String text, {TextStyle? style}) {
+    return Flexible(
+      child: Text(
+        text,
+        style: style,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
@@ -227,13 +243,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
-                    Hero( // Add Hero widget for smooth transition
-                      tag: 'analytics_card_${card.id}', // Updated unique tag
-                      child: Image.network(
-                        card.imageUrl,
-                        height: 50,
-                        width: 36,
-                        fit: BoxFit.contain,
+                    SizedBox(
+                      width: 28,
+                      child: Hero(
+                        tag: 'card_${card.id}',  // Updated unique tag
+                        child: _buildCardImage(card.imageUrl),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -433,129 +447,131 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       children: [
         Card(
           // Existing card content, but blur it when not premium
-          child: ImageFiltered(
-            imageFilter: purchaseService.isPremium 
-                ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
-                : ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-            child: Opacity(
-              opacity: purchaseService.isPremium ? 1.0 : 0.7,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          localizations.translate('setDistribution'),
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '${sortedSets.length} ${localizations.translate('sets')}',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    // Pie Chart
-                    SizedBox(
-                      height: 140,  // Reduced height
-                      child: Row(
+          child: SingleChildScrollView( // Add this to prevent overflow
+            child: ImageFiltered(
+              imageFilter: purchaseService.isPremium 
+                  ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
+                  : ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+              child: Opacity(
+                opacity: purchaseService.isPremium ? 1.0 : 0.7,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Expanded(
-                            child: PieChart(
-                              PieChartData(
-                                sections: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
-                                  final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
-                                  return PieChartSectionData(
-                                    color: colors[entry.key % colors.length],
-                                    value: entry.value.value.toDouble(),
-                                    title: '$percentage%',
-                                    radius: 60,  // Fixed smaller radius
-                                    titleStyle: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                    titlePositionPercentageOffset: 0.55,
-                                  );
-                                }).toList(),
-                                sectionsSpace: 2,
-                                centerSpaceRadius: 30,
-                              ),
-                            ),
+                          Text(
+                            localizations.translate('setDistribution'),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(width: 16),
-                          // Single legend
-                          Expanded(
-                            child: ShaderMask(
-                              shaderCallback: (Rect rect) {
-                                return LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.purple.withOpacity(0),
-                                    Colors.purple.withOpacity(1),
-                                  ],
-                                  stops: const [0.9, 1.0],
-                                ).createShader(rect);
-                              },
-                              blendMode: BlendMode.dstOut,
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
-                                    final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 4),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 12,
-                                            height: 12,
-                                            decoration: BoxDecoration(
-                                              color: colors[entry.key % colors.length],
-                                              shape: BoxShape.circle,
-                                              border: Border.all(
-                                                color: Theme.of(context).colorScheme.outline,
-                                                width: 1,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              '${entry.value.key}\n${entry.value.value} cards ($percentage%)',
-                                              style: const TextStyle(fontSize: 12),
-                                              maxLines: 2,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
+                          const Spacer(),
+                          Text(
+                            '${sortedSets.length} ${localizations.translate('sets')}',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    if (hasMore) ...[
-                      const SizedBox(height: 16),
-                      Center(
-                        child: TextButton(
-                          onPressed: () => _showAllSets(context, sortedSets, colors, cards.length),
-                          child: Text('Show All Sets (${sortedSets.length})'),
+                      const SizedBox(height: 24),
+                      // Pie Chart
+                      SizedBox(
+                        height: 140,  // Reduced height
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: PieChart(
+                                PieChartData(
+                                  sections: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
+                                    final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
+                                    return PieChartSectionData(
+                                      color: colors[entry.key % colors.length],
+                                      value: entry.value.value.toDouble(),
+                                      title: '$percentage%',
+                                      radius: 60,  // Fixed smaller radius
+                                      titleStyle: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                      titlePositionPercentageOffset: 0.55,
+                                    );
+                                  }).toList(),
+                                  sectionsSpace: 2,
+                                  centerSpaceRadius: 30,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            // Single legend
+                            Expanded(
+                              child: ShaderMask(
+                                shaderCallback: (Rect rect) {
+                                  return LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.purple.withOpacity(0),
+                                      Colors.purple.withOpacity(1),
+                                    ],
+                                    stops: const [0.9, 1.0],
+                                  ).createShader(rect);
+                                },
+                                blendMode: BlendMode.dstOut,
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
+                                      final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 4),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 12,
+                                              height: 12,
+                                              decoration: BoxDecoration(
+                                                color: colors[entry.key % colors.length],
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: Theme.of(context).colorScheme.outline,
+                                                  width: 1,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                '${entry.value.key}\n${entry.value.value} cards ($percentage%)',
+                                                style: const TextStyle(fontSize: 12),
+                                                maxLines: 2,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      if (hasMore) ...[
+                        const SizedBox(height: 16),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => _showAllSets(context, sortedSets, colors, cards.length),
+                            child: Text('Show All Sets (${sortedSets.length})'),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -974,18 +990,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               
               return ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Image.network(
-                  card.imageUrl,
-                  height: 40,
-                  width: 28,
-                  fit: BoxFit.contain,
-                ),
-                title: Text(card.name),
-                subtitle: Text(
-                  currencyProvider.formatValue(card.price ?? 0),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
+                leading: SizedBox(
+                  width: 28, // Fixed width for image
+                  child: Hero(
+                    tag: 'mover_${card.id}',  // Different tag for top movers
+                    child: _buildCardImage(card.imageUrl),
                   ),
+                ),
+                title: _buildValueText(card.name),  // Use helper method
+                subtitle: _buildValueText(
+                  currencyProvider.formatValue(card.price ?? 0),
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(
@@ -1059,6 +1074,39 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final localizations = AppLocalizations.of(context);
 
     return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 44,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
+        actions: [
+          Tooltip(
+            message: _lastUpdateTime != null 
+              ? 'Last updated: ${_formatDateTime(_lastUpdateTime!)}\nTap to check for new prices'
+              : 'Tap to check for new prices',
+            waitDuration: const Duration(milliseconds: 500),
+            showDuration: const Duration(seconds: 2),
+            preferBelow: false,
+            child: IconButton(
+              icon: _isRefreshing 
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh, size: 22),
+              onPressed: _isRefreshing ? null : _refreshPrices,
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: AnimatedBackground(
         child: SafeArea(
           child: !isSignedIn
@@ -1079,53 +1127,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                     return CustomScrollView(
                       slivers: [
-                        SliverAppBar(
-                          title: Text(localizations.translate('analytics')),
-                          pinned: true,
-                          floating: true,
-                          actions: [
-                            Tooltip(
-                              message: _lastUpdateTime != null 
-                                ? 'Last updated: ${_formatDateTime(_lastUpdateTime!)}\nTap to check for new prices'
-                                : 'Tap to check for new prices',
-                              waitDuration: const Duration(milliseconds: 500), // Add this
-                              showDuration: const Duration(seconds: 2),        // Add this
-                              preferBelow: false,                             // Add this
-                              child: Container(  // Wrap with Container for better tap target
-                                padding: const EdgeInsets.all(8),
-                                child: IconButton(
-                                  icon: _isRefreshing 
-                                      ? Stack(
-                                          alignment: Alignment.center,
-                                          children: [
-                                            const SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            ),
-                                            Icon(
-                                              Icons.refresh,
-                                              size: 16,
-                                              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                                            ),
-                                          ],
-                                        )
-                                      : const Icon(Icons.refresh),
-                                  onPressed: _isRefreshing ? null : _refreshPrices,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
                         SliverToBoxAdapter(
-                          child: Padding(  // Add this Padding widget
+                          child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: Column(
                               children: [
                                 _buildValueSummary(cards),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
+                                // ...rest of existing children...
                                 _buildValueTrendCard(cards),
                                 const SizedBox(height: 16),
                                 _buildTopMovers(cards), // Add this line
@@ -1155,40 +1164,53 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
     final weeklyChange = 5.8; // TODO: Implement real calculation
 
-    return Card(
-      elevation: 4,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Theme.of(context).colorScheme.primaryContainer,
-              Theme.of(context).colorScheme.secondaryContainer,
-            ],
+    return TweenAnimationBuilder(
+      duration: const Duration(milliseconds: 600),
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      builder: (context, double value, child) {
+        return Transform.translate(
+          offset: Offset(0, 20 * (1 - value)),
+          child: Opacity(
+            opacity: value,
+            child: child,
           ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  localizations.translate('portfolioValue'),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                _buildChangeIndicator(weeklyChange),
+        );
+      },
+      child: Card(
+        elevation: 4,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Theme.of(context).colorScheme.primaryContainer,
+                Theme.of(context).colorScheme.secondaryContainer,
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              currencyProvider.formatValue(totalValue),
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    localizations.translate('portfolioValue'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  _buildChangeIndicator(weeklyChange),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                currencyProvider.formatValue(totalValue),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1248,6 +1270,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     } else {
       return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
     }
+  }
+
+  // Add this helper method to handle image errors
+  Widget _buildCardImage(String imageUrl) {
+    return Image.network(
+      imageUrl,
+      height: 40,
+      width: 28,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          width: 28,  // Fixed width
+          height: 40,  // Fixed height
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceVariant,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.broken_image_outlined,
+            size: 20,  // Smaller icon
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        );
+      },
+    );
   }
 }
 

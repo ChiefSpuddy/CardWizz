@@ -17,7 +17,7 @@ class AppRoutes {
   static const String dex = '/dex';  // Add this route
 
   static Map<String, WidgetBuilder> get routes => {
-    home: (context) => const HomeScreen(),
+    '/home': (context) => const HomeScreen(), // Your home screen
     collection: (context) => const CollectionsScreen(),
     search: (context) => const SearchScreen(),
     settings: (context) => const SettingsScreen(),

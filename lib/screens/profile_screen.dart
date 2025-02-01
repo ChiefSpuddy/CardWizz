@@ -242,9 +242,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget _buildStatsCard(String title, String value, Color color) {
     final localizations = AppLocalizations.of(context);
     return Card(
-      elevation: 2,
+      elevation: 1, // Reduced elevation
+      margin: EdgeInsets.zero, // Remove margin
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8), // Reduced padding
         child: Column(
           children: [
             FittedBox(  // Add this wrapper
@@ -252,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               child: Text(
                 value,
                 style: TextStyle(
-                  fontSize: 20,  // Reduced from 24
+                  fontSize: 18, // Reduced from 20
                   fontWeight: FontWeight.bold,
                   color: color,
                 ),
@@ -260,11 +261,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 overflow: TextOverflow.ellipsis,  // Add this
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2), // Reduced from 4
             Text(
               localizations.translate(title),  // Use translation here
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11, // Reduced from 12
                 color: Colors.grey[600],
               ),
             ),
@@ -278,201 +279,111 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final colorScheme = Theme.of(context).colorScheme;
     final displayName = user.name ?? '';
     final initial = user.name?.isNotEmpty == true ? user.name![0].toUpperCase() : '';
-    final localizations = AppLocalizations.of(context); // Add this line
 
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primaryContainer,
-              colorScheme.secondaryContainer,
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: IntrinsicHeight(  // Add this wrapper
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,  // Make sure both columns stretch
-              children: [
-                // Avatar column
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Stack(
-                      children: [
-                        GestureDetector(
-                          onTap: () => _selectAvatar(context),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 2,
-                              ),
-                            ),
-                            child: CircleAvatar(
-                              radius: 30,
-                              backgroundColor: colorScheme.primary.withOpacity(0.2),
-                              child: user.avatarPath != null
-                                  ? ClipOval(
-                                      child: Image.asset(
-                                        user.avatarPath!,
-                                        width: 60,
-                                        height: 60,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : initial.isNotEmpty
-                                      ? Text(initial,
-                                          style: const TextStyle(
-                                            fontSize: 24,
-                                            color: Colors.white,
-                                          ))
-                                      : const Icon(Icons.person,
-                                          size: 30, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          right: -2,
-                          bottom: -2,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 2,
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.edit,
-                              size: 12,
-                              color: Colors.white,
-                            ),
-                          ),
+    return AnimatedContainer( // Add animation to header
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+      margin: const EdgeInsets.only(bottom: 4), // Reduced from 8
+      child: Column(
+        children: [
+          TweenAnimationBuilder(
+            duration: const Duration(milliseconds: 400),
+            tween: Tween<double>(begin: 0.5, end: 1.0),
+            curve: Curves.elasticOut,
+            builder: (context, double value, child) {
+              return Transform.scale(
+                scale: value,
+                child: child,
+              );
+            },
+            child: GestureDetector(
+              onTap: () => _selectAvatar(context),
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.primary.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      localizations.translate('welcomeUser').replaceAll('{user}', user.username ?? user.name ?? ''),
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                // Info column
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (displayName.isNotEmpty)
-                        Row(
-                          children: [
-                            Expanded(
-                              child: AnimatedOpacity(
-                                duration: const Duration(milliseconds: 200),
-                                opacity: _showSensitiveInfo ? 1.0 : 0.0,
-                                child: Text(
-                                  _showSensitiveInfo ? displayName : '••••••',
+                    child: CircleAvatar(
+                      radius: 40, // Slightly larger avatar
+                      backgroundColor: colorScheme.primaryContainer,
+                      child: user.avatarPath != null
+                          ? ClipOval(
+                              child: Image.asset(
+                                user.avatarPath!,
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : initial.isNotEmpty
+                              ? Text(
+                                  initial,
                                   style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                _showSensitiveInfo ? Icons.visibility : Icons.visibility_off,
-                                color: Colors.white70,
-                                size: 20,
-                              ),
-                              onPressed: () => setState(() => _showSensitiveInfo = !_showSensitiveInfo),
-                            ),
-                          ],
-                        ),
-                      const SizedBox(height: 8),
-                      // Username section with its own edit button
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () => _editUsername(context, user),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.alternate_email,
-                                    size: 16,
-                                    color: Colors.white70,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      user.username ?? 'Set username',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.white.withOpacity(0.9),
-                                      ),
-                                    ),
-                                  ),
-                                  const Icon(
-                                    Icons.edit,
-                                    size: 16,
-                                    color: Colors.white70,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                                )
+                              : const Icon(Icons.person, size: 40),
+                    ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                          width: 2,
                         ),
                       ),
-                      if (user.email != null) ...[
-                        const SizedBox(height: 8),
-                        AnimatedOpacity(
-                          duration: const Duration(milliseconds: 200),
-                          opacity: _showSensitiveInfo ? 1.0 : 0.0,
-                          child: Text(
-                            _showSensitiveInfo ? user.email! : '••••••@••••.•••',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white.withOpacity(0.7),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                      child: const Icon(
+                        Icons.edit,
+                        size: 12,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
+          const SizedBox(height: 8), // Reduced from 12
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                user.username ?? 'Set username',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit, size: 16),
+                onPressed: () => _editUsername(context, user),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+              ),
+            ],
+          ),
+          if (user.email != null)
+            Text(
+              user.email!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+            ),
+        ],
       ),
     );
   }
@@ -494,10 +405,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
         return ListView(
           controller: _scrollController,  // Add this
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16), // Remove top padding
           children: [
             _buildProfileHeader(context, user),
-            const SizedBox(height: 16),
+            const SizedBox(height: 4), // Reduced from 8
 
             // Stats Row
             Row(
@@ -509,7 +420,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     Colors.blue,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 2), // Reduced from 4
                 Expanded(
                   child: _buildStatsCard(
                     'collections',
@@ -517,7 +428,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     Colors.green,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 2), // Reduced from 4
                 Expanded(
                   child: _buildStatsCard(
                     'value',
@@ -527,7 +438,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8), // Reduced from 16
 
             // Settings Section
             Card(
@@ -550,10 +461,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ListTile(
                     leading: const Icon(Icons.notifications_outlined),
                     title: Text(localizations.translate('notifications')),
-                    subtitle: const Text('Coming soon'), // Add this
                     trailing: Switch(
                       value: _notificationsEnabled,
-                      onChanged: null, // Disable for now
+                      onChanged: null,
                     ),
                   ),
                   const Divider(height: 1),
@@ -690,73 +600,90 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final purchaseService = context.watch<PurchaseService>();
     final colorScheme = Theme.of(context).colorScheme;
 
-    return ListTile(
-      leading: const Icon(Icons.diamond_outlined, color: Colors.amber),
-      title: Row(
-        children: [
-          const Text('Premium'),
-          if (kDebugMode) ...[  // Add debug controls
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.bug_report),
-              onPressed: () {
-                if (purchaseService.isPremium) {
-                  purchaseService.disableTestMode();
-                } else {
-                  purchaseService.enableTestMode();
-                }
-              },
-              tooltip: 'Toggle test mode',
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Material(
+        borderRadius: BorderRadius.circular(12),
+        color: purchaseService.isPremium 
+            ? colorScheme.primaryContainer.withOpacity(0.3)
+            : Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            if (purchaseService.isLoading) return;
+            try {
+              if (!purchaseService.isPremium) {
+                await purchaseService.purchasePremium();
+              } else {
+                await purchaseService.restorePurchases();
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error: $e')),
+                );
+              }
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.workspace_premium,
+                  color: purchaseService.isPremium ? colorScheme.primary : Colors.amber,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Premium',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (purchaseService.error != null)
+                        Text(
+                          purchaseService.error!,
+                          style: TextStyle(
+                            color: colorScheme.error,
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (purchaseService.isLoading)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else if (purchaseService.isPremium)
+                  Icon(
+                    Icons.check_circle,
+                    color: colorScheme.primary,
+                  )
+                else
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    size: 16,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                if (kDebugMode && purchaseService.isPremium) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 20),
+                    onPressed: () => purchaseService.clearPremiumStatus(),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ],
-      ),
-      subtitle: Text(
-        purchaseService.error ?? 'Access to unrestricted collections, analytics, and more!',
-        style: TextStyle(
-          color: purchaseService.error != null 
-              ? colorScheme.error 
-              : colorScheme.onSurfaceVariant,
+          ),
         ),
       ),
-      trailing: purchaseService.isLoading
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : purchaseService.isPremium
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.check_circle, color: Colors.green),
-                    if (kDebugMode) ...[
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: () => purchaseService.clearPremiumStatus(),
-                      ),
-                    ],
-                  ],
-                )
-              : null,
-      onTap: () async {
-        if (purchaseService.isLoading) return;
-        
-        try {
-          if (!purchaseService.isPremium) {
-            await purchaseService.purchasePremium();
-          } else {
-            await purchaseService.restorePurchases();
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error: $e')),
-            );
-          }
-        }
-      },
     );
   }
 
@@ -845,12 +772,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     return Scaffold(
       appBar: AppBar(
-        // Remove the title property completely
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
+        toolbarHeight: 44,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        titleSpacing: 16,
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 40),
+          onPressed: () => Scaffold.of(context).openDrawer(),
         ),
       ),
       body: Stack(

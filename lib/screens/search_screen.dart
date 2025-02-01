@@ -234,9 +234,9 @@ Widget _buildMainContent() {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 16),  // Increased from 8 to 16
+        const SizedBox(height: 8),  // Reduced from 16
         _buildQuickSearches(),
-        const SizedBox(height: 16),  // Reduced from 24 to 16
+        const SizedBox(height: 8),  // Reduced from 16
         
         // Update this section to always show recent searches when no results
         if (_searchResults == null && !_isLoading) 
@@ -249,10 +249,10 @@ Widget _buildMainContent() {
           ),
         
         if (_searchResults != null) ...[
-          const SizedBox(height: 8),  // Reduced from 16 to 8
+          const SizedBox(height: 4),  // Reduced from 8
           // ... existing search results code ...
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),  // Added top padding
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),  // Reduced padding
             child: Row(
               children: [
                 Text(
@@ -874,11 +874,12 @@ Widget _buildRecentSearches() {
   Widget _buildSearchBar(BuildContext context) {
     final localizations = AppLocalizations.of(context);
     return Container(
-      height: 44,
+      height: 36, // Reduced height
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -889,6 +890,8 @@ Widget _buildRecentSearches() {
       ),
       child: Row(
         children: [
+          const Icon(Icons.search, size: 20),
+          const SizedBox(width: 8),
           Expanded(
             child: TextField(
               controller: _searchController,
@@ -896,7 +899,7 @@ Widget _buildRecentSearches() {
                 hintText: localizations.translate('searchCards'),
                 border: InputBorder.none,
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                contentPadding: EdgeInsets.zero,
               ),
               onChanged: _onSearchChanged,
               textInputAction: TextInputAction.search,
@@ -904,15 +907,16 @@ Widget _buildRecentSearches() {
           ),
           if (_searchController.text.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.clear, size: 20),
+              icon: const Icon(Icons.clear, size: 18),
               onPressed: () {
                 _searchController.clear();
                 setState(() => _searchResults = null);
               },
               padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
               constraints: const BoxConstraints(
-                minWidth: 40,
-                minHeight: 40,
+                minWidth: 32,
+                minHeight: 32,
               ),
             ),
         ],
@@ -943,6 +947,7 @@ Widget _buildRecentSearches() {
       onTap: () => FocusScope.of(context).unfocus(),  // Dismiss keyboard on tap
       child: Scaffold(
         appBar: AppBar(
+          toolbarHeight: 44,
           automaticallyImplyLeading: false, // Keep this
           leading: Container(), // Add this to prevent automatic drawer toggle
           elevation: 0,
@@ -957,6 +962,7 @@ Widget _buildRecentSearches() {
             ),
           ),
           title: _buildSearchBar(context),
+          titleSpacing: 0,
           actions: [
             IconButton(
               icon: Icon(_getSortIcon(_currentSort)),

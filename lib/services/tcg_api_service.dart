@@ -2,6 +2,19 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class TcgApiService {
+  static final TcgApiService _instance = TcgApiService._internal();
+  final http.Client _client = http.Client();
+
+  factory TcgApiService() {
+    return _instance;
+  }
+
+  TcgApiService._internal();
+
+  Future<void> dispose() async {
+    _client.close();
+  }
+
   static const String _baseUrl = 'https://api.pokemontcg.io/v2';
   static const String _apiKey = 'eebb53a0-319a-4231-9244-fd7ea48b5d2c';
   
@@ -178,7 +191,7 @@ class TcgApiService {
 
   Future<Map<String, dynamic>?> getCardDetails(String cardId) async {
     final url = Uri.parse('$_baseUrl/cards/$cardId');
-    final response = await http.get(url, headers: _headers);
+    final response = await _client.get(url, headers: _headers);
     
     if (response.statusCode == 200) {
       return json.decode(response.body)['data'];
@@ -193,7 +206,7 @@ class TcgApiService {
 
   Future<Map<String, dynamic>> _get(String endpoint, [Map<String, String>? queryParams]) async {
     final uri = Uri.parse('$_baseUrl/$endpoint').replace(queryParameters: queryParams);
-    final response = await http.get(uri, headers: _headers);
+    final response = await _client.get(uri, headers: _headers);
     
     if (response.statusCode == 200) {
       return json.decode(response.body);
