@@ -35,16 +35,27 @@ class TcgApiService {
     'Special Illustration Rare': 'rarity:"Special Illustration Rare"',  // New query replacing Trainer Gallery
   };
 
+  // Update the maps to remove duplicates
   static const Map<String, String> setSearchQueries = {
-    'Prismatic Evolution': 'set.id:pr', // Updated from sv10 to pr
+    'Prismatic Evolution': 'set.id:pr',
     'Surging Sparks': 'set.id:sv8',
-    'Stellar Crown': 'set.id:sv7',
-    'Twilight Masquerade': 'set.id:sv6',
-    'Paldean Fates': 'set.id:sv5',      // Corrected ID
-    'Paradox Rift': 'set.id:sv4',       // Corrected ID
-    'Obsidian Flames': 'set.id:sv3',    // Verified ID
-    'Temporal Forces': 'set.id:sv3p5',   // Corrected ID
-    'Paldea Evolved': 'set.id:sv2',     // Corrected ID
+    'Shrouded Fables': 'set.id:sv9',
+    'Pokemon 151': 'set.id:sv3pt5',
+    'Temporal Forces': 'set.id:sv5',
+    'Paradox Rift': 'set.id:sv4',
+    'Obsidian Flames': 'set.id:sv3',
+    'Paldea Evolved': 'set.id:sv2',
+    // Add vintage sets
+    'Base Set': 'set.id:base1',
+    'Jungle': 'set.id:base2',
+    'Fossil': 'set.id:base3',
+    'Team Rocket': 'set.id:base5',
+    'Gym Heroes': 'set.id:gym1',
+    'Gym Challenge': 'set.id:gym2',
+    'Neo Genesis': 'set.id:neo1',
+    'Neo Discovery': 'set.id:neo2',
+    'Neo Revelation': 'set.id:neo3',
+    'Neo Destiny': 'set.id:neo4',
   };
 
   static const Map<String, String> sortOptions = {
@@ -58,11 +69,11 @@ class TcgApiService {
 
   // Add these new maps for better set matching
   static const Map<String, List<String>> setAliases = {
-    'sv8.5': ['Prismatic Evolution', 'Prismatic', 'Evolution', 'PR'], // Updated
+    'pr': ['Prismatic Evolution', 'Prismatic', 'Evolution'],
     'sv8': ['Surging Sparks', 'Surging', 'Sparks'],
     'sv7': ['Stellar Crown', 'Stellar', 'Crown'],
     'sv6': ['Twilight Masquerade', 'Twilight', 'Masquerade'],
-    'sv5': ['Paldean Fates', 'Paldean', 'Fates'],
+    'sv5': ['Paldean Fates', 'Temporal Forces', 'Paldean', 'Fates', 'Temporal'],
     'sv4': ['Paradox Rift', 'Paradox', 'Rift'],
     'sv3': ['Obsidian Flames', 'Obsidian', 'Flames'],
     'sv3p5': ['Temporal Forces', 'Temporal', 'Forces'],
@@ -128,64 +139,56 @@ class TcgApiService {
 
   Future<Map<String, dynamic>> searchCards(
     String query, {
+    int page = 1,
+    int pageSize = 30,
     String? sortBy,
     bool ascending = true,
-    int page = 1,
-    int pageSize = 60,
-    String? customQuery,
   }) async {
     try {
-      String finalQuery;
+      // Clean up query
+      final cleanQuery = query.trim();
       
-      if (customQuery != null) {
-        finalQuery = customQuery;
-      } else {
-        // Check if query matches a set name or alias
-        final setId = _getSetIdFromName(query);
-        if (setId != null) {
-          finalQuery = 'set.id:$setId';
-          print('Matched set ID: $setId for query: $query'); // Add debug print
-        } else {
-          // Use existing name/number search logic
-          final parts = query.trim().split(RegExp(r'\s+'));
-          final lastPart = parts.last;
-          final numberMatch = RegExp(r'(\d+)(?:/(\d+))?').firstMatch(lastPart);
-          
-          if (numberMatch != null) {
-            final cardNumber = numberMatch.group(1)!;
-            final name = parts.length > 1 
-                ? parts.sublist(0, parts.length - 1).join(' ')
-                : '';
-                
-            final paddedNumber = cardNumber.padLeft(3, '0');
-            final unPaddedNumber = cardNumber.replaceFirst(RegExp(r'^0+'), '');
-            
-            if (name.isNotEmpty) {
-              finalQuery = 'name:"$name" (number:"$cardNumber" OR number:"$paddedNumber" OR number:"$unPaddedNumber")';
-            } else {
-              finalQuery = '(number:"$cardNumber" OR number:"$paddedNumber" OR number:"$unPaddedNumber")';
-            }
-          } else {
-            finalQuery = 'name:"*${query.trim()}*"';
-          }
-        }
-      }
-
+      // Build query parameters
       final queryParams = {
-        'q': finalQuery,
+        'q': cleanQuery,
         'page': page.toString(),
         'pageSize': pageSize.toString(),
+        // Always add order by to ensure consistent sorting
+        'orderBy': sortBy != null 
+            ? '${ascending ? '' : '-'}$sortBy'
+            : '-cardmarket.prices.averageSellPrice',
       };
 
-      if (sortBy != null) {
-        queryParams['orderBy'] = ascending ? sortBy : '-$sortBy';
-      }
-
       print('API Query: $queryParams');
-      return await _get('cards', queryParams);
+
+      final uri = Uri.parse('$_baseUrl/cards').replace(queryParameters: queryParams);
+      final response = await _client.get(uri, headers: _headers);
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('API Response: ${data['count']} cards found');
+        return {
+          'data': data['data'] ?? [],
+          'totalCount': data['totalCount'] ?? 0,
+          'page': data['page'] ?? 1,
+        };
+      } else {
+        print('API Error: Status ${response.statusCode}');
+        // Return empty result set instead of throwing
+        return {
+          'data': [],
+          'totalCount': 0,
+          'page': page,
+        };
+      }
     } catch (e) {
       print('API Error: $e');
-      rethrow;
+      // Return empty result set on error
+      return {
+        'data': [],
+        'totalCount': 0,
+        'page': page,
+      };
     }
   }
 

@@ -116,6 +116,7 @@ class _CardGridItemState extends State<CardGridItem> {
     );
   }
 
+  // Update _buildImage method
   Widget _buildImage() {
     if (widget.card.imageUrl.isEmpty) {
       return const Center(
@@ -123,15 +124,18 @@ class _CardGridItemState extends State<CardGridItem> {
       );
     }
 
-    return widget.cached ?? Image.network(
+    if (widget.cached != null) {
+      if (!_isLoaded) {
+        Future.microtask(() {
+          if (mounted) setState(() => _isLoaded = true);
+        });
+      }
+      return widget.cached!;
+    }
+
+    return Image.network(
       widget.card.imageUrl,
       fit: BoxFit.contain,
-      errorBuilder: (context, error, stackTrace) {
-        print('Error loading image: ${widget.card.imageUrl}');  // Add debug print
-        return const Center(
-          child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.grey),
-        );
-      },
       loadingBuilder: (context, child, progress) {
         if (progress == null) {
           if (mounted && !_hasError) {
@@ -148,6 +152,12 @@ class _CardGridItemState extends State<CardGridItem> {
                 ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
                 : null,
           ),
+        );
+      },
+      errorBuilder: (context, error, stackTrace) {
+        _hasError = true;
+        return const Center(
+          child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.red),
         );
       },
     );

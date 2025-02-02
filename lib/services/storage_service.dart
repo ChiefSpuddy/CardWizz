@@ -220,8 +220,16 @@ class StorageService {
 
   // Keep async public method
   Future<List<TcgCard>> getCards() async {
-    if (!_isInitialized) return [];
-    return _getCards();
+    try {
+      final key = _getCardsKey();
+      final jsonList = _prefs.getStringList(key) ?? [];
+      return jsonList
+          .map((json) => TcgCard.fromJson(jsonDecode(json)))
+          .toList();
+    } catch (e) {
+      print('❌ Storage error: $e');
+      return [];
+    }
   }
 
   Future<void> _loadCards() async {
@@ -529,5 +537,9 @@ class StorageService {
       // Notify listeners
       _cardsController.add(cards);
     }
+  }
+
+  String _getCardsKey() {
+    return _getUserKey('cards');
   }
 }
