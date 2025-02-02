@@ -276,7 +276,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
         centerTitle: false,
         automaticallyImplyLeading: true,
         titleSpacing: 0, // Add this to fix spacing
-        title: StreamBuilder<List<TcgCard>>(
+        title: isSignedIn ? StreamBuilder<List<TcgCard>>(  // Add this condition
           stream: Provider.of<StorageService>(context).watchCards(),
           builder: (context, snapshot) {
             final cards = snapshot.data ?? [];
@@ -395,8 +395,8 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
               ),
             );
           },
-        ),
-        actions: [
+        ) : null,  // Return null when not signed in
+        actions: isSignedIn ? [  // Add this condition
           IconButton(
             icon: const Icon(Icons.analytics_outlined),
             onPressed: () {
@@ -410,7 +410,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
             icon: const Icon(Icons.sort),
             onPressed: () => _showSortMenu(context),
           ),
-        ],
+        ] : null,  // Return null when not signed in
         bottom: isSignedIn ? PreferredSize(  // Add this condition
           preferredSize: const Size.fromHeight(52),
           child: Padding(

@@ -48,11 +48,16 @@ class CollectionService {
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           if (oldVersion < 2) {
-            // Add the color column to existing databases
-            await db.execute('''
-              ALTER TABLE collections 
-              ADD COLUMN color INTEGER DEFAULT 4282682873
-            ''');
+            // Check if color column exists before adding it
+            var tableInfo = await db.rawQuery('PRAGMA table_info(collections)');
+            bool hasColorColumn = tableInfo.any((column) => column['name'] == 'color');
+            
+            if (!hasColorColumn) {
+              await db.execute('''
+                ALTER TABLE collections 
+                ADD COLUMN color INTEGER DEFAULT 4282682873
+              ''');
+            }
           }
         },
       );

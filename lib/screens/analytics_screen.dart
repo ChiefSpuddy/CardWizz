@@ -1182,7 +1182,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           visualDensity: VisualDensity.compact,
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
-        actions: [
+        actions: isSignedIn ? [  // Add this condition
           Tooltip(
             message: _lastUpdateTime != null 
               ? 'Last updated: ${_formatDateTime(_lastUpdateTime!)}\nTap to check for new prices'
@@ -1204,7 +1204,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
           ),
           const SizedBox(width: 8),
-        ],
+        ] : null,  // Return null when not signed in
       ),
       body: AnimatedBackground(
         child: SafeArea(

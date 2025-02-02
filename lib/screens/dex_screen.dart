@@ -684,7 +684,6 @@ class _DexScreenState extends State<DexScreen> {
       drawer: const AppDrawer(),
       appBar: AppBar(
         toolbarHeight: 44, // Match other screens
-        title: const Text('Pokédex'),
         automaticallyImplyLeading: true,
       ),
       body: !isSignedIn  // Removed AnimatedBackground
