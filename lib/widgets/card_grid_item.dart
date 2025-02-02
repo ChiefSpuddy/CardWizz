@@ -9,12 +9,14 @@ class CardGridItem extends StatefulWidget {
   final TcgCard card;
   final VoidCallback? onTap;
   final bool showQuickAdd;  // Add this parameter
+  final Image? cached;  // Add this parameter
 
   const CardGridItem({
     super.key,
     required this.card,
     this.onTap,
     this.showQuickAdd = false,  // Default to false
+    this.cached,  // Add this parameter
   });
 
   @override
@@ -121,7 +123,7 @@ class _CardGridItemState extends State<CardGridItem> {
       );
     }
 
-    return Image.network(
+    return widget.cached ?? Image.network(
       widget.card.imageUrl,
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {

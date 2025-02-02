@@ -20,7 +20,7 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderStateMixin {
   final _apiService = TcgApiService();
   final _searchController = TextEditingController();
   List<TcgCard>? _searchResults;
@@ -31,33 +31,35 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _isHistoryLoading = true;
   bool _isInitialSearch = true;
 
-  // Add these constants at the top of the class
-  static const quickSearches = [
-    {'name': 'Rare Cards', 'icon': '⭐', 'description': 'Show rare cards only'},
-    {'name': 'Full Art', 'icon': '🎨', 'description': 'Show full art cards'},
-    {'name': 'Rainbow', 'icon': '🌈', 'description': 'Show rainbow rare cards'},
-    {'name': 'Gold Cards', 'icon': '✨', 'description': 'Show gold rare cards'},
-  ];
-
-  static const recentSets = [
-    {'name': 'Prismatic Evolution', 'icon': '🌈'},
-    {'name': 'Surging Sparks', 'icon': '⚡'},
-    {'name': 'Stellar Crown', 'icon': '👑'},
-    {'name': 'Twilight Masquerade', 'icon': '🎭'},  // Updated name
-    {'name': 'Paradox Rift', 'icon': '🌀'},
-    {'name': 'Obsidian Flames', 'icon': '🔥'},
-    {'name': 'Temporal Forces', 'icon': '⏳'},
-    {'name': 'Paldea Evolved', 'icon': '🌟'},
-  ];
-
-  static const popularSearches = [
-    {'name': 'Charizard', 'icon': '🔥'},
-    {'name': 'Umbreon', 'icon': '🌙'}, // Added Umbreon
-    {'name': 'Pikachu', 'icon': '⚡'},
-    {'name': 'Mew', 'icon': '✨'},
-    {'name': 'VMAX', 'icon': '🌟'},
-    {'name': 'Special Illustration Rare', 'icon': '🎨'},  // Updated from Trainer Gallery
-  ];
+  // Replace all the old search constants with new organized ones
+  static const searchCategories = {
+    'vintage': [
+      {'name': 'Base Set', 'icon': '📦', 'year': '1999', 'description': 'Original Pokemon TCG set'},
+      {'name': 'Jungle', 'icon': '🌿', 'year': '1999', 'description': 'Second Base Set expansion'},
+      {'name': 'Fossil', 'icon': '🦴', 'year': '1999', 'description': 'Ancient Pokemon cards'},
+      {'name': 'Team Rocket', 'icon': '🚀', 'year': '2000', 'description': 'Evil team themed set'},
+      {'name': 'Gym Heroes', 'icon': '🏃', 'year': '2000', 'description': 'Gym Leader cards'},
+      {'name': 'Neo Genesis', 'icon': '✨', 'year': '2000', 'description': 'First Neo series set'},
+    ],
+    'modern': [
+      {'name': 'Temporal Forces', 'icon': '⌛', 'release': '2024', 'description': 'Latest expansion'},
+      {'name': 'Paradox Rift', 'icon': '🌀', 'release': '2023', 'description': 'Paradox Pokemon'},
+      {'name': 'Obsidian Flames', 'icon': '🔥', 'release': '2023', 'description': 'Fire themed set'},
+      {'name': 'Paldea Evolved', 'icon': '🌟', 'release': '2023', 'description': 'Paldean Pokemon'},
+    ],
+    'special': [
+      {'name': 'Special Illustration', 'icon': '🎨', 'query': 'rarity:"special illustration rare"', 'description': 'Special art cards'},
+      {'name': 'Ancient Pokemon', 'icon': '🗿', 'query': 'ancient', 'description': 'Ancient variant cards'},
+      {'name': 'Full Art Trainers', 'icon': '👤', 'query': 'supertype:trainer rarity:rare', 'description': 'Full art trainer cards'},
+      {'name': 'Gold Cards', 'icon': '✨', 'query': 'rarity:gold', 'description': 'Gold rare cards'},
+    ],
+    'popular': [
+      {'name': 'Charizard', 'icon': '🔥', 'query': 'name:charizard', 'description': 'All Charizard cards'},
+      {'name': 'Mewtwo', 'icon': '🧬', 'query': 'name:mewtwo', 'description': 'All Mewtwo cards'},
+      {'name': 'Pikachu', 'icon': '⚡', 'query': 'name:pikachu', 'description': 'All Pikachu cards'},
+      {'name': 'Mew', 'icon': '💫', 'query': 'name:mew -mewtwo', 'description': 'All Mew cards'},
+    ],
+  };
 
   // Add these fields after other declarations
   int _currentPage = 1;
@@ -65,6 +67,12 @@ class _SearchScreenState extends State<SearchScreen> {
   Timer? _searchDebounce;
   int _totalCards = 0;
   bool _hasMorePages = true;
+
+  // Add cache manager
+  static const _maxConcurrentLoads = 3;
+  final _loadingImages = <String>{};
+  final _imageCache = <String, Image>{};
+  final _loadQueue = <String>[];
 
   @override
   void initState() {
@@ -229,95 +237,6 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
   }
 }
 
-// Update _buildMainContent method
-Widget _buildMainContent() {
-  return SingleChildScrollView(
-    controller: _scrollController,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),  // Reduced from 16
-        _buildQuickSearches(),
-        const SizedBox(height: 8),  // Reduced from 16
-        
-        // Update this section to always show recent searches when no results
-        if (_searchResults == null && !_isLoading) 
-          _buildRecentSearches(),
-        
-        if (_isLoading && _searchResults == null)
-          Padding(
-            padding: const EdgeInsets.only(top: 120.0),
-            child: _buildLoadingState(),
-          ),
-        
-        if (_searchResults != null) ...[
-          const SizedBox(height: 4),  // Reduced from 8
-          // ... existing search results code ...
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),  // Reduced padding
-            child: Row(
-              children: [
-                Text(
-                  'Search Results',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                if (_isLoading) ...[
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (_searchResults!.isEmpty && !_isLoading)
-            _buildNoResultsMessage()
-          else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  childAspectRatio: 0.7,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemCount: _searchResults!.length + (_isLoading ? 3 : 0),
-                itemBuilder: (context, index) {
-                  if (index >= _searchResults!.length) {
-                    return _buildShimmerItem();
-                  }
-                  return CardGridItem(
-                    card: _searchResults![index],
-                    showQuickAdd: true,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CardDetailsScreen(
-                          card: _searchResults![index],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          const SizedBox(height: 16),
-        ],
-      ],
-    ),
-  );
-}
-
 // Fix the _onSearchChanged method
 void _onSearchChanged(String query) {
   if (query.isEmpty) {
@@ -443,154 +362,102 @@ Widget _buildHorizontalScrollView({
 }
 
 // Update _buildQuickSearches method to use the new scroll indicator
-Widget _buildQuickSearches() {
-  final localizations = AppLocalizations.of(context);
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final colorScheme = Theme.of(context).colorScheme;
-  
-  return Container(
-    margin: const EdgeInsets.symmetric(horizontal: 8), // Reduced from 16 to 8 to increase width
-    decoration: BoxDecoration(
-      gradient: isDark 
-          ? LinearGradient(
-              colors: [
-                colorScheme.surface.withOpacity(0.8),
-                colorScheme.surface.withOpacity(0.6),
+Widget _buildSearchCategories() {
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _buildSearchSection('Vintage Sets', searchCategories['vintage']!, Icons.auto_awesome),
+      _buildSearchSection('Latest Sets', searchCategories['modern']!, Icons.new_releases),
+      _buildSearchSection('Special Cards', searchCategories['special']!, Icons.stars),
+      _buildSearchSection('Popular', searchCategories['popular']!, Icons.local_fire_department),
+    ],
+  );
+}
+
+Widget _buildSearchSection(String title, List<Map<String, dynamic>> items, IconData icon) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Row(
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+      SizedBox(
+        height: 120,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: items.length,
+          itemBuilder: (context, index) => _buildSearchCard(items[index]),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildSearchCard(Map<String, dynamic> item) {
+  return Card(
+    margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+    child: InkWell(
+      onTap: () => _performQuickSearch(item['name']),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 160,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  item['icon'],
+                  style: const TextStyle(fontSize: 20),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item['name'],
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
-            )
-          : AppColors.cardGradient,
-      borderRadius: BorderRadius.circular(16),
-      border: isDark ? Border.all(
-        color: colorScheme.onSurface.withOpacity(0.12),
-        width: 1,
-      ) : null,
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Popular Searches header and content
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isDark
-                  ? [
-                      colorScheme.primaryContainer,
-                      colorScheme.primary.withOpacity(0.7),
-                    ]
-                  : [
-                      colorScheme.primary,
-                      colorScheme.secondary,
-                    ],
             ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Row(
-            children: [
+            const SizedBox(height: 4),
+            Text(
+              item['description'] ?? '',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const Spacer(),
+            if (item['year'] != null || item['release'] != null)
               Text(
-                localizations.translate('popularSearches'),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: isDark 
-                      ? colorScheme.onPrimaryContainer
-                      : Colors.white,
+                item['year'] ?? item['release'] ?? '',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const Spacer(),
-              Icon(
-                Icons.local_fire_department,
-                color: isDark 
-                    ? colorScheme.onPrimaryContainer
-                    : Colors.white,
-              ),
-            ],
-          ),
+          ],
         ),
-        _buildHorizontalScrollView(
-          indicatorColor: colorScheme.surface,
-          children: popularSearches.map((search) => Padding(
-            padding: const EdgeInsets.only(right: 12), // Increased from 8 to 12
-            child: ActionChip(
-              avatar: Text(search['icon']!, style: const TextStyle(fontSize: 14)),
-              label: Text(search['name']!),
-              onPressed: () => _performQuickSearch(search['name']!),
-              backgroundColor: isDark
-                  ? colorScheme.primaryContainer.withOpacity(0.7)
-                  : colorScheme.secondaryContainer,
-              labelStyle: TextStyle(
-                color: isDark 
-                    ? colorScheme.onPrimaryContainer
-                    : colorScheme.onSecondaryContainer,
-              ),
-              side: BorderSide.none,
-            ),
-          )).toList(),
-        ),
-        const SizedBox(height: 8), // Added padding before divider
-        const Divider(height: 1),
-        const SizedBox(height: 8), // Added padding after divider
-        // Recent Sets header and content - updated styling
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isDark
-                  ? [
-                      colorScheme.surfaceVariant.withOpacity(0.5),
-                      colorScheme.surface.withOpacity(0.5),
-                    ]
-                  : [
-                      colorScheme.secondaryContainer.withOpacity(0.5),
-                      colorScheme.tertiaryContainer.withOpacity(0.5),
-                    ],
-            ),
-          ),
-          child: Row(
-            children: [
-              Text(
-                localizations.translate('recentSets'),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: isDark 
-                      ? colorScheme.onSurfaceVariant
-                      : colorScheme.onSecondaryContainer,
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.diamond_outlined,  // Changed from new_releases to diamond_outlined
-                size: 20,
-                color: isDark 
-                    ? colorScheme.onSurfaceVariant
-                    : colorScheme.onSecondaryContainer,
-              ),
-            ],
-          ),
-        ),
-        _buildHorizontalScrollView(
-          indicatorColor: colorScheme.surface,
-          children: recentSets.map((set) => 
-            Padding(
-              padding: const EdgeInsets.only(right: 12), // Increased from 8 to 12
-              child: ActionChip(
-                avatar: Text(set['icon']!, style: const TextStyle(fontSize: 14)),
-                label: Text(set['name']!),
-                onPressed: () => _performQuickSearch(set['name']!),
-                backgroundColor: isDark
-                    ? colorScheme.secondaryContainer.withOpacity(0.7)
-                    : colorScheme.secondaryContainer,
-                labelStyle: TextStyle(
-                  color: isDark 
-                      ? colorScheme.onSecondaryContainer
-                      : colorScheme.onSecondaryContainer,
-                ),
-                side: BorderSide.none,
-              ),
-            ),
-          ).toList(),
-        ),
-        const SizedBox(height: 8), // Added bottom padding
-      ],
+      ),
     ),
   );
 }
@@ -843,12 +710,17 @@ Widget _buildRecentSearches() {
   }
 
   String _getSetIcon(String setName) {
-    // Find matching set in recentSets
-    final matchingSet = recentSets.firstWhere(
-      (set) => set['name'] == setName,
-      orElse: () => {'icon': '📦'}, // Default icon if not found
-    );
-    return matchingSet['icon']!;
+    // Look in all categories for the set icon
+    for (final category in searchCategories.values) {
+      final matchingSet = category.firstWhere(
+        (set) => set['name'] == setName,
+        orElse: () => {'icon': '📦'}, // Default icon if not found
+      );
+      if (matchingSet['name'] == setName) {
+        return matchingSet['icon']!;
+      }
+    }
+    return '📦'; // Default icon if not found in any category
   }
 
   Widget _buildCard(TcgCard card) {
@@ -892,6 +764,52 @@ Widget _buildRecentSearches() {
         ),
         // ...existing results grid...
       ],
+    );
+  }
+
+  // Add method to manage image loading
+  Future<void> _loadImage(String url) async {
+    if (_loadingImages.length >= _maxConcurrentLoads) {
+      _loadQueue.add(url);
+      return;
+    }
+
+    _loadingImages.add(url);
+    try {
+      final image = Image.network(
+        url,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading image: $url');
+          return const Icon(Icons.error_outline, color: Colors.red);
+        },
+      );
+      _imageCache[url] = image;
+    } finally {
+      _loadingImages.remove(url);
+      if (_loadQueue.isNotEmpty) {
+        final nextUrl = _loadQueue.removeAt(0);
+        _loadImage(nextUrl);
+      }
+    }
+  }
+
+  // Update card grid item builder
+  Widget _buildCardGridItem(TcgCard card) {
+    if (!_imageCache.containsKey(card.imageUrl) && 
+        !_loadingImages.contains(card.imageUrl)) {
+      _loadImage(card.imageUrl);
+    }
+
+    return CardGridItem(
+      card: card,
+      showQuickAdd: true,
+      cached: _imageCache[card.imageUrl],
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CardDetailsScreen(card: card),
+        ),
+      ),
     );
   }
 
@@ -1001,7 +919,93 @@ Widget _buildRecentSearches() {
     _searchDebounce?.cancel();
     _scrollController.dispose();
     _searchController.dispose();
+    _imageCache.clear();
+    _loadQueue.clear();
+    _loadingImages.clear();
     super.dispose();
+  }
+
+  Widget _buildMainContent() {
+    return CustomScrollView(
+      controller: _scrollController,
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              _buildSearchCategories(),
+              const SizedBox(height: 8),
+              
+              // Recent searches when no results
+              if (_searchResults == null && !_isLoading) 
+                _buildRecentSearches(),
+              
+              // Loading state
+              if (_isLoading && _searchResults == null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 120.0),
+                  child: _buildLoadingState(),
+                ),
+            ],
+          ),
+        ),
+        
+        // Search results
+        if (_searchResults != null) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Row(
+                children: [
+                  Text(
+                    'Search Results',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  if (_isLoading) ...[
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (_searchResults!.isEmpty && !_isLoading)
+            SliverToBoxAdapter(child: _buildNoResultsMessage())
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  childAspectRatio: 0.7,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    if (index >= _searchResults!.length) {
+                      return _buildShimmerItem();
+                    }
+                    return _buildCardGridItem(_searchResults![index]);
+                  },
+                  childCount: _searchResults!.length + (_isLoading ? 3 : 0),
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
   }
 }
 
