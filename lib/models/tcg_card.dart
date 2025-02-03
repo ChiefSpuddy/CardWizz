@@ -1,3 +1,6 @@
+import 'package:intl/intl.dart';
+import 'dart:math';
+
 class TcgCard {
   final String id;
   final String name;
@@ -5,11 +8,12 @@ class TcgCard {
   final String imageUrl;
   final String? rarity;
   final String? setName;
-  final double? price;
-  final List<PriceHistoryEntry> priceHistory;
+  double? _price;
+  final List<PricePoint> priceHistory;
   final SetInfo? set;
   final String? setTotal;
-  final List<PricePoint> _priceHistory;
+  final DateTime? lastPriceUpdate;
+  final DateTime? lastPriceCheck;
 
   TcgCard({
     required this.id,
@@ -18,19 +22,35 @@ class TcgCard {
     required this.imageUrl,
     this.rarity,
     this.setName,
-    this.price,
-    this.priceHistory = const [],
+    double? price,
+    List<PricePoint>? priceHistory,
     this.set,
     this.setTotal,
-  }) : _priceHistory = [];
+    this.lastPriceUpdate,
+    this.lastPriceCheck,
+  }) : _price = price,
+       priceHistory = priceHistory ?? [];
 
-  List<PricePoint> get priceHistoryPoints => List.unmodifiable(_priceHistory);
+  double? get price => _price;
+
+  set price(double? newPrice) {
+    if (newPrice != _price) {
+      _price = newPrice;
+      if (newPrice != null) {
+        priceHistory.add(PricePoint(
+          price: newPrice,
+          timestamp: DateTime.now(),
+        ));
+      }
+    }
+  }
 
   factory TcgCard.fromJson(Map<String, dynamic> json) {
     try {
       final setData = json['set'] as Map<String, dynamic>?;
       final SetInfo? setInfo = setData != null ? SetInfo.fromJson(setData) : null;
-      final card = TcgCard(
+      
+      return TcgCard(
         id: json['id']?.toString() ?? '',
         name: json['name']?.toString() ?? '',
         number: json['number']?.toString() ?? '',
@@ -38,20 +58,18 @@ class TcgCard {
         rarity: json['rarity']?.toString(),
         setName: json['set']?['name']?.toString(),
         price: (json['cardmarket']?['prices']?['averageSellPrice'] as num?)?.toDouble(),
-        priceHistory: (json['priceHistory'] as List<dynamic>?)
-            ?.map((e) => PriceHistoryEntry.fromJson(e as Map<String, dynamic>))
-            .toList() ?? [],
         set: setInfo,
         setTotal: json['set']?['total']?.toString(),
+        priceHistory: (json['priceHistory'] as List<dynamic>?)
+            ?.map((p) => PricePoint.fromJson(p as Map<String, dynamic>))
+            .toList() ?? [],
+        lastPriceUpdate: json['lastPriceUpdate'] != null 
+            ? DateTime.parse(json['lastPriceUpdate'])
+            : null,
+        lastPriceCheck: json['lastPriceCheck'] != null
+            ? DateTime.parse(json['lastPriceCheck'])
+            : null,
       );
-
-      // Load price history points
-      final historyPoints = (json['priceHistoryPoints'] as List<dynamic>?)?.map(
-        (p) => PricePoint.fromJson(p as Map<String, dynamic>)
-      ).toList() ?? [];
-      
-      card._priceHistory.addAll(historyPoints);
-      return card;
     } catch (e, stack) {
       print('Error creating TcgCard from JSON: $e');
       print('JSON data: $json');
@@ -71,50 +89,72 @@ class TcgCard {
         'averageSellPrice': price,
       },
     },
-    'priceHistory': priceHistory.map((e) => e.toJson()).toList(),
-    'priceHistoryPoints': _priceHistory.map((p) => p.toJson()).toList(),
+    'priceHistory': priceHistory.map((p) => p.toJson()).toList(),
+    'lastPriceUpdate': lastPriceUpdate?.toIso8601String(),
+    'lastPriceCheck': lastPriceCheck?.toIso8601String(),
     'set': set?.toJson() ?? {
       'total': setTotal,
     },
   };
 
-  void addPriceHistoryEntry(double price) {
-    final roundedPrice = double.parse(price.toStringAsFixed(2));
-    priceHistory.add(PriceHistoryEntry(
-      date: DateTime.now(),
-      price: roundedPrice,
-    ));
-    
-    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    priceHistory.removeWhere((entry) => entry.date.isBefore(thirtyDaysAgo));
-  }
-
   void addPricePoint(double newPrice) {
-    if (_priceHistory.isEmpty || _priceHistory.last.price != newPrice) {
-      _priceHistory.add(PricePoint(
-        price: newPrice,
+    final roundedPrice = double.parse(newPrice.toStringAsFixed(2));
+    if (priceHistory.isEmpty || priceHistory.last.price != roundedPrice) {
+      priceHistory.add(PricePoint(
+        price: roundedPrice,
         timestamp: DateTime.now(),
       ));
+      
+      // Keep only last 30 days of history
       final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-      _priceHistory.removeWhere((point) => point.timestamp.isBefore(thirtyDaysAgo));
+      priceHistory.removeWhere((point) => point.timestamp.isBefore(thirtyDaysAgo));
     }
   }
 
   double? getPriceChange(Duration period) {
-    if (_priceHistory.length < 2) return null;
+    if (priceHistory.length < 2) return null;
     
     final now = DateTime.now();
     final targetTime = now.subtract(period);
     
-    final oldPrice = _priceHistory
+    // Find closest historical price point
+    final oldPrice = priceHistory
         .where((point) => point.timestamp.isBefore(targetTime))
         .lastOrNull
-        ?.price ?? _priceHistory.first.price;
+        ?.price ?? priceHistory.first.price;
     
-    final currentPrice = _priceHistory.last.price;
+    final currentPrice = priceHistory.last.price;
     
     if (oldPrice == 0) return 0;
     return ((currentPrice - oldPrice) / oldPrice) * 100;
+  }
+
+  Map<String, double> getPriceStats() {
+    if (priceHistory.isEmpty) return {};
+    
+    final prices = priceHistory.map((p) => p.price).toList();
+    final avg = prices.reduce((a, b) => a + b) / prices.length;
+    
+    return {
+      'min': prices.reduce(min),
+      'max': prices.reduce(max),
+      'avg': avg,
+      'volatility': _calculateVolatility(prices, avg),
+    };
+  }
+
+  double _calculateVolatility(List<double> prices, double mean) {
+    if (prices.length < 2) return 0;
+    final sumSquares = prices.map((p) => pow(p - mean, 2)).reduce((a, b) => a + b);
+    return sqrt(sumSquares / (prices.length - 1));
+  }
+
+  PricePoint? _findClosestPricePoint(DateTime targetDate) {
+    return priceHistory
+        .where((pp) => pp.timestamp.isBefore(targetDate))
+        .reduce((a, b) => 
+          a.timestamp.difference(targetDate).abs() < 
+          b.timestamp.difference(targetDate).abs() ? a : b);
   }
 
   TcgCard copyWith({
@@ -125,9 +165,10 @@ class TcgCard {
     String? rarity,
     String? setName,
     double? price,
-    List<PriceHistoryEntry>? priceHistory,
+    List<PricePoint>? priceHistory,
     SetInfo? set,
     String? setTotal,
+    DateTime? lastPriceCheck,
   }) {
     return TcgCard(
       id: id ?? this.id,
@@ -140,30 +181,9 @@ class TcgCard {
       priceHistory: priceHistory ?? this.priceHistory,
       set: set ?? this.set,
       setTotal: setTotal ?? this.setTotal,
+      lastPriceCheck: lastPriceCheck ?? this.lastPriceCheck,
     );
   }
-}
-
-class PriceHistoryEntry {
-  final double price;
-  final DateTime date;
-
-  PriceHistoryEntry({
-    required this.price,
-    required this.date,
-  });
-
-  factory PriceHistoryEntry.fromJson(Map<String, dynamic> json) {
-    return PriceHistoryEntry(
-      date: DateTime.fromMillisecondsSinceEpoch(json['date'] as int),
-      price: (json['price'] as num).toDouble(),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'date': date.millisecondsSinceEpoch,
-    'price': price,
-  };
 }
 
 class SetInfo {
@@ -213,16 +233,27 @@ class SetInfo {
 class PricePoint {
   final double price;
   final DateTime timestamp;
+  final String source;
+  final String? currency;
 
-  PricePoint({required this.price, required this.timestamp});
+  PricePoint({
+    required this.price, 
+    required this.timestamp,
+    this.source = 'TCG',
+    this.currency = 'USD',
+  });
 
   Map<String, dynamic> toJson() => {
     'price': price,
     'timestamp': timestamp.toIso8601String(),
+    'source': source,
+    'currency': currency,
   };
 
   factory PricePoint.fromJson(Map<String, dynamic> json) => PricePoint(
     price: json['price'] as double,
     timestamp: DateTime.parse(json['timestamp'] as String),
+    source: json['source'] as String? ?? 'TCG',
+    currency: json['currency'] as String? ?? 'USD',
   );
 }

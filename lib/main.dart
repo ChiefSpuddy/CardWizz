@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'routes.dart';
 import 'providers/app_state.dart';
 import 'services/storage_service.dart';
+import 'services/navigation_service.dart';  // Add this import
 import 'constants/colors.dart';
 import 'constants/text_styles.dart';
 import 'services/tcg_api_service.dart';
@@ -60,6 +61,7 @@ class CardWizzApp extends StatelessWidget {
     return Consumer<AppState>(
       builder: (context, appState, _) {
         return MaterialApp(
+          navigatorKey: NavigationService.navigatorKey, // Use NavigationService.navigatorKey
           title: 'CardWizz',
           debugShowCheckedModeBanner: false,
           themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,

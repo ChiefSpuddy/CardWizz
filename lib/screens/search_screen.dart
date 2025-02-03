@@ -851,7 +851,10 @@ Widget _buildRecentSearches() {
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => CardDetailsScreen(card: card),
+            builder: (context) => CardDetailsScreen(
+              card: card,
+              heroContext: 'search',  // Add this line
+            ),
           ),
         ),
       );
@@ -864,7 +867,10 @@ Widget _buildRecentSearches() {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CardDetailsScreen(card: card),
+          builder: (context) => CardDetailsScreen(
+            card: card,
+            heroContext: 'search',  // Add this line
+          ),
         ),
       ),
     );

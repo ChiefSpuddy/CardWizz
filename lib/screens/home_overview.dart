@@ -13,6 +13,7 @@ import '../providers/currency_provider.dart';  // Add this import
 import '../l10n/app_localizations.dart';  // Add this import
 import '../widgets/sign_in_view.dart';  // Add this import
 import '../screens/home_screen.dart';  // Add this import at the top with other imports
+import '../utils/hero_tags.dart';  // Add this import
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -276,7 +277,10 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => CardDetailsScreen(card: card),
+                    builder: (context) => CardDetailsScreen(
+                      card: card,
+                      heroContext: 'home_top',
+                    ),
                   ),
                 ),
                 child: Container(
@@ -286,7 +290,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                     children: [
                       Expanded(
                         child: Hero(
-                          tag: 'topcard_${card.id}',
+                          tag: HeroTags.cardImage(card.id, context: 'home_top'),
                           child: Image.network(
                             card.imageUrl,
                             fit: BoxFit.contain,
@@ -440,7 +444,10 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => CardDetailsScreen(card: tcgCard),
+                        builder: (context) => CardDetailsScreen(
+                          card: tcgCard,
+                          heroContext: 'home_top',
+                        ),
                       ),
                     ),
                     child: Container(
@@ -688,7 +695,10 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => CardDetailsScreen(card: card),
+                                  builder: (context) => CardDetailsScreen(
+                                    card: card,
+                                    heroContext: 'home_recent',
+                                  ),
                                 ),
                               ),
                               child: Container(
@@ -698,7 +708,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                                   children: [
                                     Expanded(
                                       child: Hero(
-                                        tag: 'card_${card.id}',
+                                        tag: HeroTags.cardImage(card.id, context: 'home_recent'),
                                         child: Image.network(
                                           card.imageUrl,
                                           fit: BoxFit.contain,

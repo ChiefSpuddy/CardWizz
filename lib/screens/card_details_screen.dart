@@ -7,6 +7,9 @@ import '../services/storage_service.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/currency_provider.dart';  // Add this import
+import '../utils/hero_tags.dart';  // Add this import
+import '../services/analytics_service.dart';  // Add this import
+import '../services/ebay_api_service.dart';  // Add this import
 
 extension StringExtension on String {
   String capitalize() {
@@ -17,12 +20,12 @@ extension StringExtension on String {
 
 class CardDetailsScreen extends StatefulWidget {
   final TcgCard card;
-  final String? heroTagPrefix; // Add this parameter
+  final String heroContext;  // Add this parameter
 
   const CardDetailsScreen({
     super.key,
     required this.card,
-    this.heroTagPrefix, // Add this parameter
+    this.heroContext = 'details',  // Default value
   });
 
   @override
@@ -33,8 +36,10 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
   late AnimationController _wobbleController;
   final _cardKey = GlobalKey();
   final _apiService = TcgApiService();
+  final _ebayService = EbayApiService();  // Add this
   bool _isLoading = true;
   Map<String, dynamic>? _additionalData;
+  List<Map<String, dynamic>>? _recentSales;  // Add this
 
   @override
   void initState() {
@@ -44,6 +49,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
       duration: const Duration(milliseconds: 300),
     );
     _loadAdditionalData();
+    _loadRecentSales();  // Add this
   }
 
   @override
@@ -69,6 +75,20 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _loadRecentSales() async {
+    try {
+      final sales = await _ebayService.getRecentSales(
+        widget.card.name,
+        setName: widget.card.setName,
+      );
+      if (mounted) {
+        setState(() => _recentSales = sales.take(5).toList());
+      }
+    } catch (e) {
+      print('Error loading recent sales: $e');
     }
   }
 
@@ -745,6 +765,298 @@ Widget _buildPricingSection() {
     );
   }
 
+  Widget _buildPriceHistory() {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    final stats = AnalyticsService.getCardPriceStats(widget.card);
+    if (stats.isEmpty) return const SizedBox.shrink();
+
+    final pricePoints = widget.card.priceHistory;
+    if (pricePoints.isEmpty) return const SizedBox.shrink();
+
+    // Calculate price changes for different periods
+    final changes = AnalyticsService.calculatePriceChanges(widget.card);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Price History',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Price change indicators
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: changes.entries.map((entry) {
+                final isPositive = entry.value >= 0;
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: (isPositive ? Colors.green : Colors.red)
+                        .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        entry.key,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${isPositive ? '+' : ''}${entry.value.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          color: isPositive ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Price statistics
+            Row(
+              children: [
+                _buildPriceStat(
+                  'Min',
+                  currencyProvider.formatValue(stats['minimum']),
+                ),
+                _buildPriceStat(
+                  'Avg',
+                  currencyProvider.formatValue(stats['average']),
+                ),
+                _buildPriceStat(
+                  'Max',
+                  currencyProvider.formatValue(stats['maximum']),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Price chart
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  // ...existing chart configuration...
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: pricePoints.asMap().entries.map((e) {
+                        return FlSpot(
+                          e.key.toDouble(),
+                          e.value.price,
+                        );
+                      }).toList(),
+                      isCurved: true,
+                      // ...existing line configuration...
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceStat(String label, String value) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentSales() {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    if (_recentSales == null) {
+      return const SizedBox(
+        height: 100,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    if (_recentSales!.isEmpty) {
+      return const SizedBox(
+        height: 100,
+        child: Center(
+          child: Text('No recent sales data available'),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Recent Sales',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              'Last 30 Days',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        ..._recentSales!.map((sale) => Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey[850] : Colors.grey[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Theme.of(context).dividerColor.withOpacity(0.1),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      sale['title'],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            sale['condition'] ?? 'Unknown',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        if (sale['soldDate'] != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatSaleDate(sale['soldDate']),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                currencyProvider.formatValue(
+                  double.parse(sale['price'].toString()),
+                ),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        )).toList(),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _launchUrl(_apiService.getEbaySearchUrl(
+              widget.card.name,
+              setName: widget.card.setName,
+            )),
+            icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+            label: const Text('View More on eBay'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatSaleDate(String dateStr) {
+    final date = DateTime.parse(dateStr);
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${date.day}/${date.month}';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -769,21 +1081,10 @@ Widget _buildPricingSection() {
                       );
                     },
                     child: Hero(
-                      tag: widget.heroTagPrefix != null 
-                          ? '${widget.heroTagPrefix}_${widget.card.id}'
-                          : 'card_${widget.card.id}',
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.network(
-                          widget.card.imageUrl.replaceAll('/small/', '/large/'), // Try to get higher quality image
-                          fit: BoxFit.contain,
-                          height: 400,
-                          errorBuilder: (context, _, __) => Image.network(
-                            widget.card.imageUrl,
-                            fit: BoxFit.contain,
-                            height: 400,
-                          ),
-                        ),
+                      tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
+                      child: Image.network(
+                        widget.card.imageUrl,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
@@ -804,6 +1105,30 @@ Widget _buildPricingSection() {
                     _buildPricingSection(),
                     const SizedBox(height: 24),
                     _buildCardInfo(),
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark 
+                            ? Colors.grey[900] 
+                            : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: _buildRecentSales(),
+                    ),
+                    if (widget.card.priceHistory.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).brightness == Brightness.dark 
+                              ? Colors.grey[900] 
+                              : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: _buildPriceHistory(),
+                      ),
+                    ],
                   ],
                 ),
               ),

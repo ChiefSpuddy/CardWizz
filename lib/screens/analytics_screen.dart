@@ -1,3 +1,4 @@
+import 'dart:async';  // Add this import
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -16,6 +17,11 @@ import '../services/purchase_service.dart';  // Add this import
 import 'package:flutter/services.dart'; // Add this import at the top
 import '../screens/home_screen.dart';  // Add this import at the top with other imports
 import '../constants/layout.dart';  // Add this import
+import '../widgets/price_update_dialog.dart';
+import '../services/dialog_manager.dart';  // Add this import
+import '../services/dialog_service.dart';
+import '../utils/hero_tags.dart';  // Add this import
+import '../services/analytics_service.dart';  // Add this import
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -46,10 +52,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   // Add this getter
   AppLocalizations get localizations => AppLocalizations.of(context);
 
+  // Add dialog state tracking
+  bool _isDialogVisible = false;
+  BuildContext? _dialogContext;
+  StreamSubscription? _progressSubscription;
+  StreamSubscription? _completeSubscription;
+
   @override
   void initState() {
     super.initState();
     _updateLastRefreshTime();
+  }
+
+  @override
+  void dispose() {
+    _progressSubscription?.cancel();
+    _completeSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _updateLastRefreshTime() async {
@@ -240,7 +259,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => CardDetailsScreen(card: card),
+                    builder: (context) => CardDetailsScreen(
+                      card: card,
+                      heroContext: 'analytics',  // Add this line
+                    ),
                   ),
                 );
               },
@@ -251,7 +273,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     SizedBox(
                       width: 28,
                       child: Hero(
-                        tag: 'card_${card.id}',  // Updated unique tag
+                        tag: HeroTags.cardImage(card.id, context: 'analytics_top'),
                         child: _buildCardImage(card.imageUrl),
                       ),
                     ),
@@ -1046,7 +1068,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 leading: SizedBox(
                   width: 28, // Fixed width for image
                   child: Hero(
-                    tag: 'mover_${card.id}',  // Different tag for top movers
+                    tag: HeroTags.cardImage(card.id, context: 'analytics_movers'),
                     child: _buildCardImage(card.imageUrl),
                   ),
                 ),
@@ -1076,7 +1098,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => CardDetailsScreen(card: card),
+                    builder: (context) => CardDetailsScreen(
+                      card: card,
+                      heroContext: 'analytics',  // Add this line
+                    ),
                   ),
                 ),
               );
@@ -1088,25 +1113,57 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Future<void> _refreshPrices() async {
+    if (!mounted) return;
     if (_isRefreshing) return;
     
     setState(() => _isRefreshing = true);
     
     try {
       final storage = Provider.of<StorageService>(context, listen: false);
-      if (storage.backgroundService != null) {
-        await storage.backgroundService!.refreshPrices();
-        await _updateLastRefreshTime();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text(
-              'Price check complete. Changes will appear once differences are detected.'
-            )),
+      final dialogService = DialogService.instance;
+      
+      // Cancel any existing subscriptions
+      _progressSubscription?.cancel();
+      _completeSubscription?.cancel();
+
+      await storage.initializeBackgroundService();
+      final service = storage.backgroundService;
+      if (service == null) {
+        throw Exception('Failed to initialize background service');
+      }
+
+      // Listen for progress updates
+      _progressSubscription = storage.priceUpdateProgress.listen((progress) {
+        final (current, total) = progress;
+        if (!dialogService.isDialogVisible && mounted) {
+          dialogService.showCustomDialog(
+            PriceUpdateDialog(
+              current: current,
+              total: total,
+            ),
           );
         }
-      }
+      });
+
+      // Handle completion
+      _completeSubscription = storage.priceUpdateComplete.listen((updatedCount) {
+        dialogService.hideDialog();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Updated prices for $updatedCount cards'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      });
+
+      await service.refreshPrices();
+      await _updateLastRefreshTime();
+      
     } catch (e) {
+      print('Error refreshing prices: $e');
+      DialogService.instance.hideDialog();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error updating prices: $e')),

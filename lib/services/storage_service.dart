@@ -16,6 +16,26 @@ class StorageService {
   // Change from late final to nullable
   BackgroundService? backgroundService;
 
+  // Add these fields
+  late final SharedPreferences _prefs;
+  final _cardsController = StreamController<List<TcgCard>>.broadcast();
+  bool _isInitialized = false;
+  String? _currentUserId;
+  final Map<String, TcgCard> _cardCache = {};
+  (String, TcgCard)? _lastRemovedCard;
+
+  // Add these controllers
+  final _priceUpdateController = StreamController<(int, int)>.broadcast();
+  final _priceUpdateCompleteController = StreamController<int>.broadcast();
+
+  Stream<(int, int)> get priceUpdateProgress => _priceUpdateController.stream;
+  Stream<int> get priceUpdateComplete => _priceUpdateCompleteController.stream;
+
+  // Add this helper method for user-specific keys
+  String _getUserKey(String key) {
+    return _currentUserId != null ? 'user_${_currentUserId}_$key' : key;
+  }
+
   // Private constructor with purchase service
   StorageService._(this._purchaseService);
 
@@ -29,40 +49,38 @@ class StorageService {
       
       // Initialize in sequence
       await _instance!._init();  // First initialize storage
-      await _instance!._initializeBackgroundService();  // Then initialize background service
+      await _instance!.initializeBackgroundService();  // Then initialize background service
     }
     return _instance!;
   }
 
-  // Rename method to be more specific
-  Future<void> _initializeBackgroundService() async {
+  // Change from private to public
+  Future<void> initializeBackgroundService() async {
+    if (backgroundService != null) return; // Already initialized
+    
     try {
       final apiService = TcgApiService();
       backgroundService = BackgroundService(this, apiService);
-      // Don't await the startPriceUpdates, let it run in the background
-      backgroundService?.startPriceUpdates();
+      await backgroundService!.initialize();  // Initialize after creation
+      print('Background service initialized successfully');
     } catch (e) {
       print('Error initializing background service: $e');
-      // Don't rethrow - we want the app to work even if background service fails
+      backgroundService = null;  // Reset on error
     }
-  }
-
-  late final SharedPreferences _prefs;
-  late final Database _db;
-  final _cardsController = StreamController<List<TcgCard>>.broadcast();
-  bool _isInitialized = false;
-  String? _currentUserId;
-  final Map<String, TcgCard> _cardCache = {};
-  (String, TcgCard)? _lastRemovedCard;
-
-  // Update the key format to be consistent
-  String _getUserKey(String key) {
-    return _currentUserId != null ? 'user_${_currentUserId}_$key' : key;
   }
 
   void setCurrentUser(String? userId) {
     print('Setting current user: $userId');
     _currentUserId = userId;
+    
+    // Initialize background service when user is set
+    initializeBackgroundService().then((_) {
+      if (userId != null) {
+        backgroundService?.startPriceUpdates();
+      } else {
+        backgroundService?.stopPriceUpdates();
+      }
+    });
     
     // Remove await since _loadInitialData is void
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -505,12 +523,22 @@ class StorageService {
     _cardChangeController.add(null);
   }
 
+  void notifyPriceUpdateProgress(int current, int total) {
+    _priceUpdateController.add((current, total));
+  }
+
+  void notifyPriceUpdateComplete(int updatedCount) {
+    _priceUpdateCompleteController.add(updatedCount);
+  }
+
   // Remove the await from dispose since dispose is synchronous
   @override
   void dispose() {
     _cardsController.close();
     _cardChangeController.close();
     backgroundService?.dispose();
+    _priceUpdateController.close();
+    _priceUpdateCompleteController.close();
   }
 
   // Add public getter for premium status

@@ -1,190 +1,172 @@
 import 'dart:async';
-import 'package:background_fetch/background_fetch.dart';
-import 'package:shared_preferences/shared_preferences.dart';  // Fix import
 import '../services/storage_service.dart';
 import '../services/tcg_api_service.dart';
+import '../services/ebay_api_service.dart';  // Add this import
 import '../models/tcg_card.dart';
 
-enum NetworkType {
-  ANY,
-  UNMETERED,
-  NOT_ROAMING,
-}
-
 class BackgroundService {
-  static const Duration _updateInterval = Duration(hours: 24);
-  static const Duration minUpdateInterval = Duration(hours: 6);  // Add this line
-  static const String _lastUpdateKey = 'last_price_update';
-  final StorageService _storageService;
-  final TcgApiService _apiService;
+  final StorageService _storage;
+  final TcgApiService _api;
+  final EbayApiService _ebayApi = EbayApiService();  // Re-enable eBay API
   Timer? _updateTimer;
-  bool _isEnabled = false;
+  DateTime? _lastUpdateTime;
+  bool _isEnabled = true;
+  static const Duration updateInterval = Duration(hours: 12);
+  
+  BackgroundService(this._storage, this._api);
+
   bool get isEnabled => _isEnabled;
 
-  BackgroundService(this._storageService, this._apiService) {
-    _initBackgroundFetch();
+  Future<void> _initializeLastUpdateTime() async {
+    final cards = await _storage.getAllCards();
+    _lastUpdateTime = cards
+        .map((c) => c.lastPriceUpdate)
+        .where((date) => date != null)
+        .fold<DateTime?>(null, (prev, curr) => 
+            prev == null || curr!.isAfter(prev) ? curr : prev);
   }
 
-  Future<void> _initBackgroundFetch() async {
-    try {
-      await BackgroundFetch.configure(
-        BackgroundFetchConfig(
-          minimumFetchInterval: 720, // 12 hours
-          stopOnTerminate: false,
-          enableHeadless: true,
-          requiresBatteryNotLow: true,
-          requiresCharging: false,
-          requiresStorageNotLow: true,
-        ),
-        _onBackgroundFetch,
-      );
-      
-      await BackgroundFetch.registerHeadlessTask(_onBackgroundFetch);
-    } catch (e) {
-      print('Error configuring background fetch: $e');
+  Future<void> initialize() async {
+    await _initializeLastUpdateTime();
+    if (_isEnabled) {
+      startPriceUpdates();
     }
-  }
-
-  static void _onBackgroundFetch(String taskId) async {
-    print('[BackgroundFetch] Event received: $taskId');
-    
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastUpdate = prefs.getInt(_lastUpdateKey) ?? 0;
-      final now = DateTime.now().millisecondsSinceEpoch;
-      
-      // Only update if more than 24 hours have passed
-      if (now - lastUpdate >= const Duration(hours: 24).inMilliseconds) {
-        // Re-initialize services for background task
-        final storage = await StorageService.init(null);
-        final apiService = TcgApiService();
-        final instance = BackgroundService(storage, apiService);
-        
-        await instance._updatePrices();
-        await prefs.setInt(_lastUpdateKey, now);
-      }
-    } catch (e) {
-      print('[BackgroundFetch] Error: $e');
-    }
-    
-    // Required: Signal completion
-    BackgroundFetch.finish(taskId);
   }
 
   void startPriceUpdates() {
     _isEnabled = true;
     _updateTimer?.cancel();
-    _checkAndUpdate();
-    _updateTimer = Timer.periodic(_updateInterval, (_) => _checkAndUpdate());
-    BackgroundFetch.start();
+    _updateTimer = Timer.periodic(const Duration(minutes: 15), (_) {
+      _checkForUpdates();
+    });
+    // Run initial check
+    _checkForUpdates();
   }
 
   void stopPriceUpdates() {
     _isEnabled = false;
     _updateTimer?.cancel();
     _updateTimer = null;
-    BackgroundFetch.stop();
   }
 
-  Future<void> _checkAndUpdate() async {
-    final lastUpdate = await getLastUpdateTime();
+  Future<void> _checkForUpdates() async {
     final now = DateTime.now();
-    
-    if (lastUpdate == null || now.difference(lastUpdate) >= _updateInterval) {
-      await refreshPrices();
+    if (_lastUpdateTime != null && 
+        now.difference(_lastUpdateTime!) < updateInterval) {
+      return;  // Not enough time has passed
     }
+    
+    await refreshPrices();
   }
 
-  // Add manual refresh method
   Future<void> refreshPrices() async {
-    final lastUpdate = await getLastUpdateTime();
-    final now = DateTime.now();
+    if (!_isEnabled) return;
+
+    print('Starting price refresh...');
+    final cards = await _storage.getAllCards();
+    if (cards.isEmpty) return;
+
+    var progress = 0;
+    final total = cards.length;
     
-    // Don't update if last update was too recent
-    if (lastUpdate != null && 
-        now.difference(lastUpdate) < minUpdateInterval) {
-      print('Skipping price update - too soon since last update');
-      return;
-    }
+    // Notify progress start
+    _storage.notifyPriceUpdateProgress(0, total);
 
-    try {
-      final cards = await _storageService.getCards();
-      print('Starting price update for ${cards.length} cards');
-      var updatedCount = 0;
+    final updatedCards = <TcgCard>[];
+    var updatedCount = 0;
 
-      for (final card in cards) {
-        try {
-          final details = await _apiService.getCardDetails(card.id);
-          if (details != null && details['cardmarket'] != null) {
-            final newPrice = details['cardmarket']['prices']?['averageSellPrice'] as double?;
-            if (newPrice != null && newPrice != card.price) {
-              final updatedCard = card.copyWith(price: newPrice);
-              updatedCard.addPricePoint(newPrice);
-              await _storageService.updateCard(updatedCard);
-              updatedCount++;
-              print('Updated price for ${card.name}: ${card.price} -> $newPrice');
-            }
-          }
-        } catch (e) {
-          print('Error updating price for card ${card.id}: $e');
-        }
+    for (final card in cards) {
+      try {
+        progress++;
+        _storage.notifyPriceUpdateProgress(progress, total);
+
+        // Get prices from both APIs
+        final tcgDetails = await _api.getCardDetails(card.id);
+        final tcgPrice = tcgDetails?['cardmarket']?['prices']?['averageSellPrice'];
         
-        // Add delay between requests to avoid rate limiting
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-
-      print('Updated prices for $updatedCount cards');
-      await setLastUpdateTime(now);
-    } catch (e) {
-      print('Error during price update: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> _updatePrices() async {
-    try {
-      final cards = await _storageService.getCards();
-      print('Starting price update for ${cards.length} cards');
-      
-      for (final card in cards) {
+        // Get eBay price as backup/comparison
+        double? ebayPrice;
         try {
-          final updatedCardData = await _apiService.getCardDetails(card.id);
-          if (updatedCardData != null) {
-            final updatedCard = TcgCard.fromJson(updatedCardData);
-            if (updatedCard.price != card.price) {
-              await _storageService.saveCard(updatedCard);
-              print('Updated price for ${card.name}: ${card.price} -> ${updatedCard.price}');
-            }
-          }
+          ebayPrice = await _ebayApi.getAveragePrice(
+            card.name,
+            setName: card.setName,
+          );
+          print('eBay price for ${card.name}: $ebayPrice');
         } catch (e) {
-          print('Error updating card ${card.name}: $e');
+          print('eBay API error for ${card.name}: $e');
+        }
+
+        // Use TCG price if available, otherwise use eBay price
+        final newPrice = tcgPrice ?? ebayPrice;
+        if (newPrice == null) {
+          print('No price available for ${card.name}');
           continue;
         }
-        
-        await Future.delayed(const Duration(milliseconds: 500));
+
+        // Add both prices to history for comparison
+        if (tcgPrice != null) {
+          card.priceHistory.add(PricePoint(
+            price: tcgPrice,
+            timestamp: DateTime.now(),
+            source: 'TCG',
+          ));
+        }
+        if (ebayPrice != null) {
+          card.priceHistory.add(PricePoint(
+            price: ebayPrice,
+            timestamp: DateTime.now(),
+            source: 'eBay',
+          ));
+        }
+
+        final currentPrice = card.price ?? 0;
+        if (currentPrice != newPrice || card.priceHistory.isEmpty) {
+          final newHistory = List<PricePoint>.from(card.priceHistory);
+          newHistory.add(PricePoint(
+            price: newPrice,
+            timestamp: DateTime.now(),
+          ));
+
+          // Keep only last 30 days of history
+          final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+          newHistory.removeWhere((p) => p.timestamp.isBefore(thirtyDaysAgo));
+
+          final updatedCard = TcgCard(
+            id: card.id,
+            name: card.name,
+            imageUrl: card.imageUrl,
+            price: newPrice,
+            number: card.number,
+            setName: card.setName,
+            rarity: card.rarity,
+            priceHistory: newHistory,
+            lastPriceUpdate: DateTime.now(),
+            set: card.set,
+          );
+
+          updatedCards.add(updatedCard);
+          updatedCount++;
+          print('📊 Price change for ${card.name}: ${currentPrice.toStringAsFixed(2)} -> ${newPrice.toStringAsFixed(2)}');
+        }
+      } catch (e) {
+        print('Error updating price for ${card.name}: $e');
       }
-      
-      print('Price update completed');
-    } catch (e) {
-      print('Error during price update: $e');
-      rethrow;
+
+      await Future.delayed(const Duration(milliseconds: 100));
     }
+
+    // Notify completion
+    _storage.notifyPriceUpdateComplete(updatedCount);
+    _lastUpdateTime = DateTime.now();
+    print('Price refresh complete. Updated $updatedCount cards.');
   }
 
   Future<DateTime?> getLastUpdateTime() async {
-    final prefs = await SharedPreferences.getInstance();
-    final timestamp = prefs.getInt(_lastUpdateKey);
-    return timestamp != null 
-        ? DateTime.fromMillisecondsSinceEpoch(timestamp)
-        : null;
-  }
-
-  Future<void> setLastUpdateTime(DateTime time) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_lastUpdateKey, time.millisecondsSinceEpoch);
+    return _lastUpdateTime;
   }
 
   void dispose() {
-    stopPriceUpdates();
+    _updateTimer?.cancel();
   }
+
 }

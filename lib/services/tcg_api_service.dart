@@ -69,7 +69,7 @@ class TcgApiService {
 
   // Add these new maps for better set matching
   static const Map<String, List<String>> setAliases = {
-    'pr': ['Prismatic Evolution', 'Prismatic', 'Evolution'],
+    'sv8.5': ['Prismatic Evolution', 'Prismatic', 'Evolution'],
     'sv8': ['Surging Sparks', 'Surging', 'Sparks'],
     'sv7': ['Stellar Crown', 'Stellar', 'Crown'],
     'sv6': ['Twilight Masquerade', 'Twilight', 'Masquerade'],

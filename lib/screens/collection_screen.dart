@@ -113,3 +113,22 @@ body: AnimatedBackground(
       : StreamBuilder<List<TcgCard>>(
 // ...existing code...
 
+Hero(
+  tag: HeroTags.cardImage(card.id, context: 'collection'),
+  child: Image.network(
+    card.imageUrl,
+    fit: BoxFit.contain,
+  ),
+),
+
+// Update where CardDetailsScreen is called:
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => CardDetailsScreen(
+      card: card,
+      heroContext: 'collection',  // Add this line
+    ),
+  ),
+);
+

@@ -1,8 +1,53 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';  // Add this import
-import '../services/purchase_service.dart';  // Add this import
+import 'package:provider/provider.dart';
+import '../services/purchase_service.dart';
+import 'navigation_service.dart';
 
 class DialogService {
+  static final DialogService _instance = DialogService._();
+  bool _isDialogVisible = false;
+
+  static DialogService get instance => _instance;
+  DialogService._();
+
+  Future<T?> showCustomDialog<T>(Widget dialog) async {
+    if (!NavigationService.hasContext) {
+      print('Cannot show dialog - no valid context');
+      return null;
+    }
+
+    if (_isDialogVisible) {
+      hideDialog();
+    }
+
+    _isDialogVisible = true;
+    try {
+      return await showDialog<T>(
+        context: NavigationService.currentContext!,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (context) => WillPopScope(
+          onWillPop: () async => false,
+          child: dialog,
+        ),
+      );
+    } catch (e) {
+      print('Error showing dialog: $e');
+      return null;
+    } finally {
+      _isDialogVisible = false;
+    }
+  }
+
+  void hideDialog() {
+    if (_isDialogVisible && NavigationService.hasContext) {
+      Navigator.of(NavigationService.currentContext!).pop();
+      _isDialogVisible = false;
+    }
+  }
+
+  bool get isDialogVisible => _isDialogVisible;
+  
   static void showPremiumDialog(BuildContext context, {
     required String title,
     required String message,
@@ -108,8 +153,8 @@ class DialogService {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        // Direct integration with PurchaseService
-                        context.read<PurchaseService>().subscribe('1Month');
+                        // Use purchasePremium instead of subscribe
+                        context.read<PurchaseService>().purchasePremium();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
