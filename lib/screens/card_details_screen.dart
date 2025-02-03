@@ -10,6 +10,7 @@ import '../providers/currency_provider.dart';  // Add this import
 import '../utils/hero_tags.dart';  // Add this import
 import '../services/analytics_service.dart';  // Add this import
 import '../services/ebay_api_service.dart';  // Add this import
+import 'package:cached_network_image/cached_network_image.dart';  // Add this import if not present
 
 extension StringExtension on String {
   String capitalize() {
@@ -54,6 +55,8 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
 
   @override
   void dispose() {
+    // Clear image cache when disposing
+    CachedNetworkImage.evictFromCache(widget.card.imageUrl);
     _wobbleController.dispose();
     super.dispose();
   }
@@ -1088,21 +1091,81 @@ Widget _buildPricingSection() {
             children: [
               Container(
                 color: isDark ? Colors.black : Colors.grey[100],
-                child: GestureDetector(
-                  onTapDown: (_) => _wobbleCard(),
-                  child: AnimatedBuilder(
-                    animation: _wobbleController,
-                    builder: (context, child) {
-                      return Transform.rotate(
-                        angle: sin(_wobbleController.value * pi) * 0.02,
-                        child: child,
-                      );
-                    },
-                    child: Hero(
-                      tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
-                      child: Image.network(
-                        widget.card.imageUrl,
-                        fit: BoxFit.contain,
+                height: MediaQuery.of(context).size.width * 1.2, // Reduced from 1.4
+                padding: const EdgeInsets.symmetric(vertical: 24), // Add padding
+                child: Center( // Center the card
+                  child: Container(
+                    width: MediaQuery.of(context).size.width * 0.7, // Card width
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: GestureDetector(
+                      onTapDown: (_) => _wobbleCard(),
+                      child: AnimatedBuilder(
+                        animation: _wobbleController,
+                        builder: (context, child) {
+                          return Transform.rotate(
+                            angle: sin(_wobbleController.value * pi) * 0.02,
+                            child: child,
+                          );
+                        },
+                        child: Hero(
+                          tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
+                          child: ClipRRect( // Add rounded corners
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(
+                              imageUrl: widget.card.imageUrl,
+                              fit: BoxFit.contain,
+                              errorWidget: (context, url, error) => Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.broken_image_outlined,
+                                      size: 48,
+                                      color: Theme.of(context).colorScheme.error,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Failed to load image',
+                                      style: TextStyle(
+                                        color: Theme.of(context).colorScheme.error,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    TextButton(
+                                      onPressed: () {
+                                        CachedNetworkImage.evictFromCache(widget.card.imageUrl);
+                                        setState(() {}); // Trigger rebuild to retry loading
+                                      },
+                                      child: const Text('Retry'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              fadeInDuration: const Duration(milliseconds: 300),
+                              fadeOutDuration: const Duration(milliseconds: 300),
+                              maxHeightDiskCache: 800,
+                              memCacheHeight: 800,
+                              cacheKey: '${widget.card.id}_${widget.card.imageUrl.hashCode}',
+                              errorListener: (error) {
+                                print('Error loading image: ${widget.card.imageUrl} - $error');
+                              },
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

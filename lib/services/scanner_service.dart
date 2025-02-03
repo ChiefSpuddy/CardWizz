@@ -3,6 +3,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';  // Add this import
 import '../services/tcg_api_service.dart';  // Add this import
+import '../models/tcg_card.dart';  // Add this import
 
 class ScannerService {
   final textRecognizer = TextRecognizer();
@@ -82,6 +83,42 @@ class ScannerService {
     return commonWords.contains(text.toUpperCase());
   }
 
+  Future<List<TcgCard>> _searchByName(String name) async {
+    try {
+      final nameQuery = 'name:"$name"';
+      final results = await _apiService.searchCards(
+        query: nameQuery,
+        pageSize: 5
+      );
+      
+      final List<dynamic> cardData = results['data'] as List? ?? [];
+      return cardData
+          .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('Error searching by name: $e');
+      return [];
+    }
+  }
+
+  Future<List<TcgCard>> _searchByNumber(String number, String setCode) async {
+    try {
+      final numberQuery = 'number:"$number" set.id:"$setCode"';
+      final results = await _apiService.searchCards(
+        query: numberQuery,
+        pageSize: 5
+      );
+      
+      final List<dynamic> cardData = results['data'] as List? ?? [];
+      return cardData
+          .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      print('Error searching by number: $e');
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>?> searchCard(String? number, String? name) async {
     try {
       // Try name search first for better accuracy
@@ -91,7 +128,10 @@ class ScannerService {
         final nameQuery = 'name:"$cleanName"'; // Fixed quotes
         print('Trying name search: $nameQuery');
 
-        final results = await _apiService.searchCards(nameQuery, pageSize: 5);
+        final results = await _apiService.searchCards(
+          query: 'name:"$cleanName"',
+          pageSize: 5
+        );
         if (results['data'] != null && (results['data'] as List).isNotEmpty) {
           final card = results['data'][0];
           print('Found by name: ${card['name']} #${card['number']}');
@@ -105,7 +145,10 @@ class ScannerService {
         final numberQuery = 'number:"$number"'; // Fixed quotes
         print('Trying number search: $numberQuery');
 
-        final results = await _apiService.searchCards(numberQuery, pageSize: 5);
+        final results = await _apiService.searchCards(
+          query: 'number:"$number"',
+          pageSize: 5
+        );
         if (results['data'] != null && (results['data'] as List).isNotEmpty) {
           final card = results['data'][0];
           print('Found by number: ${card['name']} #${card['number']}');
@@ -162,9 +205,12 @@ class ScannerService {
         // Try exact number search first as it's most reliable
         if (number != null) {
           print('Trying number search: number:"$number"');
-          final results = await _apiService.searchCards('number:"$number"', pageSize: 5);
+          final results = await _apiService.searchCards(
+            query: 'number:"$number"',
+            pageSize: 5,
+          );
           if (results['data'] != null && (results['data'] as List).isNotEmpty) {
-            return results['data'][0];
+            return (results['data'] as List).first;
           }
         }
 
@@ -173,9 +219,12 @@ class ScannerService {
           // Clean name for better matching
           final cleanName = name.replaceAll('Pokémon', '').trim();
           print('Trying name search: name:"$cleanName"');
-          final results = await _apiService.searchCards('name:"$cleanName"', pageSize: 5);
+          final results = await _apiService.searchCards(
+            query: 'name:"$cleanName"',
+            pageSize: 5,
+          );
           if (results['data'] != null && (results['data'] as List).isNotEmpty) {
-            return results['data'][0];
+            return (results['data'] as List).first;
           }
         }
       }

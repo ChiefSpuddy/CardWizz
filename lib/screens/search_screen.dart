@@ -73,11 +73,12 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   };
 
   // Add these fields after other declarations
-  int _currentPage = 1;
   final _scrollController = ScrollController();
   Timer? _searchDebounce;
   int _totalCards = 0;
   bool _hasMorePages = true;
+  int _currentPage = 1;  // Keep only one declaration
+  bool _isLoadingMore = false;
 
   // Add cache manager
   static const _maxConcurrentLoads = 3;
@@ -182,18 +183,13 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
   }
 
   if (!isLoadingMore) {
-    _currentPage = 1;
-    _hasMorePages = true;
+    setState(() {
+      _currentPage = 1;
+      _searchResults = null;
+    });
   }
 
-  if (!_hasMorePages) return;
-
-  setState(() {
-    _isLoading = true;
-    if (!isLoadingMore) {
-      _searchResults = null; // Set to null to show loading state
-    }
-  });
+  setState(() => _isLoading = true);
 
   try {
     if (!isLoadingMore) {
@@ -205,11 +201,11 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
     final searchQuery = _buildSearchQuery(query.trim());
     
     final results = await _apiService.searchCards(
-      searchQuery,
+      query: searchQuery,
       page: _currentPage,
       pageSize: 30,
-      sortBy: _currentSort,
-      ascending: _sortAscending,
+      orderBy: _currentSort,
+      orderByDesc: !_sortAscending,
     );
     
     if (mounted) {
@@ -236,6 +232,7 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
           print('✨ Showing first ${newCards.length} cards');
         }
         _isLoading = false;
+        _isLoadingMore = false;
       });
 
       // Pre-load next page images if we have more pages
@@ -250,6 +247,7 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
     if (mounted) {
       setState(() {
         _isLoading = false;
+        _isLoadingMore = false;
         if (!isLoadingMore) _searchResults = [];
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -297,9 +295,9 @@ void _onSearchChanged(String query) {
   }
   
   _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-    if (mounted && query == _searchController.text && query.isNotEmpty) {  // Fixed syntax with dot notation
+    if (mounted && query == _searchController.text && query.isNotEmpty) {
       setState(() {
-        _currentPage = 1;  // Reset page when searching
+        _currentPage = 1;
         _isInitialSearch = true;
       });
       _performSearch(query);
@@ -339,11 +337,11 @@ void _onSearchChanged(String query) {
 
       do {
         results = await _apiService.searchCards(
-          query,
+          query: query,
           page: _currentPage,
           pageSize: 30,
-          sortBy: _currentSort,
-          ascending: _sortAscending,
+          orderBy: _currentSort,
+          orderByDesc: !_sortAscending,
         );
 
         if ((results['data'] as List).isNotEmpty || retryCount >= 2) break;

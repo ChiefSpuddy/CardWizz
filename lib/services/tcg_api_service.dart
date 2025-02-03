@@ -1,15 +1,21 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';  // Add this import
+import '../models/tcg_card.dart';  // Add this import
 
 class TcgApiService {
   static final TcgApiService _instance = TcgApiService._internal();
   final http.Client _client = http.Client();
+  final Dio _dio;  // Add this field
 
   factory TcgApiService() {
     return _instance;
   }
 
-  TcgApiService._internal();
+  TcgApiService._internal() : _dio = Dio(BaseOptions(
+    baseUrl: _baseUrl,
+    headers: {'X-Api-Key': _apiKey},
+  ));
 
   Future<void> dispose() async {
     _client.close();
@@ -137,58 +143,33 @@ class TcgApiService {
     return null;
   }
 
-  Future<Map<String, dynamic>> searchCards(
-    String query, {
+  Future<Map<String, dynamic>> searchCards({
+    String query = '',
     int page = 1,
     int pageSize = 30,
-    String? sortBy,
-    bool ascending = true,
+    String orderBy = 'cardmarket.prices.averageSellPrice',
+    bool orderByDesc = true,
   }) async {
+    final queryParams = {
+      'q': query,
+      'page': page.toString(),
+      'pageSize': pageSize.toString(),
+      'orderBy': orderBy,
+      'orderByDesc': orderByDesc.toString(),
+    };
+
     try {
-      // Clean up query
-      final cleanQuery = query.trim();
-      
-      // Build query parameters
-      final queryParams = {
-        'q': cleanQuery,
-        'page': page.toString(),
-        'pageSize': pageSize.toString(),
-        // Always add order by to ensure consistent sorting
-        'orderBy': sortBy != null 
-            ? '${ascending ? '' : '-'}$sortBy'
-            : '-cardmarket.prices.averageSellPrice',
-      };
-
       print('API Query: $queryParams');
-
-      final uri = Uri.parse('$_baseUrl/cards').replace(queryParameters: queryParams);
-      final response = await _client.get(uri, headers: _headers);
       
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        print('API Response: ${data['count']} cards found');
-        return {
-          'data': data['data'] ?? [],
-          'totalCount': data['totalCount'] ?? 0,
-          'page': data['page'] ?? 1,
-        };
-      } else {
-        print('API Error: Status ${response.statusCode}');
-        // Return empty result set instead of throwing
-        return {
-          'data': [],
-          'totalCount': 0,
-          'page': page,
-        };
-      }
+      final response = await _dio.get('/cards', queryParameters: queryParams);
+      final data = response.data;
+      
+      print('API Response: ${data['count']} cards found');
+      
+      return data;
     } catch (e) {
-      print('API Error: $e');
-      // Return empty result set on error
-      return {
-        'data': [],
-        'totalCount': 0,
-        'page': page,
-      };
+      print('Error searching cards: $e');
+      return {'data': [], 'count': 0, 'totalCount': 0};
     }
   }
 
