@@ -47,7 +47,7 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
       {'name': 'Neo Destiny', 'icon': '⭐', 'year': '2002', 'query': 'set.id:neo4', 'description': 'Neo Destiny set'},
     ],
     'modern': [
-      {'name': 'Prismatic Evolution', 'icon': '💎', 'release': '2024', 'query': 'set.id:pr', 'description': 'Latest expansion'},
+      {'name': 'Prismatic Evolution', 'icon': '💎', 'release': '2024', 'query': 'set.id:sv8pt5', 'description': 'Latest expansion'},
       {'name': 'Surging Sparks', 'icon': '⚡', 'release': '2024', 'query': 'set.id:sv8', 'description': 'Electric themed set'},
       {'name': '151', 'icon': '🌟', 'release': '2023', 'query': 'set.id:sv3pt5', 'description': 'Original 151 Pokemon'},
       {'name': 'Temporal Forces', 'icon': '⌛', 'release': '2024', 'query': 'set.id:sv5', 'description': 'Time themed set'},
@@ -128,7 +128,8 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   void _loadNextPage() {
     if (_searchController.text.isNotEmpty || _lastQuery != null) {
       _currentPage++;
-      _performSearch(_lastQuery ?? _searchController.text, isLoadingMore: true);
+      // Pass the original query without modification
+      _performSearch(_lastQuery ?? _searchController.text, isLoadingMore: true, useOriginalQuery: true);
     }
   }
 
@@ -171,9 +172,12 @@ Widget _buildLoadingState() {
 }
 
 // Update _performSearch debug logging
-Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
+Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useOriginalQuery = false}) async {
   if (query.isEmpty) {
-    setState(() => _searchResults = null);
+    setState(() {
+      _searchResults = null;
+      _showCategories = true;  // Show categories when search is cleared
+    });
     return;
   }
 
@@ -186,6 +190,7 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
     setState(() {
       _currentPage = 1;
       _searchResults = null;
+      _showCategories = false;  // Hide categories when searching
     });
   }
 
@@ -197,8 +202,22 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
       print('🔍 New search: "$query" (sort: $_currentSort)');
     }
     
-    // Improved search logic for numbers
-    final searchQuery = _buildSearchQuery(query.trim());
+    String searchQuery;
+    if (useOriginalQuery) {
+      // Use the query as-is for pagination
+      searchQuery = query;
+    } else {
+      // Only build search query for new searches
+      searchQuery = query.startsWith('set.id:') ? query : _buildSearchQuery(query.trim());
+      
+      // Set default sorting for set searches
+      if (searchQuery.startsWith('set.id:') && !isLoadingMore) {
+        _currentSort = 'number';
+        _sortAscending = true;
+      }
+    }
+
+    print('Executing search with query: $searchQuery, page: $_currentPage');
     
     final results = await _apiService.searchCards(
       query: searchQuery,
@@ -209,33 +228,65 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
     );
     
     if (mounted) {
-      final List<dynamic> cardData = results['data'] as List? ?? [];
+      List<dynamic> cardData = results['data'] as List? ?? [];
       final totalCount = results['totalCount'] as int? ?? 0;
       
-      if (!isLoadingMore) {
-        print('📊 Found $totalCount cards total');
+      // If set search failed, try by name
+      if (cardData.isEmpty && query.startsWith('set.id:')) {
+        final setMap = searchCategories['modern']!
+            .firstWhere((s) => s['query'] == query, orElse: () => {'name': ''});
+        final setName = setMap['name'];
+        
+        if (setName?.isNotEmpty ?? false) {
+          print('Retrying search with set name: $setName');
+          final nameQuery = 'set:"$setName"';
+          final nameResults = await _apiService.searchCards(
+            query: nameQuery,
+            page: _currentPage,
+            pageSize: 30,
+            orderBy: _currentSort,
+            orderByDesc: !_sortAscending,
+          );
+          if (nameResults['data'] != null) {
+            final List<dynamic> newCardData = nameResults['data'] as List;
+            if (newCardData.isNotEmpty) {
+              cardData = newCardData;
+              final newTotalCount = (nameResults['totalCount'] as int?) ?? 0;
+              print('Found $newTotalCount cards using set name');
+              setState(() => _totalCards = newTotalCount);
+            }
+          }
+        }
       }
+
+      print('📊 Found $totalCount cards total');
       
       final newCards = cardData
           .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
           .toList();
 
       setState(() {
-        _totalCards = totalCount;
-        _hasMorePages = (_currentPage * 30) < totalCount;
-        
         if (isLoadingMore && _searchResults != null) {
           _searchResults = [..._searchResults!, ...newCards];
-          print('📥 Loaded page $_currentPage (${newCards.length} more cards)');
         } else {
           _searchResults = newCards;
-          print('✨ Showing first ${newCards.length} cards');
+          _totalCards = totalCount; // Only update total on initial search
         }
+        
+        _hasMorePages = (_currentPage * 30) < totalCount;
         _isLoading = false;
         _isLoadingMore = false;
+
+        // Save to recent searches
+        if (!isLoadingMore && _searchHistory != null && newCards.isNotEmpty) {
+          _searchHistory!.addSearch(
+            query,
+            imageUrl: newCards[0].imageUrl,
+          );
+        }
       });
 
-      // Pre-load next page images if we have more pages
+      // Pre-load next page images
       if (_hasMorePages) {
         for (final card in newCards) {
           _loadImage(card.imageUrl);
@@ -248,14 +299,20 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false}) async {
       setState(() {
         _isLoading = false;
         _isLoadingMore = false;
-        if (!isLoadingMore) _searchResults = [];
+        if (!isLoadingMore) {
+          _searchResults = [];
+          _totalCards = 0;
+        }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Search failed: ${e.toString()}'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Only show error for new searches, not pagination
+      if (!isLoadingMore) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Search failed: ${e.toString()}'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 }
@@ -705,9 +762,19 @@ Widget _buildRecentSearches() {
     setState(() {
       _currentSort = sortBy;
       _sortAscending = ascending;
+      
+      // Reset pagination when sorting changes
+      _currentPage = 1;
+      _searchResults = null;
+      _hasMorePages = true;
     });
+    
     Navigator.pop(context);
-    if (_searchController.text.isNotEmpty) {
+
+    // Rerun search with new sort
+    if (_lastQuery != null) {
+      _performSearch(_lastQuery!, useOriginalQuery: true);
+    } else if (_searchController.text.isNotEmpty) {
       _performSearch(_searchController.text);
     }
   }
@@ -1048,7 +1115,7 @@ Widget _buildRecentSearches() {
               child: Row(
                 children: [
                   Text(
-                    'Found $_totalCards cards (showing ${_searchResults!.length})',  // Updated to show both counts
+                    'Found $_totalCards cards',  // Updated text
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   if (_isLoading) ...[
