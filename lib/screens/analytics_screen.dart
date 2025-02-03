@@ -975,11 +975,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final currencyProvider = context.watch<CurrencyProvider>();
     final localizations = AppLocalizations.of(context);
     
-    // Filter cards with valid price history
+    // Filter cards with valid price history and calculate changes
     final cardsWithHistory = cards.where((card) => 
       card.price != null && card.priceHistory.length > 1
-    ).toList();
-    
+    ).map((card) {
+      final change = card.getPriceChange(const Duration(days: 1));
+      return (card, change);
+    }).where((tuple) => tuple.$2 != null && tuple.$2!.abs() > 0.01)
+      .toList()
+      ..sort((a, b) => (b.$2 ?? 0).abs().compareTo((a.$2 ?? 0).abs()));
+
     if (cardsWithHistory.isEmpty) {
       return Card(
         child: Padding(
@@ -996,35 +1001,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 child: Column(
                   children: [
                     Icon(
-                      Icons.history,
+                      Icons.show_chart,
                       size: 48,
                       color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Collecting price history...',
+                      'No price changes detected',
                       style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _lastUpdateTime != null 
-                        ? 'Last checked: ${_formatDateTime(_lastUpdateTime!)}'
-                        : 'Not checked yet',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton.icon(
-                      onPressed: _isRefreshing ? null : () => _refreshPrices(),
-                      icon: _isRefreshing 
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.refresh),
-                      label: Text(_isRefreshing ? 'Updating...' : 'Check Now'),
                     ),
                   ],
                 ),
@@ -1035,17 +1019,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       );
     }
 
-    // Calculate 24h changes with improved error handling
-    final periodChanges = cardsWithHistory.map((card) {
-      final change = card.getPriceChange(const Duration(hours: 24));
-      return (card, change);
-    }).where((tuple) => tuple.$2 != null && tuple.$2!.abs() > 0.01) // Filter out tiny changes
-      .toList()
-      ..sort((a, b) => (b.$2 ?? 0).abs().compareTo((a.$2 ?? 0).abs()));
-
-    final topMovers = periodChanges.take(5).toList();
-    
-    if (topMovers.isEmpty) return const SizedBox.shrink();
+    final topMovers = cardsWithHistory.take(5).toList();
 
     return Card(
       child: Padding(
@@ -1068,7 +1042,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 leading: SizedBox(
                   width: 28, // Fixed width for image
                   child: Hero(
-                    tag: HeroTags.cardImage(card.id, context: 'analytics_movers'),
+                    tag: HeroTags.cardImage(card.id, context: 'analytics_movers_${card.id}'),
                     child: _buildCardImage(card.imageUrl),
                   ),
                 ),
@@ -1120,9 +1094,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     
     try {
       final storage = Provider.of<StorageService>(context, listen: false);
-      final dialogService = DialogService.instance;
+      final dialogManager = DialogManager.instance;
       
-      // Cancel any existing subscriptions
+      // Cancel existing subscriptions
       _progressSubscription?.cancel();
       _completeSubscription?.cancel();
 
@@ -1132,22 +1106,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         throw Exception('Failed to initialize background service');
       }
 
+      // Show initial dialog
+      if (!dialogManager.isDialogVisible && mounted) {
+        dialogManager.showCustomDialog(
+          PriceUpdateDialog(current: 0, total: 1),
+        );
+      }
+
       // Listen for progress updates
       _progressSubscription = storage.priceUpdateProgress.listen((progress) {
         final (current, total) = progress;
-        if (!dialogService.isDialogVisible && mounted) {
-          dialogService.showCustomDialog(
-            PriceUpdateDialog(
-              current: current,
-              total: total,
-            ),
-          );
-        }
+        dialogManager.updateDialog(
+          PriceUpdateDialog(current: current, total: total),
+        );
       });
 
-      // Handle completion
+      // Listen for completion
       _completeSubscription = storage.priceUpdateComplete.listen((updatedCount) {
-        dialogService.hideDialog();
+        dialogManager.hideDialog();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1163,7 +1139,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       
     } catch (e) {
       print('Error refreshing prices: $e');
-      DialogService.instance.hideDialog();
+      DialogManager.instance.hideDialog();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error updating prices: $e')),

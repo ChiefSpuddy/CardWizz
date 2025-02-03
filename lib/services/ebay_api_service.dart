@@ -37,13 +37,19 @@ class EbayApiService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getRecentSales(String cardName, {String? setName}) async {
+  Future<List<Map<String, dynamic>>> getRecentSales(String cardName, {
+    String? setName,
+    String? number,  // Add card number parameter
+  }) async {
     final token = await _getAccessToken();
     
-    // Simplify the base query to improve matches
-    final baseQuery = '$cardName pokemon card';
+    // Build search query with card number
+    String baseQuery = '$cardName pokemon card';
+    if (number != null) {
+      baseQuery += ' $number';  // Add card number to search
+    }
     
-    // Build a more focused filter
+    // Build filters
     const excludedTerms = '-psa -bgs -cgc -ace -graded -sgc -case -slab';
     
     // Try first with set name if provided
@@ -115,9 +121,16 @@ class EbayApiService {
     return gradingTerms.any((term) => title.contains(term));
   }
 
-  Future<double?> getAveragePrice(String cardName, {String? setName}) async {
+  Future<double?> getAveragePrice(String cardName, {
+    String? setName,
+    String? number,  // Add number parameter here too
+  }) async {
     try {
-      final sales = await getRecentSales(cardName, setName: setName);
+      final sales = await getRecentSales(
+        cardName,
+        setName: setName,
+        number: number,  // Pass number to getRecentSales
+      );
       if (sales.isEmpty) {
         print('No sales found for: $cardName${setName != null ? ' ($setName)' : ''}');
         return null;

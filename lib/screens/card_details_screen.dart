@@ -83,6 +83,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
       final sales = await _ebayService.getRecentSales(
         widget.card.name,
         setName: widget.card.setName,
+        number: widget.card.number,  // Add card number
       );
       if (mounted) {
         setState(() => _recentSales = sales.take(5).toList());
@@ -945,78 +946,95 @@ Widget _buildPricingSection() {
           ],
         ),
         const SizedBox(height: 16),
-        ..._recentSales!.map((sale) => Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.grey[850] : Colors.grey[50],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Theme.of(context).dividerColor.withOpacity(0.1),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      sale['title'],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            sale['condition'] ?? 'Unknown',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                        if (sale['soldDate'] != null) ...[
-                          const SizedBox(width: 8),
+        ..._recentSales!.map((sale) => Material( // Wrap with Material
+          color: Colors.transparent,
+          child: InkWell( // Add InkWell
+            onTap: () => _launchUrl(sale['link'] ?? ''), // Use 'link' instead of 'url'
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey[850] : Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).dividerColor.withOpacity(0.1),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: GestureDetector(  // Add this wrapper
+                      onTap: () {
+                        if (sale['url'] != null) {
+                          _launchUrl(sale['url']);
+                        }
+                      },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            _formatSaleDate(sale['soldDate']),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                            sale['title'],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                             ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade600.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: Colors.green.shade600.withOpacity(0.2),
+                                  ),
+                                ),
+                                child: Text(
+                                  sale['condition'] ?? 'Unknown',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.green.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              if (sale['soldDate'] != null) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  _formatSaleDate(sale['soldDate']),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ],
-                      ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    currencyProvider.formatValue(
+                      double.parse(sale['price'].toString()),
+                    ),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
-              Text(
-                currencyProvider.formatValue(
-                  double.parse(sale['price'].toString()),
-                ),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            ),
           ),
         )).toList(),
         const SizedBox(height: 16),
@@ -1060,12 +1078,12 @@ Widget _buildPricingSection() {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    
     return Scaffold(
       appBar: AppBar(title: Text(widget.card.name)),
       body: SingleChildScrollView(
-        child: Padding(  // Add padding here
-          padding: const EdgeInsets.only(bottom: 80), // Space for FAB
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 80),
           child: Column(
             children: [
               Container(
@@ -1098,8 +1116,8 @@ Widget _buildPricingSection() {
                     Text(
                       widget.card.name,
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 24),
                     _buildPricingSection(),
@@ -1109,21 +1127,18 @@ Widget _buildPricingSection() {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark 
-                            ? Colors.grey[900] 
-                            : Colors.grey[100],
+                        color: isDark ? Colors.grey[900] : Colors.grey[100],
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: _buildRecentSales(),
                     ),
+                    // We'll use widget.card.priceHistory.isNotEmpty check directly here
                     if (widget.card.priceHistory.isNotEmpty) ...[
                       const SizedBox(height: 24),
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).brightness == Brightness.dark 
-                              ? Colors.grey[900] 
-                              : Colors.grey[100],
+                          color: isDark ? Colors.grey[900] : Colors.grey[100],
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: _buildPriceHistory(),
