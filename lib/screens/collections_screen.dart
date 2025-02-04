@@ -22,16 +22,23 @@ import '../providers/sort_provider.dart';  // Add this import
 import '../constants/layout.dart';  // Add this import
 
 class CollectionsScreen extends StatefulWidget {
-  const CollectionsScreen({super.key});
+  // Keep the field but make it private and unused
+  final bool _showEmptyState;
+  
+  const CollectionsScreen({
+    super.key,
+    bool showEmptyState = true,
+  }) : _showEmptyState = showEmptyState;
 
   @override
-  State<CollectionsScreen> createState() => CollectionsScreenState(); // Remove underscore
+  State<CollectionsScreen> createState() => CollectionsScreenState();
 }
 
 class CollectionsScreenState extends State<CollectionsScreen> { // Remove underscore
   final _pageController = PageController();
   bool _showCustomCollections = false;
   late bool _pageViewReady = false;
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -271,6 +278,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
     final isSignedIn = context.watch<AppState>().isAuthenticated;
 
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         toolbarHeight: 44, // Match home screen height
         centerTitle: false,
@@ -419,82 +427,30 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
           ),
         ) : null,  // Return null when not signed in
       ),
-      drawer: const AppDrawer(),
+      drawer: const AppDrawer(),  // Remove scaffoldKey parameter
       body: AnimatedBackground(
         child: !isSignedIn
             ? const SignInView()
             : StreamBuilder<List<TcgCard>>(
-              stream: Provider.of<StorageService>(context).watchCards(),
-              builder: (context, snapshot) {
-                if (snapshot.data?.isEmpty ?? true) {
-                  return Padding(
-                    padding: EdgeInsets.only(
-                      bottom: MediaQuery.of(context).size.height * LayoutConstants.emptyStatePaddingBottom,
-                    ),
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.style_outlined,
-                              size: 64,
-                              color: Theme.of(context).colorScheme.secondary,
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              AppLocalizations.of(context).translate('emptyCollection'),
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              AppLocalizations.of(context).translate('addFirstCard'),
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                FilledButton.icon(
-                                  onPressed: () => _createCollection(context),
-                                  icon: const Icon(Icons.create_new_folder),
-                                  label: const Text('New Binder'),
-                                ),
-                                const SizedBox(width: 16),
-                                FilledButton.icon(
-                                  onPressed: () {
-                                    final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                                    homeState?.setSelectedIndex(2);
-                                  },
-                                  icon: const Icon(Icons.add),
-                                  label: const Text('Add Card'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                stream: Provider.of<StorageService>(context).watchCards(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final cards = snapshot.data!;
+                  
+                  // Remove empty state check - always show collection
+                  return PageView(
+                    controller: _pageController,
+                    onPageChanged: _onPageChanged,
+                    children: const [
+                      CollectionGrid(),
+                      CustomCollectionsGrid(),
+                    ],
                   );
-                }
-                
-                return PageView(
-                  controller: _pageController,
-                  onPageChanged: _onPageChanged,
-                  children: const [
-                    CollectionGrid(),
-                    CustomCollectionsGrid(),
-                  ],
-                );
-              },
-            ),
+                },
+              ),
       ),
       floatingActionButton: isSignedIn && _showCustomCollections
           ? Container(

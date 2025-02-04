@@ -10,6 +10,7 @@ import '../widgets/animated_background.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/sign_in_view.dart';
 import '../providers/app_state.dart';
+import '../widgets/app_drawer.dart';  // Add this if it's missing
 import '../l10n/app_localizations.dart';  // Add this import
 import '../screens/card_details_screen.dart';  // Add this import
 import 'dart:ui';  // Add this for ImageFilter
@@ -31,6 +32,7 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   // Add these properties at the top of the class
   static const int initialDisplayCount = 5;
   final List<Color> colors = [
@@ -1263,6 +1265,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final localizations = AppLocalizations.of(context);
 
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         toolbarHeight: 44,
         automaticallyImplyLeading: false,
@@ -1270,7 +1273,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           icon: const Icon(Icons.menu),
           padding: EdgeInsets.zero,
           visualDensity: VisualDensity.compact,
-          onPressed: () => Scaffold.of(context).openDrawer(),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(), // Update this line
         ),
         actions: isSignedIn ? [  // Add this condition
           Tooltip(
@@ -1296,6 +1299,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           const SizedBox(width: 8),
         ] : null,  // Return null when not signed in
       ),
+      drawer: const AppDrawer(),  // Remove scaffoldKey parameter
       body: AnimatedBackground(
         child: SafeArea(
           child: !isSignedIn

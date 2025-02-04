@@ -19,12 +19,12 @@ class AppRoutes {
   static const String scanner = '/scanner';
 
   static Map<String, WidgetBuilder> get routes => {
-    '/home': (context) => const HomeScreen(),
+    '/': (context) => const HomeScreen(),
     collection: (context) => const CollectionsScreen(),
+    analytics: (context) => const AnalyticsScreen(),
     search: (context) => const SearchScreen(),
     settings: (context) => const SettingsScreen(),
     profile: (context) => const ProfileScreen(),
-    analytics: (context) => const AnalyticsScreen(),
     dex: (context) => const DexScreen(),
     scanner: (context) => const ScannerScreen(),
   };

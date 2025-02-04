@@ -23,6 +23,7 @@ class DexScreen extends StatefulWidget {
 }
 
 class _DexScreenState extends State<DexScreen> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _namesService = DexNamesService();
   late final DexCollectionService _collectionService;
   final _pokeApi = PokeApiService();
@@ -681,7 +682,8 @@ class _DexScreenState extends State<DexScreen> {
     final currencyProvider = context.watch<CurrencyProvider>();
 
     return Scaffold(
-      drawer: const AppDrawer(),
+      key: _scaffoldKey,
+      drawer: const AppDrawer(),  // Remove scaffoldKey parameter
       appBar: AppBar(
         toolbarHeight: 44, // Match other screens
         automaticallyImplyLeading: true,

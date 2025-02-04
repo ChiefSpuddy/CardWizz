@@ -29,8 +29,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class HomeScreenState extends State<HomeScreen> {  // Changed from _HomeScreenState to HomeScreenState
-  int _selectedIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  int _selectedIndex = 0;
 
   final List<NavItem> _navItems = const [
     NavItem(icon: Icons.home_outlined, label: 'home'),
@@ -117,8 +117,7 @@ class HomeScreenState extends State<HomeScreen> {  // Changed from _HomeScreenSt
     return ChangeNotifierProvider(
       create: (_) => SortProvider(),
       child: Scaffold(
-        key: _scaffoldKey,
-        drawer: const AppDrawer(),
+        drawer: const AppDrawer(),  // Remove scaffoldKey parameter
         body: IndexedStack(
           index: _selectedIndex,
           children: _pages,

@@ -7,13 +7,46 @@ import '../routes.dart';
 import '../screens/collections_screen.dart';  // Add this import
 import '../screens/analytics_screen.dart';  // Add this import
 import '../l10n/app_localizations.dart';  // Add this import
+import '../screens/home_screen.dart';  // Add this import for HomeScreenState
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key});
+  final GlobalKey<ScaffoldState>? scaffoldKey;
+  
+  const AppDrawer({
+    super.key,
+    this.scaffoldKey,
+  });
 
   void _navigateAndClose(BuildContext context, String route) {
     Navigator.pop(context); // Close drawer
-    if (ModalRoute.of(context)?.settings.name != route) {
+    
+    // Try to use bottom nav first
+    final homeState = context.findRootAncestorStateOfType<HomeScreenState>();
+    if (homeState != null) {
+      switch (route) {
+        case '/':
+          homeState.setSelectedIndex(0);
+          break;
+        case '/collection':
+          homeState.setSelectedIndex(1);
+          break;
+        case '/search':
+          homeState.setSelectedIndex(2);
+          break;
+        case '/analytics':
+          homeState.setSelectedIndex(3);
+          break;
+        case '/dex':
+          homeState.setSelectedIndex(4);
+          break;
+        case '/profile':
+          homeState.setSelectedIndex(5);
+          break;
+        default:
+          Navigator.pushNamed(context, route);
+      }
+    } else {
+      // Fallback to direct navigation if not in HomeScreen
       Navigator.pushNamed(context, route);
     }
   }
@@ -131,20 +164,20 @@ class AppDrawer extends StatelessWidget {
                         _buildMenuItem(
                           context,
                           icon: Icons.style_outlined,
-                          title: 'Collection', // Fixed capitalization
+                          title: 'Collection',
                           onTap: () => _navigateAndClose(context, AppRoutes.collection),
                         ),
                         _buildMenuItem(
                           context,
                           icon: Icons.collections_bookmark_outlined,
                           title: localizations.translate('binders'),
-                          onTap: () => _navigateAndClose(context, AppRoutes.collection),
+                          onTap: () => _navigateAndClose(context, AppRoutes.collection),  // Keep using collection route
                         ),
                         _buildMenuItem(
                           context,
                           icon: Icons.analytics_outlined,
                           title: localizations.translate('analytics'),
-                          onTap: () => _navigateAndClose(context, AppRoutes.analytics),
+                          onTap: () => _navigateAndClose(context, AppRoutes.analytics),  // Already using correct route
                         ),
                         _buildMenuItem(
                           context,
@@ -317,6 +350,7 @@ class AppDrawer extends StatelessWidget {
                   : null,
               onTap: () {
                 currencyProvider.setCurrency(entry.key);
+  final VoidCallback onTap;
                 Navigator.pop(context);
               },
             ),
@@ -327,6 +361,7 @@ class AppDrawer extends StatelessWidget {
   }
 }
 
+// Fix the DrawerItem class (keep only one version)
 class DrawerItem {
   final IconData icon;
   final String title;
