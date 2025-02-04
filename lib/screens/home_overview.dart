@@ -14,6 +14,7 @@ import '../l10n/app_localizations.dart';  // Add this import
 import '../widgets/sign_in_view.dart';  // Add this import
 import '../screens/home_screen.dart';  // Add this import at the top with other imports
 import '../utils/hero_tags.dart';  // Add this import
+import '../services/collection_value_service.dart';  // Add this import
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -44,152 +45,166 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
 
   Widget _buildPriceChart(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
-    final localizations = AppLocalizations.of(context);
     
-    if (cards.length < 2) {
-      return Card(
-        child: SizedBox(
-          height: 200,
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.show_chart,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  localizations.translate('needMoreCards'),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
     if (cards.isEmpty) return const SizedBox.shrink();
 
-    // Calculate cumulative value points
-    final sortedCards = List<TcgCard>.from(cards)
-      ..sort((a, b) => a.price?.compareTo(b.price ?? 0) ?? 0);
+    // Create timeline of portfolio value changes
+    final timelinePoints = <DateTime, double>{};
     
-    double cumulativeValue = 0;
-    final valuePoints = sortedCards
-        .where((card) => card.price != null)
-        .map((card) {
-          cumulativeValue += card.price!;
-          return cumulativeValue;
-        })
-        .toList();
-    
-    if (valuePoints.isEmpty) return const SizedBox.shrink();
+    // First, get all unique dates from price histories
+    final allDates = cards.expand((card) => 
+      card.priceHistory.map((p) => DateTime(
+        p.date.year, 
+        p.date.month, 
+        p.date.day,
+        p.date.hour,  // Include hour for more granular data points
+      ))
+    ).toSet().toList()
+      ..sort();
 
-    final maxY = valuePoints.last;  // Use total value as max
-    final minY = 0.0;  // Start from zero
-    final padding = maxY * 0.1;  // 10% padding
+    // For each date, calculate total portfolio value
+    for (final date in allDates) {
+      double totalValue = 0;
+      for (final card in cards) {
+        // Find price closest to this date
+        final pricePoint = card.priceHistory
+            .where((p) => p.date.isBefore(date) || p.date.isAtSameMomentAs(date))
+            .lastOrNull;
+        
+        if (pricePoint != null) {
+          totalValue += pricePoint.price;
+        }
+      }
+      timelinePoints[date] = totalValue;
+    }
 
-    // Calculate interval based on the range
-    final interval = valuePoints.length == 1 
-        ? maxY / 2  // Use half of max value for single point
-        : maxY / 4;  // Split into quarters for multiple points
+    if (timelinePoints.isEmpty) return const SizedBox.shrink();
 
-    return SizedBox(
-      height: 200,
-      child: LineChart(
-        LineChartData(
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: maxY / 4,
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: Colors.grey.withOpacity(0.1),
-              strokeWidth: 1,
-            ),
-          ),
-          titlesData: FlTitlesData(
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: max(1, valuePoints.length / 4).toDouble(),
-                getTitlesWidget: (value, _) {
-                  if (value.toInt() >= cards.length) return const SizedBox.shrink();
-                  final date = DateTime.now().subtract(Duration(days: cards.length - 1 - value.toInt()));
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      '${date.day}/${date.month}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                      ),
-                    ),
-                  );
-                },
+    final maxY = timelinePoints.values.reduce(max);
+    final minY = timelinePoints.values.reduce(min);
+    final padding = maxY * 0.1;
+
+    // Convert to spots for the chart
+    final chartSpots = timelinePoints.entries.map((entry) {
+      return FlSpot(
+        entry.key.millisecondsSinceEpoch.toDouble(),
+        entry.value,
+      );
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Collection Value Trend',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
             ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 46,
-                interval: maxY / 4,
-                getTitlesWidget: (value, _) => Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    currencyProvider.formatChartValue(value.toInt().toDouble()),  // Convert to int
-                    style: TextStyle(
-                      fontSize: 10,  // Reduced from 12
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            const Spacer(),
+            Text(
+              currencyProvider.formatValue(maxY),
+              style: TextStyle(
+                color: Colors.green.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 200,
+          child: LineChart(
+            LineChartData(
+              lineTouchData: LineTouchData(
+                enabled: true,
+                touchTooltipData: LineTouchTooltipData(
+                  tooltipBgColor: Theme.of(context).colorScheme.surface,
+                  tooltipRoundedRadius: 8,
+                  getTooltipItems: (spots) {
+                    return spots.map((spot) {
+                      final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
+                      return LineTooltipItem(
+                        '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
+                        TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: true,
+                horizontalInterval: maxY / 4,
+                verticalInterval: const Duration(days: 7).inMilliseconds.toDouble(),
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Theme.of(context).dividerColor.withOpacity(0.1),
+                  strokeWidth: 1,
+                ),
+                getDrawingVerticalLine: (value) => FlLine(
+                  color: Theme.of(context).dividerColor.withOpacity(0.1),
+                  strokeWidth: 1,
+                ),
+              ),
+              titlesData: FlTitlesData(
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    interval: const Duration(days: 7).inMilliseconds.toDouble(),
+                    getTitlesWidget: (value, _) {
+                      final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _formatDate(date),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    interval: maxY / 4,
+                    reservedSize: 46,
+                    getTitlesWidget: (value, _) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Text(
+                        currencyProvider.formatChartValue(value),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          minY: 0,
-          maxY: maxY + padding,
-          lineTouchData: LineTouchData(
-            enabled: true,
-            touchTooltipData: LineTouchTooltipData(
-              tooltipBgColor: Theme.of(context).cardColor,
-              tooltipRoundedRadius: 8,
-              getTooltipItems: (List<LineBarSpot> touchedSpots) {
-                return touchedSpots.map((LineBarSpot spot) {
-                  return LineTooltipItem(
-                    currencyProvider.formatValue(spot.y),
-                    TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  );
-                }).toList();
-              },
-              fitInsideHorizontally: true,
-              fitInsideVertically: true,
-            ),
-            getTouchedSpotIndicator: (LineChartBarData barData, List<int> indicators) {
-              return indicators.map((int index) {
-                return TouchedSpotIndicatorData(
-                  FlLine(
-                    color: Colors.green.shade600,
-                    strokeWidth: 2,
-                    dashArray: [3, 3],
-                  ),
-                  FlDotData(
-                    getDotPainter: (spot, percent, barData, index) {
+              borderData: FlBorderData(show: false),
+              minY: minY,
+              maxY: maxY + padding,
+              lineBarsData: [
+                LineChartBarData(
+                  spots: chartSpots,
+                  isCurved: true,
+                  curveSmoothness: 0.35,
+                  preventCurveOverShooting: true,
+                  color: Colors.green.shade600,
+                  barWidth: 2,
+                  dotData: FlDotData(
+                    show: true,
+                    getDotPainter: (spot, percent, bar, index) {
                       return FlDotCirclePainter(
                         radius: 4,
                         color: Colors.white,
@@ -198,37 +213,23 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                       );
                     },
                   ),
-                );
-              }).toList();
-            },
-          ),
-          lineBarsData: [
-            LineChartBarData(
-              spots: List.generate(valuePoints.length, (i) {
-                final value = double.parse(valuePoints[i].toStringAsFixed(2));
-                return FlSpot(i.toDouble(), value);
-              }),
-              isCurved: true,
-              curveSmoothness: 0.35,
-              preventCurveOverShooting: true,
-              color: Colors.green.shade600,
-              barWidth: 2.5,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(
-                show: true,
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.green.shade600.withOpacity(0.2),
-                    Colors.green.shade600.withOpacity(0.0),
-                  ],
+                  belowBarData: BarAreaData(
+                    show: true,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.green.shade600.withOpacity(0.2),
+                        Colors.green.shade600.withOpacity(0.0),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -789,5 +790,13 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
         ),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    if (date.year == now.year) {
+      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
+    }
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year.toString().substring(2)}';
   }
 }
