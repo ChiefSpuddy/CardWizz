@@ -11,7 +11,8 @@ class BackgroundService {
   Timer? _updateTimer;
   DateTime? _lastUpdateTime;
   bool _isEnabled = true;
-  static const Duration updateInterval = Duration(hours: 12);
+  static const Duration updateInterval = Duration(hours: 6);
+  static const Duration minUpdateInterval = Duration(hours: 1);
   
   BackgroundService(this._storage, this._api);
 
@@ -52,8 +53,8 @@ class BackgroundService {
   Future<void> _checkForUpdates() async {
     final now = DateTime.now();
     if (_lastUpdateTime != null && 
-        now.difference(_lastUpdateTime!) < updateInterval) {
-      return;  // Not enough time has passed
+        now.difference(_lastUpdateTime!) < minUpdateInterval) {
+      return;  // Don't update if less than 1 hour has passed
     }
     
     await refreshPrices();
@@ -69,7 +70,6 @@ class BackgroundService {
     var progress = 0;
     final total = cards.length;
     
-    // Notify progress start
     _storage.notifyPriceUpdateProgress(0, total);
 
     final updatedCards = <TcgCard>[];
@@ -80,74 +80,23 @@ class BackgroundService {
         progress++;
         _storage.notifyPriceUpdateProgress(progress, total);
 
-        // Get prices from both APIs
-        final tcgDetails = await _api.getCardDetails(card.id);
-        final tcgPrice = tcgDetails?['cardmarket']?['prices']?['averageSellPrice'];
-        
-        // Get eBay price as backup/comparison
-        double? ebayPrice;
-        try {
-          ebayPrice = await _ebayApi.getAveragePrice(
-            card.name,
-            setName: card.setName,
-          );
-          print('eBay price for ${card.name}: $ebayPrice');
-        } catch (e) {
-          print('eBay API error for ${card.name}: $e');
+        // Get eBay price
+        final newPrice = await _ebayApi.getAveragePrice(
+          card.name,
+          setName: card.setName,
+          number: card.number,
+        );
+
+        if (newPrice != null) {
+          // Always add price to history even if it hasn't changed significantly
+          final updatedCard = card.updatePrice(newPrice);
+          await _storage.updateCard(updatedCard);
+          if ((card.price ?? 0) != newPrice) {
+            updatedCount++;
+            print('📊 Price change for ${card.name}: ${card.price?.toStringAsFixed(2) ?? "0.00"} -> ${newPrice.toStringAsFixed(2)}');
+          }
         }
 
-        // Use TCG price if available, otherwise use eBay price
-        final newPrice = tcgPrice ?? ebayPrice;
-        if (newPrice == null) {
-          print('No price available for ${card.name}');
-          continue;
-        }
-
-        // Add both prices to history for comparison
-        if (tcgPrice != null) {
-          card.priceHistory.add(PricePoint(
-            price: tcgPrice,
-            timestamp: DateTime.now(),
-            source: 'TCG',
-          ));
-        }
-        if (ebayPrice != null) {
-          card.priceHistory.add(PricePoint(
-            price: ebayPrice,
-            timestamp: DateTime.now(),
-            source: 'eBay',
-          ));
-        }
-
-        final currentPrice = card.price ?? 0;
-        if (currentPrice != newPrice || card.priceHistory.isEmpty) {
-          final newHistory = List<PricePoint>.from(card.priceHistory);
-          newHistory.add(PricePoint(
-            price: newPrice,
-            timestamp: DateTime.now(),
-          ));
-
-          // Keep only last 30 days of history
-          final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-          newHistory.removeWhere((p) => p.timestamp.isBefore(thirtyDaysAgo));
-
-          final updatedCard = TcgCard(
-            id: card.id,
-            name: card.name,
-            imageUrl: card.imageUrl,
-            price: newPrice,
-            number: card.number,
-            setName: card.setName,
-            rarity: card.rarity,
-            priceHistory: newHistory,
-            lastPriceUpdate: DateTime.now(),
-            set: card.set,
-          );
-
-          updatedCards.add(updatedCard);
-          updatedCount++;
-          print('📊 Price change for ${card.name}: ${currentPrice.toStringAsFixed(2)} -> ${newPrice.toStringAsFixed(2)}');
-        }
       } catch (e) {
         print('Error updating price for ${card.name}: $e');
       }
@@ -155,7 +104,6 @@ class BackgroundService {
       await Future.delayed(const Duration(milliseconds: 100));
     }
 
-    // Notify completion
     _storage.notifyPriceUpdateComplete(updatedCount);
     _lastUpdateTime = DateTime.now();
     print('Price refresh complete. Updated $updatedCount cards.');

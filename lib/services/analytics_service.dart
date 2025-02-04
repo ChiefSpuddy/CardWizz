@@ -11,15 +11,20 @@ class AnalyticsService {
 
   static Map<String, double> calculatePriceChanges(TcgCard card) {
     final changes = <String, double>{};
-    for (final period in _periods) {
-      final change = card.getPriceChange(period);
+    
+    final periods = [
+      ('24h', const Duration(days: 1)),
+      ('7d', const Duration(days: 7)),
+      ('30d', const Duration(days: 30)),
+    ];
+
+    for (final (label, duration) in periods) {
+      final change = card.getPriceChange(duration);
       if (change != null) {
-        final key = period.inDays == 1 ? '24h' :
-                   period.inDays == 7 ? '7d' :
-                   period.inDays == 30 ? '30d' : '90d';
-        changes[key] = change;
+        changes[label] = change;
       }
     }
+
     return changes;
   }
 

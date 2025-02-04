@@ -1,8 +1,8 @@
-import 'dart:async';  // Add this import
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'dart:math' show max;
+import 'dart:math' show max, min;  // Add min here
 import 'package:flutter/gestures.dart';  // Add this import for PointerExitEvent
 import '../services/storage_service.dart';
 import '../models/tcg_card.dart';
@@ -348,30 +348,49 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     if (cards.isEmpty) return const SizedBox.shrink();
 
-    // Sort cards by value for trend analysis
-    final sortedCards = List<TcgCard>.from(cards)..sort((a, b) => 
-      (a.price ?? 0).compareTo(b.price ?? 0));
+    // Create timeline of portfolio value changes
+    final timelinePoints = <DateTime, double>{};
     
-    double runningTotal = 0;
-    final valuePoints = sortedCards
-        .where((card) => card.price != null)
-        .map((card) {
-          runningTotal += card.price!;
-          return runningTotal;
-        })
-        .toList();
+    // First, get all unique dates from price histories
+    final allDates = cards.expand((card) => 
+      card.priceHistory.map((p) => DateTime(
+        p.date.year, 
+        p.date.month, 
+        p.date.day,
+        p.date.hour,  // Include hour for more granular data points
+      ))
+    ).toSet().toList()
+      ..sort();
 
-    if (valuePoints.isEmpty) return const SizedBox.shrink();
+    // For each date, calculate total portfolio value
+    for (final date in allDates) {
+      double totalValue = 0;
+      for (final card in cards) {
+        // Find price closest to this date
+        final pricePoint = card.priceHistory
+            .where((p) => p.date.isBefore(date) || p.date.isAtSameMomentAs(date))
+            .lastOrNull;
+        
+        if (pricePoint != null) {
+          totalValue += pricePoint.price;
+        }
+      }
+      timelinePoints[date] = totalValue;
+    }
 
-    final maxY = valuePoints.last;
-    final minY = 0.0;
+    if (timelinePoints.isEmpty) return const SizedBox.shrink();
+
+    final maxY = timelinePoints.values.reduce(max);
+    final minY = timelinePoints.values.reduce(min);
     final padding = maxY * 0.1;
 
-    final spots = List.generate(valuePoints.length, (i) {
-      // Add proper rounding to 2 decimal places
-      final roundedValue = double.parse(valuePoints[i].toStringAsFixed(2));
-      return FlSpot(i.toDouble(), roundedValue);
-    });
+    // Convert to spots for the chart
+    final chartSpots = timelinePoints.entries.map((entry) {
+      return FlSpot(
+        entry.key.millisecondsSinceEpoch.toDouble(),
+        entry.value,
+      );
+    }).toList();
 
     return Card(
       child: Padding(
@@ -398,12 +417,39 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               height: 200,
               child: LineChart(
                 LineChartData(
+                  lineTouchData: LineTouchData(
+                    enabled: true,
+                    touchTooltipData: LineTouchTooltipData(
+                      tooltipBgColor: Theme.of(context).colorScheme.surface,
+                      tooltipRoundedRadius: 8,
+                      getTooltipItems: (spots) {
+                        return spots.map((spot) {
+                          final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
+                          return LineTooltipItem(
+                            '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
+                            TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          );
+                        }).toList();
+                      },
+                    ),
+                    handleBuiltInTouches: true,
+                    getTouchLineStart: (data, index) => -padding,
+                    getTouchLineEnd: (data, index) => maxY + padding,
+                  ),
                   gridData: FlGridData(
                     show: true,
-                    drawVerticalLine: false,
+                    drawVerticalLine: true,  // Show vertical grid lines
                     horizontalInterval: maxY / 4,
+                    verticalInterval: const Duration(days: 7).inMilliseconds.toDouble(),
                     getDrawingHorizontalLine: (value) => FlLine(
-                      color: Colors.grey.withOpacity(0.1),
+                      color: Theme.of(context).dividerColor.withOpacity(0.1),
+                      strokeWidth: 1,
+                    ),
+                    getDrawingVerticalLine: (value) => FlLine(
+                      color: Theme.of(context).dividerColor.withOpacity(0.1),
                       strokeWidth: 1,
                     ),
                   ),
@@ -417,20 +463,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        interval: max(1, valuePoints.length / 4).toDouble(),
+                        interval: const Duration(days: 7).inMilliseconds.toDouble(),
                         getTitlesWidget: (value, _) {
-                          if (value.toInt() >= valuePoints.length) {
-                            return const SizedBox.shrink();
-                          }
-                          final date = DateTime.now().subtract(
-                            Duration(days: valuePoints.length - 1 - value.toInt())
-                          );
+                          final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
                           return Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
-                              '${date.day}/${date.month}',
+                              _formatDate(date),
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 10,
                                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                               ),
                             ),
@@ -446,9 +487,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         getTitlesWidget: (value, _) => Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: Text(
-                            currencyProvider.formatChartValue(value.toInt().toDouble()),  // Convert to int
+                            currencyProvider.formatChartValue(value),
                             style: TextStyle(
-                              fontSize: 10,  // Reduced from 12
+                              fontSize: 10,
                               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                             ),
                           ),
@@ -457,17 +498,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   ),
                   borderData: FlBorderData(show: false),
-                  minY: 0,
+                  minY: minY,
                   maxY: maxY + padding,
                   lineBarsData: [
                     LineChartBarData(
-                      spots: spots,
+                      spots: chartSpots,
                       isCurved: true,
                       curveSmoothness: 0.35,
                       preventCurveOverShooting: true,
                       color: Colors.green.shade600,
-                      barWidth: 2.5,
-                      dotData: const FlDotData(show: false),
+                      barWidth: 2,
+                      dotData: FlDotData(
+                        show: true,
+                        getDotPainter: (spot, percent, bar, index) {
+                          return FlDotCirclePainter(
+                            radius: 4,
+                            color: Colors.white,
+                            strokeWidth: 2,
+                            strokeColor: Colors.green.shade600,
+                          );
+                        },
+                      ),
                       belowBarData: BarAreaData(
                         show: true,
                         gradient: LinearGradient(
@@ -488,6 +539,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         ),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    if (date.year == now.year) {
+      return '${date.day}/${date.month}';
+    }
+    return '${date.day}/${date.month}/${date.year.toString().substring(2)}';
   }
 
   Widget _buildSetDistribution(List<TcgCard> cards) {
@@ -975,17 +1034,39 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final currencyProvider = context.watch<CurrencyProvider>();
     final localizations = AppLocalizations.of(context);
     
-    // Filter cards with valid price history and calculate changes
-    final cardsWithHistory = cards.where((card) => 
-      card.price != null && card.priceHistory.length > 1
-    ).map((card) {
-      final change = card.getPriceChange(const Duration(days: 1));
-      return (card, change);
-    }).where((tuple) => tuple.$2 != null && tuple.$2!.abs() > 0.01)
-      .toList()
-      ..sort((a, b) => (b.$2 ?? 0).abs().compareTo((a.$2 ?? 0).abs()));
+    // Calculate changes for all periods at once
+    final cardsWithChanges = cards
+        .where((card) => card.price != null && card.priceHistory.length >= 2)
+        .map((card) {
+          // Try daily change first
+          var change = card.getPriceChange(const Duration(days: 1));
+          var period = '24h';
+          
+          // If no daily change, try weekly
+          if (change == null || change == 0) {
+            change = card.getPriceChange(const Duration(days: 7));
+            period = '7d';
+          }
+          
+          // If still no change, try monthly
+          if (change == null || change == 0) {
+            change = card.getPriceChange(const Duration(days: 30));
+            period = '30d';
+          }
+          
+          return (card, change, period);
+        })
+        .where((tuple) => tuple.$2 != null && tuple.$2 != 0) // Filter out null and 0 changes
+        .toList()
+        ..sort((a, b) => (b.$2 ?? 0).abs().compareTo((a.$2 ?? 0).abs()));
 
-    if (cardsWithHistory.isEmpty) {
+    // Debug print
+    print('Found ${cardsWithChanges.length} cards with price changes');
+    for (final (card, change, period) in cardsWithChanges.take(5)) {
+      print('${card.name}: ${change?.toStringAsFixed(1)}% ($period) - Price: ${card.price}, History: ${card.priceHistory.length} entries');
+    }
+
+    if (cardsWithChanges.isEmpty) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1019,7 +1100,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       );
     }
 
-    final topMovers = cardsWithHistory.take(5).toList();
+    final topMovers = cardsWithChanges.take(5).toList();
 
     return Card(
       child: Padding(
@@ -1027,55 +1108,96 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              localizations.translate('topMovers'),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            // Fix the overflowing row
+            Wrap(
+              spacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(
+                  localizations.translate('topMovers'),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Based on recent changes',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             ...topMovers.map((tuple) {
               final card = tuple.$1;
               final change = tuple.$2 ?? 0;
+              final period = tuple.$3;
               final isPositive = change >= 0;
               
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: SizedBox(
-                  width: 28, // Fixed width for image
-                  child: Hero(
-                    tag: HeroTags.cardImage(card.id, context: 'analytics_movers_${card.id}'),
-                    child: _buildCardImage(card.imageUrl),
-                  ),
-                ),
-                title: _buildValueText(card.name),  // Use helper method
-                subtitle: _buildValueText(
-                  currencyProvider.formatValue(card.price ?? 0),
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (isPositive ? Colors.green : Colors.red)
-                        .withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    '${isPositive ? '+' : ''}${change.toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      color: isPositive ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+              return InkWell(
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => CardDetailsScreen(
                       card: card,
-                      heroContext: 'analytics',  // Add this line
+                      heroContext: 'analytics',
                     ),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        child: Hero(
+                          tag: HeroTags.cardImage(card.id, context: 'analytics_movers_${card.id}'),
+                          child: _buildCardImage(card.imageUrl),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              card.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            Text(
+                              currencyProvider.formatValue(card.price ?? 0),
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _buildChangeIndicator(change),
+                          const SizedBox(height: 4),
+                          Text(
+                            period,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               );

@@ -9,7 +9,7 @@ class TcgCard {
   final String? rarity;
   final String? setName;
   double? _price;
-  final List<PricePoint> priceHistory;
+  final List<PriceHistoryEntry> priceHistory;
   final SetInfo? set;
   final String? setTotal;
   final DateTime? lastPriceUpdate;
@@ -23,7 +23,7 @@ class TcgCard {
     this.rarity,
     this.setName,
     double? price,
-    List<PricePoint>? priceHistory,
+    List<PriceHistoryEntry>? priceHistory,
     this.set,
     this.setTotal,
     this.lastPriceUpdate,
@@ -37,12 +37,33 @@ class TcgCard {
     if (newPrice != _price) {
       _price = newPrice;
       if (newPrice != null) {
-        priceHistory.add(PricePoint(
+        priceHistory.add(PriceHistoryEntry(
           price: newPrice,
-          timestamp: DateTime.now(),
+          date: DateTime.now(),
         ));
       }
     }
+  }
+
+  TcgCard updatePrice(double? newPrice) {
+    if (newPrice == null || newPrice == price) return this;
+    
+    final now = DateTime.now();
+    final updatedHistory = List<PriceHistoryEntry>.from(priceHistory)
+      ..add(PriceHistoryEntry(
+        price: newPrice,
+        date: now,
+      ));
+    
+    // Keep only last 30 days of history
+    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+    updatedHistory.removeWhere((entry) => entry.date.isBefore(thirtyDaysAgo));
+    
+    return copyWith(
+      price: newPrice,
+      priceHistory: updatedHistory,
+      lastPriceUpdate: now,
+    );
   }
 
   factory TcgCard.fromJson(Map<String, dynamic> json) {
@@ -61,7 +82,7 @@ class TcgCard {
         set: setInfo,
         setTotal: json['set']?['total']?.toString(),
         priceHistory: (json['priceHistory'] as List<dynamic>?)
-            ?.map((p) => PricePoint.fromJson(p as Map<String, dynamic>))
+            ?.map((p) => PriceHistoryEntry.fromJson(p as Map<String, dynamic>))
             .toList() ?? [],
         lastPriceUpdate: json['lastPriceUpdate'] != null 
             ? DateTime.parse(json['lastPriceUpdate'])
@@ -100,33 +121,51 @@ class TcgCard {
   void addPricePoint(double newPrice) {
     final roundedPrice = double.parse(newPrice.toStringAsFixed(2));
     if (priceHistory.isEmpty || priceHistory.last.price != roundedPrice) {
-      priceHistory.add(PricePoint(
+      priceHistory.add(PriceHistoryEntry(
         price: roundedPrice,
-        timestamp: DateTime.now(),
+        date: DateTime.now(),
       ));
       
       // Keep only last 30 days of history
       final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-      priceHistory.removeWhere((point) => point.timestamp.isBefore(thirtyDaysAgo));
+      priceHistory.removeWhere((point) => point.date.isBefore(thirtyDaysAgo));
     }
   }
 
   double? getPriceChange(Duration period) {
     if (priceHistory.length < 2) return null;
     
+    // Sort all prices by date first
+    final sortedPrices = priceHistory.toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    
     final now = DateTime.now();
     final targetTime = now.subtract(period);
     
-    // Find closest historical price point
-    final oldPrice = priceHistory
-        .where((point) => point.timestamp.isBefore(targetTime))
-        .lastOrNull
-        ?.price ?? priceHistory.first.price;
+    // Find closest price point before target time
+    var oldPrice = price ?? sortedPrices.last.price;  // Default to current price
+    var foundOldPrice = false;
     
-    final currentPrice = priceHistory.last.price;
+    for (final entry in sortedPrices.reversed) {
+      if (entry.date.isBefore(targetTime)) {
+        oldPrice = entry.price;
+        foundOldPrice = true;
+        break;
+      }
+    }
     
-    if (oldPrice == 0) return 0;
-    return ((currentPrice - oldPrice) / oldPrice) * 100;
+    if (!foundOldPrice) return null;  // No price found before target time
+    
+    // Calculate percentage change
+    final currentPrice = price ?? sortedPrices.last.price;
+    if (oldPrice == 0 || currentPrice == 0) return null;
+    
+    final change = ((currentPrice - oldPrice) / oldPrice) * 100;
+    
+    // Filter out unrealistic changes
+    if (change.abs() > 50) return null;  // More than 50% change is unlikely
+    
+    return change;
   }
 
   Map<String, double> getPriceStats() {
@@ -149,12 +188,12 @@ class TcgCard {
     return sqrt(sumSquares / (prices.length - 1));
   }
 
-  PricePoint? _findClosestPricePoint(DateTime targetDate) {
+  PriceHistoryEntry? _findClosestPricePoint(DateTime targetDate) {
     return priceHistory
-        .where((pp) => pp.timestamp.isBefore(targetDate))
+        .where((pp) => pp.date.isBefore(targetDate))
         .reduce((a, b) => 
-          a.timestamp.difference(targetDate).abs() < 
-          b.timestamp.difference(targetDate).abs() ? a : b);
+          a.date.difference(targetDate).abs() < 
+          b.date.difference(targetDate).abs() ? a : b);
   }
 
   TcgCard copyWith({
@@ -165,10 +204,11 @@ class TcgCard {
     String? rarity,
     String? setName,
     double? price,
-    List<PricePoint>? priceHistory,
+    List<PriceHistoryEntry>? priceHistory,
     SetInfo? set,
     String? setTotal,
     DateTime? lastPriceCheck,
+    DateTime? lastPriceUpdate,  // Add this parameter
   }) {
     return TcgCard(
       id: id ?? this.id,
@@ -182,6 +222,7 @@ class TcgCard {
       set: set ?? this.set,
       setTotal: setTotal ?? this.setTotal,
       lastPriceCheck: lastPriceCheck ?? this.lastPriceCheck,
+      lastPriceUpdate: lastPriceUpdate ?? this.lastPriceUpdate,  // Add this line
     );
   }
 }
@@ -230,30 +271,41 @@ class SetInfo {
   };
 }
 
-class PricePoint {
+class PriceHistoryEntry {
   final double price;
-  final DateTime timestamp;
+  final DateTime date;
   final String source;
   final String? currency;
 
-  PricePoint({
+  PriceHistoryEntry({
     required this.price, 
-    required this.timestamp,
+    required this.date,
     this.source = 'TCG',
     this.currency = 'USD',
   });
 
   Map<String, dynamic> toJson() => {
     'price': price,
-    'timestamp': timestamp.toIso8601String(),
+    'timestamp': date.toIso8601String(),  // Changed from 'date' to 'timestamp'
     'source': source,
     'currency': currency,
   };
 
-  factory PricePoint.fromJson(Map<String, dynamic> json) => PricePoint(
-    price: json['price'] as double,
-    timestamp: DateTime.parse(json['timestamp'] as String),
-    source: json['source'] as String? ?? 'TCG',
-    currency: json['currency'] as String? ?? 'USD',
-  );
+  factory PriceHistoryEntry.fromJson(Map<String, dynamic> json) {
+    // Handle both 'date' and 'timestamp' fields
+    final dateStr = json['date'] ?? json['timestamp'];
+    if (dateStr == null) {
+      throw FormatException('Missing date/timestamp in price history entry');
+    }
+    
+    return PriceHistoryEntry(
+      price: (json['price'] as num).toDouble(),
+      date: DateTime.parse(dateStr as String),
+      source: json['source'] as String? ?? 'TCG',
+      currency: json['currency'] as String? ?? 'USD',
+    );
+  }
+
+  // Add getter for backward compatibility
+  DateTime get timestamp => date;
 }
