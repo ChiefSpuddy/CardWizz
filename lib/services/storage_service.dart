@@ -7,6 +7,7 @@ import 'package:collection/collection.dart';
 import '../services/purchase_service.dart';
 import '../services/tcg_api_service.dart';
 import '../services/background_service.dart';
+import 'package:rxdart/rxdart.dart'; // Add this import
 
 class StorageService {
   static const int _freeUserCardLimit = 25;  // Changed from 10 to 25
@@ -120,48 +121,43 @@ class StorageService {
       return;
     }
 
-    final cardsKey = _getUserKey('cards');
-    print('Loading cards with key: $cardsKey');
-    
-    final cardsJson = _prefs.getStringList(cardsKey) ?? [];
-    print('Found ${cardsJson.length} cards in storage');
-
     try {
-      final cards = cardsJson.map((json) {
-        try {
-          final data = jsonDecode(json);
-          if (data == null) return null;
-          
-          // Convert to Map<String, dynamic> and validate
-          final cardData = Map<String, dynamic>.from(data);
-          if (cardData['id'] == null || cardData['name'] == null) {
-            print('Invalid card data, skipping: $cardData');
-            return null;
-          }
-          
-          return TcgCard.fromJson(cardData);
-        } catch (e) {
-          print('Error parsing card JSON: $e');
-          return null;
-        }
-      })
-      .where((card) => card != null)
-      .cast<TcgCard>()
-      .toList();
-
-      _cardsController.add(cards);
+      final cards = _getCards();
+      // Only emit if cards are different from last emission
+      if (_lastEmittedCards == null || !_areCardListsEqual(_lastEmittedCards!, cards)) {
+        _lastEmittedCards = cards;
+        _cardsController.add(cards);
+      }
     } catch (e) {
       print('Error loading cards: $e');
       _cardsController.add([]);
     }
   }
 
+  // Add helper method to compare card lists
+  bool _areCardListsEqual(List<TcgCard> list1, List<TcgCard> list2) {
+    if (list1.length != list2.length) return false;
+    for (var i = 0; i < list1.length; i++) {
+      if (list1[i].id != list2[i].id) return false;
+    }
+    return true;
+  }
+
   Stream<List<TcgCard>> watchCards() {
     if (!_isInitialized) {
       return Stream.value([]);
     }
-    _loadCards(); // Refresh when stream is requested
-    return _cardsController.stream;
+    
+    // Use throttleTime instead of debounceTime for better performance
+    return _cardsController.stream
+        .throttleTime(const Duration(milliseconds: 100))
+        .distinct((previous, next) {
+          if (previous.length != next.length) return false;
+          for (var i = 0; i < previous.length; i++) {
+            if (previous[i].id != next[i].id) return false;
+          }
+          return true;
+        });
   }
 
   Future<void> refreshCards() async {
@@ -570,4 +566,7 @@ class StorageService {
   String _getCardsKey() {
     return _getUserKey('cards');
   }
+
+  // Add this field at the top of the class
+  List<TcgCard>? _lastEmittedCards;
 }

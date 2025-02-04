@@ -551,276 +551,260 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildSetDistribution(List<TcgCard> cards) {
     final purchaseService = context.watch<PurchaseService>();
-    final localizations = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     
     // Get sorted sets
     final sortedSets = _getSetDistribution(cards);
-    final hasMore = sortedSets.length > initialDisplayCount;
+    final totalCards = cards.length;
+    final displaySets = sortedSets.take(6).toList(); // Show top 6 sets
 
-    return Stack(
-      children: [
-        Card(
-          // Existing card content, but blur it when not premium
-          child: SingleChildScrollView( // Add this to prevent overflow
-            child: ImageFiltered(
-              imageFilter: purchaseService.isPremium 
-                  ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
-                  : ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-              child: Opacity(
-                opacity: purchaseService.isPremium ? 1.0 : 0.7,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          if (purchaseService.isPremium) ...[
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            localizations.translate('setDistribution'),
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${sortedSets.length} ${localizations.translate('sets')}',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      // Pie Chart
-                      SizedBox(
-                        height: 140,  // Reduced height
-                        child: Row(
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: PieChart(
-                                PieChartData(
-                                  sections: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
-                                    final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
-                                    return PieChartSectionData(
-                                      color: colors[entry.key % colors.length],
-                                      value: entry.value.value.toDouble(),
-                                      title: '$percentage%',
-                                      radius: 60,  // Fixed smaller radius
-                                      titleStyle: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                      titlePositionPercentageOffset: 0.55,
-                                    );
-                                  }).toList(),
-                                  sectionsSpace: 2,
-                                  centerSpaceRadius: 30,
-                                ),
+                            Text(
+                              'Set Distribution',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            // Single legend
-                            Expanded(
-                              child: ShaderMask(
-                                shaderCallback: (Rect rect) {
-                                  return LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.purple.withOpacity(0),
-                                      Colors.purple.withOpacity(1),
-                                    ],
-                                    stops: const [0.9, 1.0],
-                                  ).createShader(rect);
-                                },
-                                blendMode: BlendMode.dstOut,
-                                child: SingleChildScrollView(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: sortedSets.take(initialDisplayCount).toList().asMap().entries.map((entry) {
-                                      final percentage = (entry.value.value / cards.length * 100).toStringAsFixed(1);
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 4),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 12,
-                                              height: 12,
-                                              decoration: BoxDecoration(
-                                                color: colors[entry.key % colors.length],
-                                                shape: BoxShape.circle,
-                                                border: Border.all(
-                                                  color: Theme.of(context).colorScheme.outline,
-                                                  width: 1,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                '${entry.value.key}\n${entry.value.value} cards ($percentage%)',
-                                                style: const TextStyle(fontSize: 12),
-                                                maxLines: 2,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${sortedSets.length} sets total',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.primary,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      if (hasMore) ...[
-                        const SizedBox(height: 16),
-                        Center(
-                          child: TextButton(
-                            onPressed: () => _showAllSets(context, sortedSets, colors, cards.length),
-                            child: Text('Show All Sets (${sortedSets.length})'),
+                      IconButton(
+                        icon: const Icon(Icons.pie_chart),
+                        onPressed: () => _showDetailedSetAnalysis(context, sortedSets, totalCards),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  ...displaySets.map((set) {
+                    final percentage = (set.value / totalCards * 100);
+                    final index = displaySets.indexOf(set);
+                    final color = _getSetColor(index);
+                    
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  set.key,
+                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              Text(
+                                '${set.value} cards',
+                                style: TextStyle(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                          const SizedBox(height: 8),
+                          Stack(
+                            children: [
+                              Container(
+                                height: 6,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surfaceVariant,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                              TweenAnimationBuilder<double>(
+                                duration: Duration(milliseconds: 1000 + (index * 200)),
+                                curve: Curves.easeOutCubic,
+                                tween: Tween(begin: 0, end: percentage),
+                                builder: (context, value, child) => FractionallySizedBox(
+                                  widthFactor: value / 100,
+                                  child: Container(
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          color.withOpacity(0.7),
+                                          color,
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(3),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: color.withOpacity(0.2),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Text(
+                                '${percentage.toStringAsFixed(1)}%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: color,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  if (sortedSets.length > displaySets.length) ...[
+                    const SizedBox(height: 8),
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () => _showDetailedSetAnalysis(context, sortedSets, totalCards),
+                        icon: const Icon(Icons.analytics_outlined),
+                        label: Text('View All ${sortedSets.length} Sets'),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-          ),
-        ),
-        
-        // Premium lock overlay
-        if (!purchaseService.isPremium)
-          Positioned.fill(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () async {
-                  try {
-                    await purchaseService.purchasePremium();
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')),
-                      );
-                    }
-                  }
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.lock_outline,
-                        size: 48,
-                        color: colorScheme.primary,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Premium Feature',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Unlock detailed set analytics\nand more with Premium',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: colorScheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: () => purchaseService.purchasePremium(),
-                        icon: const Text('💎'),
-                        label: const Text('Upgrade Now'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
+          ] else
+            _buildPremiumOverlay(purchaseService),
+        ],
+      ),
     );
   }
 
-  void _showAllSets(
+  Color _getSetColor(int index) {
+    final colors = [
+      const Color(0xFF4CAF50),  // Green
+      const Color(0xFF2196F3),  // Blue
+      const Color(0xFFFFA726),  // Orange
+      const Color(0xFFE91E63),  // Pink
+      const Color(0xFF9C27B0),  // Purple
+      const Color(0xFF00BCD4),  // Cyan
+    ];
+    return colors[index % colors.length];
+  }
+
+  void _showDetailedSetAnalysis(
     BuildContext context,
     List<MapEntry<String, int>> sets,
-    List<Color> colors,
     int totalCards,
   ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
         minChildSize: 0.5,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Text(
-                    'All Sets',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                itemCount: sets.length,
-                itemBuilder: (context, index) {
-                  final entry = sets[index];
-                  final percentage = (entry.value / totalCards * 100).toStringAsFixed(1);
-                  return ListTile(
-                    leading: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: colors[index % colors.length],
-                        shape: BoxShape.circle,
+        builder: (context, controller) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              _buildDragHandle(),
+              Expanded(
+                child: CustomScrollView(
+                  controller: controller,
+                  slivers: [
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text(
+                          'Set Distribution Analysis',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                    title: Text(entry.key),
-                    trailing: Text(
-                      '${entry.value} (${percentage}%)',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    SliverPadding(
+                      padding: const EdgeInsets.all(20),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final set = sets[index];
+                            final percentage = (set.value / totalCards * 100);
+                            final color = _getSetColor(index);
+                            
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          set.key,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${set.value} cards (${percentage.toStringAsFixed(1)}%)',
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          childCount: sets.length,
+                        ),
+                      ),
                     ),
-                  );  // Add semicolon here
-                },
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1563,6 +1547,73 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildDragHandle() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Container(
+        width: 40,
+        height: 4,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPremiumOverlay(PurchaseService purchaseService) {
+    return Positioned.fill(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => purchaseService.purchasePremium(),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.bar_chart_rounded,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Premium Analytics',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Unlock detailed collection insights\nand advanced analytics',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () => purchaseService.purchasePremium(),
+                  icon: const Text('✨'),
+                  label: const Text('Upgrade to Premium'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
