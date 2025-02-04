@@ -171,7 +171,98 @@ Widget _buildLoadingState() {
   );
 }
 
-// Update _performSearch debug logging
+// Add helper method to detect set searches
+bool _isSetSearch(String query) {
+  // Check if query matches known set names
+  final allSets = [
+    ...searchCategories['vintage']!,
+    ...searchCategories['modern']!,
+  ];
+  
+  final normalizedQuery = query.toLowerCase().trim();
+  return allSets.any((set) => 
+    set['name']!.toLowerCase() == normalizedQuery ||
+    query.startsWith('set.id:') ||
+    query.startsWith('set:')
+  );
+}
+
+// Add helper method to get set ID from name
+String? _getSetIdFromName(String query) {
+  final normalizedQuery = query.toLowerCase().trim();
+  
+  // Check all set categories
+  final allSets = [
+    ...searchCategories['vintage']!,
+    ...searchCategories['modern']!,
+  ];
+  
+  // Try exact match first
+  final exactMatch = allSets.firstWhere(
+    (set) => set['name']!.toLowerCase() == normalizedQuery,
+    orElse: () => {'query': ''},
+  );
+  
+  if (exactMatch['query']?.isNotEmpty ?? false) {
+    return exactMatch['query'];
+  }
+
+  // Try contains match
+  final containsMatch = allSets.firstWhere(
+    (set) => set['name']!.toLowerCase().contains(normalizedQuery) ||
+            normalizedQuery.contains(set['name']!.toLowerCase()),
+    orElse: () => {'query': ''},
+  );
+
+  return containsMatch['query']?.isNotEmpty ?? false ? containsMatch['query'] : null;
+}
+
+// Update _buildSearchQuery method to fix null-safety issue
+String _buildSearchQuery(String query) {
+  // Check for exact set.id: prefix first
+  if (query.startsWith('set.id:')) {
+    return query;
+  }
+  
+  // Try to match set name
+  final setId = _getSetIdFromName(query);
+  if (setId != null) {
+    return setId;  // This will be in format 'set.id:xyz'
+  }
+  
+  // Check for number pattern
+  final numberMatch = RegExp(r'(\d+)(?:/\d+)?$').firstMatch(query);
+  if (numberMatch != null) {
+    final number = numberMatch.group(1)!;
+    final name = query.substring(0, numberMatch.start).trim();
+    
+    if (name.isNotEmpty) {
+      return 'name:"$name" number:"$number"';
+    } else {
+      return 'number:"$number"';
+    }
+  }
+  
+  // For non-number searches, check if it exactly matches a set name
+  final normalizedQuery = query.toLowerCase().trim();
+  final allSets = [
+    ...searchCategories['vintage']!,
+    ...searchCategories['modern']!,
+  ];
+  
+  final matchingSet = allSets.any((set) => 
+    set['name']!.toLowerCase() == normalizedQuery
+  );
+  
+  if (matchingSet) {
+    return 'set:"$query"';
+  }
+  
+  // Default to name search
+  return 'name:"*$query*"';
+}
+
+// Update _performSearch method to handle sort order correctly
 Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useOriginalQuery = false}) async {
   if (query.isEmpty) {
     setState(() {
@@ -204,29 +295,36 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
     
     String searchQuery;
     if (useOriginalQuery) {
-      // Use the query as-is for pagination
       searchQuery = query;
     } else {
-      // Only build search query for new searches
       searchQuery = query.startsWith('set.id:') ? query : _buildSearchQuery(query.trim());
       
-      // Set default sorting for set searches
-      if (searchQuery.startsWith('set.id:') && !isLoadingMore) {
+      // Only set default number sorting for new set searches if no explicit sort has been chosen
+      if (searchQuery.startsWith('set.id:') && !isLoadingMore && 
+          _currentSort == 'cardmarket.prices.averageSellPrice' && 
+          !_sortAscending) {  // Only apply default if no sort is actively selected
         _currentSort = 'number';
         _sortAscending = true;
       }
     }
 
-    print('Executing search with query: $searchQuery, page: $_currentPage');
+    print('Executing search with query: $searchQuery, sort: $_currentSort ${_sortAscending ? 'ASC' : 'DESC'}');
     
+    // Make sure orderByDesc is correctly set based on _sortAscending
     final results = await _apiService.searchCards(
       query: searchQuery,
       page: _currentPage,
       pageSize: 30,
       orderBy: _currentSort,
-      orderByDesc: !_sortAscending,
+      orderByDesc: !_sortAscending,  // This is correct, but let's add some debug logging
     );
-    
+
+    print('Search parameters:');
+    print('- Query: $searchQuery');
+    print('- Sort: $_currentSort');
+    print('- Ascending: $_sortAscending');
+    print('- OrderByDesc: ${!_sortAscending}');
+
     if (mounted) {
       List<dynamic> cardData = results['data'] as List? ?? [];
       final totalCount = results['totalCount'] as int? ?? 0;
@@ -280,7 +378,7 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
         // Save to recent searches
         if (!isLoadingMore && _searchHistory != null && newCards.isNotEmpty) {
           _searchHistory!.addSearch(
-            query,
+            _formatSearchForDisplay(query), // Use formatted query
             imageUrl: newCards[0].imageUrl,
           );
         }
@@ -315,26 +413,6 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
       }
     }
   }
-}
-
-// Add helper method for search query building
-String _buildSearchQuery(String query) {
-  // Check for number pattern (e.g., "pikachu 4", "4/123", "4")
-  final numberMatch = RegExp(r'(\d+)(?:/\d+)?$').firstMatch(query);
-  
-  if (numberMatch != null) {
-    final number = numberMatch.group(1)!;
-    final name = query.substring(0, numberMatch.start).trim();
-    
-    if (name.isNotEmpty) {
-      return 'name:"$name" number:"$number"';
-    } else {
-      return 'number:"$number"';
-    }
-  }
-  
-  // For non-number searches, use contains
-  return 'name:"*$query*"';
 }
 
 // Fix the _onSearchChanged method syntax
@@ -387,7 +465,7 @@ void _onSearchChanged(String query) {
         _sortAscending = false;
       }
 
-      print('Executing search with query: $query, sort: $_currentSort ${_sortAscending ? 'ASC' : 'DESC'}');
+      print('Executing search with query: $query, sort: $_currentSort ${_sortAscending ? 'ASC' : 'DESC'})');
 
       int retryCount = 0;
       Map<String, dynamic> results;
@@ -693,6 +771,32 @@ Widget _buildRecentSearches() {
   );
 }
 
+// Add helper method to format search for display
+String _formatSearchForDisplay(String query) {
+  // Remove technical prefixes and format for display
+  if (query.startsWith('set.id:')) {
+    // Find matching set name from categories
+    final allSets = [...searchCategories['vintage']!, ...searchCategories['modern']!];
+    final matchingSet = allSets.firstWhere(
+      (set) => set['query'] == query,
+      orElse: () => {'name': query.replaceAll('set.id:', '')},
+    );
+    return matchingSet['name']!;
+  }
+  
+  if (query.contains('subtypes:') || query.contains('rarity:')) {
+    // Find matching special category
+    final specials = searchCategories['special']!;
+    final matchingSpecial = specials.firstWhere(
+      (special) => special['query'] == query,
+      orElse: () => {'name': query},
+    );
+    return matchingSpecial['name']!;
+  }
+  
+  return query;
+}
+
   Widget _buildShimmerItem() {
     return Container(
       decoration: CardStyles.cardDecoration(context),
@@ -732,13 +836,13 @@ Widget _buildRecentSearches() {
               title: const Text('Price (High to Low)'),
               leading: const Icon(Icons.attach_money),
               selected: _currentSort == 'cardmarket.prices.averageSellPrice' && !_sortAscending,
-              onTap: () => _updateSort('cardmarket.prices.averageSellPrice', false),
+              onTap: () => _updateSort('cardmarket.prices.averageSellPrice', false),  // false for descending (high to low)
             ),
             ListTile(
               title: const Text('Price (Low to High)'),
               leading: const Icon(Icons.money_off),
               selected: _currentSort == 'cardmarket.prices.averageSellPrice' && _sortAscending,
-              onTap: () => _updateSort('cardmarket.prices.averageSellPrice', true),
+              onTap: () => _updateSort('cardmarket.prices.averageSellPrice', true),  // true for ascending (low to high)
             ),
             ListTile(
               title: const Text('Name (A to Z)'),
@@ -752,6 +856,19 @@ Widget _buildRecentSearches() {
               selected: _currentSort == 'name' && !_sortAscending,
               onTap: () => _updateSort('name', false),
             ),
+            const Divider(height: 1),
+            ListTile(
+              title: const Text('Set Number (Low to High)'),
+              leading: const Icon(Icons.format_list_numbered),
+              selected: _currentSort == 'number' && _sortAscending,
+              onTap: () => _updateSort('number', true),
+            ),
+            ListTile(
+              title: const Text('Set Number (High to Low)'),
+              leading: const Icon(Icons.format_list_numbered),
+              selected: _currentSort == 'number' && !_sortAscending,
+              onTap: () => _updateSort('number', false),
+            ),
           ],
         ),
       ),
@@ -759,6 +876,10 @@ Widget _buildRecentSearches() {
   }
 
   void _updateSort(String sortBy, bool ascending) {
+    print('Updating sort:');
+    print('- From: $_currentSort (ascending: $_sortAscending)');
+    print('- To: $sortBy (ascending: $ascending)');
+
     setState(() {
       _currentSort = sortBy;
       _sortAscending = ascending;
@@ -773,8 +894,10 @@ Widget _buildRecentSearches() {
 
     // Rerun search with new sort
     if (_lastQuery != null) {
+      print('Rerunning search with sort: $_currentSort (ascending: $_sortAscending)');
       _performSearch(_lastQuery!, useOriginalQuery: true);
     } else if (_searchController.text.isNotEmpty) {
+      print('Running new search with sort: $_currentSort (ascending: $_sortAscending)');
       _performSearch(_searchController.text);
     }
   }
@@ -1066,31 +1189,9 @@ Widget _buildRecentSearches() {
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        // Categories toggle
+        // Categories toggle - updated to use new header
         SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8), // Added bottom padding
-            child: Row(
-              children: [
-                Text(
-                  'Quick Searches',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onBackground,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: Icon(
-                    _showCategories ? Icons.expand_less : Icons.expand_more,
-                    size: 20,
-                  ),
-                  onPressed: () => setState(() => _showCategories = !_showCategories),
-                ),
-              ],
-            ),
-          ),
+          child: _buildQuickSearchesHeader(),
         ),
 
         // Categories section (collapsible)
@@ -1185,6 +1286,33 @@ Widget _buildRecentSearches() {
 
         // ...rest of existing content...
       ],
+    );
+  }
+
+  // Update quick searches header to be clickable
+  Widget _buildQuickSearchesHeader() {
+    return InkWell( // Wrap with InkWell
+      onTap: () => setState(() => _showCategories = !_showCategories),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(
+          children: [
+            Text(
+              'Quick Searches',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onBackground,
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              _showCategories ? Icons.expand_less : Icons.expand_more,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

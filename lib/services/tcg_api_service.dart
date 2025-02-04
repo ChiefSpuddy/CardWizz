@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' show min;  // Add this import
 import 'package:http/http.dart' as http;
 import 'package:dio/dio.dart';  // Add this import
 import '../models/tcg_card.dart';  // Add this import
@@ -143,33 +144,127 @@ class TcgApiService {
     return null;
   }
 
+  // Update searchCards to handle all sorting cases consistently
   Future<Map<String, dynamic>> searchCards({
-    String query = '',
+    required String query,
     int page = 1,
     int pageSize = 30,
     String orderBy = 'cardmarket.prices.averageSellPrice',
     bool orderByDesc = true,
   }) async {
-    final queryParams = {
-      'q': query,
-      'page': page.toString(),
-      'pageSize': pageSize.toString(),
-      'orderBy': orderBy,
-      'orderByDesc': orderByDesc.toString(),
-    };
-
     try {
-      print('API Query: $queryParams');
+      // Always get all pages for consistent sorting
+      final firstPageResponse = await _dio.get('/cards', queryParameters: {
+        'q': query,
+        'page': '1',
+        'pageSize': pageSize.toString(),
+        'select': 'id,name,number,images,set,rarity,cardmarket',
+      });
       
-      final response = await _dio.get('/cards', queryParameters: queryParams);
-      final data = response.data;
+      final totalCount = firstPageResponse.data['totalCount'] as int;
+      final totalPages = (totalCount / pageSize).ceil();
       
-      print('API Response: ${data['count']} cards found');
+      // Collect all cards
+      List<dynamic> allCards = [...(firstPageResponse.data['data'] as List)];
       
-      return data;
+      // Fetch remaining pages in parallel
+      if (totalPages > 1) {
+        final futures = <Future>[];
+        for (var p = 2; p <= totalPages; p++) {
+          futures.add(_dio.get('/cards', queryParameters: {
+            'q': query,
+            'page': p.toString(),
+            'pageSize': pageSize.toString(),
+            'select': 'id,name,number,images,set,rarity,cardmarket',
+          }));
+        }
+        
+        final responses = await Future.wait(futures);
+        for (final response in responses) {
+          allCards.addAll(response.data['data'] as List);
+        }
+      }
+
+      // Sort all cards based on criteria
+      allCards.sort((a, b) {
+        switch (orderBy) {
+          case 'cardmarket.prices.averageSellPrice':
+            final priceA = _extractPrice(a);
+            final priceB = _extractPrice(b);
+            
+            if (priceA == 0 && priceB > 0) return 1;
+            if (priceB == 0 && priceA > 0) return -1;
+            if (priceA == 0 && priceB == 0) return 0;
+            
+            return orderByDesc ? priceB.compareTo(priceA) : priceA.compareTo(priceB);
+          
+          case 'name':
+            final nameA = a['name'] as String;
+            final nameB = b['name'] as String;
+            return orderByDesc ? nameB.compareTo(nameA) : nameA.compareTo(nameB);
+          
+          case 'number':
+            // Convert numbers to integers for proper numeric sorting
+            final numA = int.tryParse(a['number'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+            final numB = int.tryParse(b['number'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+            return orderByDesc ? numB.compareTo(numA) : numA.compareTo(numB);
+          
+          default:
+            return 0;
+        }
+      });
+
+      // Return paginated result from sorted cards
+      final startIndex = (page - 1) * pageSize;
+      final endIndex = min(startIndex + pageSize, allCards.length);
+      final paginatedCards = allCards.sublist(startIndex, endIndex);
+
+      // Debug logging
+      print('\nSorted by: $orderBy (${orderByDesc ? 'DESC' : 'ASC'})');
+      print('First 5 results:');
+      for (var i = 0; i < min(5, paginatedCards.length); i++) {
+        final card = paginatedCards[i];
+        switch (orderBy) {
+          case 'cardmarket.prices.averageSellPrice':
+            print('[$i]: \$${_extractPrice(card).toStringAsFixed(2)}');
+            break;
+          case 'name':
+            print('[$i]: ${card['name']}');
+            break;
+          case 'number':
+            print('[$i]: ${card['number']}');
+            break;
+        }
+      }
+
+      return {
+        'data': paginatedCards,
+        'page': page,
+        'count': paginatedCards.length,
+        'totalCount': totalCount,
+      };
     } catch (e) {
       print('Error searching cards: $e');
       return {'data': [], 'count': 0, 'totalCount': 0};
+    }
+  }
+
+  // Add helper method to safely extract price
+  double _extractPrice(dynamic card) {
+    try {
+      final prices = card['cardmarket']?['prices'];
+      if (prices == null) return 0.0;
+      
+      // Try market price first, then average sell price
+      double? price = prices['averageSellPrice'];
+      if (price == null) {
+        price = prices['market'];
+      }
+      
+      return price?.toDouble() ?? 0.0;
+    } catch (e) {
+      print('Error extracting price: $e');
+      return 0.0;
     }
   }
 
