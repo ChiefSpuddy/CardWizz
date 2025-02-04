@@ -811,208 +811,159 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildPriceRangeDistribution(List<TcgCard> cards) {
-    final purchaseService = context.watch<PurchaseService>();
-    final localizations = AppLocalizations.of(context);
-    final currencyProvider = context.watch<CurrencyProvider>();
-    final colorScheme = Theme.of(context).colorScheme;
+  final purchaseService = context.watch<PurchaseService>();
+  final currencyProvider = context.watch<CurrencyProvider>();
+  final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Updated price ranges with more detail
-    final ranges = [
-      (0.0, 1.0, '< ${currencyProvider.symbol}1'),
-      (1.0, 5.0, '${currencyProvider.symbol}1-5'),
-      (5.0, 10.0, '${currencyProvider.symbol}5-10'),
-      (10.0, 25.0, '${currencyProvider.symbol}10-25'),
-      (25.0, 50.0, '${currencyProvider.symbol}25-50'),
-      (50.0, 100.0, '${currencyProvider.symbol}50-100'),
-      (100.0, 200.0, '${currencyProvider.symbol}100-200'),
-      (200.0, 500.0, '${currencyProvider.symbol}200-500'),
-      (500.0, double.infinity, '${currencyProvider.symbol}500+'),
-    ];
+  // Simplified price ranges
+  final ranges = [
+    (0.0, 1.0, 'Budget'),
+    (1.0, 5.0, 'Common'),
+    (5.0, 15.0, 'Uncommon'),
+    (15.0, 50.0, 'Rare'),
+    (50.0, 100.0, 'Super Rare'),
+    (100.0, double.infinity, 'Ultra Rare'),
+  ];
 
-    final distribution = List.filled(ranges.length, 0);
-    for (final card in cards) {
-      final price = card.price ?? 0;
-      for (var i = 0; i < ranges.length; i++) {
-        if (price >= ranges[i].$1 && price < ranges[i].$2) {
-          distribution[i]++;
-          break;
-        }
+  // Calculate distribution
+  final distribution = List.filled(ranges.length, 0);
+  for (final card in cards) {
+    final price = card.price ?? 0;
+    for (var i = 0; i < ranges.length; i++) {
+      if (price >= ranges[i].$1 && price < ranges[i].$2) {
+        distribution[i]++;
+        break;
       }
     }
+  }
 
-    return Stack(
+  final maxCount = distribution.reduce(max);
+
+  return Card(
+    child: Stack(
       children: [
-        Card(
-          child: ImageFiltered(
-            imageFilter: purchaseService.isPremium 
-                ? ImageFilter.blur(sigmaX: 0, sigmaY: 0)
-                : ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-            child: Opacity(
-              opacity: purchaseService.isPremium ? 1.0 : 0.7,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          localizations.translate('priceRange'),
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '${localizations.translate('total')}: ${cards.length} ${localizations.translate('cards')}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Price Distribution',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ...List.generate(ranges.length, (index) {
+                final count = distribution[index];
+                if (count == 0) return const SizedBox.shrink();
+
+                final percentage = count / cards.length * 100;
+                final range = ranges[index];
+                final color = [
+                  Colors.grey,
+                  Colors.green,
+                  Colors.blue,
+                  Colors.purple,
+                  Colors.orange,
+                  Colors.red,
+                ][index];
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              range.$3,
+                              style: const TextStyle(fontWeight: FontWeight.w500),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 240, // Increased height
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 8), // Add padding for labels
-                        child: BarChart(
-                          BarChartData(
-                            alignment: BarChartAlignment.spaceAround,
-                            maxY: distribution.reduce(max).toDouble(),
-                            barGroups: distribution.asMap().entries.map((entry) {
-                              return BarChartGroupData(
-                                x: entry.key,
-                                barRods: [
-                                  BarChartRodData(
-                                    toY: entry.value.toDouble(),
-                                    color: Theme.of(context).colorScheme.primary,
-                                    width: 20, // Slightly reduced width
-                                    borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(6)
+                          Expanded(
+                            child: Text(
+                              '$count cards',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                fontSize: 13,
+                              ),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    height: 8,
+                                    color: Theme.of(context).colorScheme.surfaceVariant,
+                                  ),
+                                  FractionallySizedBox(
+                                    widthFactor: count / maxCount,
+                                    child: Container(
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            color.withOpacity(0.7),
+                                            color,
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],
-                              );
-                            }).toList(),
-                            titlesData: FlTitlesData(
-                              leftTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  reservedSize: 40,
-                                  interval: 5,
-                                ),
-                              ),
-                              bottomTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  reservedSize: 40, // More space for labels
-                                  interval: 1,
-                                  getTitlesWidget: (value, _) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: Transform.rotate(
-                                        angle: -0.5, // Angle labels slightly
-                                        child: Text(
-                                          ranges[value.toInt()].$3,
-                                          style: const TextStyle(fontSize: 10),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              rightTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              topTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                            ),
-                            borderData: FlBorderData(show: false),
-                            gridData: FlGridData(
-                              show: true,
-                              drawVerticalLine: false,
-                              horizontalInterval: 5,
-                              getDrawingHorizontalLine: (value) => FlLine(
-                                color: Theme.of(context).dividerColor.withOpacity(0.2),
-                                strokeWidth: 1,
                               ),
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 48,
+                            child: Text(
+                              '${percentage.toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: color,
+                              ),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        
-        // Premium lock overlay
-        if (!purchaseService.isPremium)
-          Positioned.fill(
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () async {
-                  try {
-                    await purchaseService.purchasePremium();
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')),
-                      );
-                    }
-                  }
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.query_stats,
-                        size: 48,
-                        color: colorScheme.primary,
-                      ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 4),
                       Text(
-                        'Premium Feature',
+                        '${currencyProvider.symbol}${range.$1.toStringAsFixed(0)}'
+                        '${range.$2 < double.infinity ? ' - ${currencyProvider.symbol}${range.$2.toStringAsFixed(0)}' : '+'}',
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Unlock detailed price analytics\nand collection insights',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: colorScheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: () => purchaseService.purchasePremium(),
-                        icon: const Text('💎'),
-                        label: const Text('Upgrade Now'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-            ),
+                );
+              }),
+            ],
+          ),
+        ),
+        if (!purchaseService.isPremium)
+          Positioned.fill(
+            child: _buildPremiumOverlay(purchaseService),
           ),
       ],
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildTopMovers(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
