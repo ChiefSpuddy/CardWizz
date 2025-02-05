@@ -37,12 +37,17 @@ class _DexScreenState extends State<DexScreen> {
   String? _selectedGeneration;
   Map<String, int> _collectionCounts = {};
 
-  // Add generation ranges
+  // Update generation ranges
   final Map<String, (int, int)> _generations = {
     'Gen 1': (1, 151),
     'Gen 2': (152, 251),
     'Gen 3': (252, 386),
-    // Add more generations as needed
+    'Gen 4': (387, 493),
+    'Gen 5': (494, 649),
+    'Gen 6': (650, 721),
+    'Gen 7': (722, 809),
+    'Gen 8': (810, 905),
+    'Gen 9': (906, 1008),
   };
 
   // Add grid layout constants
@@ -53,6 +58,9 @@ class _DexScreenState extends State<DexScreen> {
   bool _isInitialized = false;
   StreamSubscription? _updateSubscription;
   bool _isRefreshing = false;
+
+  // Add viewport tracking
+  final _visibleItems = <String>{};
 
   @override
   void initState() {
@@ -229,8 +237,48 @@ class _DexScreenState extends State<DexScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels == _scrollController.position.maxScrollExtent) {
+    _checkVisibleItems();
+    // Load more when reaching 80% of the list
+    if (_scrollController.position.pixels >= 
+        _scrollController.position.maxScrollExtent * 0.8) {
       _loadMoreItems();
+    }
+  }
+
+  void _checkVisibleItems() {
+    if (!mounted) return;
+    
+    final RenderBox? gridBox = context.findRenderObject() as RenderBox?;
+    if (gridBox == null) return;
+
+    final viewport = gridBox.paintBounds;
+    final firstVisible = (_scrollController.position.pixels / gridBox.size.height * _gridCrossAxisCount).floor();
+    final lastVisible = (((_scrollController.position.pixels + viewport.height) / 
+        gridBox.size.height) * _gridCrossAxisCount).ceil();
+
+    final visibleRange = _getFilteredPokemon().sublist(
+      firstVisible.clamp(0, _allDexNames.length),
+      lastVisible.clamp(0, _allDexNames.length),
+    );
+
+    _visibleItems.clear();
+    _visibleItems.addAll(visibleRange);
+    
+    // Preload next batch of sprites
+    _preloadSprites(lastVisible, lastVisible + 20);
+  }
+
+  Future<void> _preloadSprites(int start, int end) async {
+    final pokemon = _getFilteredPokemon();
+    final validEnd = end.clamp(0, pokemon.length);
+    
+    for (var i = start; i < validEnd; i++) {
+      final name = pokemon[i];
+      final dexNumber = _namesService.getDexNumber(name);
+      final spriteUrl = _pokeApi.getSpriteUrl(dexNumber);
+      
+      // Preload sprite image
+      precacheImage(NetworkImage(spriteUrl), context);
     }
   }
 

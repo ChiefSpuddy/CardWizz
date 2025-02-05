@@ -1,6 +1,6 @@
 name: cardwizz
 description: A TCG card collection management app
-version: 1.0.0+2  # Increment either version or build number
+version: 1.0.0+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -43,6 +43,8 @@ dependencies:
   google_mlkit_text_recognition: ^0.8.1
   camera: ^0.10.5
   rxdart: ^0.27.7  # Add this line
+  flutter_cache_manager: ^3.3.1  # Add this for better image caching
+  palette_generator: ^0.3.3+3  # Add this for Pokemon type color extraction
 
 dev_dependencies:
   flutter_test:

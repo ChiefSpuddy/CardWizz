@@ -21,11 +21,24 @@ class DexNamesService {
     // Add more mappings as needed
   };
 
+  // Add generation boundaries for efficient loading
+  static const Map<int, (int, int)> _generationBoundaries = {
+    1: (1, 151),
+    2: (152, 251),
+    3: (252, 386),
+    4: (387, 493),
+    5: (494, 649),
+    6: (650, 721),
+    7: (722, 809),
+    8: (810, 905),
+    9: (906, 1008),
+  };
+
   Future<List<String>> loadDexNames() async {
     if (_isLoaded) return _dexMap.values.toList();
     try {
-      // Fetch first 386 Pokémon (Gen 1-3)
-      for (int i = 1; i <= 386; i++) {
+      // Fetch all Pokémon (Gen 1-9)
+      for (int i = 1; i <= 1008; i++) {
         final data = await _pokeApiService.fetchPokemon(i.toString());
         if (data != null) {
           _dexMap[i] = _capitalize(data['name']);
@@ -46,20 +59,21 @@ class DexNamesService {
     }
 
     try {
+      final batchSize = 50;  // Process in smaller batches
       final names = <String>[];
-      final futures = List.generate(
-        end - start + 1,
-        (i) => _pokeApiService.fetchBasicData((start + i).toString())
-      );
-
-      final results = await Future.wait(futures);
       
-      for (var i = 0; i < results.length; i++) {
-        final data = results[i];
-        if (data != null) {
-          final name = _formatPokemonName(data['name']); // Use new format method
-          names.add(name);
-          _dexMap[start + i] = name;  // Store in map for reverse lookup
+      for (var i = start; i <= end; i += batchSize) {
+        final batchEnd = (i + batchSize - 1).clamp(start, end);
+        final dexNumbers = List.generate(batchEnd - i + 1, (index) => i + index);
+        
+        final results = await _pokeApiService.fetchPokemonBatch(dexNumbers);
+        
+        for (final data in results) {
+          if (data != null) {
+            final name = _formatPokemonName(data['name']);
+            names.add(name);
+            _dexMap[i + names.length - 1] = name;
+          }
         }
       }
       
@@ -102,5 +116,10 @@ class DexNamesService {
       print('Error getting dex number for $pokemonName: $e');
       return 0;
     }
+  }
+
+  // Add method to get generation info
+  static (int, int)? getGenerationBoundaries(int genNumber) {
+    return _generationBoundaries[genNumber];
   }
 }

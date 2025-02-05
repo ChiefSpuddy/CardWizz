@@ -1,29 +1,68 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 class PokeApiService {
-  static const int _maxConcurrentRequests = 10;  // Increase for faster loading
+  static const int _maxConcurrentRequests = 20;  // Increased for better performance
   final Map<String, String> _spriteCache = {};
   final Map<String, Map<String, dynamic>> _pokemonCache = {};
+  final _cacheManager = DefaultCacheManager();
 
-  // Optimize sprite URL generation
+  // Optimize sprite URL handling with CDN
   String getSpriteUrl(int dexNum) {
     return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/$dexNum.png';
   }
 
-  // Batch fetch Pokemon data with concurrency limit
+  // Add efficient batch loading
   Future<List<Map<String, dynamic>>> fetchPokemonBatch(List<int> dexNumbers) async {
     final results = <Map<String, dynamic>>[];
+    final uncachedNumbers = dexNumbers.where(
+      (num) => !_pokemonCache.containsKey(num.toString())
+    ).toList();
     
-    // Process in smaller batches
-    for (var i = 0; i < dexNumbers.length; i += _maxConcurrentRequests) {
-      final batch = dexNumbers.skip(i).take(_maxConcurrentRequests);
-      final futures = batch.map((dexNum) => fetchBasicData(dexNum.toString()));
+    // Add cached results first
+    results.addAll(
+      dexNumbers
+          .where((num) => _pokemonCache.containsKey(num.toString()))
+          .map((num) => _pokemonCache[num.toString()]!)
+    );
+
+    // Process uncached in smaller batches
+    for (var i = 0; i < uncachedNumbers.length; i += _maxConcurrentRequests) {
+      final batch = uncachedNumbers.skip(i).take(_maxConcurrentRequests);
+      final futures = batch.map((dexNum) => _fetchAndCacheBasicData(dexNum.toString()));
       final responses = await Future.wait(futures);
       results.addAll(responses.whereType<Map<String, dynamic>>());
     }
     
     return results;
+  }
+
+  Future<Map<String, dynamic>?> _fetchAndCacheBasicData(String identifier) async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://pokeapi.co/api/v2/pokemon/$identifier'),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final result = {
+          'name': data['name'],
+          'sprite': getSpriteUrl(int.parse(identifier)),
+          'types': data['types'],
+          'stats': data['stats'],
+        };
+        _pokemonCache[identifier] = result;
+        
+        // Pre-cache sprite image
+        _cacheManager.downloadFile(result['sprite']);
+        
+        return result;
+      }
+    } catch (e) {
+      print('Error fetching Pokemon #$identifier: $e');
+    }
+    return null;
   }
 
   Future<Map<String, dynamic>?> fetchBasicData(String identifier) async {
