@@ -181,6 +181,18 @@ class AppDrawer extends StatelessWidget {
                         ),
                         _buildMenuItem(
                           context,
+                          icon: Icons.catching_pokemon_outlined,  // Add Dex menu item
+                          title: 'Dex',
+                          onTap: () => _navigateAndClose(context, AppRoutes.dex),
+                        ),
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.person_outline,  // Add Profile menu item
+                          title: 'Profile',
+                          onTap: () => _navigateAndClose(context, AppRoutes.profile),
+                        ),
+                        _buildMenuItem(
+                          context,
                           icon: Icons.search_outlined,
                           title: 'Search',
                           onTap: () => _navigateAndClose(context, '/search'),

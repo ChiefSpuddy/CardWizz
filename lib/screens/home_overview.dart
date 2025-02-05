@@ -123,6 +123,8 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 touchTooltipData: LineTouchTooltipData(
                   tooltipBgColor: Theme.of(context).colorScheme.surface,
                   tooltipRoundedRadius: 8,
+                  fitInsideHorizontally: true,  // Add this line
+                  fitInsideVertically: true,    // Add this line
                   getTooltipItems: (spots) {
                     return spots.map((spot) {
                       final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
@@ -136,6 +138,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                     }).toList();
                   },
                 ),
+                handleBuiltInTouches: true,
               ),
               gridData: FlGridData(
                 show: true,
