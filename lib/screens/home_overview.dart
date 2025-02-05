@@ -638,15 +638,6 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,  // Changed from start
                           children: [
-                            Text(
-                              localizations.translate('collectionValueTrend'),
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: -0.5,
-                                height: 1.2,
-                              ),
-                              textAlign: TextAlign.center,  // Add this
-                            ),
                             const SizedBox(height: 24),  // Adjusted spacing
                             _buildPriceChart(cards),
                           ],

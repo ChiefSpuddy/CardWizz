@@ -12,7 +12,7 @@ enum CollectionSortOption {
 }
 
 class SortProvider with ChangeNotifier {
-  CollectionSortOption _currentSort = CollectionSortOption.newest;
+  CollectionSortOption _currentSort = CollectionSortOption.valueHighLow;  // Changed from newest
 
   CollectionSortOption get currentSort => _currentSort;
 

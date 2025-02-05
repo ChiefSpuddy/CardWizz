@@ -76,8 +76,42 @@ class TcgApiService {
     '-set.releaseDate': 'Release Date (Oldest)',
   };
 
-  // Add these new maps for better set matching
-  static const Map<String, List<String>> setAliases = {
+  // Remove the first setAliases declaration and keep only this one
+  static const Map<String, String> setAliases = {
+    // Modern sets
+    'astral radiance': 'swsh10',
+    'brilliant stars': 'swsh9',
+    'steam siege': 'xy11',
+    'crown zenith': 'swsh12pt5',
+    'silver tempest': 'swsh12',
+    'temporal forces': 'sv3p5',
+    // XY series sets
+    'phantom forces': 'xy4',
+    'roaring skies': 'xy6',
+    'ancient origins': 'xy7',
+    'breakpoint': 'xy9',
+    'breakthrough': 'xy8',
+    'evolutions': 'xy12',
+    'fates collide': 'xy10',
+    'flashfire': 'xy2',
+    'furious fists': 'xy3',
+    'generations': 'g1',
+    'primal clash': 'xy5',
+    'hidden fates': 'sm115',
+    // Partial matches and alternative spellings
+    'prismatic': 'sve',
+    'paradox': 'sv4',
+    'obsidian': 'sv3',
+    'paldea': 'sv2',
+    'scarlet': 'sv1',
+    'steam seige': 'xy11',  // Common misspelling
+    'astral': 'swsh10',     // Partial match
+    'brilliant': 'swsh9',   // Partial match
+    'hidden fate': 'sm115', // Singular form
+  };
+
+  // Replace the old list-based setAliases with a new setNameVariants map
+  static const Map<String, List<String>> setNameVariants = {
     'sv8.5': ['Prismatic Evolution', 'Prismatic', 'Evolution'],
     'sv8': ['Surging Sparks', 'Surging', 'Sparks'],
     'sv7': ['Stellar Crown', 'Stellar', 'Crown'],
@@ -87,6 +121,178 @@ class TcgApiService {
     'sv3': ['Obsidian Flames', 'Obsidian', 'Flames'],
     'sv3p5': ['Temporal Forces', 'Temporal', 'Forces'],
     'sv2': ['Paldea Evolved', 'Paldea', 'Evolved'],
+  };
+
+  static const Map<String, String> setIdMap = {
+    'team rocket returns': 'ex7',
+    'lost origin': 'swsh11',
+    'vivid voltage': 'swsh4',
+    'astral radiance': 'swsh10',
+    'brilliant stars': 'swsh9',
+    'steam siege': 'xy11',
+    'crown zenith': 'swsh12pt5',
+    'silver tempest': 'swsh12',
+    'temporal forces': 'sv3p5',
+    'paradox rift': 'sv4',
+    'obsidian flames': 'sv3',
+    'paldea evolved': 'sv2',
+  };
+
+  static const Map<String, String> allSetIds = {
+    // Sword & Shield Era
+    'fusion strike': 'swsh8',
+    'brilliant stars': 'swsh9',
+    'astral radiance': 'swsh10',
+    'pokemon go expansion': 'pgo',  // Changed key to avoid duplicate
+    'lost origin': 'swsh11',
+    'silver tempest': 'swsh12',
+    'crown zenith': 'swsh12pt5',
+    'celebrations': 'cel25',
+    'evolving skies': 'swsh7',
+    'chilling reign': 'swsh6',
+    'battle styles': 'swsh5',
+    'shining fates': 'swsh45',
+    'vivid voltage': 'swsh4',
+    'champions path': 'swsh35',
+    'darkness ablaze': 'swsh3',
+    'rebel clash': 'swsh2',
+    'sword & shield base': 'swsh1',
+    
+    // Scarlet & Violet Era
+    'paldean fates': 'sv5',
+    'temporal forces': 'sv3p5',
+    'paradox rift': 'sv4',
+    'obsidian flames': 'sv3',
+    '151': 'sv3pt5',
+    'paldea evolved': 'sv2',
+    'scarlet & violet base': 'sv1',
+    
+    // Sun & Moon Era
+    'cosmic eclipse': 'sm12',
+    'hidden fates': 'sm115',
+    'unified minds': 'sm11',
+    'unbroken bonds': 'sm10',
+    'team up': 'sm9',
+    'lost thunder': 'sm8',
+    'dragon majesty': 'sm75',
+    'celestial storm': 'sm7',
+    'forbidden light': 'sm6',
+    'ultra prism': 'sm5',
+    'crimson invasion': 'sm4',
+    'shining legends': 'sm35',
+    'burning shadows': 'sm3',
+    'guardians rising': 'sm2',
+    'sun & moon base': 'sm1',
+    
+    // XY Era
+    'evolutions': 'xy12',
+    'steam siege': 'xy11',
+    'fates collide': 'xy10',
+    'generations': 'g1',
+    'breakpoint': 'xy9',
+    'breakthrough': 'xy8',
+    'ancient origins': 'xy7',
+    'roaring skies': 'xy6',
+    'primal clash': 'xy5',
+    'phantom forces': 'xy4',
+    'furious fists': 'xy3',
+    'flashfire': 'xy2',
+    'xy base set': 'xy1',
+    
+    // Black & White Era
+    'legendary treasures': 'bw11',
+    'plasma blast': 'bw10',
+    'plasma freeze': 'bw9',
+    'plasma storm': 'bw8',
+    'boundaries crossed': 'bw7',
+    'dragons exalted': 'bw6',
+    'dark explorers': 'bw5',
+    'next destinies': 'bw4',
+    'noble victories': 'bw3',
+    'emerging powers': 'bw2',
+    'black & white base': 'bw1',
+    
+    // HeartGold SoulSilver Era
+    'call of legends': 'col',
+    'triumphant': 'hgss4',
+    'undaunted': 'hgss3',
+    'unleashed': 'hgss2',
+    'heartgold soulsilver': 'hgss1',
+    
+    // Platinum Era
+    'arceus': 'pl4',
+    'supreme victors': 'pl3',
+    'rising rivals': 'pl2',
+    'platinum base': 'pl1',
+    
+    // Diamond & Pearl Era
+    'stormfront': 'dp7',
+    'legends awakened': 'dp6',
+    'majestic dawn': 'dp5',
+    'great encounters': 'dp4',
+    'secret wonders': 'dp3',
+    'mysterious treasures': 'dp2',
+    'diamond & pearl base': 'dp1',
+    
+    // EX Series
+    'power keepers': 'ex16',
+    'dragon frontiers': 'ex15',
+    'crystal guardians': 'ex14',
+    'holon phantoms': 'ex13',
+    'legend maker': 'ex12',
+    'delta species': 'ex11',
+    'unseen forces': 'ex10',
+    'emerald': 'ex9',
+    'deoxys': 'ex8',
+    'team rocket returns': 'ex7',
+    'fire red & leaf green': 'ex6',
+    'hidden legends': 'ex5',
+    'team magma vs team aqua': 'ex4',
+    'dragon': 'ex3',
+    'sandstorm': 'ex2',
+    'ruby & sapphire': 'ex1',
+    
+    // E-Card Series
+    'skyridge': 'ecard3',
+    'aquapolis': 'ecard2',
+    'expedition': 'ecard1',
+    
+    // Neo Series
+    'neo destiny': 'neo4',
+    'neo revelation': 'neo3',
+    'neo discovery': 'neo2',
+    'neo genesis': 'neo1',
+    
+    // Gym Series
+    'gym challenge': 'gym2',
+    'gym heroes': 'gym1',
+    
+    // Base Set Era
+    'legendary collection': 'base6',
+    'team rocket': 'base5',
+    'base set 2': 'base4',
+    'fossil': 'base3',
+    'jungle': 'base2',
+    'base set': 'base1',
+    
+    // Special Sets & Promos
+    'pokemon go series': 'pgo',  // Changed key to be more specific
+    'celebrations classic': 'cel25c',
+    'shining fates subset': 'swsh45sv',
+    'champions path promos': 'swsh35',
+    'detective pikachu': 'det1',
+    'dragon vault': 'dv1',
+    'double crisis': 'dc1',
+    'radiant collection': 'rc1',
+    'pop series promos': 'pop1',
+    'southern islands': 'si1',
+    'black star promos': 'bsp',
+    
+    // Special search mappings
+    'delta': 'subtypes:"delta species"',
+    'ancient': 'subtypes:ancient',
+    'trainer gallery': 'subtypes:"trainer gallery"',
+    'shining': 'subtypes:shining',
   };
 
   final _headers = {
@@ -121,30 +327,113 @@ class TcgApiService {
   String? _getSetIdFromName(String query) {
     query = query.trim().toLowerCase();
     
-    // First try exact match from setSearchQueries
-    for (final entry in setSearchQueries.entries) {
-      if (entry.key.toLowerCase() == query) {
-        return entry.value.replaceAll('set.id:', '');
+    // First try direct match from setAliases
+    if (setAliases.containsKey(query)) {
+      return setAliases[query];
+    }
+
+    // Then try name variants
+    for (final entry in setNameVariants.entries) {
+      final variants = entry.value.map((v) => v.toLowerCase()).toList();
+      if (variants.contains(query)) {
+        return entry.key;
       }
     }
 
-    // Then try aliases and partial matches
+    // Finally try partial matches from setAliases
     for (final entry in setAliases.entries) {
-      final aliases = entry.value.map((e) => e.toLowerCase()).toList();
-      // Check if query matches any alias completely
-      if (aliases.contains(query)) {
-        return entry.key;
-      }
-      // Check if query is part of any alias
-      for (final alias in aliases) {
-        if (alias.contains(query) || query.contains(alias)) {
-          return entry.key;
-        }
+      if (entry.key.contains(query) || query.contains(entry.key)) {
+        return entry.value;
       }
     }
 
     return null;
   }
+
+  static const Map<String, String> specialSearches = {
+    'delta': 'nationalPokedexNumbers:[1 TO 999] subtypes:"delta species"',
+    'delta species': 'nationalPokedexNumbers:[1 TO 999] subtypes:"delta species"',
+    'ancient': 'subtypes:ancient',
+    'trainer gallery': 'subtypes:"Trainer Gallery"',
+    'gold': 'rarity:"Rare Secret"',
+    'rainbow': 'rarity:"Rare Rainbow"',
+  };
+
+  String _processSearchQuery(String query) {
+    final normalizedQuery = query.toLowerCase().trim();
+    
+    // Check for special searches first
+    if (specialSearches.containsKey(normalizedQuery)) {
+      print('Found special search: ${specialSearches[normalizedQuery]}');
+      return specialSearches[normalizedQuery]!;
+    }
+
+    // Already formatted query
+    if (normalizedQuery.startsWith('set.id:') || 
+        normalizedQuery.startsWith('subtypes:') ||
+        normalizedQuery.startsWith('nationalPokedexNumbers:')) {
+      return normalizedQuery;
+    }
+
+    // Try exact set match first
+    String? setId = allSetIds[normalizedQuery];
+    if (setId != null) {
+      // Check if this is a special search query
+      if (setId.startsWith('subtypes:')) {
+        return setId;
+      }
+      print('Found exact set match: $setId for query: $query');
+      return 'set.id:$setId';
+    }
+
+    // Try variations if no exact match
+    if (setId == null) {
+      // Try removing special characters and spaces
+      final simplifiedQuery = normalizedQuery
+          .replaceAll(RegExp(r'[^a-z0-9]'), '')
+          .replaceAll('and', '&');
+          
+      for (final entry in allSetIds.entries) {
+        final simplifiedKey = entry.key
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '')
+            .replaceAll('and', '&');
+            
+        if (simplifiedKey == simplifiedQuery ||
+            simplifiedKey.contains(simplifiedQuery) ||
+            simplifiedQuery.contains(simplifiedKey)) {
+          setId = entry.value;
+          break;
+        }
+      }
+    }
+
+    // Return formatted query based on type
+    if (setId != null) {
+      if (setId.startsWith('subtypes:')) {
+        return setId;
+      }
+      return 'set.id:$setId';
+    }
+
+    // Default to name search
+    print('No set match found, using name search for: $query');
+    return 'name:"$query"';
+  }
+
+  static const Map<String, String> setQueries = {
+    'furious fists': 'set.id:xy3',
+    'breakpoint': 'set.id:xy9',
+    'fates collide': 'set.id:xy10',
+    'flashfire': 'set.id:xy2',
+    'phantom forces': 'set.id:xy4',
+    'roaring skies': 'set.id:xy6',
+    'ancient origins': 'set.id:xy7',
+    'breakthrough': 'set.id:xy8',
+    'steam siege': 'set.id:xy11',
+    'evolutions': 'set.id:xy12',
+    // Add more mappings as needed
+  };
 
   // Update searchCards to handle all sorting cases consistently
   Future<Map<String, dynamic>> searchCards({
@@ -155,99 +444,39 @@ class TcgApiService {
     bool orderByDesc = true,
   }) async {
     try {
-      // Always get all pages for consistent sorting
-      final firstPageResponse = await _dio.get('/cards', queryParameters: {
-        'q': query,
-        'page': '1',
+      final processedQuery = _processSearchQuery(query);
+      print('Processing query: "$query" -> "$processedQuery"');
+
+      // Use .select parameter to include all necessary fields
+      final queryParams = {
+        'q': processedQuery,
+        'page': page.toString(),
         'pageSize': pageSize.toString(),
-        'select': 'id,name,number,images,set,rarity,cardmarket',
-      });
-      
-      final totalCount = firstPageResponse.data['totalCount'] as int;
-      final totalPages = (totalCount / pageSize).ceil();
-      
-      // Collect all cards
-      List<dynamic> allCards = [...(firstPageResponse.data['data'] as List)];
-      
-      // Fetch remaining pages in parallel
-      if (totalPages > 1) {
-        final futures = <Future>[];
-        for (var p = 2; p <= totalPages; p++) {
-          futures.add(_dio.get('/cards', queryParameters: {
-            'q': query,
-            'page': p.toString(),
-            'pageSize': pageSize.toString(),
-            'select': 'id,name,number,images,set,rarity,cardmarket',
-          }));
-        }
-        
-        final responses = await Future.wait(futures);
-        for (final response in responses) {
-          allCards.addAll(response.data['data'] as List);
-        }
-      }
-
-      // Sort all cards based on criteria
-      allCards.sort((a, b) {
-        switch (orderBy) {
-          case 'cardmarket.prices.averageSellPrice':
-            final priceA = _extractPrice(a);
-            final priceB = _extractPrice(b);
-            
-            if (priceA == 0 && priceB > 0) return 1;
-            if (priceB == 0 && priceA > 0) return -1;
-            if (priceA == 0 && priceB == 0) return 0;
-            
-            return orderByDesc ? priceB.compareTo(priceA) : priceA.compareTo(priceB);
-          
-          case 'name':
-            final nameA = a['name'] as String;
-            final nameB = b['name'] as String;
-            return orderByDesc ? nameB.compareTo(nameA) : nameA.compareTo(nameB);
-          
-          case 'number':
-            // Convert numbers to integers for proper numeric sorting
-            final numA = int.tryParse(a['number'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-            final numB = int.tryParse(b['number'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-            return orderByDesc ? numB.compareTo(numA) : numA.compareTo(numB);
-          
-          default:
-            return 0;
-        }
-      });
-
-      // Return paginated result from sorted cards
-      final startIndex = (page - 1) * pageSize;
-      final endIndex = min(startIndex + pageSize, allCards.length);
-      final paginatedCards = allCards.sublist(startIndex, endIndex);
-
-      // Debug logging
-      print('\nSorted by: $orderBy (${orderByDesc ? 'DESC' : 'ASC'})');
-      print('First 5 results:');
-      for (var i = 0; i < min(5, paginatedCards.length); i++) {
-        final card = paginatedCards[i];
-        switch (orderBy) {
-          case 'cardmarket.prices.averageSellPrice':
-            print('[$i]: \$${_extractPrice(card).toStringAsFixed(2)}');
-            break;
-          case 'name':
-            print('[$i]: ${card['name']}');
-            break;
-          case 'number':
-            print('[$i]: ${card['number']}');
-            break;
-        }
-      }
-
-      return {
-        'data': paginatedCards,
-        'page': page,
-        'count': paginatedCards.length,
-        'totalCount': totalCount,
+        'orderBy': orderByDesc ? '-$orderBy' : orderBy,
+        'select': 'id,name,number,images,set,rarity,subtypes,nationalPokedexNumber,cardmarket',
       };
+
+      print('Making API request with query: $processedQuery');
+      
+      final response = await _dio.get('/cards', 
+        queryParameters: queryParams,
+        options: Options(validateStatus: (status) => status != null && status < 500),
+      );
+      
+      if (response.statusCode == 400) {
+        print('Search failed with invalid query: $processedQuery');
+        return {'data': [], 'totalCount': 0, 'page': page};
+      }
+      
+      return {
+        'data': response.data['data'] ?? [],
+        'totalCount': response.data['totalCount'] ?? 0,
+        'page': page,
+      };
+
     } catch (e) {
-      print('Error searching cards: $e');
-      return {'data': [], 'count': 0, 'totalCount': 0};
+      print('Search error: $e');
+      return {'data': [], 'totalCount': 0, 'page': page};
     }
   }
 

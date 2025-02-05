@@ -3,13 +3,28 @@ class SearchTerms {
     SearchCategory(
       name: 'Latest Sets',
       searches: [
-        'Paradox Rift',
-        'Obsidian Flames',
-        'Paldea Evolved',
-        '151',
-        'Scarlet & Violet',
+        'set.id:swsh10',  // Astral Radiance
+        'set.id:swsh9',   // Brilliant Stars
+        'set.id:xy11',    // Steam Siege
+        'set.id:sv4',     // Paradox Rift
+        'set.id:sv3',     // Obsidian Flames
+        'set.id:sv2',     // Paldea Evolved
+        'set.id:sv5',     // 151
+        'set.id:sv1',     // Scarlet & Violet
       ],
       icon: 'set',
+    ),
+    SearchCategory(
+      name: 'Classic Sets',
+      searches: [
+        'set.id:base1',  // Base Set
+        'set.id:base2',  // Jungle
+        'set.id:base3',  // Fossil
+        'set.id:base5',  // Team Rocket
+        'set.id:gym1',   // Gym Heroes
+        'set.id:gym2',   // Gym Challenge
+      ],
+      icon: 'classic',
     ),
     SearchCategory(
       name: 'Special Cards',

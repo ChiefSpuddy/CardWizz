@@ -19,13 +19,22 @@ class SearchFilters extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          ...PokemonSets.rarityFilters.map((filter) => Padding(
+          Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
-              label: Text(filter['name']!),
-              selected: selectedFilter == filter['code'],
-              onSelected: (_) => onFilterSelected(filter['code']!),
-              avatar: Text(filter['icon']!),
+              label: const Text('All Sets'),
+              selected: selectedFilter == null,
+              onSelected: (_) => onFilterSelected(''),
+              avatar: const Text('🔍'),
+            ),
+          ),
+          ...PokemonSets.setQueries.entries.map((entry) => Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(entry.key),
+              selected: selectedFilter == entry.value['query'],
+              onSelected: (_) => onFilterSelected(entry.value['query']!),
+              avatar: Text(entry.value['icon']!),
             ),
           )),
         ],

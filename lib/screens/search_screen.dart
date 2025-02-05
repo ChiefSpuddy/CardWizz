@@ -670,50 +670,52 @@ Widget _buildRecentSearches() {
   if (searches.isEmpty) return const SizedBox.shrink();
 
   return Padding(
-    padding: const EdgeInsets.fromLTRB(16, 24, 16, 32), // Added vertical padding
+    padding: const EdgeInsets.only(top: 24, bottom: 32),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(
-              Icons.history,
-              size: 18,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Recent Searches',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onBackground,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(
+                Icons.history,
+                size: 18,
+                color: Theme.of(context).colorScheme.primary,
               ),
-            ),
-            const Spacer(),
-            TextButton(
-              onPressed: () {
-                _searchHistory?.clearHistory();
-                setState(() {});
-              },
-              child: Text(
-                'Clear',
+              const SizedBox(width: 8),
+              Text(
+                'Recent Searches',
                 style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onBackground,
                 ),
               ),
-            ),
-          ],
+              const Spacer(),
+              TextButton(
+                onPressed: () {
+                  _searchHistory?.clearHistory();
+                  setState(() {});
+                },
+                child: Text(
+                  'Clear',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 8),
-        Card(
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.2),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.symmetric(
+              horizontal: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.2),
+              ),
             ),
           ),
           child: ListView.separated(
@@ -729,22 +731,22 @@ Widget _buildRecentSearches() {
             itemBuilder: (context, index) {
               final search = searches[index];
               return ListTile(
-                contentPadding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                contentPadding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
                 visualDensity: VisualDensity.compact,
-                leading: Container(
-                  width: 32,
-                  height: 45,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(6),
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    width: 32,
+                    height: 45,
                     color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                    child: search['imageUrl'] != null
+                        ? Image.network(
+                            search['imageUrl']!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.search, size: 16),
+                          )
+                        : const Icon(Icons.search, size: 16),
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: search['imageUrl'] != null
-                      ? Image.network(
-                          search['imageUrl']!,
-                          fit: BoxFit.cover,
-                        )
-                      : const Icon(Icons.search, size: 16),
                 ),
                 title: Text(
                   search['query']!,
@@ -1083,18 +1085,23 @@ String _formatSearchForDisplay(String query) {
             toolbarHeight: 56, // Reduced height
             backgroundColor: Theme.of(context).colorScheme.surface,
             elevation: 0,
+            leadingWidth: 72, // Increase this to create more space
             leading: Padding(
-              padding: const EdgeInsets.all(8),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: IconButton(
-                  icon: const Icon(Icons.camera_alt_outlined, size: 20),
-                  onPressed: () => Navigator.pushNamed(context, '/scanner'),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8), // Adjust padding to move icon right
+              child: Material(
+                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => Navigator.pushNamed(context, '/scanner'),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.camera_alt_outlined,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),

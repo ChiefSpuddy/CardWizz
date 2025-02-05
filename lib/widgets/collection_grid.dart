@@ -9,6 +9,7 @@ import '../models/custom_collection.dart';
 import '../providers/app_state.dart';
 import '../widgets/sign_in_button.dart';
 import '../utils/notification_manager.dart';
+import '../providers/sort_provider.dart';
 
 class CollectionGrid extends StatefulWidget {
   final bool keepAlive;  // Add this
@@ -414,8 +415,36 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
         }
 
         final cards = snapshot.data ?? [];
+        final sortOption = context.watch<SortProvider>().currentSort;
+    
+        // Sort the cards based on selected option
+        final sortedCards = List<TcgCard>.from(cards);
+        switch (sortOption) {
+          case CollectionSortOption.nameAZ:
+            sortedCards.sort((a, b) => a.name.compareTo(b.name));
+            break;
+          case CollectionSortOption.nameZA:
+            sortedCards.sort((a, b) => b.name.compareTo(a.name));
+            break;
+          case CollectionSortOption.valueHighLow:
+            sortedCards.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
+            break;
+          case CollectionSortOption.valueLowHigh:
+            sortedCards.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
+            break;
+          case CollectionSortOption.newest:
+            sortedCards.sort((a, b) => (b.addedToCollection ?? DateTime.now())
+                .compareTo(a.addedToCollection ?? DateTime.now()));
+            break;
+          case CollectionSortOption.oldest:
+            sortedCards.sort((a, b) => (a.addedToCollection ?? DateTime.now())
+                .compareTo(b.addedToCollection ?? DateTime.now()));
+            break;
+          default:
+            break;
+        }
 
-        if (cards.isEmpty) {
+        if (sortedCards.isEmpty) {
           return const Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -446,9 +475,9 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
               ),
-              itemCount: cards.length,
+              itemCount: sortedCards.length,  // Use sortedCards instead of cards
               itemBuilder: (context, index) {
-                final card = cards[index];
+                final card = sortedCards[index];  // Use sortedCards instead of cards
                 final isSelected = _selectedCards.contains(card.id);
                 
                 return GestureDetector(

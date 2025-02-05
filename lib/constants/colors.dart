@@ -22,6 +22,20 @@ class AppColors {
   static final pokemonTileCollectedDark = Color(0xFF1B3726);  // Dark green for dark mode
   static final pokemonTileUncollectedDark = Color(0xFF2A2A2A);  // Dark surface color
 
+  // Add card rarity colors
+  static const rarityColors = {
+    'Common': Color(0xFF808080),
+    'Uncommon': Color(0xFF1E88E5),
+    'Rare': Color(0xFFFFD700),
+    'Rare Holo': Color(0xFFFFB74D),
+    'Rare Ultra': Color(0xFFE65100),
+    'Rare Secret': Color(0xFFD81B60),
+    'Rare Rainbow': Color(0xFFE91E63),
+    'Rare Shining': Color(0xFF9C27B0),
+    'Amazing Rare': Color(0xFF673AB7),
+    'Promo': Color(0xFF4CAF50),
+  };
+
   // Gradients
   static const primaryGradient = LinearGradient(
     colors: [Color(0xFF6366F1), Color(0xFF818CF8)],

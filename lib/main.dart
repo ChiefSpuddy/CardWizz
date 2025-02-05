@@ -20,6 +20,7 @@ import 'screens/card_details_screen.dart';
 import 'models/tcg_card.dart';  // Add this import
 import 'services/collection_service.dart';  // Add this import
 import 'screens/home_screen.dart'; // Add this import
+import 'providers/sort_provider.dart';  // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +52,10 @@ void main() async {
         Provider<TcgApiService>(create: (_) => TcgApiService()),
         ChangeNotifierProvider<CurrencyProvider>(
           create: (_) => CurrencyProvider(),
+        ),
+        // Add this provider
+        ChangeNotifierProvider(
+          create: (_) => SortProvider(),
         ),
       ],
       child: const CardWizzApp(),  // Remove the Builder widget
