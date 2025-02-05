@@ -8,6 +8,7 @@ import '../widgets/card_grid_item.dart';
 import '../screens/card_details_screen.dart';  // Add this import
 import '../providers/currency_provider.dart';  // Add this import
 import '../widgets/animated_background.dart';  // Add this import
+import '../screens/home_screen.dart';  // Add this import
 
 class CustomCollectionDetailScreen extends StatefulWidget {
   final CustomCollection collection;
@@ -256,6 +257,53 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
                       'Add cards from your collection',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      height: 46,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(23),
+                        gradient: LinearGradient(
+                          colors: Theme.of(context).brightness == Brightness.dark ? [
+                            Colors.blue[700]!,
+                            Colors.blue[900]!,
+                          ] : [
+                            Theme.of(context).colorScheme.primary,
+                            Theme.of(context).colorScheme.secondary,
+                          ],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).popUntil((route) => route.isFirst);
+                          final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                          if (homeState != null) {
+                            homeState.setSelectedIndex(1); // 1 is the index for Collection tab
+                          }
+                        },
+                        icon: const Icon(Icons.style, color: Colors.white),
+                        label: const Text(
+                          'Go to Collection',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                        ),
                       ),
                     ),
                   ],

@@ -19,6 +19,7 @@ import 'screens/add_to_collection_screen.dart';
 import 'screens/card_details_screen.dart';
 import 'models/tcg_card.dart';  // Add this import
 import 'services/collection_service.dart';  // Add this import
+import 'screens/home_screen.dart'; // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -185,6 +186,7 @@ class CardWizzApp extends StatelessWidget {
             '/add-to-collection': (context) => AddToCollectionScreen(
               card: ModalRoute.of(context)!.settings.arguments as TcgCard,
             ),
+            '/home': (context) => const HomeScreen(),  // Remove initialTab parameter
           },
           onGenerateRoute: (settings) {
             if (settings.name == '/card-details') {

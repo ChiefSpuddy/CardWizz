@@ -152,14 +152,21 @@ class CollectionService {
       whereArgs: [_currentUserId],
     );
     
-    final collections = maps.map((map) => CustomCollection(
-      id: map['id'] as String,
-      name: map['name'] as String,
-      description: map['description'] as String? ?? '',
-      cardIds: map['card_ids'].toString().split(',').where((id) => id.isNotEmpty).toList(),
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
-      color: Color(map['color'] as int? ?? 0xFF90CAF9),  // Add color here
-    )).toList();
+    final collections = maps.map((map) {
+      final cardIdsStr = map['card_ids'] as String?;
+      final cardIds = cardIdsStr == null || cardIdsStr.isEmpty 
+          ? <String>[]
+          : cardIdsStr.split(',').where((id) => id.isNotEmpty).toList();
+      
+      return CustomCollection(
+        id: map['id'] as String,
+        name: map['name'] as String,
+        description: map['description'] as String? ?? '',
+        cardIds: cardIds,
+        createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
+        color: Color(map['color'] as int? ?? 0xFF90CAF9),
+      );
+    }).toList();
 
     // Add value calculation
     final enrichedCollections = await Future.wait(
@@ -169,7 +176,6 @@ class CollectionService {
       }),
     );
 
-    // Use provided sort option or default to newest
     return sortCollections(enrichedCollections, sortOption ?? CollectionSortOption.newest);
   }
 
@@ -220,7 +226,9 @@ class CollectionService {
       id: map['id'] as String,
       name: map['name'] as String,
       description: map['description'] as String? ?? '',
-      cardIds: map['card_ids'].toString().split(',').where((id) => id.isNotEmpty).toList(),
+      cardIds: (map['card_ids'] as String?)?.split(',')
+          .where((id) => id.isNotEmpty)
+          .toList() ?? [],
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       color: Color(map['color'] as int? ?? 0xFF90CAF9),
     );
@@ -316,14 +324,18 @@ class CollectionService {
     
     final collection = await getCollection(collectionId);
     if (collection != null) {
-      final updatedCardIds = [...collection.cardIds, cardId];
-      await _db.update(
-        'collections',
-        {'card_ids': updatedCardIds.join(',')},
-        where: 'id = ? AND user_id = ?',
-        whereArgs: [collectionId, _currentUserId],
-      );
-      await _refreshCollections();
+      final currentIds = collection.cardIds;
+      if (!currentIds.contains(cardId)) {
+        final updatedCardIds = [...currentIds, cardId];
+        
+        await _db.update(
+          'collections',
+          {'card_ids': updatedCardIds.join(',')},
+          where: 'id = ? AND user_id = ?',
+          whereArgs: [collectionId, _currentUserId],
+        );
+        await _refreshCollections();
+      }
     }
   }
 

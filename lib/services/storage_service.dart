@@ -153,16 +153,8 @@ class StorageService {
       return Stream.value([]);
     }
     
-    // Use throttleTime instead of debounceTime for better performance
-    return _cardsController.stream
-        .throttleTime(const Duration(milliseconds: 100))
-        .distinct((previous, next) {
-          if (previous.length != next.length) return false;
-          for (var i = 0; i < previous.length; i++) {
-            if (previous[i].id != next[i].id) return false;
-          }
-          return true;
-        });
+    final cards = _getCards();
+    return _cardsController.stream.startWith(cards);
   }
 
   Future<void> refreshCards() async {
@@ -174,67 +166,23 @@ class StorageService {
     if (_currentUserId == null) return [];
     
     final cardsKey = _getUserKey('cards');
-    print('Getting cards with key: $cardsKey');
-    
     final cardsJson = _prefs.getStringList(cardsKey) ?? [];
-    print('Found ${cardsJson.length} cards in storage');
     
-    try {
-      return cardsJson.map((json) {
-        try {
-          if (json.isEmpty) {
-            print('Empty JSON string found');
+    final cards = cardsJson
+        .where((json) => json.isNotEmpty)
+        .map((json) {
+          try {
+            final data = jsonDecode(json);
+            return TcgCard.fromJson(data);
+          } catch (e) {
             return null;
           }
-          
-          final dynamic decoded = jsonDecode(json);
-          if (decoded == null) {
-            print('Null JSON data found');
-            return null;
-          }
-          
-          if (decoded is! Map<String, dynamic>) {
-            print('Invalid JSON format: $decoded');
-            return null;
-          }
-          
-          // Validate required fields
-          if (decoded['id'] == null || decoded['name'] == null) {
-            print('Missing required fields in card data: $decoded');
-            return null;
-          }
-          
-          // Ensure all string fields are actually strings
-          final sanitizedData = Map<String, dynamic>.fromEntries(
-            decoded.entries.map((e) {
-              if (e.value == null && (
-                  e.key == 'id' || 
-                  e.key == 'name' || 
-                  e.key == 'imageUrl' ||
-                  e.key == 'setName' ||
-                  e.key == 'number'
-                )) {
-                return MapEntry(e.key, '');  // Convert null to empty string for required string fields
-              }
-              return e;
-            }),
-          );
-          
-          return TcgCard.fromJson(sanitizedData);
-        } catch (e, stack) {
-          print('Error parsing card JSON: $e');
-          print('JSON data: $json');
-          print('Stack trace: $stack');
-          return null;
-        }
-      })
-      .where((card) => card != null)
-      .cast<TcgCard>()
-      .toList();
-    } catch (e) {
-      print('Error loading cards: $e');
-      return [];
-    }
+        })
+        .where((card) => card != null)
+        .cast<TcgCard>()
+        .toList();
+    
+    return cards;
   }
 
   // Keep async public method

@@ -139,9 +139,9 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final cards = widget.cards;
-    final binderCards = cards.where(
-      (card) => widget.collection.cardIds.contains(card.id)
+    // Match cards by ID
+    final binderCards = widget.cards.where(
+      (card) => widget.collection.cardIds.contains(card.id.trim())
     ).toList();
     
     final currencyProvider = context.watch<CurrencyProvider>();
@@ -455,8 +455,9 @@ class _CustomCollectionsGridState extends State<CustomCollectionsGrid> with Auto
         return StreamBuilder<List<TcgCard>>(
           stream: Provider.of<StorageService>(context).watchCards(),
           builder: (context, cardsSnapshot) {
-            final cards = cardsSnapshot.data ?? [];
-
+            final allCards = cardsSnapshot.data ?? [];
+            print('DEBUG: Total available cards: ${allCards.length}');
+            
             return GridView.builder(
               padding: const EdgeInsets.all(16),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -468,19 +469,20 @@ class _CustomCollectionsGridState extends State<CustomCollectionsGrid> with Auto
               itemCount: sortedCollections.length,
               itemBuilder: (context, index) {
                 final collection = sortedCollections[index];
-                final binderCards = cards.where(
-                  (card) => collection.cardIds.contains(card.id)
-                ).toList();
-
+                
+                print('DEBUG: Collection ${collection.name} has IDs: ${collection.cardIds.join(', ')}');
+                
                 return BinderCard(
                   collection: collection,
-                  cards: binderCards,
+                  cards: allCards,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => CustomCollectionDetailScreen(
                         collection: collection,
-                        initialCards: binderCards,
+                        initialCards: allCards.where(
+                          (card) => collection.cardIds.contains(card.id.trim())
+                        ).toList(),
                       ),
                     ),
                   ),
