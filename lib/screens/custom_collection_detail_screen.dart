@@ -7,13 +7,16 @@ import '../services/storage_service.dart';
 import '../widgets/card_grid_item.dart';
 import '../screens/card_details_screen.dart';  // Add this import
 import '../providers/currency_provider.dart';  // Add this import
+import '../widgets/animated_background.dart';  // Add this import
 
 class CustomCollectionDetailScreen extends StatefulWidget {
   final CustomCollection collection;
+  final List<TcgCard>? initialCards;  // Add this
 
   const CustomCollectionDetailScreen({
     super.key,
     required this.collection,
+    this.initialCards,  // Add this
   });
 
   @override
@@ -23,7 +26,9 @@ class CustomCollectionDetailScreen extends StatefulWidget {
 class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScreen> {
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
+  List<TcgCard>? _cards;  // Add this field
 
+  // Add binder colors
   final List<Color> _binderColors = [
     const Color(0xFF90CAF9),  // Light Blue
     const Color(0xFFF48FB1),  // Pink
@@ -38,6 +43,7 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
     super.initState();
     _nameController = TextEditingController(text: widget.collection.name);
     _descriptionController = TextEditingController(text: widget.collection.description);
+    _cards = widget.initialCards;  // Initialize cards from widget parameter
   }
 
   @override
@@ -217,73 +223,78 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
           ),
         ],
       ),
-      body: StreamBuilder<List<TcgCard>>(
-        stream: Provider.of<StorageService>(context).watchCards(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: AnimatedBackground(  // Wrap the body with AnimatedBackground
+        child: StreamBuilder<List<TcgCard>>(
+          stream: Provider.of<StorageService>(context).watchCards(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData && _cards == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          final allCards = snapshot.data!;
-          final collectionCards = allCards
-              .where((card) => widget.collection.cardIds.contains(card.id))
-              .toList();
+            final allCards = snapshot.data ?? [];
+            _cards ??= allCards.where(
+              (card) => widget.collection.cardIds.contains(card.id)
+            ).toList();
 
-          if (collectionCards.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.style_outlined,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'This binder is empty',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Add cards from your collection',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+            if (_cards!.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.style_outlined,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.secondary,
                     ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return GridView.builder(
-            padding: const EdgeInsets.all(8),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 0.7,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: collectionCards.length,
-            itemBuilder: (context, index) {
-              final card = collectionCards[index];
-              return CardGridItem(
-                card: card,
-                onTap: () => _showCardDetails(context, card),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'This binder is empty',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add cards from your collection',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               );
-            },
-          );
-        },
+            }
+
+            return GridView.builder(
+              padding: const EdgeInsets.all(8),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                childAspectRatio: 0.7,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: _cards!.length,
+              itemBuilder: (context, index) {
+                final card = _cards![index];
+                return CardGridItem(
+                  card: card,
+                  onTap: () => _showCardDetails(context, card),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
 
   void _showCardDetails(BuildContext context, TcgCard card) {
-    // Implement card details navigation
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CardDetailsScreen(card: card),
+        builder: (context) => CardDetailsScreen(
+          card: card,
+          heroContext: 'binder_${widget.collection.id}',  // Make hero tag unique
+          isFromBinder: true,  // Always true when viewing from binder
+        ),
       ),
     );
   }

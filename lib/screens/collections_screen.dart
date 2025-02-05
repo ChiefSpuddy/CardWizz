@@ -85,7 +85,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
           Expanded(
             child: InkWell(
               onTap: () {
-                if (_pageController.hasClients) {  // Add this check
+                if (_pageController.hasClients) {
                   _pageController.animateToPage(
                     0,
                     duration: const Duration(milliseconds: 300),
@@ -137,7 +137,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
           Expanded(
             child: InkWell(
               onTap: () {
-                if (_pageController.hasClients) {  // Add this check
+                if (_pageController.hasClients) {
                   _pageController.animateToPage(
                     1,
                     duration: const Duration(milliseconds: 300),
@@ -431,25 +431,14 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
       body: AnimatedBackground(
         child: !isSignedIn
             ? const SignInView()
-            : StreamBuilder<List<TcgCard>>(
-                stream: Provider.of<StorageService>(context).watchCards(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final cards = snapshot.data!;
-                  
-                  // Remove empty state check - always show collection
-                  return PageView(
-                    controller: _pageController,
-                    onPageChanged: _onPageChanged,
-                    children: const [
-                      CollectionGrid(),
-                      CustomCollectionsGrid(),
-                    ],
-                  );
-                },
+            : PageView(
+                controller: _pageController,
+                onPageChanged: _onPageChanged,
+                physics: const ClampingScrollPhysics(),
+                children: const [
+                  CollectionGrid(key: PageStorageKey('main_collection')),
+                  CustomCollectionsGrid(key: PageStorageKey('custom_collections')),
+                ],
               ),
       ),
       floatingActionButton: isSignedIn && _showCustomCollections

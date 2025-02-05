@@ -9,8 +9,7 @@ class HeroTags {
   static String cardImage(String cardId, {
     required String context,
   }) {
-    final key = '${context}_$cardId';
-    return _tagCache.putIfAbsent(key, () => '${key}_${DateTime.now().microsecondsSinceEpoch}');
+    return 'card_${cardId}_${context}';  // Add context to make tag unique
   }
   
   static String cardName(String cardId, {String? context}) {

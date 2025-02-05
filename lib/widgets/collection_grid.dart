@@ -11,15 +11,23 @@ import '../widgets/sign_in_button.dart';
 import '../utils/notification_manager.dart';
 
 class CollectionGrid extends StatefulWidget {
-  const CollectionGrid({super.key});
+  final bool keepAlive;  // Add this
+
+  const CollectionGrid({
+    super.key,
+    this.keepAlive = false,  // Add this
+  });
 
   @override
-  _CollectionGridState createState() => _CollectionGridState();
+  State<CollectionGrid> createState() => _CollectionGridState();
 }
 
-class _CollectionGridState extends State<CollectionGrid> {
+class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAliveClientMixin {
   final Set<String> _selectedCards = {};
   bool _isMultiSelectMode = false;
+
+  @override
+  bool get wantKeepAlive => true;  // Keep the state alive
 
   void _toggleCardSelection(String cardId) {
     setState(() {
@@ -200,7 +208,11 @@ class _CollectionGridState extends State<CollectionGrid> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CardDetailsScreen(card: card),
+        builder: (context) => CardDetailsScreen(
+          card: card,
+          heroContext: 'collection',
+          isFromCollection: true,  // Add this parameter
+        ),
       ),
     );
   }
@@ -357,6 +369,8 @@ class _CollectionGridState extends State<CollectionGrid> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);  // Required for AutomaticKeepAliveClientMixin
+
     final appState = context.watch<AppState>();
     final storage = Provider.of<StorageService>(context);
     

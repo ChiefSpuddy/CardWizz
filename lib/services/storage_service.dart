@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';  // Add this for ValueNotifier
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/tcg_card.dart';
@@ -106,10 +107,14 @@ class StorageService {
     print('Cleared current user, data remains in storage for: $currentId');
   }
 
+  final _isReadyNotifier = ValueNotifier<bool>(false);
+  ValueNotifier<bool> get isReady => _isReadyNotifier;
+
   Future<void> _init() async {
     if (!_isInitialized) {
       _prefs = await SharedPreferences.getInstance();
       _isInitialized = true;
+      _isReadyNotifier.value = true;  // Add this
       _loadInitialData();
     }
   }
@@ -530,6 +535,7 @@ class StorageService {
   // Remove the await from dispose since dispose is synchronous
   @override
   void dispose() {
+    _isReadyNotifier.dispose();  // Add this
     _cardsController.close();
     _cardChangeController.close();
     backgroundService?.dispose();

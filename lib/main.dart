@@ -18,9 +18,13 @@ import 'services/scanner_service.dart';
 import 'screens/add_to_collection_screen.dart';
 import 'screens/card_details_screen.dart';
 import 'models/tcg_card.dart';  // Add this import
+import 'services/collection_service.dart';  // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  final collectionService = await CollectionService.getInstance();
+  await collectionService.initializeLastUser(); // Add this line
 
   final purchaseService = PurchaseService();
   await purchaseService.initialize();

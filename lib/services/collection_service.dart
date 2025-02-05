@@ -71,6 +71,14 @@ class CollectionService {
     print('Setting collection service user: $userId');
     _currentUserId = userId;
     
+    // Save user ID to SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    if (userId != null) {
+      await prefs.setString('current_user_id', userId);
+    } else {
+      await prefs.remove('current_user_id');
+    }
+    
     // If signing out, don't clear collections from database
     if (userId == null) {
       _collectionsController.add([]);
@@ -97,6 +105,15 @@ class CollectionService {
 
     // Refresh collections after migration
     await _refreshCollections();
+  }
+
+  // Add this method to initialize user on app start
+  Future<void> initializeLastUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUserId = prefs.getString('current_user_id');
+    if (savedUserId != null) {
+      await setCurrentUser(savedUserId);
+    }
   }
 
   Future<void> clearUserData() async {

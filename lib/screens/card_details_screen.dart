@@ -11,6 +11,8 @@ import '../utils/hero_tags.dart';  // Add this import
 import '../services/analytics_service.dart';  // Add this import
 import '../services/ebay_api_service.dart';  // Add this import
 import 'package:cached_network_image/cached_network_image.dart';  // Add this import if not present
+import '../services/collection_service.dart';  // Add this import
+import '../widgets/create_collection_sheet.dart';  // Add this import
 
 extension StringExtension on String {
   String capitalize() {
@@ -22,11 +24,15 @@ extension StringExtension on String {
 class CardDetailsScreen extends StatefulWidget {
   final TcgCard card;
   final String heroContext;  // Add this parameter
+  final bool isFromBinder;  // Add this parameter
+  final bool isFromCollection;  // Add this parameter
 
   const CardDetailsScreen({
     super.key,
     required this.card,
     this.heroContext = 'details',  // Default value
+    this.isFromBinder = false,  // Add default value
+    this.isFromCollection = false,  // Add default value
   });
 
   @override
@@ -38,6 +44,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
   final _cardKey = GlobalKey();
   final _apiService = TcgApiService();
   final _ebayService = EbayApiService();  // Add this
+  late final StorageService _storage;  // Add this field
   bool _isLoading = true;
   Map<String, dynamic>? _additionalData;
   List<Map<String, dynamic>>? _recentSales;  // Add this
@@ -45,6 +52,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
   @override
   void initState() {
     super.initState();
+    _storage = Provider.of<StorageService>(context, listen: false);
     _wobbleController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -1078,6 +1086,157 @@ Widget _buildPricingSection() {
     }
   }
 
+  Future<void> _showAddToBinderDialog(BuildContext context) async {
+    final service = await CollectionService.getInstance();
+    final collections = await service.getCustomCollections();
+    
+    if (collections.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('No Binders'),
+          content: const Text('Create a binder first to add cards to it.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _showCreateBinderDialog(context);
+              },
+              child: const Text('Create Binder'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Add to Binder',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: collections.length,
+                itemBuilder: (context, index) {
+                  final collection = collections[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: collection.color,
+                      child: const Icon(Icons.collections_bookmark, color: Colors.white),
+                    ),
+                    title: Text(collection.name),
+                    subtitle: Text('${collection.cardIds.length} cards'),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await service.addCardToCollection(collection.id, widget.card.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Added to ${collection.name}')),
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showCreateBinderDialog(context);
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Create New Binder'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCreateBinderDialog(BuildContext context) async {
+    final service = await CollectionService.getInstance();
+    final nameController = TextEditingController();
+    Color selectedColor = Colors.blue;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create New Binder'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Binder Name'),
+              autofocus: true,
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Colors.blue,
+                Colors.green,
+                Colors.red,
+                Colors.purple,
+                Colors.orange,
+                Colors.teal,
+              ].map((color) => InkWell(
+                onTap: () => setState(() => selectedColor = color),
+                child: CircleAvatar(
+                  backgroundColor: color,
+                  child: selectedColor == color ? const Icon(Icons.check, color: Colors.white) : null,
+                ),
+              )).toList(),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true && nameController.text.isNotEmpty && context.mounted) {
+      await service.createCustomCollection(
+        nameController.text,
+        '',
+        color: selectedColor,
+      );
+      // After creating, show the binder selection dialog again
+      if (context.mounted) {
+        _showAddToBinderDialog(context);
+      }
+    }
+
+    nameController.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1214,36 +1373,75 @@ Widget _buildPricingSection() {
           ),
         ),
       ),
-      floatingActionButton: Container(
-        height: 46, // Reduced height
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(23),
-          gradient: LinearGradient(
-            colors: [
-              Theme.of(context).primaryColor,
-              Theme.of(context).colorScheme.secondary,
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Theme.of(context).primaryColor.withOpacity(0.4),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
+      floatingActionButton: FutureBuilder<CollectionService>(
+        future: CollectionService.getInstance(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const SizedBox.shrink();
+          
+          return StreamBuilder<List<TcgCard>>(
+            stream: _storage.watchCards(),
+            builder: (context, cardsSnapshot) {
+              // If we're viewing from collection or binder, show "Add to Binder"
+              if (widget.isFromCollection || widget.isFromBinder) {
+                return _buildFAB(
+                  icon: Icons.collections_bookmark,
+                  label: 'Add to Binder',
+                  onPressed: () => _showAddToBinderDialog(context),
+                );
+              }
+
+              // Otherwise check if card is in collection
+              final isInCollection = cardsSnapshot.data?.any(
+                (c) => c.id == widget.card.id
+              ) ?? false;
+
+              return _buildFAB(
+                icon: isInCollection ? Icons.collections_bookmark : Icons.add,
+                label: isInCollection ? 'Add to Binder' : 'Add to Collection',
+                onPressed: isInCollection 
+                  ? () => _showAddToBinderDialog(context)
+                  : () => _addToCollection(context),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFAB({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(23),
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).primaryColor,
+            Theme.of(context).colorScheme.secondary,
           ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
         ),
-        child: FloatingActionButton.extended(
-          onPressed: () => _addToCollection(context),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          icon: const Icon(Icons.add_to_photos, size: 20), // Smaller icon
-          label: const Text(
-            'Add to Collection',
-            style: TextStyle(fontSize: 14), // Smaller text
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).primaryColor.withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
-          heroTag: null, // Add this to prevent hero animation conflicts
+        ],
+      ),
+      child: FloatingActionButton.extended(
+        onPressed: onPressed,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        icon: Icon(icon, size: 20),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 14),
         ),
       ),
     );
