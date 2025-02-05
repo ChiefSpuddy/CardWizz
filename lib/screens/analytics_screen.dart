@@ -396,7 +396,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16), // Reduced horizontal padding from 16 to 8
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -506,10 +506,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     LineChartBarData(
                       spots: chartSpots,
                       isCurved: true,
-                      curveSmoothness: 0.35,
-                      preventCurveOverShooting: true,
+                      curveSmoothness: 0.5, // Increased from 0.35
+                      preventCurveOverShooting: false, // Changed to false to allow smoother curves
                       color: Colors.green.shade600,
-                      barWidth: 2,
+                      barWidth: 2.5, // Slightly increased for better visibility
                       dotData: FlDotData(
                         show: true,
                         getDotPainter: (spot, percent, bar, index) {
@@ -1320,7 +1320,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       slivers: [
                         SliverToBoxAdapter(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            padding: const EdgeInsets.symmetric(horizontal: 8), // Reduced from 16
                             child: Column(
                               children: [
                                 _buildValueSummary(cards),

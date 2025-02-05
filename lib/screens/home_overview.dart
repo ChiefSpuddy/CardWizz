@@ -201,10 +201,10 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 LineChartBarData(
                   spots: chartSpots,
                   isCurved: true,
-                  curveSmoothness: 0.35,
-                  preventCurveOverShooting: true,
+                  curveSmoothness: 0.5, // Increased from 0.35
+                  preventCurveOverShooting: false, // Changed to false to allow smoother curves
                   color: Colors.green.shade600,
-                  barWidth: 2,
+                  barWidth: 2.5, // Slightly increased for better visibility
                   dotData: FlDotData(
                     show: true,
                     getDotPainter: (spot, percent, bar, index) {
