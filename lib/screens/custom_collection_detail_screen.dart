@@ -9,6 +9,7 @@ import '../screens/card_details_screen.dart';  // Add this import
 import '../providers/currency_provider.dart';  // Add this import
 import '../widgets/animated_background.dart';  // Add this import
 import '../screens/home_screen.dart';  // Add this import
+import '../screens/collections_screen.dart';  // Add this import
 
 class CustomCollectionDetailScreen extends StatefulWidget {
   final CustomCollection collection;
@@ -57,74 +58,114 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
   Future<void> _editDetails() async {
     final service = await CollectionService.getInstance();
     Color selectedColor = widget.collection.color;
+
+    // Use the same color palette as create binder dialog
+    final binderColors = const [
+      // Blues
+      Color(0xFF90CAF9),
+      Color(0xFF42A5F5),
+      Color(0xFF1976D2),
+      // Greens
+      Color(0xFF81C784),
+      Color(0xFF66BB6A),
+      Color(0xFF388E3C),
+      // Oranges & Yellows
+      Color(0xFFFFB74D),
+      Color(0xFFFFA726),
+      Color(0xFFFBC02D),
+      // Reds & Pinks
+      Color(0xFFE57373),
+      Color(0xFFF06292),
+      Color(0xFFEC407A),
+      // Purples
+      Color(0xFFBA68C8),
+      Color(0xFF9575CD),
+      Color(0xFF7E57C2),
+      // Others
+      Color(0xFF4DB6AC),
+      Color(0xFF26A69A),
+      Color(0xFF78909C),
+    ];
     
     final result = await showDialog<(bool, Color)>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
           title: const Text('Edit Binder'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-              ),
-              TextField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Description'),
-              ),
-              const SizedBox(height: 16),
-              const Text('Binder Color'),
-              const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: _binderColors.map((color) => 
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: InkWell(
-                        onTap: () {
-                          setState(() => selectedColor = color);
-                        },
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                ),
+                TextField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                ),
+                const SizedBox(height: 24),
+                const Text('Binder Color'),
+                const SizedBox(height: 16),
+                Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.25,
+                  ),
+                  child: GridView.builder(
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 6,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: binderColors.length,
+                    itemBuilder: (context, index) {
+                      final color = binderColors[index];
+                      final isSelected = selectedColor == color;
+                      final isLightColor = ThemeData.estimateBrightnessForColor(color) == Brightness.light;
+
+                      return GestureDetector(
+                        onTap: () => setState(() => selectedColor = color),
                         child: Container(
-                          width: 42,
-                          height: 42,
                           decoration: BoxDecoration(
                             color: color,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: color == selectedColor
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.transparent,
-                              width: 2,
+                              color: isSelected ? Colors.white : Colors.transparent,
+                              width: 3,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: color.withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                          child: color == selectedColor
-                            ? Icon(
-                                Icons.check,
-                                color: ThemeData.estimateBrightnessForColor(color) == Brightness.light
-                                  ? Colors.black
-                                  : Colors.white,
-                              )
-                            : null,
+                          child: isSelected
+                              ? Icon(
+                                  Icons.check,
+                                  color: isLightColor ? Colors.black87 : Colors.white,
+                                  size: 20,
+                                )
+                              : null,
                         ),
-                      ),
-                    ),
-                  ).toList(),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
-              child: const Text('Cancel'),
               onPressed: () => Navigator.pop(context, (false, selectedColor)),
+              child: const Text('Cancel'),
             ),
-            TextButton(
-              child: const Text('Save'),
+            FilledButton(
               onPressed: () => Navigator.pop(context, (true, selectedColor)),
+              child: const Text('Save'),
             ),
           ],
         ),
@@ -284,9 +325,18 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
                       child: ElevatedButton.icon(
                         onPressed: () {
                           Navigator.of(context).popUntil((route) => route.isFirst);
-                          final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                          if (homeState != null) {
-                            homeState.setSelectedIndex(1); // 1 is the index for Collection tab
+                          if (mounted) {
+                            // First find HomeScreenState to switch to collections tab
+                            final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                            if (homeState != null) {
+                              homeState.setSelectedIndex(1);
+                            }
+                            // Then find CollectionsScreen to toggle view
+                            final collectionsScreen = context.findRootAncestorStateOfType<CollectionsScreenState>();
+                            if (collectionsScreen != null) {
+                              collectionsScreen.showCustomCollections = false;
+                            }
+                            Navigator.popUntil(context, (route) => route.isFirst);
                           }
                         },
                         icon: const Icon(Icons.style, color: Colors.white),

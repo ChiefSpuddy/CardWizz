@@ -9,6 +9,7 @@ import '../models/custom_collection.dart';  // Add this
 import '../widgets/collection_grid.dart';
 import '../widgets/custom_collections_grid.dart';
 import '../widgets/create_collection_sheet.dart';
+import '../widgets/create_binder_dialog.dart';  // Add this import
 import 'analytics_screen.dart';
 import 'home_screen.dart';
 import 'custom_collection_detail_screen.dart';  // Add this
@@ -271,6 +272,107 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
     }
   }
 
+  Future<void> _showCreateBinderDialog(BuildContext context) async {
+    final success = await showDialog<bool>(
+      context: context,
+      builder: (context) => const CreateBinderDialog(),
+      useSafeArea: true,
+    );
+
+    if (success == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 2),
+          backgroundColor: Theme.of(context).colorScheme.secondary,
+          behavior: SnackBarBehavior.floating,
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+            left: 16,
+            right: 16,
+          ),
+          content: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Binder Created',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'Add cards to get started',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildCreateBinderButton(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      height: 46, // Smaller height
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(23),
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).primaryColor,
+            Theme.of(context).colorScheme.secondary,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).primaryColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: FloatingActionButton.extended(
+        onPressed: () => _showCreateBinderDialog(context),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        icon: const Icon(Icons.add, size: 20),
+        label: const Text(
+          'Create New Binder',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -431,7 +533,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
       body: AnimatedBackground(
         child: !isSignedIn
             ? const SignInView()
-            : PageView(
+            : PageView(  // Remove Stack and just use PageView directly
                 controller: _pageController,
                 onPageChanged: _onPageChanged,
                 physics: const ClampingScrollPhysics(),
@@ -441,46 +543,47 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
                 ],
               ),
       ),
-      floatingActionButton: isSignedIn && _showCustomCollections
-          ? Container(
-              height: 46, // Smaller height
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(23),
-                gradient: LinearGradient(
-                  colors: isDark ? [
-                    Colors.blue[900]!,
-                    Colors.blue[800]!,
-                  ] : [
-                    Theme.of(context).colorScheme.primary,
-                    Theme.of(context).colorScheme.secondary,
+      floatingActionButton: AnimatedSwitcher(  // Add this block
+        duration: const Duration(milliseconds: 300),
+        child: _showCustomCollections
+            ? Container(
+                key: const ValueKey('create_binder_fab'),
+                height: 46,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(23),
+                  gradient: LinearGradient(
+                    colors: isDark ? [
+                      Colors.blue[900]!,
+                      Colors.blue[800]!,
+                    ] : [
+                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.secondary,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context).primaryColor.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
                   ],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: FloatingActionButton.extended(
-                onPressed: () => _createCollection(context),
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                extendedPadding: const EdgeInsets.symmetric(horizontal: 20),
-                icon: const Icon(Icons.add, size: 20), // Smaller icon
-                label: const Text(
-                  'New Binder',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                child: FloatingActionButton.extended(
+                  onPressed: () => _showCreateBinderDialog(context),
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  icon: const Icon(Icons.add, size: 20),
+                  label: const Text(
+                    'Create New Binder',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-            )
-          : null,
+              )
+            : null,
+      ),
     );
   }
 }

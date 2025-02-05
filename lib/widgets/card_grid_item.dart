@@ -33,8 +33,45 @@ class _CardGridItemState extends State<CardGridItem> {
       await storage.addCard(widget.card);
       
       if (!context.mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars(); // Clear any existing SnackBars
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Card added to collection')),
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(
+                Icons.check_circle_outline,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Added ${widget.card.name} to collection',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2), // Reduced from default 4 seconds
+          backgroundColor: Theme.of(context).colorScheme.secondary,
+          margin: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+            left: 16,
+            right: 16,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 4,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+        ),
       );
     } catch (e) {
       if (!context.mounted) return;

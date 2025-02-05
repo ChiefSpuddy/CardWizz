@@ -13,6 +13,8 @@ import '../services/ebay_api_service.dart';  // Add this import
 import 'package:cached_network_image/cached_network_image.dart';  // Add this import if not present
 import '../services/collection_service.dart';  // Add this import
 import '../widgets/create_collection_sheet.dart';  // Add this import
+import '../widgets/create_binder_dialog.dart';  // Add this import
+import '../screens/custom_collection_detail_screen.dart';  // Add this import
 
 extension StringExtension on String {
   String capitalize() {
@@ -1154,17 +1156,48 @@ Widget _buildPricingSection() {
               ),
             ),
             const SizedBox(height: 16),
-            SizedBox(
+            Container(
               width: double.infinity,
+              height: 50,  // Fixed height
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).primaryColor,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).primaryColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
               child: TextButton.icon(
                 onPressed: () {
                   Navigator.pop(context);
                   _showCreateBinderDialog(context);
                 },
-                icon: const Icon(Icons.add),
-                label: const Text('Create New Binder'),
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: Text(
+                  'Create New Binder',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                ),
               ),
             ),
+            const SizedBox(height: 8),  // Add bottom padding
           ],
         ),
       ),
@@ -1172,69 +1205,45 @@ Widget _buildPricingSection() {
   }
 
   Future<void> _showCreateBinderDialog(BuildContext context) async {
-    final service = await CollectionService.getInstance();
-    final nameController = TextEditingController();
-    Color selectedColor = Colors.blue;
-
-    final result = await showDialog<bool>(
+    final collectionId = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create New Binder'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Binder Name'),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Colors.blue,
-                Colors.green,
-                Colors.red,
-                Colors.purple,
-                Colors.orange,
-                Colors.teal,
-              ].map((color) => InkWell(
-                onTap: () => setState(() => selectedColor = color),
-                child: CircleAvatar(
-                  backgroundColor: color,
-                  child: selectedColor == color ? const Icon(Icons.check, color: Colors.white) : null,
-                ),
-              )).toList(),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Create'),
-          ),
-        ],
+      builder: (context) => CreateBinderDialog(
+        cardToAdd: widget.card.id,  // Pass the card ID
       ),
     );
 
-    if (result == true && nameController.text.isNotEmpty && context.mounted) {
-      await service.createCustomCollection(
-        nameController.text,
-        '',
-        color: selectedColor,
-      );
-      // After creating, show the binder selection dialog again
-      if (context.mounted) {
-        _showAddToBinderDialog(context);
+    if (collectionId != null && context.mounted) {
+      final service = await CollectionService.getInstance();
+      final collection = await service.getCollection(collectionId);
+      
+      // First close the "Add to Binder" bottom sheet if it's open
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      if (context.mounted && collection != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Created "${collection.name}" and added ${widget.card.name}'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CustomCollectionDetailScreen(
+                      collection: collection,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
       }
     }
-
-    nameController.dispose();
   }
 
   @override

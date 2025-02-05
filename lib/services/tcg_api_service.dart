@@ -8,6 +8,8 @@ class TcgApiService {
   static final TcgApiService _instance = TcgApiService._internal();
   final http.Client _client = http.Client();
   final Dio _dio;  // Add this field
+  final _cache = <String, (DateTime, dynamic)>{};
+  final _cacheDuration = const Duration(hours: 1);
 
   factory TcgApiService() {
     return _instance;
@@ -292,6 +294,19 @@ class TcgApiService {
     } else {
       throw Exception('Failed to load data: ${response.statusCode}');
     }
+  }
+
+  Future<dynamic> _getWithCache(String endpoint) async {
+    if (_cache.containsKey(endpoint)) {
+      final (timestamp, data) = _cache[endpoint]!;
+      if (DateTime.now().difference(timestamp) < _cacheDuration) {
+        return data;
+      }
+    }
+    
+    final response = await _get(endpoint);
+    _cache[endpoint] = (DateTime.now(), response);
+    return response;
   }
 
   // Add this new method

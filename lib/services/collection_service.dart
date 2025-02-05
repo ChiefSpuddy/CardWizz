@@ -9,6 +9,7 @@ import '../models/custom_collection.dart';
 import '../services/storage_service.dart';  // Add this import
 import '../providers/sort_provider.dart';  // Add this
 import '../services/purchase_service.dart';
+import 'package:flutter/foundation.dart';  // Add this import for kDebugMode
 
 class CollectionService {
   static const int _freeUserBinderLimit = 10;  // Add this constant
@@ -130,11 +131,16 @@ class CollectionService {
     
     try {
       final collections = await getCustomCollections();
-      print('Found ${collections.length} collections for user $_currentUserId');
       _collectionsController.add(collections);
     } catch (e) {
-      print('Error refreshing collections: $e'); // Add debug print
       _collectionsController.addError(e);
+    }
+  }
+
+  // Add this method to control debug output
+  void _debugLog(String message, {bool verbose = false}) {
+    if (kDebugMode && !verbose) {
+      print(message);
     }
   }
 
@@ -176,6 +182,7 @@ class CollectionService {
       }),
     );
 
+    _debugLog('Found ${collections.length} collections', verbose: true);
     return sortCollections(enrichedCollections, sortOption ?? CollectionSortOption.newest);
   }
 
@@ -234,29 +241,32 @@ class CollectionService {
     );
   }
 
-  Future<void> createCustomCollection(
+  Future<String> createCustomCollection(  // Change return type to String
     String name,
     String description, {
-    Color color = const Color(0xFF90CAF9),  // Add default color parameter
+    Color color = const Color(0xFF90CAF9),
   }) async {
-    if (_currentUserId == null) return;
+    if (_currentUserId == null) throw 'No user logged in';
 
     final collections = await getCustomCollections();
     if (!_storage.isPremium && collections.length >= _freeUserBinderLimit) {
       throw 'Free users can only create up to $_freeUserBinderLimit binders. Upgrade to Premium for unlimited binders!';
     }
 
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    
     await _db.insert('collections', {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'id': id,
       'name': name,
       'description': description,
       'created_at': DateTime.now().millisecondsSinceEpoch,
       'card_ids': '',
       'user_id': _currentUserId,
-      'color': color.value,  // Make sure color value is stored
+      'color': color.value,
     });
 
     await _refreshCollections();
+    return id;  // Return the collection ID
   }
 
   // Fix return type for binder limit methods

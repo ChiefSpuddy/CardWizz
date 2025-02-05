@@ -523,4 +523,15 @@ class StorageService {
 
   // Add this field at the top of the class
   List<TcgCard>? _lastEmittedCards;
+
+  void _debugLog(String message, {bool verbose = false}) {
+    if (kDebugMode && !verbose) {
+      print(message);
+    }
+  }
+
+  Future<void> refreshPrices() async {
+    _debugLog('Starting price refresh...', verbose: true);
+    // ...existing code...
+  }
 }
