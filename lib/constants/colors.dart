@@ -14,6 +14,14 @@ class AppColors {
   static const onPrimary = Colors.white;  // Add this
   static const onSecondary = Colors.white;  // Add this
 
+  // Add Pokemon tile colors
+  static const pokemonTileCollected = Color(0xFFE8F5E9);  // Light green for light mode
+  static const pokemonTileUncollected = Colors.white;
+  
+  // Dark mode Pokemon tile colors
+  static final pokemonTileCollectedDark = Color(0xFF1B3726);  // Dark green for dark mode
+  static final pokemonTileUncollectedDark = Color(0xFF2A2A2A);  // Dark surface color
+
   // Gradients
   static const primaryGradient = LinearGradient(
     colors: [Color(0xFF6366F1), Color(0xFF818CF8)],

@@ -14,6 +14,10 @@ import 'dart:async';  // Add this import for StreamSubscription
 import '../widgets/app_drawer.dart';  // Add this import
 import '../providers/currency_provider.dart';  // Add this import
 import '../widgets/sign_in_view.dart';  // Add this import
+import 'package:shimmer/shimmer.dart';
+import 'package:lottie/lottie.dart';  // Add this import
+import '../constants/colors.dart';  // Add this import
+import 'dart:ui';  // Add this import at the top with other imports
 
 class DexScreen extends StatefulWidget {
   const DexScreen({super.key});
@@ -325,111 +329,222 @@ class _DexScreenState extends State<DexScreen> {
 
   Future<void> _showPokemonInfo(BuildContext context, String pokemonName, Map<String, dynamic> data) {
     final types = (data['types'] as List?)?.map((t) => t['type']['name'].toString().toUpperCase()).toList() ?? [];
-    final height = ((data['height'] ?? 0) / 10).toStringAsFixed(1); // convert to meters
-    final weight = ((data['weight'] ?? 0) / 10).toStringAsFixed(1); // convert to kg
+    final height = ((data['height'] ?? 0) / 10).toStringAsFixed(1);
+    final weight = ((data['weight'] ?? 0) / 10).toStringAsFixed(1);
     final stats = data['stats'] as List? ?? [];
-    
-    return showDialog(
+    final pokemonStats = _collectionService.getPokemonStats(pokemonName);
+    final cards = pokemonStats['cards'] as List<TcgCard>? ?? [];
+    final currencyProvider = context.read<CurrencyProvider>();
+    final mainColor = _getTypeColor(types.firstOrNull ?? '');
+
+    return showModalBottomSheet(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                _getTypeColor(types.firstOrNull ?? '').withOpacity(0.2),
-                Colors.white,
-              ],
-            ),
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: SingleChildScrollView(
+          child: DefaultTabController(
+            length: 2,
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: _getTypeColor(types.firstOrNull ?? '').withOpacity(0.1),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            '#${_namesService.getDexNumber(pokemonName).toString().padLeft(3, '0')}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            pokemonName,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                // Modern top bar with gradient
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        mainColor.withOpacity(0.8),
+                        mainColor.withOpacity(0.4),
+                      ],
                     ),
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ),
-                  ],
-                ),
-                Hero(
-                  tag: 'pokemon-$pokemonName',
-                  child: CachedNetworkImage(
-                    imageUrl: data['sprites']['other']['official-artwork']['front_default'] ?? '',
-                    height: 200,
-                    width: 200,
-                    placeholder: (context, url) => const CircularProgressIndicator(),
-                    errorWidget: (context, url, error) => const Icon(Icons.error),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: types.map((type) => 
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Chip(
-                              backgroundColor: _getTypeColor(type),
-                              label: Text(
-                                type,
-                                style: const TextStyle(color: Colors.white),
+                  child: SafeArea(
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.white),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                              Text(
+                                '#${_namesService.getDexNumber(pokemonName).toString().padLeft(3, '0')}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Hero(
+                          tag: 'pokemon-$pokemonName',
+                          child: CachedNetworkImage(
+                            imageUrl: data['sprites']['other']['official-artwork']['front_default'] ?? '',
+                            height: 180,
+                            width: 180,
+                          ),
+                        ),
+                        Text(
+                          pokemonName,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Modern type chips
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          children: types.map((type) => _buildTypeChip(type)).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                        // Modern tabs
+                        TabBar(
+                          indicatorColor: Colors.white,
+                          indicatorWeight: 3,
+                          tabs: [
+                            Tab(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.info_outline, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text('Info', style: TextStyle(fontSize: 16)),
+                                ],
                               ),
                             ),
-                          )
-                        ).toList(),
+                            Tab(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.style, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text('Cards (${cards.length})', style: TextStyle(fontSize: 16)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Tab content
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      // Info tab with modern styling
+                      LayoutBuilder(
+                        builder: (context, constraints) => SingleChildScrollView(
+                          controller: scrollController,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildInfoCard(
+                                    'Physical Attributes',
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        _buildAttributeColumn(
+                                          icon: Icons.height,
+                                          label: 'Height',
+                                          value: '$height m',
+                                          color: mainColor,
+                                        ),
+                                        Container(
+                                          width: 1,
+                                          height: 40,
+                                          color: Colors.grey[300],
+                                        ),
+                                        _buildAttributeColumn(
+                                          icon: Icons.monitor_weight,
+                                          label: 'Weight',
+                                          value: '$weight kg',
+                                          color: mainColor,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  _buildInfoCard(
+                                    'Base Stats',
+                                    Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: stats.map((stat) {
+                                        final value = stat['base_stat'] as int;
+                                        return _buildModernStatBar(
+                                          _formatStatName(stat['stat']['name'].toString().toUpperCase()),
+                                          value,
+                                          mainColor,
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
-                      const SizedBox(height: 16),
-                      ...stats.map((stat) => _buildStatBar(
-                        stat['stat']['name'].toString(),
-                        stat['base_stat'] as int,
-                      )),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildStatCard('Height', '$height m'),
-                          _buildStatCard('Weight', '$weight kg'),
-                        ],
-                      ),
+                      // Cards tab with modern styling
+                      cards.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.style_outlined, 
+                                    size: 48, 
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No cards collected yet',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : GridView.builder(
+                              controller: scrollController,
+                              padding: const EdgeInsets.all(12),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.7,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                              itemCount: cards.length,
+                              itemBuilder: (context, index) => _buildCardTile(
+                                cards[index],
+                                currencyProvider,
+                              ),
+                            ),
                     ],
                   ),
                 ),
@@ -441,33 +556,84 @@ class _DexScreenState extends State<DexScreen> {
     );
   }
 
-  Widget _buildStatBar(String statName, int value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              statName.toUpperCase(),
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: LinearProgressIndicator(
-              value: value / 255, // Max stat value
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                _getStatColor(value),
+  Widget _buildTypeChip(String type) {
+    final color = _getTypeColor(type);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.4)),
+      ),
+      child: Text(
+        type,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(String title, Widget content) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
+            const SizedBox(height: 16),
+            content,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernStatBar(String name, int value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                value.toString(),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Text(
-            value.toString(),
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: value / 255,
+              backgroundColor: color.withOpacity(0.1),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              minHeight: 6,
             ),
           ),
         ],
@@ -475,37 +641,75 @@ class _DexScreenState extends State<DexScreen> {
     );
   }
 
-  Color _getStatColor(int value) {
-    if (value >= 150) return Colors.green;
-    if (value >= 90) return Colors.lime;
-    if (value >= 60) return Colors.orange;
-    return Colors.red;
-  }
-
-  Widget _buildStatCard(String label, String value) {
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  Widget _buildCardTile(TcgCard card, CurrencyProvider currencyProvider) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CardDetailsScreen(card: card),
+        ),
+      ),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Column(
           children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                child: Image.network(
+                  card.imageUrl,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 16,
+            if (card.price != null)
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                ),
+                child: Text(
+                  currencyProvider.formatValue(card.price!),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
               ),
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAttributeColumn({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, size: 24, color: color),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 
@@ -513,39 +717,57 @@ class _DexScreenState extends State<DexScreen> {
     final dexNumber = _namesService.getDexNumber(pokemonName);
     final spriteUrl = _pokeApi.getSpriteUrl(dexNumber);
     final stats = _collectionService.getPokemonStats(pokemonName);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Card(
       elevation: 2,
-      color: stats['isCollected'] ? Colors.green.withOpacity(0.1) : null,
+      color: stats['isCollected']
+          ? (isDark ? AppColors.pokemonTileCollectedDark : AppColors.pokemonTileCollected)
+          : (isDark ? AppColors.pokemonTileUncollectedDark : AppColors.pokemonTileUncollected),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: stats['isCollected'] 
-          ? () => _showPokemonCards(context, pokemonName, stats['cards'])
-          : null,
+        onTap: () async {
+          final data = await _pokeApi.fetchPokemon(dexNumber.toString());
+          if (data != null && mounted) {
+            _showPokemonInfo(context, pokemonName, data);
+          }
+        },
         child: Stack(
           children: [
             Column(
-              mainAxisAlignment: MainAxisAlignment.center,  // Center the content
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Center(  // Center the image
-                    child: GestureDetector( // Add tap handler for Pokemon info
-                      onTap: () async {
-                        final data = await _pokeApi.fetchPokemon(dexNumber.toString());
-                        if (data != null && mounted) {
-                          _showPokemonInfo(context, pokemonName, data);
-                        }
-                      },
-                      child: CachedNetworkImage(
-                        imageUrl: spriteUrl,
-                        fit: BoxFit.contain,
-                        width: 80,  // Fixed width for consistent sizing
-                        height: 80,  // Fixed height for consistent sizing
-                        placeholder: (context, url) => const SizedBox(
-                          width: 80,
-                          height: 80,
-                          child: Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                  child: Center(
+                    child: CachedNetworkImage(
+                      imageUrl: spriteUrl,
+                      fit: BoxFit.contain,
+                      width: 80,
+                      height: 80,
+                      placeholder: (context, url) => Container(
+                        width: 80,
+                        height: 80,
+                        padding: const EdgeInsets.all(16),
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text(
+                            pokemonName[0].toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[400],
+                            ),
                           ),
                         ),
                       ),
@@ -723,99 +945,227 @@ class _DexScreenState extends State<DexScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
-    final isSignedIn = appState.isAuthenticated;
-    final currencyProvider = context.watch<CurrencyProvider>();
-
-    return Scaffold(
-      key: _scaffoldKey,
-      drawer: const AppDrawer(),  // Remove scaffoldKey parameter
-      appBar: AppBar(
-        toolbarHeight: 44, // Match other screens
-        automaticallyImplyLeading: true,
-      ),
-      body: !isSignedIn  // Removed AnimatedBackground
-          ? const SignInView()
-          : Column(
-              children: [
-                _buildGenerationProgress(),
-                Expanded(
-                  child: _isLoading && _currentPage == 0
-                      ? const Center(child: CircularProgressIndicator())
-                      : _buildPokemonGrid(),
+  Widget _buildLoadingScreen() {
+    return Column(
+      children: [
+        // Shimmer effect for generation tabs
+        Container(
+          height: 100,
+          padding: const EdgeInsets.all(8),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: 5,
+            itemBuilder: (context, index) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: Container(
+                  width: 120,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-              ],
+              ),
             ),
+          ),
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(_gridSpacing),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _gridCrossAxisCount,
+              childAspectRatio: _aspectRatio,
+              crossAxisSpacing: _gridSpacing,
+              mainAxisSpacing: _gridSpacing,
+            ),
+            itemCount: 18, // Show a reasonable number of shimmer tiles
+            itemBuilder: (context, index) => _buildLoadingTile(),
+          ),
+        ),
+      ],
     );
   }
 
-  void _showPokemonCards(BuildContext context, String pokemonName, List<TcgCard> cards) {
-    final currencyProvider = context.read<CurrencyProvider>();  // Add this
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        builder: (_, controller) => Column(
+  Widget _buildLoadingTile() {
+    return Card(
+      elevation: 2,
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AppBar(
-              title: Text('$pokemonName Cards'),
-              leading: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.pop(context),
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
-            Expanded(
-              child: GridView.builder(
-                controller: controller,
-                padding: const EdgeInsets.all(8),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  childAspectRatio: 0.7,
-                ),
-                itemCount: cards.length,
-                itemBuilder: (context, index) {
-                  final card = cards[index];
-                  return GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CardDetailsScreen(card: card),
-                      ),
-                    ),
-                    child: Card(
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Image.network(
-                              card.imageUrl,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                          if (card.price != null)
-                            Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: Text(
-                                currencyProvider.formatValue(card.price!),  // Update this line
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+            const SizedBox(height: 8),
+            Container(
+              width: 60,
+              height: 12,
+              color: Colors.white,
+            ),
+            const SizedBox(height: 4),
+            Container(
+              width: 40,
+              height: 10,
+              color: Colors.white,
             ),
           ],
         ),
       ),
     );
+  }
+
+  // Update the build method to use the new loading screen
+  @override
+  Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+    final isSignedIn = appState.isAuthenticated;
+
+    return Scaffold(
+      key: _scaffoldKey,
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.7),
+            ),
+          ),
+        ),
+        toolbarHeight: 44,
+        automaticallyImplyLeading: true,
+      ),
+      body: Stack(
+        children: [
+          // Add animated background
+          Lottie.asset(
+            'assets/animations/background.json',
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          ),
+          // Main content
+          !isSignedIn
+              ? const SignInView()
+              : Column(
+                  children: [
+                    _buildGenerationProgress(),
+                    Expanded(
+                      child: _isLoading && _currentPage == 0
+                          ? const Center(
+                              child: SizedBox(
+                                width: 60,
+                                height: 60,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                ),
+                              ),
+                            )
+                          : _buildPokemonGrid(),
+                    ),
+                  ],
+                ),
+        ],
+      ),
+    );
+  }
+
+  // Update Pokemon tile to show loading state
+  Widget _buildPokemonTileWithLoading(String pokemonName) {
+    final dexNumber = _namesService.getDexNumber(pokemonName);
+    final spriteUrl = _pokeApi.getSpriteUrl(dexNumber);
+    final stats = _collectionService.getPokemonStats(pokemonName);
+    
+    return Card(
+      elevation: 2,
+      child: Stack(
+        children: [
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Center(
+                  child: CachedNetworkImage(
+                    imageUrl: spriteUrl,
+                    fit: BoxFit.contain,
+                    width: 80,
+                    height: 80,
+                    fadeInDuration: const Duration(milliseconds: 300),
+                    placeholder: (context, url) => Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Text(
+                          pokemonName[0].toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // ...existing Pokemon info code...
+            ],
+          ),
+          if (stats['isCollected'])
+            const Positioned(
+              top: 8,
+              right: 8,
+              child: Icon(Icons.check_circle, color: Colors.green, size: 20),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _formatStatName(String name) {
+    switch (name) {
+      case 'HP':
+        return 'HP';
+      case 'ATTACK':
+        return 'Attack';
+      case 'DEFENSE':
+        return 'Defense';
+      case 'SPECIAL-ATTACK':
+        return 'Sp. Atk';
+      case 'SPECIAL-DEFENSE':
+        return 'Sp. Def';
+      case 'SPEED':
+        return 'Speed';
+      default:
+        return name;
+    }
   }
 }
