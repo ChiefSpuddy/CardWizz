@@ -7,6 +7,7 @@ class PokeApiService {
   final Map<String, String> _spriteCache = {};
   final Map<String, Map<String, dynamic>> _pokemonCache = {};
   final _cacheManager = DefaultCacheManager();
+  final Map<String, Map<String, dynamic>> _speciesCache = {};
 
   // Optimize sprite URL handling with CDN
   String getSpriteUrl(int dexNum) {
@@ -104,6 +105,44 @@ class PokeApiService {
       }
     } catch (e) {
       print('Error fetching Pokemon data: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> fetchSpeciesData(int dexNum) async {
+    final identifier = dexNum.toString();
+    if (_speciesCache.containsKey(identifier)) {
+      return _speciesCache[identifier];
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse('https://pokeapi.co/api/v2/pokemon-species/$identifier'),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        // Get English flavor text entries
+        final flavorTexts = (data['flavor_text_entries'] as List)
+            .where((entry) => entry['language']['name'] == 'en')
+            .map((entry) => entry['flavor_text'].toString()
+                .replaceAll('\n', ' ')
+                .replaceAll('\f', ' '))
+            .toList();
+
+        final result = {
+          'flavor_text': flavorTexts.isNotEmpty ? flavorTexts.first : null,
+          'color': data['color']['name'],
+          'habitat': data['habitat']?['name'],
+          'generation': data['generation']['name'],
+        };
+        
+        _speciesCache[identifier] = result;
+        return result;
+      }
+    } catch (e) {
+      print('Error fetching species data for #$identifier: $e');
     }
     return null;
   }

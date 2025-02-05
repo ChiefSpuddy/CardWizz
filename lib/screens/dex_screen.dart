@@ -336,6 +336,7 @@ class _DexScreenState extends State<DexScreen> {
     final cards = pokemonStats['cards'] as List<TcgCard>? ?? [];
     final currencyProvider = context.read<CurrencyProvider>();
     final mainColor = _getTypeColor(types.firstOrNull ?? '');
+    final speciesData = _pokeApi.fetchSpeciesData(_namesService.getDexNumber(pokemonName));
 
     return showModalBottomSheet(
       context: context,
@@ -486,6 +487,55 @@ class _DexScreenState extends State<DexScreen> {
                                         ),
                                       ],
                                     ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  FutureBuilder<Map<String, dynamic>?>(
+                                    future: speciesData,
+                                    builder: (context, snapshot) {
+                                      if (!snapshot.hasData) return const SizedBox.shrink();
+                                      
+                                      final flavorText = snapshot.data!['flavor_text'];
+                                      final habitat = snapshot.data!['habitat'];
+                                      
+                                      return _buildInfoCard(
+                                        'Pokédex Entry',
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            if (flavorText != null)
+                                              Text(
+                                                flavorText,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  height: 1.5,
+                                                  fontStyle: FontStyle.italic,
+                                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                                                ),
+                                              ),
+                                            if (habitat != null) ...[
+                                              const SizedBox(height: 12),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.landscape,
+                                                    size: 16,
+                                                    color: Theme.of(context).colorScheme.primary,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Habitat: ${habitat[0].toUpperCase()}${habitat.substring(1)}',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      );
+                                    },
                                   ),
                                   const SizedBox(height: 16),
                                   _buildInfoCard(
