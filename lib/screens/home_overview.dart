@@ -548,7 +548,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
       appBar: AppBar(
         toolbarHeight: 44,
         automaticallyImplyLeading: false,
-        title: isSignedIn && user != null ? RichText(
+        title: isSignedIn && user?.username != null ? RichText(  // Add null check here
           text: TextSpan(
             style: Theme.of(context).textTheme.titleMedium,
             children: [
@@ -556,7 +556,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 text: '${localizations.translate('welcome')} ',
               ),
               TextSpan(
-                text: '@${user.username}',
+                text: '@${user?.username ?? 'Guest'}',  // Add fallback to 'Guest'
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.bold,

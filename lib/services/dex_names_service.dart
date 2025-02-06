@@ -374,6 +374,42 @@ class DexNamesService {
     }
   }
 
+  // Add this method near the start of the class
+  String formatPokemonName(String name) {
+    // Handle special cases first
+    final specialCases = {
+      'mr-mime': 'Mr. Mime',
+      'ho-oh': 'Ho-Oh',
+      'porygon-z': 'Porygon-Z',
+      'mime-jr': 'Mime Jr.',
+      'type-null': 'Type: Null',
+      'jangmo-o': 'Jangmo-o',
+      'hakamo-o': 'Hakamo-o',
+      'kommo-o': 'Kommo-o',
+      'tapu-koko': 'Tapu Koko',
+      'tapu-lele': 'Tapu Lele',
+      'tapu-bulu': 'Tapu Bulu',
+      'tapu-fini': 'Tapu Fini',
+      'nidoran-f': 'Nidoran♀',
+      'nidoran-m': 'Nidoran♂',
+    };
+
+    // Check for special cases
+    if (specialCases.containsKey(name.toLowerCase())) {
+      return specialCases[name.toLowerCase()]!;
+    }
+
+    // Handle hyphenated names
+    if (name.contains('-')) {
+      return name.split('-')
+          .map((part) => part.substring(0, 1).toUpperCase() + part.substring(1))
+          .join('-');
+    }
+
+    // Standard capitalization
+    return name.substring(0, 1).toUpperCase() + name.substring(1);
+  }
+
   Future<List<String>> loadGenerationNames(int startNum, int endNum) async {
     await _initialize();
     
@@ -381,7 +417,7 @@ class DexNamesService {
     for (int i = startNum; i <= endNum; i++) {
       final name = _numberToName[i];
       if (name != null) {
-        names.add(name);
+        names.add(formatPokemonName(name));  // Apply formatting here
       } else {
         print('Warning: No name found for Pokémon #$i');
       }

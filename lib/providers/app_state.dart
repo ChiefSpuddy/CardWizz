@@ -9,7 +9,7 @@ class AppState with ChangeNotifier {
   final AuthService _authService;
   CollectionService? _collectionService;
   SharedPreferences? _prefs;  // Add this
-  bool _isDarkMode = false;
+  bool _isDarkMode = true;  // Change default to true
   bool _isLoading = true;
   Locale _locale = const Locale('en');
   bool _analyticsEnabled = true;
@@ -32,7 +32,8 @@ class AppState with ChangeNotifier {
       _collectionService?.setCurrentUser(_authService.currentUser!.id);
     }
     
-    _isDarkMode = _prefs?.getBool('darkMode') ?? false;
+    // Load dark mode setting, default to true if not set
+    _isDarkMode = _prefs?.getBool('darkMode') ?? true;
 
     await _initializePrivacySettings();
 

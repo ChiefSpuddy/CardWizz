@@ -545,13 +545,25 @@ class TcgApiService {
   }
 
   Future<Map<String, dynamic>> _get(String endpoint, [Map<String, String>? queryParams]) async {
-    final uri = Uri.parse('$_baseUrl/$endpoint').replace(queryParameters: queryParams);
-    final response = await _client.get(uri, headers: _headers);
-    
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to load data: ${response.statusCode}');
+    try {
+      final uri = Uri.parse('$_baseUrl/$endpoint').replace(queryParameters: queryParams);
+      final response = await _client.get(uri, headers: _headers);
+      
+      // Return empty result for 404 instead of throwing
+      if (response.statusCode == 404) {
+        print('Resource not found at $uri');
+        return {'data': [], 'totalCount': 0, 'page': 1};
+      }
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        print('API error: ${response.statusCode} - ${response.body}');
+        return {'data': [], 'totalCount': 0, 'page': 1};
+      }
+    } catch (e) {
+      print('Network error during API call: $e');
+      return {'data': [], 'totalCount': 0, 'page': 1};
     }
   }
 
@@ -571,15 +583,26 @@ class TcgApiService {
   // Add this new method
   Future<Map<String, dynamic>> searchSet(String setId) async {
     try {
+      // Validate setId format
+      if (setId.isEmpty) {
+        return {'data': [], 'totalCount': 0, 'page': 1};
+      }
+
       final queryParams = {
         'q': 'set.id:$setId',
         'orderBy': '-cardmarket.prices.averageSellPrice',
         'pageSize': '60',  // Increased to show more cards
       };
-      return await _get('cards', queryParams);
+
+      final result = await _get('cards', queryParams);
+      
+      // Add some debug logging
+      print('Set search for $setId returned ${result['data']?.length ?? 0} cards');
+      
+      return result;
     } catch (e) {
-      print('Set search error: $e');
-      rethrow;
+      print('Set search error for $setId: $e');
+      return {'data': [], 'totalCount': 0, 'page': 1};
     }
   }
 }

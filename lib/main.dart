@@ -152,17 +152,22 @@ class CardWizzApp extends StatelessWidget {
               color: AppColors.text,
             ),
             bottomNavigationBarTheme: BottomNavigationBarThemeData(
-              selectedLabelStyle: TextStyle(
+              selectedItemColor: AppColors.primary,
+              unselectedItemColor: AppColors.text.withOpacity(0.5),  // Make unselected more visible
+              selectedLabelStyle: const TextStyle(
                 fontSize: 12,
-                overflow: TextOverflow.visible,
-                height: 1.0,
+                fontWeight: FontWeight.w700,  // Increased from w600 to w700
+                letterSpacing: 0.5,  // Add letter spacing
+                height: 1.5,  // Increased from 1.0
               ),
               unselectedLabelStyle: TextStyle(
                 fontSize: 12,
-                overflow: TextOverflow.visible,
-                height: 1.0,
+                fontWeight: FontWeight.w500,
+                color: AppColors.text.withOpacity(0.8),  // Make unselected text more visible
+                height: 1.5,
               ),
               type: BottomNavigationBarType.fixed,
+              showUnselectedLabels: true,  // Make sure unselected labels are visible
             ),
           ),
           darkTheme: ThemeData.dark().copyWith(
