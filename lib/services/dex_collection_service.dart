@@ -27,32 +27,40 @@ class DexCollectionService {
   }
 
   Future<void> initialize() async {
-    if (_isInitialized) return;
+    if (_isInitialized && _storage.currentUserId != null) return;
     
     try {
-      _allCards = await _storage.getCards();
-      
-      // Clear existing caches
+      // Clear caches first
       _collectionCache.clear();
       _cardCache.clear();
+      _allCards = null;
+      _isInitialized = false;
       
-      // Build new caches
-      for (final card in _allCards!) {
-        final baseName = _normalizeCardName(card.name);
-        _collectionCache[baseName] = true;
+      // Only proceed if we have a user
+      if (_storage.currentUserId != null) {
+        _allCards = await _storage.getCards();
         
-        // Ensure we don't add duplicate cards
-        if (!_cardCache.containsKey(baseName)) {
-          _cardCache[baseName] = [];
+        // Build new caches
+        for (final card in _allCards!) {
+          final baseName = _normalizeCardName(card.name);
+          _collectionCache[baseName] = true;
+          
+          if (!_cardCache.containsKey(baseName)) {
+            _cardCache[baseName] = [];
+          }
+          if (!_cardCache[baseName]!.any((c) => c.id == card.id)) {
+            _cardCache[baseName]!.add(card);
+          }
         }
-        if (!_cardCache[baseName]!.any((c) => c.id == card.id)) {
-          _cardCache[baseName]!.add(card);
-        }
+        
+        _isInitialized = true;
+        print('DexCollection initialized with ${_allCards?.length ?? 0} cards');
+      } else {
+        print('DexCollection initialize skipped - no user');
       }
-      
-      _isInitialized = true;
     } catch (e) {
       print('Error initializing dex collection: $e');
+      _isInitialized = false;
       rethrow;
     }
   }
@@ -87,10 +95,7 @@ class DexCollectionService {
     _isRefreshing = true;
     
     try {
-      _isInitialized = false;
-      _cardCache.clear();  // Make sure to clear card cache
-      _collectionCache.clear();  // And collection cache
-      await initialize();
+      await initialize();  // This will handle all the cache clearing
       _updateController.add(null);
     } finally {
       _isRefreshing = false;

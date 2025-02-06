@@ -362,23 +362,23 @@ class TcgApiService {
   String _processSearchQuery(String query) {
     final normalizedQuery = query.toLowerCase().trim();
     
+    // If query is already formatted, return as-is
+    if (query.startsWith('set.id:') || 
+        query.startsWith('name:') ||
+        query.startsWith('subtypes:') ||
+        query.startsWith('nationalPokedexNumbers:')) {
+      return query;
+    }
+
     // Check for special searches first
     if (specialSearches.containsKey(normalizedQuery)) {
       print('Found special search: ${specialSearches[normalizedQuery]}');
       return specialSearches[normalizedQuery]!;
     }
 
-    // Already formatted query
-    if (normalizedQuery.startsWith('set.id:') || 
-        normalizedQuery.startsWith('subtypes:') ||
-        normalizedQuery.startsWith('nationalPokedexNumbers:')) {
-      return normalizedQuery;
-    }
-
-    // Try exact set match first
+    // Try set match first
     String? setId = allSetIds[normalizedQuery];
     if (setId != null) {
-      // Check if this is a special search query
       if (setId.startsWith('subtypes:')) {
         return setId;
       }
@@ -388,7 +388,6 @@ class TcgApiService {
 
     // Try variations if no exact match
     if (setId == null) {
-      // Try removing special characters and spaces
       final simplifiedQuery = normalizedQuery
           .replaceAll(RegExp(r'[^a-z0-9]'), '')
           .replaceAll('and', '&');
@@ -408,7 +407,7 @@ class TcgApiService {
       }
     }
 
-    // Return formatted query based on type
+    // Return set query if found
     if (setId != null) {
       if (setId.startsWith('subtypes:')) {
         return setId;
@@ -416,9 +415,9 @@ class TcgApiService {
       return 'set.id:$setId';
     }
 
-    // Default to name search
+    // Default to name search (but don't double wrap)
     print('No set match found, using name search for: $query');
-    return 'name:"$query"';
+    return 'name:*$query*';  // Simplified format without double quotes
   }
 
   static const Map<String, String> setQueries = {
@@ -447,7 +446,6 @@ class TcgApiService {
       final processedQuery = _processSearchQuery(query);
       print('Processing query: "$query" -> "$processedQuery"');
 
-      // Use .select parameter to include all necessary fields
       final queryParams = {
         'q': processedQuery,
         'page': page.toString(),
@@ -465,7 +463,9 @@ class TcgApiService {
       
       if (response.statusCode == 400) {
         print('Search failed with invalid query: $processedQuery');
-        return {'data': [], 'totalCount': 0, 'page': page};
+        // Try a simpler query format as fallback
+        final fallbackQuery = query.startsWith('name:') ? query : 'name:*${query.trim()}*';
+        return await _fallbackSearch(fallbackQuery, page, pageSize, orderBy, orderByDesc);
       }
       
       return {
@@ -478,6 +478,36 @@ class TcgApiService {
       print('Search error: $e');
       return {'data': [], 'totalCount': 0, 'page': page};
     }
+  }
+
+  // Add this new method for fallback searches
+  Future<Map<String, dynamic>> _fallbackSearch(
+    String query,
+    int page,
+    int pageSize,
+    String orderBy,
+    bool orderByDesc,
+  ) async {
+    final queryParams = {
+      'q': query,
+      'page': page.toString(),
+      'pageSize': pageSize.toString(),
+      'orderBy': orderByDesc ? '-$orderBy' : orderBy,
+      'select': 'id,name,number,images,set,rarity,subtypes,nationalPokedexNumber,cardmarket',
+    };
+
+    print('Attempting fallback search with query: $query');
+    
+    final response = await _dio.get('/cards', 
+      queryParameters: queryParams,
+      options: Options(validateStatus: (status) => status != null && status < 500),
+    );
+    
+    return {
+      'data': response.data['data'] ?? [],
+      'totalCount': response.data['totalCount'] ?? 0,
+      'page': page,
+    };
   }
 
   // Add helper method to safely extract price

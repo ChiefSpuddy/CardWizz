@@ -340,123 +340,58 @@ class DexNamesService {
     // Add more as needed...
   };
 
-  Future<List<String>> loadDexNames() async {
-    if (_isLoaded) return _dexMap.values.toList();
-    try {
-      // Fetch all Pokémon (Gen 1-9)
-      for (int i = 1; i <= 1008; i++) {
-        final data = await _pokeApiService.fetchPokemon(i.toString());
-        if (data != null) {
-          _dexMap[i] = _capitalize(data['name']);
-        }
-      }
-      _isLoaded = true;
-      return _dexMap.values.toList();
-    } catch (e) {
-      print('Error loading dex names: $e');
-      return [];
-    }
-  }
+  Map<String, int> _nameToNumber = {};
+  Map<int, String> _numberToName = {};
+  bool _isInitialized = false;
 
-  Future<List<String>> loadGenerationNames(int start, int end) async {
-    final key = start * 1000 + end;
-    if (_generationCache.containsKey(key)) {
-      return _generationCache[key]!;
-    }
-
-    try {
-      final batchSize = 50;  // Process in smaller batches
-      final names = <String>[];
-      
-      for (var i = start; i <= end; i += batchSize) {
-        final batchEnd = (i + batchSize - 1).clamp(start, end);
-        final dexNumbers = List.generate(batchEnd - i + 1, (index) => i + index);
-        
-        final results = await _pokeApiService.fetchPokemonBatch(dexNumbers);
-        
-        for (final data in results) {
-          if (data != null) {
-            final name = _formatPokemonName(data['name']);
-            names.add(name);
-            _dexMap[i + names.length - 1] = name;
-          }
-        }
-      }
-      
-      _generationCache[key] = names;
-      return names;
-    } catch (e) {
-      print('Error loading generation names: $e');
-      return [];
-    }
-  }
-
-  String _capitalize(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1);
-  }
-
-  String _formatPokemonName(String name) {
-    // Check variant mappings first
-    final variantName = _variantMappings[name.toLowerCase()];
-    if (variantName != null) {
-      return variantName;
-    }
-
-    // Check special mappings
-    if (_specialNameMappings.containsKey(name.toLowerCase())) {
-      return _specialNameMappings[name.toLowerCase()]!;
-    }
-
-    // Remove form information in parentheses
-    final baseName = name.split('(')[0].trim();
+  Future<void> _initialize() async {
+    if (_isInitialized) return;
     
-    // Replace hyphens with spaces for certain names
-    if (baseName.startsWith('Tapu-')) {
-      return baseName.replaceAll('-', ' ');
-    }
+    try {
+      final String jsonString = await rootBundle.loadString('assets/names.json');
+      final Map<String, dynamic> data = json.decode(jsonString);
+      
+      // Fix: Access the "names" object from the JSON
+      final namesData = data['names'] as Map<String, dynamic>;
+      
+      _nameToNumber.clear();
+      _numberToName.clear();
 
-    // Handle other hyphenated names
-    if (baseName.contains('-')) {
-      return baseName.split('-')
-          .map((part) => _capitalize(part))
-          .join('-');
+      namesData.forEach((key, value) {
+        final number = int.tryParse(key);
+        if (number != null && value is String) {
+          final name = value.toLowerCase();
+          _nameToNumber[name] = number;
+          _numberToName[number] = name;
+        }
+      });
+      
+      _isInitialized = true;
+      print('Initialized DexNamesService with ${_nameToNumber.length} Pokemon');
+    } catch (e) {
+      print('Error initializing DexNamesService: $e');
+      rethrow;
     }
-
-    return _capitalize(baseName);
   }
 
-  // Update to use map lookup
-  int getDexNumber(String pokemonName) {
-    // Format the name consistently
-    final formattedName = _formatPokemonName(pokemonName);
+  Future<List<String>> loadGenerationNames(int startNum, int endNum) async {
+    await _initialize();
     
-    // Try Gen 9 mappings first (higher priority)
-    final gen9Number = _gen9Mappings[formattedName];
-    if (gen9Number != null) return gen9Number;
-
-    // Try each mapping in order
-    final gen2Number = _gen2Mappings[formattedName];
-    if (gen2Number != null) return gen2Number;
-
-    final gen3Number = _gen3Mappings[formattedName];
-    if (gen3Number != null) return gen3Number;
-
-    final gen4Number = _gen4Mappings[formattedName];
-    if (gen4Number != null) return gen4Number;
-
-    final additionalNumber = _additionalMappings[formattedName];
-    if (additionalNumber != null) return additionalNumber;
-
-    // Try direct lookup as last resort
-    try {
-      return _dexMap.entries
-          .firstWhere((entry) => entry.value == formattedName)
-          .key;
-    } catch (e) {
-      print('Could not find dex number for: $pokemonName');
-      return 0;
+    List<String> names = [];
+    for (int i = startNum; i <= endNum; i++) {
+      final name = _numberToName[i];
+      if (name != null) {
+        names.add(name);
+      } else {
+        print('Warning: No name found for Pokémon #$i');
+      }
     }
+    
+    return names;
+  }
+
+  int getDexNumber(String name) {
+    return _nameToNumber[name.toLowerCase()] ?? 0;
   }
 
   // Add method to get generation info

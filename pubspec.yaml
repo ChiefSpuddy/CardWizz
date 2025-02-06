@@ -1,6 +1,6 @@
 name: cardwizz
-description: A TCG card collection management app
-version: 1.0.0+2
+description: A TCG card collection management app with powerful scanning and pricing features
+version: 1.0.0+1  # Format is version+buildNumber
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

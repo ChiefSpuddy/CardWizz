@@ -47,9 +47,9 @@
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>Photo library access is required to import card images</string>
+		<string>CardWizz needs photo library access to import card images</string>
 		<key>NSCameraUsageDescription</key>
-		<string>Camera access is required to scan cards</string>
+		<string>CardWizz needs camera access to scan trading cards</string>
 		<key>NSContactsUsageDescription</key>
 		<string>Access to contacts is required to save business cards</string>
 		<key>com.apple.developer.icloud-container-identifiers</key>

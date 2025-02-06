@@ -306,14 +306,29 @@ class _DexScreenState extends State<DexScreen> {
 
   Future<void> _loadDexNames() async {
     setState(() => _isLoading = true);
-    final names = await _namesService.loadDexNames();
-    if (mounted) {
-      setState(() {
-        _allDexNames = names;
-        _isLoading = false;  // Remove the parenthesis here
-      });  // Fix the closure
-      // Preload first page of Pokemon data
-      _preloadPokemonData(0, _pageSize);
+    
+    try {
+      // Use existing method loadGenerationNames instead
+      final (start, end) = _generations['Gen 1']!;
+      final names = await _namesService.loadGenerationNames(start, end);
+      
+      if (mounted) {
+        setState(() {
+          _allDexNames = names;
+          _isLoading = false;
+        });
+        
+        // Preload first page of Pokemon data
+        _preloadPokemonData(0, _pageSize);
+      }
+    } catch (e) {
+      print('Error loading dex names: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _allDexNames = [];
+        });
+      }
     }
   }
 

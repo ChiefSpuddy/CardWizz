@@ -534,4 +534,7 @@ class StorageService {
     _debugLog('Starting price refresh...', verbose: true);
     // ...existing code...
   }
+
+  // Add this getter
+  String? get currentUserId => _currentUserId;
 }
