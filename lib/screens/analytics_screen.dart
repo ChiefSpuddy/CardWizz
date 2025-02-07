@@ -24,6 +24,8 @@ import '../services/dialog_service.dart';
 import '../utils/hero_tags.dart';  // Add this import
 import '../services/analytics_service.dart';  // Add this import
 import '../services/ebay_api_service.dart';  // Add this import
+// Add this import for launchUrl
+import 'package:url_launcher/url_launcher.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -64,7 +66,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   // Add this field
   bool _isLoadingMarketData = false;
   Map<String, dynamic>? _marketInsights;
-  Map<String, dynamic>? _marketActivity;
+  Map<String, dynamic>? _marketOpportunities;
+
+  // Add loading states
+  String? _marketDataError;
+  int _loadingProgress = 0;
+  int _totalCards = 0;
 
   @override
   void initState() {
@@ -1275,11 +1282,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    'Market Insights',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Market Opportunities',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (_isLoadingMarketData)
+                        Text(
+                          'Analyzing $_loadingProgress of $_totalCards cards...',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        )
+                      else
+                        Text(
+                          'Based on current eBay market prices',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 if (_isLoadingMarketData)
@@ -1295,50 +1321,36 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ),
               ],
             ),
-            const SizedBox(height: 16),
-            if (_marketInsights != null) ...[
-              _buildMarketStat(
-                'Total Active Listings',
-                '${_marketInsights!['totalListings']}',
-                Icons.store,
-              ),
-              _buildMarketStat(
-                'Average Market Price',
-                context.read<CurrencyProvider>().formatValue(_marketInsights!['averagePrice']),
-                Icons.payments,
-              ),
+            if (_marketDataError != null) ...[
               const SizedBox(height: 16),
-              Text(
-                'Market Activity',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              if (_marketActivity != null)
-                Row(
-                  children: [
-                    _buildActivityIndicator(
-                      'Last 24h',
-                      _marketActivity!['last_24h'] ?? 0,
-                      Colors.green,
-                    ),
-                    _buildActivityIndicator(
-                      'Last Week',
-                      _marketActivity!['last_week'] ?? 0,
-                      Colors.blue,
-                    ),
-                    _buildActivityIndicator(
-                      'Last Month',
-                      _marketActivity!['last_month'] ?? 0,
-                      Colors.purple,
-                    ),
-                  ],
+              _buildErrorState(_marketDataError!, () => _loadMarketData(cards)),
+            ] else if (_isLoadingMarketData) ...[
+              const SizedBox(height: 16),
+              _buildLoadingState(),
+            ] else if (_marketOpportunities != null) ...[
+              const SizedBox(height: 16),
+              if ((_marketOpportunities!['undervalued'] as List).isNotEmpty)
+                _buildOpportunitySection(
+                  'Selling Opportunities',
+                  'Cards you could sell for profit',
+                  _marketOpportunities!['undervalued'] as List,
+                  Colors.green,
+                  Icons.trending_up,
                 ),
-            ] else
+              if ((_marketOpportunities!['overvalued'] as List).isNotEmpty)
+                _buildOpportunitySection(
+                  'Buying Opportunities',
+                  'Cards you might want to wait to buy',
+                  _marketOpportunities!['overvalued'] as List,
+                  Colors.orange,
+                  Icons.trending_down,
+                ),
+            ] else if (!_isLoadingMarketData)
               Center(
                 child: TextButton.icon(
                   onPressed: () => _loadMarketData(cards),
                   icon: const Icon(Icons.update),
-                  label: const Text('Load Market Data'),
+                  label: const Text('Analyze Market Data'),
                 ),
               ),
           ],
@@ -1347,23 +1359,446 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _buildMarketStat(String label, String value, IconData icon) {
+  Widget _buildLoadingState() {
+    return Column(
+      children: [
+        const LinearProgressIndicator(),
+        const SizedBox(height: 16),
+        ...List.generate(2, (index) => 
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 20,
+                        width: 150,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 16,
+                        width: 100,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  height: 32,
+                  width: 80,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorState(String error, VoidCallback onRetry) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 48,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            error,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try Again'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Add this method to load market data
+  Future<void> _loadMarketData(List<TcgCard> cards) async {
+    if (_isLoadingMarketData) return;
+    
+    setState(() {
+      _isLoadingMarketData = true;
+      _marketDataError = null;
+      _loadingProgress = 0;
+      _totalCards = cards.length;
+    });
+    
+    try {
+      final ebayService = EbayApiService();
+      final opportunities = <String, List<Map<String, dynamic>>>{
+        'undervalued': [],
+        'overvalued': [],
+      };
+
+      // Process cards in smaller batches
+      const batchSize = 5;
+      for (var i = 0; i < cards.length; i += batchSize) {
+        final batch = cards.skip(i).take(batchSize).toList();
+        final results = await ebayService.getMarketOpportunities(batch);
+        
+        // Fix type casting
+        final undervalued = (results['undervalued'] as List)
+            .map((item) => item as Map<String, dynamic>)
+            .toList();
+        final overvalued = (results['overvalued'] as List)
+            .map((item) => item as Map<String, dynamic>)
+            .toList();
+        
+        // Add to opportunities
+        opportunities['undervalued']!.addAll(undervalued);
+        opportunities['overvalued']!.addAll(overvalued);
+        
+        if (mounted) {
+          setState(() => _loadingProgress = min(i + batchSize, cards.length));
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _marketOpportunities = opportunities;
+          _isLoadingMarketData = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading market data: $e');
+      if (mounted) {
+        setState(() {
+          _marketDataError = 'Failed to load market data. Please try again.';
+          _isLoadingMarketData = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildOpportunitySection(
+    String title,
+    String subtitle,
+    List<dynamic> opportunities,
+    Color color,
+    IconData icon,
+  ) {
+    // Fix type casting issue
+    final currencyProvider = context.read<CurrencyProvider>();
+    final typedOpportunities = opportunities.cast<Map<String, dynamic>>();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    // Update headers to be more clear
+                    title == 'Selling Opportunities' 
+                        ? 'Good Time to Sell'
+                        : 'Price Drop Alert',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    // Make the explanations more actionable
+                    title == 'Selling Opportunities'
+                        ? 'Market price is higher than your purchase price'
+                        : 'Market price is lower than current listings',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...typedOpportunities.take(3).map((card) {
+          final currentPrice = (card['currentPrice'] as num).toDouble();
+          final marketPrice = (card['marketPrice'] as num).toDouble();
+          final percentDiff = (card['percentDiff'] as num).toDouble();
+          final priceDiff = marketPrice - currentPrice;
+          final profit = priceDiff.abs();
+          
+          return InkWell(
+            onTap: () => _showMarketDetails(card),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          card['name'] as String,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        RichText(
+                          text: TextSpan(
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: title == 'Selling Opportunities' 
+                                    ? 'Your cost: ${currencyProvider.formatValue(currentPrice)}'
+                                    : 'Current price: ${currencyProvider.formatValue(currentPrice)}',
+                              ),
+                              const TextSpan(text: ' • '),
+                              TextSpan(
+                                text: title == 'Selling Opportunities'
+                                    ? 'Can sell for: ${currencyProvider.formatValue(marketPrice)}'
+                                    : 'Market price: ${currencyProvider.formatValue(marketPrice)}',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      title == 'Selling Opportunities'
+                          ? '+${currencyProvider.formatValue(profit)} profit'
+                          : '-${currencyProvider.formatValue(profit)} cheaper',
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+        // ...rest of existing code...
+      ],
+    );
+  }
+
+  void _showMarketDetails(Map<String, dynamic> card) {
+    final currencyProvider = context.read<CurrencyProvider>();
+    final currentPrice = (card['currentPrice'] as num).toDouble();
+    final marketPrice = (card['marketPrice'] as num).toDouble();
+    final priceDiff = marketPrice - currentPrice;
+    final isSellingOpportunity = priceDiff > 0;
+    final priceRange = card['priceRange'] as Map<String, dynamic>;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.surface,
+              Theme.of(context).colorScheme.surface.withOpacity(0.95),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    isSellingOpportunity ? Colors.green : Colors.orange,
+                    isSellingOpportunity 
+                        ? Colors.green.withOpacity(0.7) 
+                        : Colors.orange.withOpacity(0.7),
+                  ],
+                ),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    card['name'] as String,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isSellingOpportunity 
+                        ? 'Potential profit opportunity!'
+                        : 'Price is above market average',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildMarketDetailRow(
+                    'Your Collection Price',
+                    currencyProvider.formatValue(currentPrice),
+                    subtitle: 'Price when added to collection',
+                  ),
+                  _buildMarketDetailRow(
+                    'Current Market Price',
+                    currencyProvider.formatValue(marketPrice),
+                    subtitle: 'Based on recent listings',
+                  ),
+                  _buildMarketDetailRow(
+                    isSellingOpportunity ? 'Potential Profit' : 'Price Difference',
+                    currencyProvider.formatValue(priceDiff.abs()),
+                    isHighlight: true,
+                    color: isSellingOpportunity ? Colors.green : Colors.orange,
+                    subtitle: '${card['recentSales']} recent sales found',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildPriceRangeInfo(priceRange, currencyProvider),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            isSellingOpportunity ? Colors.green : Colors.blue,
+                            isSellingOpportunity 
+                                ? Colors.green.shade700 
+                                : Colors.blue.shade700,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final url = 'https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(card['name'] as String)} pokemon card';
+                          await _launchUrl(url);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.open_in_new, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              isSellingOpportunity 
+                                  ? 'Check Current Listings' 
+                                  : 'View on eBay',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMarketDetailRow(String label, String value, {
+    bool isHighlight = false,
+    Color? color,
+    String? subtitle,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
             ),
           ),
           Text(
             value,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
+              fontWeight: isHighlight ? FontWeight.bold : null,
+              color: color ?? (isHighlight ? Theme.of(context).colorScheme.primary : null),
             ),
           ),
         ],
@@ -1371,61 +1806,63 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _buildActivityIndicator(String label, int count, Color color) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              count.toString(),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+  Widget _buildPriceRangeInfo(Map<String, dynamic> priceRange, CurrencyProvider currencyProvider) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Market Price Range',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildPricePoint('Low', priceRange['min'] as double, currencyProvider),
+              _buildPricePoint('Median', priceRange['median'] as double, currencyProvider),
+              _buildPricePoint('High', priceRange['max'] as double, currencyProvider),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Future<void> _loadMarketData(List<TcgCard> cards) async {
-    if (_isLoadingMarketData) return;
-    
-    setState(() => _isLoadingMarketData = true);
-    
-    try {
-      final ebayService = EbayApiService();
-      final cardNames = cards.map((c) => c.name).toList();
-      
-      final insights = await ebayService.getMarketInsights(cardNames);
-      final activity = await ebayService.getMarketActivity(cardNames);
-      
+  Widget _buildPricePoint(String label, double price, CurrencyProvider currencyProvider) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 12,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          currencyProvider.formatValue(price),
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+
+  // Add helper method for launching URLs
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
       if (mounted) {
-        setState(() {
-          _marketInsights = insights;
-          _marketActivity = activity;
-          _isLoadingMarketData = false;
-        });
-      }
-    } catch (e) {
-      print('Error loading market data: $e');
-      if (mounted) {
-        setState(() => _isLoadingMarketData = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch URL')),
+        );
       }
     }
   }
