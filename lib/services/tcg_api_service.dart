@@ -107,13 +107,18 @@ class TcgApiService {
     }
   }
 
-  // Search an entire set
-  Future<Map<String, dynamic>> searchSet(String setId) async {
+  // Update searchSet to handle pagination
+  Future<Map<String, dynamic>> searchSet(
+    String setId, {
+    int page = 1,
+    int pageSize = 20,
+  }) async {
     return searchCards(
       query: 'set.id:$setId',
       orderBy: 'number',
       orderByDesc: false,
-      pageSize: 200,
+      page: page,
+      pageSize: pageSize,
     );
   }
 

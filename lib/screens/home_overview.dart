@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/storage_service.dart';
-import '../services/tcg_api_service.dart';  // Add this import
+import '../services/tcg_api_service.dart';
 import '../providers/app_state.dart';
 import '../models/tcg_card.dart';
 import '../screens/card_details_screen.dart';
@@ -15,6 +15,7 @@ import '../widgets/sign_in_view.dart';  // Add this import
 import '../screens/home_screen.dart';  // Add this import at the top with other imports
 import '../utils/hero_tags.dart';  // Add this import
 import '../services/collection_value_service.dart';  // Add this import
+import '../utils/cache_manager.dart';  // Add this import
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -26,6 +27,16 @@ class HomeOverview extends StatefulWidget {
 class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderStateMixin {
   late final AnimationController _animationController;
 
+  // Add these variables at the top of the class
+  static const int cardsPerPage = 20;
+  int _currentPage = 1;
+  bool _isLoadingMore = false;
+  final ScrollController _latestSetScrollController = ScrollController();
+
+  // Add this cache variable
+  static const String LATEST_SET_CACHE_KEY = 'latest_set_cards';
+  final _cacheManager = CustomCacheManager();  // Update the instance name
+
   @override
   void initState() {
     super.initState();
@@ -35,12 +46,62 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     );
     _animationController.forward();
     _animationController.repeat(reverse: true);
+    
+    _latestSetScrollController.addListener(_onLatestSetScroll);
   }
 
   @override
   void dispose() {
+    _latestSetScrollController.removeListener(_onLatestSetScroll);
+    _latestSetScrollController.dispose();
     _animationController.dispose();
     super.dispose();
+  }
+
+  void _onLatestSetScroll() {
+    if (_latestSetScrollController.position.pixels >
+        _latestSetScrollController.position.maxScrollExtent - 200 && !_isLoadingMore) {
+      _loadMoreLatestSetCards();
+    }
+  }
+
+  Future<void> _loadMoreLatestSetCards() async {
+    if (_isLoadingMore) return;
+    
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final nextPageData = await Provider.of<TcgApiService>(context, listen: false)
+          .searchSet('sv8pt5', page: _currentPage + 1, pageSize: cardsPerPage);
+      
+      final currentData = await _cacheManager.get('${LATEST_SET_CACHE_KEY}_sv8pt5');
+      if (currentData != null) {
+        final List currentCards = currentData['data'];
+        final List newCards = nextPageData['data'];
+        
+        // Merge and cache the new data
+        final mergedData = {
+          ...nextPageData,
+          'data': [...currentCards, ...newCards],
+        };
+        
+        await _cacheManager.set(
+          '${LATEST_SET_CACHE_KEY}_sv8pt5',
+          mergedData,
+          const Duration(hours: 1),
+        );
+        
+        setState(() {
+          _currentPage++;
+        });
+      }
+    } finally {
+      setState(() {
+        _isLoadingMore = false;
+      });
+    }
   }
 
   Widget _buildPriceChart(List<TcgCard> cards) {
@@ -271,111 +332,115 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
         ),
         SizedBox(
           height: 200,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: topCards.length,
-            itemBuilder: (context, index) {
-              final card = topCards[index];
-              return GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CardDetailsScreen(
-                      card: card,
-                      heroContext: 'home_top',
-                    ),
-                  ),
-                ),
-                child: Container(
-                  width: 140,
-                  margin: const EdgeInsets.only(right: 8),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Hero(
-                          tag: HeroTags.cardImage(card.id, context: 'home_top'),
-                          child: Image.network(
-                            card.imageUrl,
-                            fit: BoxFit.contain,
+          child: topCards.isEmpty
+              ? _buildCardLoadingAnimation()  // Replace shimmer
+              : ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: topCards.length,
+                  itemBuilder: (context, index) {
+                    final card = topCards[index];
+                    return GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CardDetailsScreen(
+                            card: card,
+                            heroContext: 'home_top',
                           ),
                         ),
                       ),
-                      if (card.price != null)
-                        Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: Text(
-                            currencyProvider.formatValue(card.price!),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
+                      child: Container(
+                        width: 140,
+                        margin: const EdgeInsets.only(right: 8),
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: Hero(
+                                tag: HeroTags.cardImage(card.id, context: 'home_top'),
+                                child: Image.network(
+                                  card.imageUrl,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (card.price != null)
+                              Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Text(
+                                  currencyProvider.formatValue(card.price!),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
         const SizedBox(height: 16),
         Card(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        localizations.translate('cardName'),
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        localizations.translate('value'),
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                  ],
-                ),
-                const Divider(height: 16),
-                ...topCards.take(5).map((card) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
+            child: topCards.isEmpty
+                ? _buildTableLoadingAnimation()  // Replace shimmer
+                : Column(
                     children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          card.name,
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          currencyProvider.formatValue(card.price ?? 0),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green.shade600,  // Modern green color
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              localizations.translate('cardName'),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
                           ),
-                          textAlign: TextAlign.right,
-                        ),
+                          Expanded(
+                            child: Text(
+                              localizations.translate('value'),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
                       ),
+                      const Divider(height: 16),
+                      ...topCards.take(5).map((card) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                card.name,
+                                style: const TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                currencyProvider.formatValue(card.price ?? 0),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green.shade600,  // Modern green color
+                                ),
+                                textAlign: TextAlign.right,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )),
                     ],
                   ),
-                )),
-              ],
-            ),
           ),
         ),
       ],
@@ -385,6 +450,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   Widget _buildLatestSetCards(BuildContext context) {
     final currencyProvider = context.watch<CurrencyProvider>();
     final localizations = AppLocalizations.of(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -401,7 +467,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 ),
               ),
               Text(
-                localizations.translate('surgingSparks'),
+                'Prismatic Evolution',  // Updated set name
                 style: TextStyle(
                   color: Colors.grey[600],
                   fontSize: 14,
@@ -413,82 +479,123 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
         SizedBox(
           height: 200,
           child: FutureBuilder(
-            future: Provider.of<TcgApiService>(context).searchSet('sv8'),
+            // Update the search query to use sv8pt5 instead of sv8
+            future: _getLatestSetCards(context, setId: 'sv8pt5'),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
+                return _buildCardLoadingAnimation();
               }
               final cards = (snapshot.data?['data'] as List?) ?? [];
               
-              // Sort cards by price
+              // Sort by set number in descending order (highest to lowest)
               cards.sort((a, b) {
-                final priceA = a['cardmarket']?['prices']?['averageSellPrice'] ?? 0.0;
-                final priceB = b['cardmarket']?['prices']?['averageSellPrice'] ?? 0.0;
-                return (priceB as num).compareTo(priceA as num);
+                final numA = int.tryParse(a['number'] ?? '') ?? 0;
+                final numB = int.tryParse(b['number'] ?? '') ?? 0;
+                return numB.compareTo(numA); // Reverse order for highest first
               });
 
-              return ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: cards.length.clamp(0, 10),
-                itemBuilder: (context, index) {
-                  final card = cards[index];
-                  // Convert API card data to TcgCard model
-                  final tcgCard = TcgCard(
-                    id: card['id'],
-                    name: card['name'],
-                    number: card['number'],
-                    imageUrl: card['images']['small'],
-                    rarity: card['rarity'],
-                    setName: card['set']?['name'],
-                    price: card['cardmarket']?['prices']?['averageSellPrice'],
-                  );
-                  
-                  return GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CardDetailsScreen(
-                          card: tcgCard,
-                          heroContext: 'home_top',
-                        ),
-                      ),
-                    ),
-                    child: Container(
-                      width: 140,
-                      margin: const EdgeInsets.only(right: 8),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Hero(
-                              tag: 'latest_${tcgCard.id}',
-                              child: Image.network(
-                                tcgCard.imageUrl,
-                                fit: BoxFit.contain,
-                              ),
+              return Stack(
+                children: [
+                  ListView.builder(
+                    controller: _latestSetScrollController,  // Add the scroll controller
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: cards.length + 1,  // Add 1 for loading indicator
+                    itemBuilder: (context, index) {
+                      if (index == cards.length) {
+                        return _isLoadingMore
+                            ? Container(
+                                width: 100,
+                                alignment: Alignment.center,
+                                child: const CircularProgressIndicator(),
+                              )
+                            : const SizedBox.shrink();
+                      }
+
+                      final card = cards[index];
+                      // Convert API card data to TcgCard model
+                      final tcgCard = TcgCard(
+                        id: card['id'],
+                        name: card['name'],
+                        number: card['number'],
+                        imageUrl: card['images']['small'],
+                        rarity: card['rarity'],
+                        setName: card['set']?['name'],
+                        price: card['cardmarket']?['prices']?['averageSellPrice'],
+                      );
+                      
+                      return GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CardDetailsScreen(
+                              card: tcgCard,
+                              heroContext: 'home_top',
                             ),
                           ),
-                          if (tcgCard.price != null)
-                            Padding(
-                              padding: const EdgeInsets.all(4),
-                              child: Text(
-                                currencyProvider.formatValue(tcgCard.price!),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+                        ),
+                        child: Container(
+                          width: 140,
+                          margin: const EdgeInsets.only(right: 8),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: Hero(
+                                  tag: 'latest_${tcgCard.id}',
+                                  child: Image.network(
+                                    tcgCard.imageUrl,
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                              if (tcgCard.price != null)
+                                Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Text(
+                                    currencyProvider.formatValue(tcgCard.price!),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               );
             },
           ),
         ),
       ],
     );
+  }
+
+  // Update the method to accept setId parameter
+  Future<Map<String, dynamic>> _getLatestSetCards(BuildContext context, {String setId = 'sv8pt5'}) async {
+    try {
+      // Update cache key to include setId
+      final cacheKey = '${LATEST_SET_CACHE_KEY}_$setId';
+      
+      // Try to get cached data first
+      final cachedData = await _cacheManager.get(cacheKey);
+      if (cachedData != null) {
+        return cachedData;
+      }
+
+      // If no cached data, fetch from API
+      final data = await Provider.of<TcgApiService>(context, listen: false).searchSet(setId, page: _currentPage, pageSize: cardsPerPage);
+      
+      // Cache the response for 1 hour
+      await _cacheManager.set(cacheKey, data, const Duration(hours: 1));
+      
+      return data;
+    } catch (e) {
+      print('Error loading latest set cards: $e');
+      rethrow;
+    }
   }
 
   Widget _buildEmptyState() {
@@ -792,5 +899,126 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
       return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
     }
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year.toString().substring(2)}';
+  }
+
+  // Add these new methods for shimmer loading effects
+  Widget _buildCardLoadingAnimation() {
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: 5,
+      itemBuilder: (context, index) {
+        return Container(
+          width: 140,
+          margin: const EdgeInsets.only(right: 8),
+          child: Column(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                height: 14,
+                width: 60,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTableLoadingAnimation() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: _buildLoadingBar(),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildLoadingBar(),
+            ),
+          ],
+        ),
+        const Divider(height: 16),
+        ...List.generate(
+          5,
+          (index) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: _buildLoadingBar(),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildLoadingBar(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingBar() {
+    return Container(
+      height: 14,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 1500),
+              builder: (context, value, child) {
+                return FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: value,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                          Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
