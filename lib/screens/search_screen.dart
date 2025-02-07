@@ -132,59 +132,92 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
 
   void _onScroll() {
     if (!_isLoading && 
-      _hasMorePages &&
-      _searchResults != null &&
-      _scrollController.position.pixels >= 
-      _scrollController.position.maxScrollExtent - 1200) {
-    _loadNextPage();
-  }
+        !_isLoadingMore &&  // Add this check
+        _hasMorePages &&
+        _searchResults != null &&
+        _scrollController.position.pixels >= 
+        _scrollController.position.maxScrollExtent - 1200) {
+      _loadNextPage();
+    }
   }
 
   void _loadNextPage() {
     if (_searchController.text.isNotEmpty || _lastQuery != null) {
+      setState(() => _isLoadingMore = true);  // Set loading more state
       _currentPage++;
-      // Pass the original query without modification
-      _performSearch(_lastQuery ?? _searchController.text, isLoadingMore: true, useOriginalQuery: true);
+      _performSearch(
+        _lastQuery ?? _searchController.text,
+        isLoadingMore: true,
+        useOriginalQuery: true,
+      );
     }
   }
 
-// Add this new method for a more stylish loading indicator
-Widget _buildLoadingState() {
-  final localizations = AppLocalizations.of(context);
-  return Center(  // Add this wrapper
-    child: Padding(
-      padding: const EdgeInsets.only(top: 80.0), // Changed from 120.0 to 80.0
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 32.0), // Added vertical padding
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          children: [
-            SizedBox(
-              width: 48,
-              height: 48,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  Theme.of(context).colorScheme.primary,
+  Widget _buildLoadingState() {
+    final localizations = AppLocalizations.of(context);
+    return Center(  // Add this wrapper
+      child: Padding(
+        padding: const EdgeInsets.only(top: 80.0), // Changed from 120.0 to 80.0
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 32.0), // Added vertical padding
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).colorScheme.primary,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              localizations.translate('searching'),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              const SizedBox(height: 16),
+              Text(
+                localizations.translate('searching'),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
+
+  Widget _buildLoadingMoreIndicator() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Text(
+            'Loading more...',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.secondary,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
 // Add helper method to detect set searches
 bool _isSetSearch(String query) {
@@ -299,7 +332,11 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
     });
   }
 
-  setState(() => _isLoading = true);
+  setState(() {
+    if (!isLoadingMore) {
+      _isLoading = true;
+    }
+  });
 
   try {
     if (!isLoadingMore) {
@@ -446,7 +483,7 @@ void _onSearchChanged(String query) {
   }
   
   _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-    if (mounted && query == _searchController.text && query.isNotEmpty) { // Fixed syntax error
+    if (mounted && query == _searchController.text && query.isNotEmpty) {  // Fixed syntax here
       setState(() {
         _currentPage = 1;
         _isInitialSearch = true;
@@ -1410,22 +1447,24 @@ String _formatSearchForDisplay(String query) {
       return SliverToBoxAdapter(child: _buildNoResultsMessage());
     }
 
-    return SliverGrid(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 0.7,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          if (index >= _searchResults!.length) {
-            return _hasMorePages ? _buildShimmerItem() : null;
-          }
-          return _buildCardGridItem(_searchResults![index]);
-        },
-        childCount: _searchResults!.length + (_hasMorePages ? 3 : 0),
-      ),
+    return SliverList(
+      delegate: SliverChildListDelegate([
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            childAspectRatio: 0.7,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+          ),
+          itemCount: _searchResults!.length,
+          itemBuilder: (context, index) => _buildCardGridItem(_searchResults![index]),
+        ),
+        if (_hasMorePages && !_isLoading)
+          _buildLoadingMoreIndicator(),
+      ]),
     );
   }
 
