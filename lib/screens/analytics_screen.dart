@@ -1360,49 +1360,94 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildLoadingState() {
+    // Calculate percentage for smoother progress
+    final progress = _totalCards > 0 ? _loadingProgress / _totalCards : 0.0;
+    final percentage = (progress * 100).toInt();
+    
     return Column(
       children: [
-        const LinearProgressIndicator(),
-        const SizedBox(height: 16),
-        ...List.generate(2, (index) => 
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        height: 20,
-                        width: 150,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceVariant,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: 16,
-                        width: 100,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
+        Container(
+          height: 24, // Increased height to fit percentage
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceVariant,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Stack(
+            children: [
+              // Animated progress bar
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+                height: double.infinity,
+                width: MediaQuery.of(context).size.width * progress,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.green.shade400,
+                      Colors.green.shade500,
                     ],
                   ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                Container(
-                  height: 32,
-                  width: 80,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceVariant,
-                    borderRadius: BorderRadius.circular(16),
+              ),
+              // Centered percentage text
+              Center(
+                child: Text(
+                  '$percentage%',
+                  style: TextStyle(
+                    color: percentage > 50 
+                        ? Colors.white 
+                        : Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.green.shade500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Analyzing card $_loadingProgress of $_totalCards',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    'This may take a few minutes',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],

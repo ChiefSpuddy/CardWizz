@@ -284,12 +284,16 @@ class EbayApiService {
       'overvalued': <Map<String, dynamic>>[],
     };
 
+    // Add progress tracking
+    int processedCards = 0;
+    final total = cards.length;
+
     for (final card in cards) {
       try {
-        print('Analyzing market for: ${card.name} (${card.setName ?? 'Unknown Set'})');
-        final currentPrice = (card.price ?? 0).toDouble();
+        processedCards++;
+        print('Analyzing market for: ${card.name} (${processedCards}/$total)');
         
-        // Skip cards with no price
+        final currentPrice = card.price ?? 0.0;
         if (currentPrice == 0) {
           print('Skipping ${card.name} - No current price');
           continue;
@@ -301,34 +305,19 @@ class EbayApiService {
           number: card.number,
         );
 
-        // Debug the results
-        print('Found ${results.length} listings for ${card.name}');
-
-        if (results.length >= 3) { // Require at least 3 listings for comparison
-          // Extract and validate prices
+        if (results.length >= 3) {
           final prices = results
-              .map((r) => r['price'])
-              .whereType<num>()
-              .map((p) => p.toDouble())
+              .map((r) => (r['price'] as num).toDouble())
               .where((p) => p > 0)
               .toList();
 
-          if (prices.length >= 3) { // Also require at least 3 valid prices
+          if (prices.length >= 3) {
             prices.sort();
-
-            // Calculate median instead of average for more stability
             final medianPrice = prices[prices.length ~/ 2];
             final priceDiff = medianPrice - currentPrice;
             final percentDiff = (priceDiff / currentPrice) * 100;
 
-            print('Analysis for ${card.name}:');
-            print('- Current price: \$${currentPrice.toStringAsFixed(2)}');
-            print('- Market price: \$${medianPrice.toStringAsFixed(2)}');
-            print('- Difference: ${priceDiff.toStringAsFixed(2)}');
-            print('- Percent diff: ${percentDiff.toStringAsFixed(1)}%');
-
-            // Adjust thresholds for opportunities
-            if (percentDiff.abs() >= 20) { // Increase threshold to 20%
+            if (percentDiff.abs() >= 15) {
               final insight = {
                 'id': card.id,
                 'name': card.name,
@@ -344,47 +333,23 @@ class EbayApiService {
                 },
               };
 
-              // Changed logic - undervalued when market price is higher
-              if (medianPrice > currentPrice * 1.2) { // 20% higher
-                print('Adding ${card.name} to undervalued opportunities');
+              if (medianPrice > currentPrice * 1.15) {
                 opportunities['undervalued']!.add(insight);
-              } else if (medianPrice < currentPrice * 0.8) { // 20% lower
-                print('Adding ${card.name} to overvalued opportunities');
+                print('Added ${card.name} to undervalued (${opportunities['undervalued']!.length})');
+              } else if (medianPrice < currentPrice * 0.85) {
                 opportunities['overvalued']!.add(insight);
+                print('Added ${card.name} to overvalued (${opportunities['overvalued']!.length})');
               }
             }
           }
         }
 
-        // Add delay to avoid rate limiting
         await Future.delayed(const Duration(milliseconds: 500));
 
       } catch (e) {
         print('Error analyzing market for ${card.name}: $e');
-        continue;
       }
     }
-
-    // Sort by potential profit/savings
-    for (final category in opportunities.keys) {
-      opportunities[category]!.sort((a, b) {
-        // Fix type casting by doing it separately
-        final aMarket = (a['marketPrice'] as num).toDouble();
-        final aCurrent = (a['currentPrice'] as num).toDouble();
-        final bMarket = (b['marketPrice'] as num).toDouble();
-        final bCurrent = (b['currentPrice'] as num).toDouble();
-        
-        // Calculate differences
-        final aDiff = (aMarket - aCurrent).abs();
-        final bDiff = (bMarket - bCurrent).abs();
-        
-        return bDiff.compareTo(aDiff);
-      });
-    }
-
-    print('Analysis complete:');
-    print('- Undervalued cards: ${opportunities['undervalued']!.length}');
-    print('- Overvalued cards: ${opportunities['overvalued']!.length}');
 
     return opportunities;
   }
