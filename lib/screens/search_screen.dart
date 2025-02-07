@@ -1187,7 +1187,7 @@ String _formatSearchForDisplay(String query) {
         ),
         child: Scaffold(
           appBar: AppBar(
-            toolbarHeight: 120, // Increased height for toggle + search
+            toolbarHeight: 44, // Changed from 120 to 44 to match collections
             backgroundColor: Theme.of(context).colorScheme.surface,
             elevation: 0,
             leadingWidth: 72,
@@ -1209,177 +1209,59 @@ String _formatSearchForDisplay(String query) {
                 ),
               ),
             ),
-            title: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
-                  child: Container(
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: SegmentedButton<SearchMode>(
-                      showSelectedIcon: false,
-                      style: ButtonStyle(
-                        visualDensity: VisualDensity.compact,
-                        side: MaterialStateProperty.all(BorderSide.none),
-                        overlayColor: MaterialStateProperty.all(Colors.transparent),
+            title: Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 12),
+                  Icon(
+                    Icons.search,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: _searchMode == SearchMode.cards 
+                          ? 'Search cards...' 
+                          : 'Search sets...',
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        hintStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        ),
                       ),
-                      selected: {_searchMode},
-                      onSelectionChanged: (Set<SearchMode> modes) {
-                        setState(() {
-                          _searchMode = modes.first;
-                          _searchResults = null;
-                          _setResults = null;
-                          _searchController.clear();
-                          _showCategories = true;
-                        });
-                      },
-                      segments: [
-                        ButtonSegment(
-                          value: SearchMode.cards,
-                          label: Container(
-                            height: double.infinity,
-                            width: 110, // Added explicit width
-                            decoration: BoxDecoration(
-                              gradient: _searchMode == SearchMode.cards ? LinearGradient( // Fix gradient condition
-                                colors: isDark ? [
-                                  Colors.blue[900]!,
-                                  Colors.blue[800]!,
-                                ] : [
-                                  Theme.of(context).colorScheme.primary,
-                                  Theme.of(context).colorScheme.secondary,
-                                ],
-                              ) : null,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.style,
-                                  size: 16,
-                                  color: _searchMode == SearchMode.cards
-                                    ? Colors.white
-                                    : Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Cards',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: _searchMode == SearchMode.cards
-                                      ? Colors.white
-                                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        ButtonSegment(
-                          value: SearchMode.sets,
-                          label: Container(
-                            height: double.infinity,
-                            width: 110, // Added explicit width
-                            decoration: BoxDecoration(
-                              gradient: _searchMode == SearchMode.sets ? LinearGradient( // Fix gradient condition
-                                colors: isDark ? [
-                                  Colors.blue[900]!,
-                                  Colors.blue[800]!,
-                                ] : [
-                                  Theme.of(context).colorScheme.primary,
-                                  Theme.of(context).colorScheme.secondary,
-                                ],
-                              ) : null,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.collections_bookmark,
-                                  size: 16,
-                                  color: _searchMode == SearchMode.sets
-                                    ? Colors.white
-                                    : Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Sets',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: _searchMode == SearchMode.sets
-                                      ? Colors.white
-                                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      onChanged: _onSearchChanged,
+                      textInputAction: TextInputAction.search,
                     ),
                   ),
-                ),
-                Container(
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.search,
-                        size: 20,
+                  if (_searchController.text.isNotEmpty)
+                    IconButton(
+                      icon: Icon(
+                        Icons.clear,
+                        size: 18,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: _searchMode == SearchMode.cards 
-                              ? 'Search cards...' 
-                              : 'Search sets...',
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                            hintStyle: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
-                            ),
-                          ),
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                          onChanged: _onSearchChanged,
-                          textInputAction: TextInputAction.search,
-                        ),
+                      onPressed: _clearSearch,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
                       ),
-                      if (_searchController.text.isNotEmpty)
-                        IconButton(
-                          icon: Icon(
-                            Icons.clear,
-                            size: 18,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          onPressed: _clearSearch,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                ],
+              ),
             ),
             actions: [
               IconButton(
@@ -1391,6 +1273,125 @@ String _formatSearchForDisplay(String query) {
                 onPressed: _showSortOptions,
               ),
             ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(52),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Container(
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: SegmentedButton<SearchMode>(
+                    showSelectedIcon: false,
+                    style: ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                      side: MaterialStateProperty.all(BorderSide.none),
+                      overlayColor: MaterialStateProperty.all(Colors.transparent),
+                    ),
+                    selected: {_searchMode},
+                    onSelectionChanged: (Set<SearchMode> modes) {
+                      setState(() {
+                        _searchMode = modes.first;
+                        _searchResults = null;
+                        _setResults = null;
+                        _searchController.clear();
+                        _showCategories = true;
+                      });
+                    },
+                    segments: [
+                      ButtonSegment(
+                        value: SearchMode.cards,
+                        label: Container(
+                          height: double.infinity,
+                          width: MediaQuery.of(context).size.width * 0.44, // Make buttons wider
+                          decoration: BoxDecoration(
+                            gradient: _searchMode == SearchMode.cards ? LinearGradient(
+                              // ...existing gradient...
+                              colors: isDark ? [
+                                Colors.blue[900]!,
+                                Colors.blue[800]!,
+                              ] : [
+                                Theme.of(context).colorScheme.primary,
+                                Theme.of(context).colorScheme.secondary,
+                              ],
+                            ) : null,
+                            borderRadius: BorderRadius.circular(18), // Increased from 8
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.style,
+                                size: 16,
+                                color: _searchMode == SearchMode.cards
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Cards',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: _searchMode == SearchMode.cards
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      ButtonSegment(
+                        value: SearchMode.sets,
+                        label: Container(
+                          height: double.infinity,
+                          width: MediaQuery.of(context).size.width * 0.44, // Make buttons wider
+                          decoration: BoxDecoration(
+                            gradient: _searchMode == SearchMode.sets ? LinearGradient(
+                              // ...existing gradient...
+                              colors: isDark ? [
+                                Colors.blue[900]!,
+                                Colors.blue[800]!,
+                              ] : [
+                                Theme.of(context).colorScheme.primary,
+                                Theme.of(context).colorScheme.secondary,
+                              ],
+                            ) : null,
+                            borderRadius: BorderRadius.circular(18), // Increased from 8
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.collections_bookmark,
+                                size: 16,
+                                color: _searchMode == SearchMode.sets
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Sets',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: _searchMode == SearchMode.sets
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
           body: _buildContent(),
         ),
