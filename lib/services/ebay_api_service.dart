@@ -175,4 +175,80 @@ class EbayApiService {
     final squares = values.map((x) => pow(x - mean, 2));
     return sqrt(squares.reduce((a, b) => a + b) / values.length);
   }
+
+  Future<Map<String, dynamic>> getMarketInsights(List<String> cardNames) async {
+    int totalListings = 0;
+    double averagePrice = 0;
+    int processedCards = 0;
+    final priceRanges = <String, int>{
+      'under_5': 0,
+      '5_to_20': 0,
+      '20_to_50': 0,
+      '50_to_100': 0,
+      'over_100': 0,
+    };
+
+    for (final name in cardNames) {
+      try {
+        final results = await getRecentSales(name);
+        if (results.isNotEmpty) {
+          final prices = results
+              .map((r) => double.tryParse(r['price'].toString()) ?? 0)
+              .where((p) => p > 0)
+              .toList();
+
+          if (prices.isNotEmpty) {
+            totalListings += prices.length;
+            averagePrice += prices.reduce((a, b) => a + b) / prices.length;
+            processedCards++;
+
+            for (final price in prices) {
+              if (price < 5) priceRanges['under_5'] = (priceRanges['under_5'] ?? 0) + 1;
+              else if (price < 20) priceRanges['5_to_20'] = (priceRanges['5_to_20'] ?? 0) + 1;
+              else if (price < 50) priceRanges['20_to_50'] = (priceRanges['20_to_50'] ?? 0) + 1;
+              else if (price < 100) priceRanges['50_to_100'] = (priceRanges['50_to_100'] ?? 0) + 1;
+              else priceRanges['over_100'] = (priceRanges['over_100'] ?? 0) + 1;
+            }
+          }
+        }
+      } catch (e) {
+        print('Error getting market insights for $name: $e');
+      }
+    }
+
+    return {
+      'totalListings': totalListings,
+      'averagePrice': processedCards > 0 ? averagePrice / processedCards : 0,
+      'priceRanges': priceRanges,
+      'processedCards': processedCards,
+    };
+  }
+
+  Future<Map<String, dynamic>> getMarketActivity(List<String> cardNames) async {
+    final now = DateTime.now();
+    final activityMap = <String, int>{
+      'last_24h': 0,
+      'last_week': 0,
+      'last_month': 0,
+    };
+
+    for (final name in cardNames) {
+      try {
+        final results = await getRecentSales(name);
+        for (final sale in results) {
+          final date = DateTime.tryParse(sale['soldDate'] ?? '');
+          if (date != null) {
+            final difference = now.difference(date);
+            if (difference.inHours <= 24) activityMap['last_24h'] = (activityMap['last_24h'] ?? 0) + 1;
+            if (difference.inDays <= 7) activityMap['last_week'] = (activityMap['last_week'] ?? 0) + 1;
+            if (difference.inDays <= 30) activityMap['last_month'] = (activityMap['last_month'] ?? 0) + 1;
+          }
+        }
+      } catch (e) {
+        print('Error getting market activity for $name: $e');
+      }
+    }
+
+    return activityMap;
+  }
 }

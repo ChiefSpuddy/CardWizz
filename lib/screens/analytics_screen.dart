@@ -23,6 +23,7 @@ import '../services/dialog_manager.dart';  // Add this import
 import '../services/dialog_service.dart';
 import '../utils/hero_tags.dart';  // Add this import
 import '../services/analytics_service.dart';  // Add this import
+import '../services/ebay_api_service.dart';  // Add this import
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -59,6 +60,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   BuildContext? _dialogContext;
   StreamSubscription? _progressSubscription;
   StreamSubscription? _completeSubscription;
+
+  // Add this field
+  bool _isLoadingMarketData = false;
+  Map<String, dynamic>? _marketInsights;
+  Map<String, dynamic>? _marketActivity;
 
   @override
   void initState() {
@@ -1259,6 +1265,171 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  Widget _buildMarketInsightsCard(List<TcgCard> cards) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Market Insights',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (_isLoadingMarketData)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: () => _loadMarketData(cards),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_marketInsights != null) ...[
+              _buildMarketStat(
+                'Total Active Listings',
+                '${_marketInsights!['totalListings']}',
+                Icons.store,
+              ),
+              _buildMarketStat(
+                'Average Market Price',
+                context.read<CurrencyProvider>().formatValue(_marketInsights!['averagePrice']),
+                Icons.payments,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Market Activity',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              if (_marketActivity != null)
+                Row(
+                  children: [
+                    _buildActivityIndicator(
+                      'Last 24h',
+                      _marketActivity!['last_24h'] ?? 0,
+                      Colors.green,
+                    ),
+                    _buildActivityIndicator(
+                      'Last Week',
+                      _marketActivity!['last_week'] ?? 0,
+                      Colors.blue,
+                    ),
+                    _buildActivityIndicator(
+                      'Last Month',
+                      _marketActivity!['last_month'] ?? 0,
+                      Colors.purple,
+                    ),
+                  ],
+                ),
+            ] else
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => _loadMarketData(cards),
+                  icon: const Icon(Icons.update),
+                  label: const Text('Load Market Data'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMarketStat(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityIndicator(String label, int count, Color color) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              count.toString(),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadMarketData(List<TcgCard> cards) async {
+    if (_isLoadingMarketData) return;
+    
+    setState(() => _isLoadingMarketData = true);
+    
+    try {
+      final ebayService = EbayApiService();
+      final cardNames = cards.map((c) => c.name).toList();
+      
+      final insights = await ebayService.getMarketInsights(cardNames);
+      final activity = await ebayService.getMarketActivity(cardNames);
+      
+      if (mounted) {
+        setState(() {
+          _marketInsights = insights;
+          _marketActivity = activity;
+          _isLoadingMarketData = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading market data: $e');
+      if (mounted) {
+        setState(() => _isLoadingMarketData = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSignedIn = context.watch<AppState>().isAuthenticated;
@@ -1328,6 +1499,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 _buildValueSummary(cards),
                                 const SizedBox(height: 12),
                                 _buildValueTrendCard(cards),
+                                const SizedBox(height: 16),
+                                _buildMarketInsightsCard(cards), // Add this line
                                 const SizedBox(height: 16),
                                 _buildTopMovers(cards),
                                 const SizedBox(height: 16),
