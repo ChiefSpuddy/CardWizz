@@ -13,6 +13,9 @@ import '../providers/currency_provider.dart';
 import '../l10n/app_localizations.dart';  // Add this import
 import '../constants/layout.dart';  // Add this import
 
+// Move enum outside the class
+enum SearchMode { cards, sets }
+
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -47,13 +50,21 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
       {'name': 'Neo Destiny', 'icon': '⭐', 'year': '2002', 'query': 'set.id:neo4', 'description': 'Neo Destiny set'},
     ],
     'modern': [
-      {'name': 'Prismatic Evolution', 'icon': '💎', 'release': '2024', 'query': 'set.id:sv8pt5', 'description': 'Latest expansion'},
+      {'name': 'Prismatic Evolution', 'icon': '💎', 'release': '2024', 'query': 'set.id:sv8pt5', 'description': 'Special set'},
       {'name': 'Surging Sparks', 'icon': '⚡', 'release': '2024', 'query': 'set.id:sv8', 'description': 'Electric themed set'},
       {'name': '151', 'icon': '🌟', 'release': '2023', 'query': 'set.id:sv3pt5', 'description': 'Original 151 Pokemon'},
       {'name': 'Temporal Forces', 'icon': '⌛', 'release': '2024', 'query': 'set.id:sv5', 'description': 'Time themed set'},
       {'name': 'Paradox Rift', 'icon': '🌀', 'release': '2023', 'query': 'set.id:sv4', 'description': 'Paradox Pokemon'},
       {'name': 'Obsidian Flames', 'icon': '🔥', 'release': '2023', 'query': 'set.id:sv3', 'description': 'Fire themed set'},
       {'name': 'Paldea Evolved', 'icon': '🌟', 'release': '2023', 'query': 'set.id:sv2', 'description': 'Paldean Pokemon'},
+      {'name': 'Scarlet & Violet', 'icon': '⚔️', 'release': '2023', 'query': 'set.id:sv1', 'description': 'Base SV set'},
+    ],
+    'swsh': [  // Add new SWSH category
+      {'name': 'Crown Zenith', 'icon': '👑', 'release': '2023', 'query': 'set.id:swsh12pt5', 'description': 'Final SwSh set'},
+      {'name': 'Silver Tempest', 'icon': '⚡', 'release': '2022', 'query': 'set.id:swsh12', 'description': 'Silver themed'},
+      {'name': 'Lost Origin', 'icon': '🌌', 'release': '2022', 'query': 'set.id:swsh11', 'description': 'Lost Zone cards'},
+      {'name': 'Astral Radiance', 'icon': '✨', 'release': '2022', 'query': 'set.id:swsh10', 'description': 'Astral cards'},
+      {'name': 'Brilliant Stars', 'icon': '💫', 'release': '2022', 'query': 'set.id:swsh9', 'description': 'Brilliant cards'},
     ],
     'special': [
       {'name': 'Special Illustration', 'icon': '🎨', 'query': 'rarity:"Special Illustration Rare"', 'description': 'Special art cards'},
@@ -89,6 +100,10 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
 
   // Add field to track last query
   String? _lastQuery;
+
+  // Add search mode state
+  SearchMode _searchMode = SearchMode.cards;
+  List<dynamic>? _setResults;
 
   @override
   void initState() {
@@ -217,24 +232,36 @@ String? _getSetIdFromName(String query) {
   return containsMatch['query']?.isNotEmpty ?? false ? containsMatch['query'] : null;
 }
 
-// Update _buildSearchQuery method to fix null-safety issue
+// Update _buildSearchQuery method to handle raw number searches better
 String _buildSearchQuery(String query) {
+  // Clean the input query
+  query = query.trim();
+  
   // Check for exact set.id: prefix first
   if (query.startsWith('set.id:')) {
     return query;
   }
-  
+
   // Try to match set name
   final setId = _getSetIdFromName(query);
   if (setId != null) {
-    return setId;  // This will be in format 'set.id:xyz'
+    return setId;
   }
-  
-  // Check for number pattern
-  final numberMatch = RegExp(r'(\d+)(?:/\d+)?$').firstMatch(query);
-  if (numberMatch != null) {
-    final number = numberMatch.group(1)!;
-    final name = query.substring(0, numberMatch.start).trim();
+
+  // Handle number-only patterns first
+  final numberPattern = RegExp(r'^(\d+)(?:/\d+)?$');
+  final match = numberPattern.firstMatch(query);
+  if (match != null) {
+    final number = match.group(1)!;
+    return 'number:"$number"';
+  }
+
+  // Handle name + number patterns
+  final nameNumberPattern = RegExp(r'^(.*?)\s+(\d+)(?:/\d+)?$');
+  final nameNumberMatch = nameNumberPattern.firstMatch(query);
+  if (nameNumberMatch != null) {
+    final name = nameNumberMatch.group(1)?.trim() ?? '';
+    final number = nameNumberMatch.group(2)!;
     
     if (name.isNotEmpty) {
       return 'name:"$name" number:"$number"';
@@ -242,24 +269,11 @@ String _buildSearchQuery(String query) {
       return 'number:"$number"';
     }
   }
-  
-  // For non-number searches, check if it exactly matches a set name
-  final normalizedQuery = query.toLowerCase().trim();
-  final allSets = [
-    ...searchCategories['vintage']!,
-    ...searchCategories['modern']!,
-  ];
-  
-  final matchingSet = allSets.any((set) => 
-    set['name']!.toLowerCase() == normalizedQuery
-  );
-  
-  if (matchingSet) {
-    return 'set:"$query"';
-  }
-  
+
   // Default to name search
-  return 'name:"*$query*"';
+  return query.contains(' ') 
+    ? 'name:"$query"'
+    : 'name:"*$query*"';
 }
 
 // Update _performSearch method to handle sort order correctly
@@ -420,7 +434,9 @@ void _onSearchChanged(String query) {
   if (query.isEmpty) {
     setState(() {
       _searchResults = null;
+      _setResults = null;
       _isInitialSearch = true;
+      _showCategories = true;
     });
     return;
   }
@@ -430,12 +446,16 @@ void _onSearchChanged(String query) {
   }
   
   _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-    if (mounted && query == _searchController.text && query.isNotEmpty) {
+    if (mounted && query == _searchController.text && query.isNotEmpty) { // Fixed syntax error
       setState(() {
         _currentPage = 1;
         _isInitialSearch = true;
       });
-      _performSearch(query);
+      if (_searchMode == SearchMode.cards) {
+        _performSearch(query);
+      } else {
+        _performSetSearch(query);
+      }
     }
   });
 }
@@ -447,86 +467,47 @@ void _onSearchChanged(String query) {
       _searchResults = null;
       _currentPage = 1;
       _hasMorePages = true;
+      _showCategories = false;  // Hide categories when searching
+      _lastQuery = searchItem['query'];  // Add this line
     });
 
     try {
-      // Add retry logic and better query handling
-      String query = searchItem['query'] ?? '';
+      final query = searchItem['query'] as String;
       
-      // Always use original query for pagination
-      final originalQuery = query;
+      print('Executing quick search: $query');
       
-      // For set searches, use number sorting
-      if (query.startsWith('set.id:')) {
-        _currentSort = 'number';
-        _sortAscending = true;
-      } else if (query.contains('rarity:')) {
-        _currentSort = 'cardmarket.prices.averageSellPrice';
-        _sortAscending = false;
-      }
-
-      print('Executing search with query: $query, sort: $_currentSort ${_sortAscending ? 'ASC' : 'DESC'})');
-
-      int retryCount = 0;
-      Map<String, dynamic> results;
-
-      do {
-        results = await _apiService.searchCards(
-          query: query,
-          page: _currentPage,
-          pageSize: 30,
-          orderBy: _currentSort,
-          orderByDesc: !_sortAscending,
-        );
-
-        if ((results['data'] as List).isNotEmpty || retryCount >= 2) break;
-        
-        // If no results, try alternative query
-        if (query.startsWith('set.id:')) {
-          query = 'set:"${searchItem['name']}"';
-          print('Retrying with alternative query: $query');
-        }
-        
-        retryCount++;
-      } while (retryCount < 3);
+      final results = await _apiService.searchCards(
+        query: query,
+        page: 1,
+        pageSize: 30,
+        orderBy: _currentSort,
+        orderByDesc: !_sortAscending,
+      );
 
       if (mounted) {
         final List<dynamic> cardData = results['data'] as List? ?? [];
         final totalCount = results['totalCount'] as int? ?? 0;
         
-        if (cardData.isEmpty) {
-          print('No results found for query: $query');
-        } else {
-          print('Found ${cardData.length} cards for query: $query');
-        }
-
         final newCards = cardData
             .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
             .toList();
 
         setState(() {
-          _totalCards = totalCount;
-          _hasMorePages = _currentPage * 30 < totalCount;
           _searchResults = newCards;
+          _totalCards = totalCount;
           _isLoading = false;
-          _isInitialSearch = false;
-          // Store original query for pagination
-          _lastQuery = originalQuery;
+          _hasMorePages = (_currentPage * 30) < totalCount;
+          _lastQuery = query;  // Store query for pagination
         });
       }
     } catch (e) {
-      print('Search error with query: ${searchItem['query']} - Error: $e');
+      print('Quick search error: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _searchResults = null;
+          _searchResults = [];
+          _totalCards = 0;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Search failed: ${e.toString()}'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
       }
     }
   }
@@ -538,8 +519,9 @@ Widget _buildSearchCategories() {
     children: [
       _buildSearchSection('Vintage Sets', searchCategories['vintage']!, Icons.auto_awesome),
       _buildSearchSection('Latest Sets', searchCategories['modern']!, Icons.new_releases),
-      _buildSearchSection('Special Cards', searchCategories['special']!, Icons.stars),
-      _buildSearchSection('Popular', searchCategories['popular']!, Icons.local_fire_department),
+      _buildSearchSection('Sword & Shield', searchCategories['swsh']!, Icons.shield),
+      _buildSpecialSearches('Special Cards', searchCategories['special']!, Icons.stars),
+      _buildSpecialSearches('Popular', searchCategories['popular']!, Icons.local_fire_department),
     ],
   );
 }
@@ -572,15 +554,91 @@ Widget _buildSearchSection(String title, List<Map<String, dynamic>> items, IconD
         ),
       ),
       SizedBox(
-        height: 64,  // Even more compact
+        height: 80, // Increased height for better logos
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           itemCount: items.length,
-          itemBuilder: (context, index) => _buildSearchCard(items[index]),
+          itemBuilder: (context, index) => _buildSetCard(items[index]),
         ),
       ),
     ],
+  );
+}
+
+// Add new method for special/popular searches with text
+Widget _buildSpecialSearches(String title, List<Map<String, dynamic>> items, IconData icon) {
+  final colorScheme = Theme.of(context).colorScheme;
+  
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        child: Row(
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onBackground,
+              ),
+            ),
+            const Spacer(),
+            Icon(
+              Icons.chevron_right,
+              size: 14,
+              color: colorScheme.primary.withOpacity(0.5),
+            ),
+          ],
+        ),
+      ),
+      SizedBox(
+        height: 48, // Smaller height for text-based items
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: items.length,
+          itemBuilder: (context, index) => _buildSpecialSearchCard(items[index]),
+        ),
+      ),
+    ],
+  );
+}
+
+// Add method for special search card with text
+Widget _buildSpecialSearchCard(Map<String, dynamic> item) {
+  final colorScheme = Theme.of(context).colorScheme;
+  
+  return Card(
+    elevation: 0,
+    margin: const EdgeInsets.symmetric(horizontal: 4),
+    child: InkWell(
+      onTap: () => _performQuickSearch(item),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              item['icon'],
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              item['name'],
+              style: TextStyle(
+                fontSize: 13,
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
   );
 }
 
@@ -721,7 +779,7 @@ Widget _buildRecentSearches() {
           child: ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
+            padding: const EdgeInsets.symmetric(vertical: 8), // Add vertical padding
             itemCount: searches.length,
             separatorBuilder: (context, index) => Divider(
               height: 1,
@@ -731,7 +789,7 @@ Widget _buildRecentSearches() {
             itemBuilder: (context, index) {
               final search = searches[index];
               return ListTile(
-                contentPadding: const EdgeInsets.fromLTRB(16, 0, 12, 0),
+                contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4), // Add vertical padding
                 visualDensity: VisualDensity.compact,
                 leading: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
@@ -1068,99 +1126,223 @@ String _formatSearchForDisplay(String query) {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Theme(
         data: Theme.of(context).copyWith(
-          cardTheme: CardTheme(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+          segmentedButtonTheme: SegmentedButtonThemeData(
+            style: ButtonStyle(
+              padding: MaterialStateProperty.all(EdgeInsets.zero),
+              minimumSize: MaterialStateProperty.all(const Size(120, 36)), // Increased from 80 to 120
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              backgroundColor: MaterialStateProperty.resolveWith<Color>((states) {
+                return Colors.transparent;
+              }),
+              // Remove showDefaultIndicator and use these properties instead
+              side: MaterialStateProperty.all(BorderSide.none),
+              shadowColor: MaterialStateProperty.all(Colors.transparent),
+              surfaceTintColor: MaterialStateProperty.all(Colors.transparent),
+              overlayColor: MaterialStateProperty.all(Colors.transparent),
             ),
-            color: Theme.of(context).colorScheme.surface,
           ),
         ),
         child: Scaffold(
           appBar: AppBar(
-            toolbarHeight: 56, // Reduced height
+            toolbarHeight: 120, // Increased height for toggle + search
             backgroundColor: Theme.of(context).colorScheme.surface,
             elevation: 0,
-            leadingWidth: 72, // Increase this to create more space
+            leadingWidth: 72,
             leading: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8), // Adjust padding to move icon right
-              child: Material(
-                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              child: AspectRatio(  // Add this to maintain aspect ratio
+                aspectRatio: 1,
+                child: Material(
+                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(12),
-                  onTap: () => Navigator.pushNamed(context, '/scanner'),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    alignment: Alignment.center,
-                    child: Icon(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => Navigator.pushNamed(context, '/scanner'),
+                    child: const Icon(
                       Icons.camera_alt_outlined,
                       size: 20,
-                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),
               ),
             ),
-            title: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 12),
-                  Icon(
-                    Icons.search,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: AppLocalizations.of(context).translate('searchCards'),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                        hintStyle: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+            title: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
+                  child: Container(
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: SegmentedButton<SearchMode>(
+                      showSelectedIcon: false,
+                      style: ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        side: MaterialStateProperty.all(BorderSide.none),
+                        overlayColor: MaterialStateProperty.all(Colors.transparent),
+                      ),
+                      selected: {_searchMode},
+                      onSelectionChanged: (Set<SearchMode> modes) {
+                        setState(() {
+                          _searchMode = modes.first;
+                          _searchResults = null;
+                          _setResults = null;
+                          _searchController.clear();
+                          _showCategories = true;
+                        });
+                      },
+                      segments: [
+                        ButtonSegment(
+                          value: SearchMode.cards,
+                          label: Container(
+                            height: double.infinity,
+                            width: 110, // Added explicit width
+                            decoration: BoxDecoration(
+                              gradient: _searchMode == SearchMode.cards ? LinearGradient( // Fix gradient condition
+                                colors: isDark ? [
+                                  Colors.blue[900]!,
+                                  Colors.blue[800]!,
+                                ] : [
+                                  Theme.of(context).colorScheme.primary,
+                                  Theme.of(context).colorScheme.secondary,
+                                ],
+                              ) : null,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.style,
+                                  size: 16,
+                                  color: _searchMode == SearchMode.cards
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Cards',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: _searchMode == SearchMode.cards
+                                      ? Colors.white
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      onChanged: _onSearchChanged,
-                      textInputAction: TextInputAction.search,
+                        ButtonSegment(
+                          value: SearchMode.sets,
+                          label: Container(
+                            height: double.infinity,
+                            width: 110, // Added explicit width
+                            decoration: BoxDecoration(
+                              gradient: _searchMode == SearchMode.sets ? LinearGradient( // Fix gradient condition
+                                colors: isDark ? [
+                                  Colors.blue[900]!,
+                                  Colors.blue[800]!,
+                                ] : [
+                                  Theme.of(context).colorScheme.primary,
+                                  Theme.of(context).colorScheme.secondary,
+                                ],
+                              ) : null,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.collections_bookmark,
+                                  size: 16,
+                                  color: _searchMode == SearchMode.sets
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Sets',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: _searchMode == SearchMode.sets
+                                      ? Colors.white
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  if (_searchController.text.isNotEmpty)
-                    IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        size: 18,
+                ),
+                Container(
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 12),
+                      Icon(
+                        Icons.search,
+                        size: 20,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchResults = null);
-                      },
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 32,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            hintText: _searchMode == SearchMode.cards 
+                              ? 'Search cards...' 
+                              : 'Search sets...',
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                            hintStyle: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                            ),
+                          ),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                          onChanged: _onSearchChanged,
+                          textInputAction: TextInputAction.search,
+                        ),
                       ),
-                    ),
-                ],
-              ),
+                      if (_searchController.text.isNotEmpty)
+                        IconButton(
+                          icon: Icon(
+                            Icons.clear,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          onPressed: _clearSearch,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             actions: [
               IconButton(
@@ -1173,132 +1355,180 @@ String _formatSearchForDisplay(String query) {
               ),
             ],
           ),
-          body: _buildMainContent(),
+          body: _buildContent(),
         ),
       ),
     );
   }
 
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _scrollController.dispose();
-    _searchController.dispose();
-    _imageCache.clear();
-    _loadQueue.clear();
-    _loadingImages.clear();
-    _loadingRequestedUrls.clear();
-    super.dispose();
-  }
+  Widget _buildContent() {
+    if (_isLoading) {
+      return _buildLoadingState();
+    }
 
-  Widget _buildMainContent() {
     return CustomScrollView(
       controller: _scrollController,
-      physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        // Categories toggle - updated to use new header
-        SliverToBoxAdapter(
-          child: _buildQuickSearchesHeader(),
-        ),
-
-        // Categories section (collapsible)
-        if (_showCategories)
+        if (_searchResults == null && _setResults == null) ...[
+          // Show categories and recent searches when no results
           SliverToBoxAdapter(
-            child: _buildSearchCategories(),
+            child: _buildQuickSearchesHeader(),
           ),
-
-        // Recent searches or loading state
-        if (_searchResults == null) 
+          if (_showCategories)
+            SliverToBoxAdapter(
+              child: _buildSearchCategories(),
+            ),
           SliverToBoxAdapter(
-            child: _isLoading 
-              ? _buildLoadingState()
-              : _buildRecentSearches(),
+            child: _buildRecentSearches(),
           ),
-
-        // Search results header
-        if (_searchResults != null) 
+        ] else ...[
+          // Show search results
           SliverPadding(
             padding: const EdgeInsets.all(16),
             sliver: SliverToBoxAdapter(
-              child: Row(
-                children: [
-                  Text(
-                    'Found $_totalCards cards',  // Updated text
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  if (_isLoading) ...[
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+              child: Text(
+                _searchMode == SearchMode.cards
+                    ? 'Found $_totalCards cards'
+                    : 'Found ${_setResults?.length ?? 0} sets',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
           ),
-
-        // Search results grid - updated with better null checking
-        if (_searchResults != null && _searchResults!.isNotEmpty)
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                childAspectRatio: 0.7,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  if (index >= _searchResults!.length) {
-                    if (_hasMorePages) {
-                      return _buildShimmerItem();
-                    }
-                    return null; // Return null to prevent extra items
-                  }
-                  return _buildCardGridItem(_searchResults![index]);
-                },
-                childCount: _searchResults!.length + (_hasMorePages ? 3 : 0),
-              ),
-            ),
+            sliver: _searchMode == SearchMode.cards
+                ? _buildCardResultsGrid()
+                : _buildSetResultsGrid(),
           ),
-
-        // Add loading indicator at bottom when loading more
-        if (_isLoading && _searchResults != null && _searchResults!.isNotEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
-              child: Column(
-                children: [
-                  const CircularProgressIndicator(strokeWidth: 2),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Loading more cards...',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-        // ...rest of existing content...
+        ],
       ],
     );
   }
 
-  // Update quick searches header to be clickable
+  Widget _buildCardResultsGrid() {
+    if (_searchResults == null || _searchResults!.isEmpty) {
+      return SliverToBoxAdapter(child: _buildNoResultsMessage());
+    }
+
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 0.7,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          if (index >= _searchResults!.length) {
+            return _hasMorePages ? _buildShimmerItem() : null;
+          }
+          return _buildCardGridItem(_searchResults![index]);
+        },
+        childCount: _searchResults!.length + (_hasMorePages ? 3 : 0),
+      ),
+    );
+  }
+
+  Widget _buildSetResultsGrid() {
+    if (_setResults == null || _setResults!.isEmpty) {
+      return SliverToBoxAdapter(child: _buildNoResultsMessage());
+    }
+
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.5,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => _buildSetGridItem(_setResults![index]),
+        childCount: _setResults!.length,
+      ),
+    );
+  }
+
+  // Add set search method
+  Future<void> _performSetSearch(String query) async {
+    if (query.isEmpty) {
+      setState(() => _setResults = null);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final results = await _apiService.searchSets(query: query);
+      
+      if (mounted) {
+        setState(() {
+          _setResults = results['data'] as List?;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Set search error: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _setResults = null; // Fixed syntax error here
+        });
+      }
+    }
+  }
+
+  // Add set results grid
+  Widget _buildSetGrid() {
+    if (_setResults == null) return const SizedBox.shrink();
+    
+    return GridView.builder(
+      padding: const EdgeInsets.all(8),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.5,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: _setResults!.length,
+      itemBuilder: (context, index) {
+        final set = _setResults![index];
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              _searchController.text = set['name'];
+              _searchMode = SearchMode.cards;
+              _performSearch('set.id:${set['id']}'); // Changed to use _performSearch directly
+            },
+            child: Column(
+              children: [
+                if (set['images']?['logo'] != null)
+                  Expanded(
+                    child: Image.network(
+                      set['images']['logo'],
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ListTile(
+                  title: Text(
+                    set['name'],
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  subtitle: Text(
+                    '${set['total']} cards • ${set['releaseDate']}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildQuickSearchesHeader() {
-    return InkWell( // Wrap with InkWell
+    return InkWell(
       onTap: () => setState(() => _showCategories = !_showCategories),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -1319,6 +1549,126 @@ String _formatSearchForDisplay(String query) {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSetGridItem(Map<String, dynamic> set) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _searchController.text = set['name'];
+            _searchMode = SearchMode.cards;
+            _performSearch('set.id:${set['id']}');
+          });
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (set['images']?['logo'] != null)
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  child: Image.network(
+                    set['images']['logo'],
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    set['name'],
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${set['total']} cards • ${set['releaseDate']}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _searchResults = null;
+      _setResults = null;
+      _showCategories = true;
+      _currentPage = 1;
+      _hasMorePages = true;
+      if (_currentSort != 'cardmarket.prices.averageSellPrice') {
+        _currentSort = 'cardmarket.prices.averageSellPrice';
+        _sortAscending = false;
+      }
+    });
+  }
+
+  Widget _buildSetCard(Map<String, dynamic> item) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final query = item['query'] as String;
+    final isSetQuery = query.startsWith('set.id:');
+    
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        onTap: () {
+          _currentSort = 'number';
+          _sortAscending = true;
+          _performQuickSearch(item);
+        },
+        child: isSetQuery
+          ? AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Padding( // Add padding to make logos smaller
+                padding: const EdgeInsets.all(16),
+                child: Image.network(
+                  _apiService.getSetLogo(query),
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Center(
+                    child: Text(
+                      item['icon'],
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : Container(
+              padding: const EdgeInsets.all(12),
+              child: Center(
+                child: Text(
+                  item['icon'],
+                  style: const TextStyle(fontSize: 24),
+                ),
+              ),
+            ),
       ),
     );
   }

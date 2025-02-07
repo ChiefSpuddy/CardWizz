@@ -1,15 +1,25 @@
 class PokemonSets {
-  static const Map<String, String> setIds = {
-    'Crown Zenith': 'swsh12pt5',
-    'Silver Tempest': 'swsh12',
-    'Paradox Rift': 'sv4',
-    'Obsidian Flames': 'sv3',
-    'Paldea Evolved': 'sv2',
-    '151': 'sv3pt5',
-    'Scarlet & Violet': 'sv1',
+  // Map of set names to their IDs
+  static const Map<String, String> setIdMap = {
+    'lost origin': 'swsh11',  // Add this first
+    'crown zenith': 'swsh12pt5',
+    'silver tempest': 'swsh12',
+    'vivid voltage': 'swsh4',
+    'astral radiance': 'swsh10',
+    'brilliant stars': 'swsh9',
+    'steam siege': 'xy11',
+    'temporal forces': 'sv3p5',
+    'paradox rift': 'sv4',
+    'obsidian flames': 'sv3',
+    'paldea evolved': 'sv2',
+    'base set': 'base1',
+    'jungle': 'base2',
+    'fossil': 'base3',
+    // Add more sets as needed...
   };
 
-  static const List<Map<String, String>> rarityFilters = [
+  // Categories for UI organization
+  static const List<Map<String, String>> rarity_categories = [
     {'name': 'All Sets', 'code': '', 'icon': '🔍'},
     {'name': 'Crown Zenith', 'code': 'set.id:swsh12pt5', 'icon': '👑'},
     {'name': 'Silver Tempest', 'code': 'set.id:swsh12', 'icon': '⚡'},
@@ -167,12 +177,14 @@ class PokemonSets {
   };
 
   static String? getSetId(String searchTerm) {
-    // First try direct match in setIds
-    final directMatch = setIds[searchTerm];
+    // First try direct match in setIdMap
+    final directMatch = setIdMap[searchTerm];
     if (directMatch != null) return directMatch;
 
     // Then try aliases (case insensitive)
     final normalizedSearch = searchTerm.toLowerCase();
     return setAliases[normalizedSearch];
   }
+
+  static Map<String, String> get allSetIds => setIdMap;
 }
