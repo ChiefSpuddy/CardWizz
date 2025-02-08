@@ -107,9 +107,7 @@ We retain your data for:
 ## 12. Contact Us
 
 For privacy-related questions:
-- Email: privacy@cardwizz.com
-- Support: support@cardwizz.com
-- Address: [Your Business Address]
+- Support: cardwizzhelp@gmail.com
 
 ## 13. Consent
 
