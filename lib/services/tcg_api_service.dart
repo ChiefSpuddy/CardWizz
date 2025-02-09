@@ -1,15 +1,55 @@
 import 'package:dio/dio.dart';
+import 'dart:async';
+
+// Move cache entry class outside
+class _CacheEntry {
+  final dynamic data;
+  final DateTime timestamp;
+  
+  _CacheEntry(this.data) : timestamp = DateTime.now();
+  
+  bool get isExpired => 
+    DateTime.now().difference(timestamp) > const Duration(hours: 1);
+}
 
 class TcgApiService {
   static final TcgApiService _instance = TcgApiService._internal();
   final Dio _dio;
+  static const String _baseUrl = 'https://api.pokemontcg.io/v2';
+  
+  // Update rate limiting constants
+  static const _requestDelay = Duration(milliseconds: 250); // Increased delay
+  static const _maxRetries = 3;
+  static const _retryDelay = Duration(seconds: 2);
+  static const _cacheExpiration = Duration(hours: 1);
+  static const _maxConcurrentRequests = 2; // Reduce concurrent requests
+  static const _rateLimitDelay = Duration(seconds: 5); // Add dedicated rate limit delay
+  static const _imageCacheExpiration = Duration(days: 7); // Add image cache expiration
+  
+  final _requestQueue = <Future>[];
+  final _cache = <String, _CacheEntry>{};
+  final _imageCache = <String, String>{}; // Add image URL cache
+  final _imageLoadErrors = <String>{}; // Track failed image URLs
+  final _semaphore = Completer<void>()..complete();
+  DateTime? _lastRequestTime;
   
   factory TcgApiService() => _instance;
   
   TcgApiService._internal() : _dio = Dio(BaseOptions(
-    baseUrl: 'https://api.pokemontcg.io/v2',
-    headers: {'X-Api-Key': 'eebb53a0-319a-4231-9244-fd7ea48b5d2c'},
+    baseUrl: _baseUrl,
+    headers: {'X-Api-Key': 'your-api-key-here'}, // Replace with your Pokemon TCG API key
   ));
+
+  // Add rate limiting method
+  Future<void> _waitForRateLimit() async {
+    if (_lastRequestTime != null) {
+      final timeSinceLastRequest = DateTime.now().difference(_lastRequestTime!);
+      if (timeSinceLastRequest < _requestDelay) {
+        await Future.delayed(_requestDelay - timeSinceLastRequest);
+      }
+    }
+    _lastRequestTime = DateTime.now();
+  }
 
   // Basic sort options
   static const Map<String, String> sortOptions = {
@@ -47,53 +87,175 @@ class TcgApiService {
   // Core search method
   Future<Map<String, dynamic>> searchCards({
     required String query,
-    int page = 1,
-    int pageSize = 30,
     String orderBy = 'number',
     bool orderByDesc = false,
+    int pageSize = 20,
+    int page = 1,
   }) async {
-    // Initialize with raw query as fallback
-    String searchQuery = query;
+    final cacheKey = '$query-$orderBy-$orderByDesc-$pageSize-$page';
     
+    // Check cache first
+    final cacheEntry = _cache[cacheKey];
+    if (cacheEntry != null && !cacheEntry.isExpired) {
+      return cacheEntry.data as Map<String, dynamic>;
+    }
+
     try {
-      // Basic query cleaning
-      final cleanQuery = query.trim();
-      
-      // Determine search type and format query
-      if (cleanQuery.startsWith('set.id:')) {
-        searchQuery = cleanQuery; // Pass through set searches unchanged
-      } else if (RegExp(r'^\d+(?:/\d+)?$').hasMatch(cleanQuery)) {
-        searchQuery = 'number:$cleanQuery';
-      } else {
-        // Handle name search - strip any existing name: prefix first
-        final nameQuery = cleanQuery.replaceAll('name:', '').replaceAll('"', '').trim();
-        searchQuery = 'name:*$nameQuery*'; // Single wildcard at end
+      // Don't clean set.id queries
+      final cleanedQuery = query.startsWith('set.id:') ? query : _cleanupQuery(query);
+      print('Searching with query: $cleanedQuery');
+
+      final response = await _makeRequestWithRetry(
+        '/cards',
+        queryParameters: {
+          'q': cleanedQuery,
+          'orderBy': orderByDesc ? '-$orderBy' : orderBy,
+          'pageSize': pageSize,
+          'page': page,
+        },
+      );
+
+      if (response['data'] == null || (response['data'] as List).isEmpty) {
+        print('No results found for query: $cleanedQuery');
+        return {'data': [], 'totalCount': 0, 'page': page};
       }
 
-      print('Making API request:');
-      print('Query: $searchQuery');
-      print('Sort: ${orderByDesc ? '-' : ''}$orderBy');
+      _cache[cacheKey] = _CacheEntry(response);
+      return response;
 
-      final response = await _dio.get('/cards', queryParameters: {
-        'q': searchQuery,
-        'page': page.toString(),
-        'pageSize': pageSize.toString(),
-        'orderBy': orderByDesc ? '-$orderBy' : orderBy,
-      });
-
-      final totalCount = response.data['totalCount'] ?? 0;
-      print('Success - Found $totalCount cards');
-      return response.data;
-
-    } on DioException catch (e) {
-      print('Search error: $e');
-      print('Raw query: $query');
-      print('Failed query: $searchQuery');
-      return {'data': [], 'totalCount': 0, 'page': page};
     } catch (e) {
-      print('Unexpected error: $e');
-      return {'data': [], 'totalCount': 0, 'page': page};
+      print('Search error: $e');
+      rethrow;
     }
+  }
+
+  // Add batch search method
+  Future<List<Map<String, dynamic>>> searchCardsBatch(
+    List<String> queries,
+  ) async {
+    final results = <Map<String, dynamic>>[];
+    final batch = <Future<Map<String, dynamic>>>[];
+
+    for (final query in queries) {
+      // Check cache first
+      final cacheKey = '$query-number-false-1-1';
+      final cacheEntry = _cache[cacheKey];
+      
+      if (cacheEntry != null && !cacheEntry.isExpired) {
+        results.add(cacheEntry.data as Map<String, dynamic>);
+        continue;
+      }
+
+      // Add to batch if not cached
+      batch.add(searchCards(query: query, pageSize: 1));
+      
+      // Process batch when full
+      if (batch.length >= _maxConcurrentRequests) {
+        results.addAll(await Future.wait(batch));
+        batch.clear();
+        await Future.delayed(_requestDelay);
+      }
+    }
+
+    // Process remaining requests
+    if (batch.isNotEmpty) {
+      results.addAll(await Future.wait(batch));
+    }
+
+    return results;
+  }
+
+  String _cleanupQuery(String query) {
+    // Don't modify set.id queries
+    if (query.startsWith('set.id:')) {
+      return query;
+    }
+
+    // Special query handlers
+    if (query.startsWith('rarity:') || query.startsWith('subtypes:')) {
+      return query;
+    }
+
+    // Clean the query
+    String clean = query
+      .toLowerCase()
+      .trim()
+      .replaceAll('"', '')
+      .replaceAll('\'', '')
+      .replaceAll('♀', 'f')
+      .replaceAll('♂', 'm');
+
+    // Handle special cases
+    if (clean.contains('nidoran')) {
+      if (clean.contains('m') || clean.contains('M')) {
+        return 'name:"Nidoran ♂"';
+      } else if (clean.contains('f') || clean.contains('F')) {
+        return 'name:"Nidoran ♀"';
+      }
+    }
+
+    // If it's not a special query, wrap in name search
+    if (!clean.contains(':')) {
+      return 'name:"$clean"';
+    }
+
+    return clean;
+  }
+
+  Future<Map<String, dynamic>> _makeRequestWithRetry(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    int retryCount = 0,
+  }) async {
+    try {
+      // Add delay between requests
+      await _waitForRateLimit();
+      
+      final response = await _dio.get(
+        path,
+        queryParameters: queryParameters,
+      );
+      return response.data;
+    } catch (e) {
+      if (e is DioException) {
+        if (e.response?.statusCode == 429) {
+          if (retryCount < _maxRetries) {
+            print('Rate limited, waiting ${_rateLimitDelay.inSeconds}s before retry...');
+            await Future.delayed(_rateLimitDelay * (retryCount + 1));
+            return _makeRequestWithRetry(
+              path,
+              queryParameters: queryParameters,
+              retryCount: retryCount + 1,
+            );
+          }
+        } else if (e.response?.statusCode == 404) {
+          // Handle 404 errors for images
+          final url = e.requestOptions.uri.toString();
+          if (url.contains('/images/')) {
+            _imageLoadErrors.add(url);
+            return {'data': []};
+          }
+        }
+      }
+      rethrow;
+    }
+  }
+
+  // Add method to validate image URL
+  String? getValidImageUrl(String? url) {
+    if (url == null || _imageLoadErrors.contains(url)) {
+      return null;
+    }
+    return _imageCache[url] ?? url;
+  }
+
+  void _cleanCache() {
+    _cache.removeWhere((_, entry) => entry.isExpired);
+  }
+
+  // Clear cache method
+  void clearCache() {
+    _cache.clear();
   }
 
   // Get single card details

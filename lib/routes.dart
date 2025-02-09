@@ -5,8 +5,8 @@ import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/analytics_screen.dart';
-import 'screens/dex_screen.dart';
 import 'screens/scanner_screen.dart';
+import 'screens/collection_index_screen.dart'; // Update this import
 
 class AppRoutes {
   static const String home = '/';
@@ -25,7 +25,7 @@ class AppRoutes {
     search: (context) => const SearchScreen(),
     settings: (context) => const SettingsScreen(),
     profile: (context) => const ProfileScreen(),
-    dex: (context) => const DexScreen(),
+    dex: (context) => const CollectionIndexScreen(), // Update this line
     scanner: (context) => const ScannerScreen(),
   };
 }

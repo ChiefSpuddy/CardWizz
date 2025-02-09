@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';  // Add this import
 import '../models/tcg_card.dart';  // Add this import
-import '../services/dex_names_service.dart';
+import '../services/collection_index_service.dart';  // Update this import
 import '../services/dex_collection_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/sign_in_button.dart';
@@ -19,16 +19,16 @@ import 'package:lottie/lottie.dart';  // Add this import
 import '../constants/colors.dart';  // Add this import
 import 'dart:ui';  // Add this import at the top with other imports
 
-class DexScreen extends StatefulWidget {
-  const DexScreen({super.key});
+class CollectionIndexScreen extends StatefulWidget {
+  const CollectionIndexScreen({super.key});
 
   @override
-  State<DexScreen> createState() => _DexScreenState();
+  State<CollectionIndexScreen> createState() => _CollectionIndexScreenState();
 }
 
-class _DexScreenState extends State<DexScreen> {
+class _CollectionIndexScreenState extends State<CollectionIndexScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-  final _namesService = DexNamesService();
+  final _namesService = CollectionIndexService();  // Update this line
   late final DexCollectionService _collectionService;
   final _pokeApi = PokeApiService();
   List<String> _allDexNames = [];
@@ -37,7 +37,7 @@ class _DexScreenState extends State<DexScreen> {
   int _currentPage = 0;
   bool _hasMoreItems = true;
   final ScrollController _scrollController = ScrollController();
-  final Map<String, Map<String, dynamic>> _pokemonCache = {};
+  final Map<String, Map<String, dynamic>> _creatureCache = {};
   String? _selectedGeneration;
   Map<String, int> _collectionCounts = {};
 
@@ -164,8 +164,8 @@ class _DexScreenState extends State<DexScreen> {
   void _updateGenerationStats(String genKey, Map<String, dynamic> stats) {
     if (!mounted) return;
     setState(() {
-      _collectionCounts[genKey] = stats['uniquePokemon'];
-      _pokemonCache.addAll(
+      _collectionCounts[genKey] = stats['uniqueCreatures'];
+      _creatureCache.addAll(
         (stats['spriteUrls'] as Map<String, String>).map(
           (name, url) => MapEntry(name, {'sprite': url}),
         ),
@@ -209,30 +209,6 @@ class _DexScreenState extends State<DexScreen> {
     }
   }
 
-  Color _getTypeColor(String type) {
-    final colors = {
-      'NORMAL': Colors.grey[400]!,
-      'FIRE': Colors.deepOrange,
-      'WATER': Colors.blue,
-      'ELECTRIC': Colors.amber,
-      'GRASS': Colors.green,
-      'ICE': Colors.lightBlue,
-      'FIGHTING': Colors.brown[700]!,
-      'POISON': Colors.purple,
-      'GROUND': Colors.brown,
-      'FLYING': Colors.indigo[200]!,
-      'PSYCHIC': Colors.pink,
-      'BUG': Colors.lightGreen,
-      'ROCK': Colors.grey[700]!,
-      'GHOST': Colors.deepPurple,
-      'DRAGON': Colors.indigo,
-      'DARK': Colors.grey[900]!,
-      'STEEL': Colors.blueGrey,
-      'FAIRY': Colors.pinkAccent,
-    };
-    return colors[type] ?? Colors.grey;
-  }
-
   @override
   void dispose() {
     _updateSubscription?.cancel();
@@ -260,7 +236,7 @@ class _DexScreenState extends State<DexScreen> {
     final lastVisible = (((_scrollController.position.pixels + viewport.height) / 
         gridBox.size.height) * _gridCrossAxisCount).ceil();
 
-    final visibleRange = _getFilteredPokemon().sublist(
+    final visibleRange = _getFilteredCreatures().sublist(
       firstVisible.clamp(0, _allDexNames.length),
       lastVisible.clamp(0, _allDexNames.length),
     );
@@ -273,11 +249,11 @@ class _DexScreenState extends State<DexScreen> {
   }
 
   Future<void> _preloadSprites(int start, int end) async {
-    final pokemon = _getFilteredPokemon();
-    final validEnd = end.clamp(0, pokemon.length);
+    final creatures = _getFilteredCreatures();
+    final validEnd = end.clamp(0, creatures.length);
     
     for (var i = start; i < validEnd; i++) {
-      final name = pokemon[i];
+      final name = creatures[i];
       final dexNumber = _namesService.getDexNumber(name);
       final spriteUrl = _pokeApi.getSpriteUrl(dexNumber);
       
@@ -318,8 +294,8 @@ class _DexScreenState extends State<DexScreen> {
           _isLoading = false;
         });
         
-        // Preload first page of Pokemon data
-        _preloadPokemonData(0, _pageSize);
+        // Preload first page of creature data
+        _preloadCreatureData(0, _pageSize);
       }
     } catch (e) {
       print('Error loading dex names: $e');
@@ -332,26 +308,24 @@ class _DexScreenState extends State<DexScreen> {
     }
   }
 
-  Future<void> _preloadPokemonData(int start, int count) async {
+  Future<void> _preloadCreatureData(int start, int count) async {
     final end = min(start + count, _allDexNames.length);
     for (var i = start; i < end; i++) {
       final name = _allDexNames[i];
-      if (!_pokemonCache.containsKey(name)) {
-        _pokemonCache[name] = await _pokeApi.fetchPokemon(name) ?? {};
+      if (!_creatureCache.containsKey(name)) {
+        _creatureCache[name] = await _pokeApi.fetchPokemon(name) ?? {};
       }
     }
   }
 
-  Future<void> _showPokemonInfo(BuildContext context, String pokemonName, Map<String, dynamic> data) {
-    final types = (data['types'] as List?)?.map((t) => t['type']['name'].toString().toUpperCase()).toList() ?? [];
+  Future<void> _showCreatureInfo(BuildContext context, String creatureName, Map<String, dynamic> data) {
     final height = ((data['height'] ?? 0) / 10).toStringAsFixed(1);
     final weight = ((data['weight'] ?? 0) / 10).toStringAsFixed(1);
     final stats = data['stats'] as List? ?? [];
-    final pokemonStats = _collectionService.getPokemonStats(pokemonName);
-    final cards = pokemonStats['cards'] as List<TcgCard>? ?? [];
+    final creatureStats = _collectionService.getCreatureStats(creatureName);
+    final cards = creatureStats['cards'] as List<TcgCard>? ?? [];
     final currencyProvider = context.read<CurrencyProvider>();
-    final mainColor = _getTypeColor(types.firstOrNull ?? '');
-    final speciesData = _pokeApi.fetchSpeciesData(_namesService.getDexNumber(pokemonName));
+    final speciesData = _pokeApi.fetchSpeciesData(_namesService.getDexNumber(creatureName));
 
     return showModalBottomSheet(
       context: context,
@@ -377,8 +351,8 @@ class _DexScreenState extends State<DexScreen> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        mainColor.withOpacity(0.8),
-                        mainColor.withOpacity(0.4),
+                        Colors.blue.withOpacity(0.8),
+                        Colors.blue.withOpacity(0.4),
                       ],
                     ),
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -396,7 +370,7 @@ class _DexScreenState extends State<DexScreen> {
                                 onPressed: () => Navigator.pop(context),
                               ),
                               Text(
-                                '#${_namesService.getDexNumber(pokemonName).toString().padLeft(3, '0')}',
+                                '#${_namesService.getDexNumber(creatureName).toString().padLeft(3, '0')}',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   color: Colors.white,
@@ -407,7 +381,7 @@ class _DexScreenState extends State<DexScreen> {
                           ),
                         ),
                         Hero(
-                          tag: 'pokemon-$pokemonName',
+                          tag: 'creature-$creatureName',
                           child: CachedNetworkImage(
                             imageUrl: data['sprites']['other']['official-artwork']['front_default'] ?? '',
                             height: 180,
@@ -415,7 +389,7 @@ class _DexScreenState extends State<DexScreen> {
                           ),
                         ),
                         Text(
-                          pokemonName,
+                          creatureName,
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
@@ -423,12 +397,6 @@ class _DexScreenState extends State<DexScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // Modern type chips
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8,
-                          children: types.map((type) => _buildTypeChip(type)).toList(),
-                        ),
                         const SizedBox(height: 16),
                         // Modern tabs
                         TabBar(
@@ -487,7 +455,7 @@ class _DexScreenState extends State<DexScreen> {
                                           icon: Icons.height,
                                           label: 'Height',
                                           value: '$height m',
-                                          color: mainColor,
+                                          color: Colors.blue,
                                         ),
                                         Container(
                                           width: 1,
@@ -498,7 +466,7 @@ class _DexScreenState extends State<DexScreen> {
                                           icon: Icons.monitor_weight,
                                           label: 'Weight',
                                           value: '$weight kg',
-                                          color: mainColor,
+                                          color: Colors.blue,
                                         ),
                                       ],
                                     ),
@@ -513,7 +481,7 @@ class _DexScreenState extends State<DexScreen> {
                                       final habitat = snapshot.data!['habitat'];
                                       
                                       return _buildInfoCard(
-                                        'Pokédex Entry',
+                                        'Dex Entry',
                                         Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
@@ -562,7 +530,7 @@ class _DexScreenState extends State<DexScreen> {
                                         return _buildModernStatBar(
                                           _formatStatName(stat['stat']['name'].toString().toUpperCase()),
                                           value,
-                                          mainColor,
+                                          Colors.blue,
                                         );
                                       }).toList(),
                                     ),
@@ -616,26 +584,6 @@ class _DexScreenState extends State<DexScreen> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTypeChip(String type) {
-    final color = _getTypeColor(type);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.4)),
-      ),
-      child: Text(
-        type,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
         ),
       ),
     );
@@ -778,10 +726,10 @@ class _DexScreenState extends State<DexScreen> {
     );
   }
 
-  Widget _buildPokemonTile(String pokemonName) {
-    final dexNumber = _namesService.getDexNumber(pokemonName);
+  Widget _buildCreatureTile(String creatureName) {
+    final dexNumber = _namesService.getDexNumber(creatureName);
     final spriteUrl = _pokeApi.getSpriteUrl(dexNumber);
-    final stats = _collectionService.getPokemonStats(pokemonName);
+    final stats = _collectionService.getCreatureStats(creatureName);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Card(
@@ -794,7 +742,7 @@ class _DexScreenState extends State<DexScreen> {
         onTap: () async {
           final data = await _pokeApi.fetchPokemon(dexNumber.toString());
           if (data != null && mounted) {
-            _showPokemonInfo(context, pokemonName, data);
+            _showCreatureInfo(context, creatureName, data);
           }
         },
         child: Stack(
@@ -827,7 +775,7 @@ class _DexScreenState extends State<DexScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            pokemonName[0].toUpperCase(),
+                            creatureName[0].toUpperCase(),
                             style: TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.bold,
@@ -851,7 +799,7 @@ class _DexScreenState extends State<DexScreen> {
                         ),
                       ),
                       Text(
-                        pokemonName,
+                        creatureName,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -949,7 +897,7 @@ class _DexScreenState extends State<DexScreen> {
     );
   }
 
-  List<String> _getFilteredPokemon() {
+  List<String> _getFilteredCreatures() {
     if (_selectedGeneration == null) return _allDexNames;
     
     final (start, end) = _generations[_selectedGeneration]!;
@@ -959,29 +907,29 @@ class _DexScreenState extends State<DexScreen> {
     }).toList();
   }
 
-  Future<double> _getCollectionProgress(List<String> pokemon) async {
-    if (pokemon.isEmpty) return 0;
-    final collected = await _getCollectedCount(pokemon);
-    return collected / pokemon.length;
+  Future<double> _getCollectionProgress(List<String> creatures) async {
+    if (creatures.isEmpty) return 0;
+    final collected = await _getCollectedCount(creatures);
+    return collected / creatures.length;
   }
 
-  Future<int> _getCollectedCount(List<String> pokemon) async {
+  Future<int> _getCollectedCount(List<String> creatures) async {
     int count = 0;
-    for (final name in pokemon) {
-      final stats = await _collectionService.getPokemonStats(name);
+    for (final name in creatures) {
+      final stats = await _collectionService.getCreatureStats(name);
       if (stats['isCollected'] == true) count++;
     }
     return count;
   }
 
-  Widget _buildPokemonGrid() {
+  Widget _buildCreatureGrid() {
     if (_allDexNames.isEmpty) {
       return const Center(
-        child: Text('No Pokémon found. Please try again.'),
+        child: Text('No creatures found. Please try again.'),
       );
     }
 
-    final filteredPokemon = _getFilteredPokemon();
+    final filteredCreatures = _getFilteredCreatures();
     
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
@@ -995,7 +943,7 @@ class _DexScreenState extends State<DexScreen> {
         return false;
       },
       child: GridView.builder(
-        key: PageStorageKey('pokemon_grid'),  // Preserve scroll position
+        key: PageStorageKey('creature_grid'),  // Preserve scroll position
         controller: _scrollController,
         padding: const EdgeInsets.all(_gridSpacing),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -1004,8 +952,8 @@ class _DexScreenState extends State<DexScreen> {
           crossAxisSpacing: _gridSpacing,
           mainAxisSpacing: _gridSpacing,
         ),
-        itemCount: filteredPokemon.length,
-        itemBuilder: (context, index) => _buildPokemonTile(filteredPokemon[index]),
+        itemCount: filteredCreatures.length,
+        itemBuilder: (context, index) => _buildCreatureTile(filteredCreatures[index]),
       ),
     );
   }
@@ -1138,7 +1086,7 @@ class _DexScreenState extends State<DexScreen> {
                                 ),
                               ),
                             )
-                          : _buildPokemonGrid(),
+                          : _buildCreatureGrid(),
                     ),
                   ],
                 ),
@@ -1147,11 +1095,11 @@ class _DexScreenState extends State<DexScreen> {
     );
   }
 
-  // Update Pokemon tile to show loading state
-  Widget _buildPokemonTileWithLoading(String pokemonName) {
-    final dexNumber = _namesService.getDexNumber(pokemonName);
+  // Update creature tile to show loading state
+  Widget _buildCreatureTileWithLoading(String creatureName) {
+    final dexNumber = _namesService.getDexNumber(creatureName);
     final spriteUrl = _pokeApi.getSpriteUrl(dexNumber);
-    final stats = _collectionService.getPokemonStats(pokemonName);
+    final stats = _collectionService.getCreatureStats(creatureName);
     
     return Card(
       elevation: 2,
@@ -1189,7 +1137,7 @@ class _DexScreenState extends State<DexScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          pokemonName[0].toUpperCase(),
+                          creatureName[0].toUpperCase(),
                           style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
@@ -1201,7 +1149,7 @@ class _DexScreenState extends State<DexScreen> {
                   ),
                 ),
               ),
-              // ...existing Pokemon info code...
+              // ...existing creature info code...
             ],
           ),
           if (stats['isCollected'])

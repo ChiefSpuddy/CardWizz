@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'poke_api_service.dart';
 
-class DexNamesService {
+class CollectionIndexService {
   final _pokeApiService = PokeApiService();
   Map<int, String> _dexMap = {};  // Change to map for O(1) lookup
   bool _isLoaded = false;
@@ -367,15 +367,15 @@ class DexNamesService {
       });
       
       _isInitialized = true;
-      print('Initialized DexNamesService with ${_nameToNumber.length} Pokemon');
+      print('Initialized CollectionIndexService with ${_nameToNumber.length} cards');
     } catch (e) {
-      print('Error initializing DexNamesService: $e');
+      print('Error initializing CollectionIndexService: $e');
       rethrow;
     }
   }
 
   // Add this method near the start of the class
-  String formatPokemonName(String name) {
+  String formatCardName(String name) {
     // Handle special cases first
     final specialCases = {
       'mr-mime': 'Mr. Mime',
@@ -417,16 +417,16 @@ class DexNamesService {
     for (int i = startNum; i <= endNum; i++) {
       final name = _numberToName[i];
       if (name != null) {
-        names.add(formatPokemonName(name));  // Apply formatting here
+        names.add(formatCardName(name));  // Apply formatting here
       } else {
-        print('Warning: No name found for Pokémon #$i');
+        print('Warning: No name found for card #$i');
       }
     }
     
     return names;
   }
 
-  int getDexNumber(String name) {
+  int getIndexNumber(String name) {
     return _nameToNumber[name.toLowerCase()] ?? 0;
   }
 

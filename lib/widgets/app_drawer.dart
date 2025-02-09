@@ -181,21 +181,15 @@ class AppDrawer extends StatelessWidget {
                         ),
                         _buildMenuItem(
                           context,
-                          icon: Icons.catching_pokemon_outlined,  // Add Dex menu item
-                          title: 'Dex',
-                          onTap: () => _navigateAndClose(context, AppRoutes.dex),
-                        ),
-                        _buildMenuItem(
-                          context,
-                          icon: Icons.person_outline,  // Add Profile menu item
-                          title: 'Profile',
-                          onTap: () => _navigateAndClose(context, AppRoutes.profile),
-                        ),
-                        _buildMenuItem(
-                          context,
                           icon: Icons.search_outlined,
                           title: 'Search',
                           onTap: () => _navigateAndClose(context, '/search'),
+                        ),
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.grid_view_outlined,
+                          title: 'Collection Tracker',
+                          onTap: () => _navigateAndClose(context, '/dex'), // Use /dex route instead of /collection-index
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -241,6 +235,10 @@ class AppDrawer extends StatelessWidget {
                             },
                           ),
                         ],
+                        ListTile(
+                          title: const Text('Collection Index'), // Update label if needed
+                          onTap: () => Navigator.pushNamed(context, '/dex'),
+                        ),
                       ],
                     ),
                   ),

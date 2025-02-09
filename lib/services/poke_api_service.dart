@@ -1,8 +1,10 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:dio/dio.dart';  // Add this import
 
 class PokeApiService {
+  final _dio = Dio();  // Add this line
   static const int _maxConcurrentRequests = 20;  // Increased for better performance
   final Map<String, String> _spriteCache = {};
   final Map<String, Map<String, dynamic>> _pokemonCache = {};
@@ -145,5 +147,26 @@ class PokeApiService {
       print('Error fetching species data for #$identifier: $e');
     }
     return null;
+  }
+
+  Future<Map<String, dynamic>?> fetchCard(String pokemonName) async {
+    try {
+      final response = await _dio.get(
+        'https://api.pokemontcg.io/v2/cards',
+        queryParameters: {
+          'q': 'name:$pokemonName',
+          'pageSize': 1,
+          'orderBy': 'set.releaseDate'  // Get the newest card
+        },
+      );
+      
+      if (response.data['data']?.isNotEmpty) {
+        return response.data['data'][0];
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching card for $pokemonName: $e');
+      return null;
+    }
   }
 }

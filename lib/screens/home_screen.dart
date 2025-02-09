@@ -8,7 +8,7 @@ import 'home_overview.dart';
 import 'collections_screen.dart';
 import 'search_screen.dart';
 import 'profile_screen.dart';
-import 'dex_screen.dart';  // Add this import
+import 'collection_index_screen.dart';  // Add this import, remove dex_screen.dart import
 import '../widgets/app_drawer.dart';
 import 'analytics_screen.dart';  // Add this import
 import '../services/purchase_service.dart';  // Add this import
@@ -32,22 +32,24 @@ class HomeScreenState extends State<HomeScreen> {  // Changed from _HomeScreenSt
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
 
+  // Add 'final' keyword to the _navItems declaration
   final List<NavItem> _navItems = const [
     NavItem(icon: Icons.home_outlined, label: 'home'),
     NavItem(icon: Icons.style_outlined, label: 'Collection'),
     NavItem(icon: Icons.search_outlined, label: 'search'),
     NavItem(icon: Icons.analytics_outlined, label: 'analytics'),
-    NavItem(icon: Icons.catching_pokemon_outlined, label: 'Dex'),
+    NavItem(icon: Icons.grid_view_outlined, label: 'Tracker'), // Updated icon and label
     NavItem(icon: Icons.person_outline, label: 'profile'),
   ];
 
-  final List<Widget> _pages = const [
-    HomeOverview(),
-    CollectionsScreen(),
-    SearchScreen(),
-    AnalyticsScreen(),
-    DexScreen(),
-    ProfileScreen(),
+  // Add 'final' keyword to the _screens declaration
+  final List<Widget> _screens = [
+    const HomeOverview(),
+    const CollectionsScreen(),
+    const SearchScreen(),
+    const AnalyticsScreen(),
+    const CollectionIndexScreen(),  // Make sure this is using CollectionIndexScreen
+    const ProfileScreen(),
   ];
 
   @override
@@ -120,7 +122,7 @@ class HomeScreenState extends State<HomeScreen> {  // Changed from _HomeScreenSt
         drawer: const AppDrawer(),  // Remove scaffoldKey parameter
         body: IndexedStack(
           index: _selectedIndex,
-          children: _pages,
+          children: _screens,
         ),
         bottomNavigationBar: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
