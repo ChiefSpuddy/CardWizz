@@ -15,8 +15,8 @@ class AppRoutes {
   static const String settings = '/settings';
   static const String profile = '/profile';
   static const String analytics = '/analytics';
-  static const String dex = '/dex';
   static const String scanner = '/scanner';
+  static const String collectionIndex = '/collection-index'; // Add this line
 
   static Map<String, WidgetBuilder> get routes => {
     '/': (context) => const HomeScreen(),
@@ -25,7 +25,7 @@ class AppRoutes {
     search: (context) => const SearchScreen(),
     settings: (context) => const SettingsScreen(),
     profile: (context) => const ProfileScreen(),
-    dex: (context) => const CollectionIndexScreen(), // Update this line
+    collectionIndex: (context) => const CollectionIndexScreen(), // Add this line
     scanner: (context) => const ScannerScreen(),
   };
 }

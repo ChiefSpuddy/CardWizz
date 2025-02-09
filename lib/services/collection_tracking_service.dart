@@ -1,10 +1,10 @@
 import '../models/tcg_card.dart';
 import 'storage_service.dart';
-import 'collection_index_service.dart';  // Update this import
+import 'collection_index_service.dart';  // Make sure this import is used
 import 'poke_api_service.dart';
 import 'dart:async';
 
-class DexCollectionService {
+class CollectionTrackingService {
   final StorageService _storage;
   final CollectionIndexService _namesService;  // Update this type
   final PokeApiService _pokeApi;
@@ -15,7 +15,7 @@ class DexCollectionService {
   final _updateController = StreamController<void>.broadcast();
   Stream<void> get onUpdate => _updateController.stream;
 
-  DexCollectionService(this._storage) :
+  CollectionTrackingService(this._storage) :
     _namesService = CollectionIndexService(),  // Update constructor
     _pokeApi = PokeApiService() {
     // Make listener more robust
@@ -105,19 +105,18 @@ class DexCollectionService {
     _updateController.add(null);
   }
 
-  bool isPokemonCollected(String pokemonName) {
-    final normalized = _normalizeCardName(pokemonName);
+  bool isCardCollected(String name) {  // Changed from isPokemonCollected
+    final normalized = _normalizeCardName(name);
     final isCollected = _collectionCache[normalized] ?? false;
     return isCollected;
   }
 
-  List<TcgCard> getCardsForPokemon(String pokemonName) {
-    final normalized = _normalizeCardName(pokemonName);
+  List<TcgCard> getCardsForName(String name) {  // Changed from getCardsForPokemon
+    final normalized = _normalizeCardName(name);
     return _cardCache[normalized] ?? [];
   }
 
-  // Update getGenerationStats to use the correct method name
-  Future<Map<String, dynamic>> getGenerationStats(int startNum, int endNum) async {
+  Future<Map<String, dynamic>> getSetStats(int startNum, int endNum) async {  // Changed from getGenerationStats
     if (!_isInitialized) {
       await refresh();
     }
@@ -138,9 +137,9 @@ class DexCollectionService {
       final name = data['name'].toString();
       (stats['spriteUrls'] as Map<String, String>)[name] = data['sprite'];
       
-      if (isPokemonCollected(name)) {
+      if (isCardCollected(name)) {
         (stats['collectedPokemon'] as List<String>).add(name);
-        final cards = getCardsForPokemon(name);
+        final cards = getCardsForName(name);
         stats['cardCount'] = (stats['cardCount'] as int) + cards.length;
         stats['totalValue'] = (stats['totalValue'] as double) + 
           cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
@@ -152,14 +151,14 @@ class DexCollectionService {
   }
 
   // Simplified Pokemon stats
-  Map<String, dynamic> getCreatureStats(String creatureName) {
+  Map<String, dynamic> getCardStats(String name) {  // Changed from getCreatureStats
     if (!_isInitialized) return {'isCollected': false, 'cardCount': 0};
     
-    final name = creatureName.toLowerCase();
-    final cards = _cardCache[name] ?? [];
+    final normalized = name.toLowerCase();
+    final cards = _cardCache[normalized] ?? [];
     
     return {
-      'isCollected': _collectionCache[name] ?? false,
+      'isCollected': _collectionCache[normalized] ?? false,
       'cardCount': cards.length,
       'totalValue': cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0)),
       'cards': cards,

@@ -4,16 +4,15 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lottie/lottie.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/tcg_card.dart';
-import '../services/collection_index_service.dart';
+import '../services/collection_index_service.dart';  // Make sure this import is used
 import '../services/storage_service.dart';
 import '../providers/currency_provider.dart';
-import '../constants/colors.dart';  // Add this import
-import '../services/dex_collection_service.dart';  // Add this import
-import '../services/poke_api_service.dart';  // Add this import
-import '../services/tcg_api_service.dart';  // Add this import
+import '../constants/colors.dart';
+import '../services/collection_tracking_service.dart';  // Updated import
+import '../services/tcg_api_service.dart';
 import 'card_details_screen.dart';
-import 'home_screen.dart';  // Add this import
-import 'dart:math' as math;  // Add this import at the top
+import 'home_screen.dart';  // This imports HomeScreenState too
+import 'dart:math' as math;
 
 class CollectionIndexScreen extends StatefulWidget {
   const CollectionIndexScreen({super.key});
@@ -24,22 +23,22 @@ class CollectionIndexScreen extends StatefulWidget {
 
 class _CollectionIndexScreenState extends State<CollectionIndexScreen> {
   final _namesService = CollectionIndexService();
-  late final DexCollectionService _collectionService;
+  late final CollectionTrackingService _collectionService;  // Updated type
   List<String> _allNames = [];
   bool _isLoading = true;
   String? _selectedSeries;
 
   // Simplify series definitions
   final Map<String, (int, int)> _series = {
-    'Series 1': (1, 151),
-    'Series 2': (152, 251),
-    'Series 3': (252, 386),
+    'Set A': (1, 151),      // Changed from 'Series 1'
+    'Set B': (152, 251),    // Changed from 'Series 2'
+    'Set C': (252, 386),    // Changed from 'Series 3'
   };
 
   @override
   void initState() {
     super.initState();
-    _collectionService = DexCollectionService(
+    _collectionService = CollectionTrackingService(  // Updated constructor
       Provider.of<StorageService>(context, listen: false),
     );
     _initializeCollection();
@@ -51,7 +50,7 @@ class _CollectionIndexScreenState extends State<CollectionIndexScreen> {
   }
 
   Future<void> _loadInitialSeries() async {
-    await _selectGeneration('Series 1');
+    await _selectGeneration('Set A');
   }
 
   Widget _buildPlaceholder(String name) {
@@ -104,7 +103,7 @@ class _CollectionIndexScreenState extends State<CollectionIndexScreen> {
 
   Widget _buildCreatureTile(String name) {
     final searchName = _namesService.normalizeSearchQuery(name);
-    final stats = _collectionService.getCreatureStats(searchName);
+    final stats = _collectionService.getCardStats(searchName);  // Changed from getCreatureStats
     final cards = stats['cards'] as List<TcgCard>? ?? [];
     final hasCards = cards.isNotEmpty;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -240,21 +239,12 @@ class _CollectionIndexScreenState extends State<CollectionIndexScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context); // Close dialog
-                // Find the home screen state
-                final homeState = context.findRootAncestorStateOfType<HomeScreenState>();
-                if (homeState != null) {
-                  // Switch to search tab
-                  homeState.setSelectedIndex(2);
-                  // Pass search term through state management or similar
-                } else {
-                  // Fallback to regular navigation if not in HomeScreen
-                  Navigator.pushNamed(
-                    context, 
-                    '/search',
-                    arguments: {'searchTerm': name},
-                  );
-                }
+                Navigator.pop(context);
+                Navigator.pushNamed(
+                  context, 
+                  '/search',
+                  arguments: {'searchTerm': name},
+                );
               },
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 12),

@@ -1701,6 +1701,8 @@ String _formatSearchForDisplay(String query) {
           setState(() {
             _searchController.text = set['name'];
             _searchMode = SearchMode.cards;
+            _currentSort = 'cardmarket.prices.averageSellPrice';
+            _sortAscending = false;
             _performSearch('set.id:${set['id']}');
           });
         },
@@ -1779,8 +1781,13 @@ String _formatSearchForDisplay(String query) {
       ),
       child: InkWell(
         onTap: () {
-          _currentSort = 'number';
-          _sortAscending = true;
+          // Set price sorting by default for set searches
+          if (isSetQuery) {
+            setState(() {
+              _currentSort = 'cardmarket.prices.averageSellPrice';
+              _sortAscending = false;
+            });
+          }
           _performQuickSearch(item);
         },
         child: isSetQuery
