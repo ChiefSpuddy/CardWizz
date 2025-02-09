@@ -235,10 +235,6 @@ class AppDrawer extends StatelessWidget {
                             },
                           ),
                         ],
-                        ListTile(
-                          title: const Text('Collection Index'), // Update label if needed
-                          onTap: () => Navigator.pushNamed(context, '/dex'),
-                        ),
                       ],
                     ),
                   ),

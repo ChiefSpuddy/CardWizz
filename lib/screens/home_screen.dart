@@ -70,12 +70,9 @@ class HomeScreenState extends State<HomeScreen> {  // Changed from _HomeScreenSt
   }
 
   void setSelectedIndex(int index) {
-    if (_selectedIndex != index) {
-      HapticFeedback.selectionClick();  // Add haptic feedback
-      setState(() {
-        _selectedIndex = index;
-      });
-    }
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   Widget _buildBottomNavItem(BuildContext context, int index) {

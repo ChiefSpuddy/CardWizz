@@ -63,28 +63,12 @@ class DexCollectionService {
   }
 
   String _normalizeCardName(String cardName) {
-    final specialCases = {
-      'mr.': 'mr',
-      'mr ': 'mr',
-      'farfetch\'d': 'farfetchd',
-      'mime jr.': 'mime jr',
-      'mime jr ': 'mime jr',
-    };
-
-    String normalized = cardName.toLowerCase().trim();
-    
-    // Remove variant suffixes (ex, gx, v, etc)
-    normalized = normalized.replaceAll(RegExp(r'\s*(ex|gx|v|vmax|vstar)\b', caseSensitive: false), '');
-    
-    for (final entry in specialCases.entries) {
-      if (normalized.startsWith(entry.key)) {
-        normalized = normalized.replaceFirst(entry.key, entry.value);
-      }
-    }
-
-    final baseNamePattern = RegExp(r'^([a-zA-Z\-]+)');
-    final match = baseNamePattern.firstMatch(normalized);
-    return match?.group(1) ?? normalized;
+    return cardName.toLowerCase()
+      .replaceAll(RegExp(r'\s*(ex|gx|v|vmax|vstar|★|\*)\b'), '')
+      .replaceAll(RegExp(r'alolan\s+'), '')
+      .replaceAll(RegExp(r'galarian\s+'), '')
+      .replaceAll(RegExp(r'hisuian\s+'), '')
+      .trim();
   }
 
   bool _isRefreshing = false;  // Add this flag
@@ -211,37 +195,29 @@ class DexCollectionService {
 
   // Helper method to extract dex number from card name
   int _getDexNumber(String cardName) {
-    // Load from names.json if needed
-    final normalized = cardName.toLowerCase().trim();
-    
-    // Try looking up by name first
-    final namePattern = RegExp(r'(nidoran[ ]*[♂♀fm]|[a-zA-Z\-]+)');
-    final nameMatch = namePattern.firstMatch(normalized);
-    
-    if (nameMatch != null) {
-      final baseName = nameMatch.group(1)?.toLowerCase() ?? '';
-      
-      // Special case handling
-      if (baseName.contains('nidoran')) {
-        if (baseName.contains('m') || baseName.contains('♂')) {
-          print('Found Nidoran♂ in: $cardName');
-          return 32; // Nidoran♂
-        } else if (baseName.contains('f') || baseName.contains('♀')) {
-          print('Found Nidoran♀ in: $cardName');
-          return 29; // Nidoran♀
-        }
-      }
-      
-      // Try partial match against known names
-      for (final entry in _dexNumbers.entries) {
-        if (baseName.startsWith(entry.key)) {
-          print('Found ${entry.key} (#${entry.value}) in: $cardName');
-          return entry.value;
-        }
+    // Special cases first
+    final specialCases = {
+      'nidoran♂': 32,
+      'nidoran♀': 29,
+      'mr. mime': 122,
+      'mime jr': 439,
+      'farfetch\'d': 83,
+      // Add more special cases as needed
+    };
+
+    for (final entry in specialCases.entries) {
+      if (cardName.contains(entry.key)) {
+        return entry.value;
       }
     }
-    
-    print('Could not determine dex number for: $cardName');
+
+    // Try to match against the name mapping
+    for (final entry in _dexNumbers.entries) {
+      if (cardName.startsWith(entry.key)) {
+        return entry.value;
+      }
+    }
+
     return 0;
   }
 
@@ -315,7 +291,267 @@ class DexCollectionService {
     'machoke': 67,
     'machamp': 68,
     // Add more as needed...
+    
+    // Add Series 2 (Generation 2) mappings
+    'chikorita': 152,
+    'bayleef': 153,
+    'meganium': 154,
+    'cyndaquil': 155,
+    'quilava': 156,
+    'typhlosion': 157,
+    'totodile': 158,
+    'croconaw': 159,
+    'feraligatr': 160,
+    'sentret': 161,
+    'furret': 162,
+    'hoothoot': 163,
+    'noctowl': 164,
+    'ledyba': 165,
+    'ledian': 166,
+    'spinarak': 167,
+    'ariados': 168,
+    'crobat': 169,
+    'chinchou': 170,
+    'lanturn': 171,
+    'pichu': 172,
+    'cleffa': 173,
+    'igglybuff': 174,
+    'togepi': 175,
+    'togetic': 176,
+    'natu': 177,
+    'xatu': 178,
+    'mareep': 179,
+    'flaaffy': 180,
+    'ampharos': 181,
+    'bellossom': 182,
+    'marill': 183,
+    'azumarill': 184,
+    'sudowoodo': 185,
+    'politoed': 186,
+    'hoppip': 187,
+    'skiploom': 188,
+    'jumpluff': 189,
+    'aipom': 190,
+    'sunkern': 191,
+    'sunflora': 192,
+    'yanma': 193,
+    'wooper': 194,
+    'quagsire': 195,
+    'espeon': 196,
+    'umbreon': 197,
+    'murkrow': 198,
+    'slowking': 199,
+    'misdreavus': 200,
+    'unown': 201,
+    'wobbuffet': 202,
+    'girafarig': 203,
+    'pineco': 204,
+    'forretress': 205,
+    'dunsparce': 206,
+    'gligar': 207,
+    'steelix': 208,
+    'snubbull': 209,
+    'granbull': 210,
+    'qwilfish': 211,
+    'scizor': 212,
+    'shuckle': 213,
+    'heracross': 214,
+    'sneasel': 215,
+    'teddiursa': 216,
+    'ursaring': 217,
+    'slugma': 218,
+    'magcargo': 219,
+    'swinub': 220,
+    'piloswine': 221,
+    'corsola': 222,
+    'remoraid': 223,
+    'octillery': 224,
+    'delibird': 225,
+    'mantine': 226,
+    'skarmory': 227,
+    'houndour': 228,
+    'houndoom': 229,
+    'kingdra': 230,
+    'phanpy': 231,
+    'donphan': 232,
+    'porygon2': 233,
+    'stantler': 234,
+    'smeargle': 235,
+    'tyrogue': 236,
+    'hitmontop': 237,
+    'smoochum': 238,
+    'elekid': 239,
+    'magby': 240,
+    'miltank': 241,
+    'blissey': 242,
+    'raikou': 243,
+    'entei': 244,
+    'suicune': 245,
+    'larvitar': 246,
+    'pupitar': 247,
+    'tyranitar': 248,
+    'lugia': 249,
+    'ho-oh': 250,
+    'celebi': 251,
+
+    // Add Series 3 (Generation 3) mappings
+    'treecko': 252,
+    'grovyle': 253,
+    'sceptile': 254,
+    'torchic': 255,
+    'combusken': 256,
+    'blaziken': 257,
+    'mudkip': 258,
+    'marshtomp': 259,
+    'swampert': 260,
+    'poochyena': 261,
+    'mightyena': 262,
+    'zigzagoon': 263,
+    'linoone': 264,
+    'wurmple': 265,
+    'silcoon': 266,
+    'beautifly': 267,
+    'cascoon': 268,
+    'dustox': 269,
+    'lotad': 270,
+    'lombre': 271,
+    'ludicolo': 272,
+    'seedot': 273,
+    'nuzleaf': 274,
+    'shiftry': 275,
+    'taillow': 276,
+    'swellow': 277,
+    'wingull': 278,
+    'pelipper': 279,
+    'ralts': 280,
+    'kirlia': 281,
+    'gardevoir': 282,
+    'surskit': 283,
+    'masquerain': 284,
+    'shroomish': 285,
+    'breloom': 286,
+    'slakoth': 287,
+    'vigoroth': 288,
+    'slaking': 289,
+    'nincada': 290,
+    'ninjask': 291,
+    'shedinja': 292,
+    'whismur': 293,
+    'loudred': 294,
+    'exploud': 295,
+    'makuhita': 296,
+    'hariyama': 297,
+    'azurill': 298,
+    'nosepass': 299,
+    'skitty': 300,
+    'delcatty': 301,
+    'sableye': 302,
+    'mawile': 303,
+    'aron': 304,
+    'lairon': 305,
+    'aggron': 306,
+    'meditite': 307,
+    'medicham': 308,
+    'electrike': 309,
+    'manectric': 310,
+    'plusle': 311,
+    'minun': 312,
+    'volbeat': 313,
+    'illumise': 314,
+    'roselia': 315,
+    'gulpin': 316,
+    'swalot': 317,
+    'carvanha': 318,
+    'sharpedo': 319,
+    'wailmer': 320,
+    'wailord': 321,
+    'numel': 322,
+    'camerupt': 323,
+    'torkoal': 324,
+    'spoink': 325,
+    'grumpig': 326,
+    'spinda': 327,
+    'trapinch': 328,
+    'vibrava': 329,
+    'flygon': 330,
+    'cacnea': 331,
+    'cacturne': 332,
+    'swablu': 333,
+    'altaria': 334,
+    'zangoose': 335,
+    'seviper': 336,
+    'lunatone': 337,
+    'solrock': 338,
+    'barboach': 339,
+    'whiscash': 340,
+    'corphish': 341,
+    'crawdaunt': 342,
+    'baltoy': 343,
+    'claydol': 344,
+    'lileep': 345,
+    'cradily': 346,
+    'anorith': 347,
+    'armaldo': 348,
+    'feebas': 349,
+    'milotic': 350,
+    'castform': 351,
+    'kecleon': 352,
+    'shuppet': 353,
+    'banette': 354,
+    'duskull': 355,
+    'dusclops': 356,
+    'tropius': 357,
+    'chimecho': 358,
+    'absol': 359,
+    'wynaut': 360,
+    'snorunt': 361,
+    'glalie': 362,
+    'spheal': 363,
+    'sealeo': 364,
+    'walrein': 365,
+    'clamperl': 366,
+    'huntail': 367,
+    'gorebyss': 368,
+    'relicanth': 369,
+    'luvdisc': 370,
+    'bagon': 371,
+    'shelgon': 372,
+    'salamence': 373,
+    'beldum': 374,
+    'metang': 375,
+    'metagross': 376,
+    'regirock': 377,
+    'regice': 378,
+    'registeel': 379,
+    'latias': 380,
+    'latios': 381,
+    'kyogre': 382,
+    'groudon': 383,
+    'rayquaza': 384,
+    'jirachi': 385,
+    'deoxys': 386,
   };
+
+  int getCollectedCount(int start, int end) {
+    if (!_isInitialized || _allCards == null) return 0;
+    
+    Set<int> collectedNumbers = {};
+    
+    for (var card in _allCards!) {
+      // Clean the name first
+      final name = _normalizeCardName(card.name);
+      
+      // Get the dex number for this card
+      final dexNumber = _getDexNumber(name);
+      
+      // If it's in our range, count it
+      if (dexNumber >= start && dexNumber <= end) {
+        collectedNumbers.add(dexNumber);
+      }
+    }
+    
+    return collectedNumbers.length;
+  }
 
   @override
   void dispose() {

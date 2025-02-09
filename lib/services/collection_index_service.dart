@@ -1,16 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 
-// Add this extension at the top of the file
-extension StringExtension on String {
-  String capitalize() {
-    if (isEmpty) return this;
-    return '${this[0].toUpperCase()}${substring(1).toLowerCase()}';
-  }
-}
-
 class CollectionIndexService {
-  Map<String, int> _nameToNumber = {};
+  Map<String, int> _cardNumbers = {};
   bool _isInitialized = false;
 
   Future<void> initialize() async {
@@ -20,9 +12,9 @@ class CollectionIndexService {
     final Map<String, dynamic> data = json.decode(jsonString);
     final namesData = data['names'] as Map<String, dynamic>;
     
-    _nameToNumber = Map.fromEntries(
+    _cardNumbers = Map.fromEntries(
       namesData.entries.map((e) => MapEntry(
-        normalizeCreatureName(e.value as String),
+        normalizeCardName(e.value as String),
         int.parse(e.key),
       )),
     );
@@ -55,15 +47,57 @@ class CollectionIndexService {
     return names;
   }
 
-  int getCardNumber(String cardName) {
-    final match = RegExp(r'Card (\d+)').firstMatch(cardName);
-    return match != null ? int.parse(match.group(1)!) : 0;
+  String _stripCardVariants(String name) {
+    return name.toLowerCase()
+      .replaceAll(RegExp(r'\s*(ex|gx|v|vmax|vstar|★|\*)\b'), '')
+      .replaceAll(RegExp(r'alolan\s+'), '')  // Handle regional variants
+      .replaceAll(RegExp(r'galarian\s+'), '')
+      .replaceAll(RegExp(r'hisuian\s+'), '')
+      .trim();
   }
 
-  int getDexNumber(String name) {
-    // Use look up from names.json data
-    // This will need to be implemented based on your data structure
-    return int.tryParse(name.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+  int getCardNumber(String name) {
+    if (!_isInitialized) {
+      initialize();
+      return 0;
+    }
+
+    // Add common special cases
+    final specialCases = {
+      'lugia': 249,
+      'umbreon': 197,
+      'snorlax': 143,
+      'kangaskhan': 115,
+      'latias': 380,
+      'hydreigon': 635,
+      'exeggutor': 103,
+      // Add more special cases as needed
+    };
+
+    // Clean the name first
+    final baseName = _stripCardVariants(name);
+    
+    // Check special cases first
+    for (final entry in specialCases.entries) {
+      if (baseName.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+
+    // Try exact match from card numbers map
+    final number = _cardNumbers[normalizeCardName(baseName)];
+    if (number != null) {
+      return number;
+    }
+
+    // Try to find partial match
+    for (final entry in _cardNumbers.entries) {
+      if (baseName.startsWith(entry.key)) {
+        return entry.value;
+      }
+    }
+
+    return 0;  // Return 0 if no match found
   }
 
   Future<Map<String, dynamic>> getGenerationStats(int startNum, int endNum) async {
@@ -86,17 +120,12 @@ class CollectionIndexService {
     return 'Card ${number.toString().padLeft(3, '0')}';
   }
 
-  String normalizeCreatureName(String name) {
+  String normalizeCardName(String name) {
     // Handle special cases
     final specialCases = {
-      'nidoran♀': 'nidoran-f',
-      'nidoran♂': 'nidoran-m',
-      'nidoran f': 'nidoran-f',
-      'nidoran m': 'nidoran-m',
-      'farfetchd': 'farfetchd',
       'mr mime': 'mr-mime',
       'mime jr': 'mime-jr',
-      'type null': 'type-null',
+      'farfetchd': 'farfetch\'d',
     };
 
     String normalized = name
@@ -109,30 +138,23 @@ class CollectionIndexService {
   }
 
   String normalizeSearchQuery(String name) {
-    String normalized = normalizeCreatureName(name);
+    String normalized = normalizeCardName(name);
     
     // Handle special character display cases
     final displayCases = {
-      'nidoran-f': 'Nidoran♀',
-      'nidoran-m': 'Nidoran♂',
-      'farfetchd': 'Farfetch\'d',
       'mr-mime': 'Mr. Mime',
       'mime-jr': 'Mime Jr.',
-      'type-null': 'Type: Null',
+      'farfetchd': 'Farfetch\'d',
     };
     
-    if (displayCases.containsKey(normalized)) {
-      return displayCases[normalized]!;
-    }
-    
-    return normalized
-        .split('-')
-        .map((part) => part.capitalize())
-        .join(' ');
+    return displayCases[normalized] ?? 
+           normalized.split('-')
+                    .map((part) => part[0].toUpperCase() + part.substring(1))
+                    .join(' ');
   }
 
   int? getNumberFromName(String name) {
     if (!_isInitialized) return null;
-    return _nameToNumber[normalizeCreatureName(name)];
+    return _cardNumbers[normalizeCardName(name)];
   }
 }
