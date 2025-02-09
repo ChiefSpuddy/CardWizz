@@ -33,6 +33,11 @@
 			<string>UIInterfaceOrientationPortrait</string>
 			<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		</array>
+		<!-- Add this key to explicitly declare iPhone-only support -->
+		<key>UIDeviceFamily</key>
+		<array>
+			<integer>1</integer>
+		</array>
 		<key>UIRequiresFullScreen</key>
 		<true/>
 		<key>UIViewControllerBasedStatusBarAppearance</key>
