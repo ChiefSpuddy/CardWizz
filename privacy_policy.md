@@ -29,12 +29,32 @@ No images are stored without your explicit action.
 ## 3. How We Use Your Information
 
 We use collected information to:
-- Manage your card collection
+- Manage your card collection (Free: up to 200 cards, Premium: unlimited)
 - Provide market price updates
-- Improve app functionality
+- Enable card scanning (Free: 50 scans/month, Premium: unlimited)
+- Process price alerts (Free: 2 alerts, Premium: unlimited)
 - Send important notifications
 - Troubleshoot technical issues
 - Enhance user experience
+
+## 4. Service Limits
+
+### 4.1 Free Tier
+- Maximum 200 cards in collection
+- 50 card scans per month
+- 2 price alerts
+- 4 collections/binders
+- Basic analytics
+
+### 4.2 Premium Tier
+- Unlimited cards in collection
+- Unlimited card scans
+- Unlimited price alerts
+- Unlimited collections/binders
+- Advanced analytics and insights
+- Real-time market data
+- Cloud backup and restore
+- Custom themes
 
 ## 4. Data Storage and Security
 
