@@ -107,6 +107,41 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   Widget _buildPriceChart(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
     
+    // Check if we have enough price history data
+    final hasEnoughData = cards.any((card) => card.priceHistory.length > 1);
+    if (!hasEnoughData) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.show_chart,
+                size: 48,
+                color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Price Trend Coming Soon',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Check back tomorrow to see how your collection value changes over time!',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
     if (cards.isEmpty) return const SizedBox.shrink();
 
     // Create timeline of portfolio value changes
@@ -144,6 +179,14 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     final maxY = timelinePoints.values.reduce(max);
     final minY = timelinePoints.values.reduce(min);
     final padding = maxY * 0.1;
+
+    // Add these checks
+    if (maxY <= 0 || maxY == minY) {
+      return const SizedBox.shrink();
+    }
+
+    // Ensure horizontal interval is never zero
+    final horizontalInterval = max(maxY / 4, 0.1);
 
     // Convert to spots for the chart
     final chartSpots = timelinePoints.entries.map((entry) {
@@ -204,7 +247,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
               gridData: FlGridData(
                 show: true,
                 drawVerticalLine: true,
-                horizontalInterval: maxY / 4,
+                horizontalInterval: horizontalInterval, // Use safe interval
                 verticalInterval: const Duration(days: 7).inMilliseconds.toDouble(),
                 getDrawingHorizontalLine: (value) => FlLine(
                   color: Theme.of(context).dividerColor.withOpacity(0.1),

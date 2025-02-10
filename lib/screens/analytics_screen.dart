@@ -330,6 +330,41 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildValueTrendCard(List<TcgCard> cards) {
+    final hasEnoughData = cards.any((card) => card.priceHistory.length > 1);
+    
+    if (!hasEnoughData) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.trending_up,
+                size: 48,
+                color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Tracking Price Changes',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'We\'ll start showing value trends once we have more price history data. Come back tomorrow!',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final currencyProvider = context.watch<CurrencyProvider>();
     final localizations = AppLocalizations.of(context);
     
@@ -397,7 +432,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     final maxY = timelinePoints.values.reduce(max);
     final minY = timelinePoints.values.reduce(min);
+    
+    // Add these safety checks
+    if (maxY <= 0 || maxY == minY) {
+      return const SizedBox.shrink();
+    }
+
     final padding = maxY * 0.1;
+    // Ensure horizontal interval is never zero
+    final horizontalInterval = max(maxY / 4, 0.1);
 
     // Convert to spots for the chart
     final chartSpots = timelinePoints.entries.map((entry) {
@@ -457,7 +500,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: true,  // Show vertical grid lines
-                    horizontalInterval: maxY / 4,
+                    horizontalInterval: horizontalInterval, // Use safe interval
                     verticalInterval: const Duration(days: 7).inMilliseconds.toDouble(),
                     getDrawingHorizontalLine: (value) => FlLine(
                       color: Theme.of(context).dividerColor.withOpacity(0.1),
