@@ -439,8 +439,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
 
     final padding = maxY * 0.1;
-    // Ensure horizontal interval is never zero
-    final horizontalInterval = max(maxY / 4, 0.1);
+    // Ensure horizontal interval is never zero and is proportional to the data range
+    final horizontalInterval = max((maxY - minY) / 4, 1.0);  // Changed minimum from 0.1 to 1.0
 
     // Convert to spots for the chart
     final chartSpots = timelinePoints.entries.map((entry) {
@@ -1317,86 +1317,89 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildMarketInsightsCard(List<TcgCard> cards) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Market Opportunities',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (_isLoadingMarketData)
+      child: SingleChildScrollView(  // Add this wrapper
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,  // Add this
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          'Analyzing $_loadingProgress of $_totalCards cards...',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        )
-                      else
-                        Text(
-                          'Based on current eBay market prices',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          'Market Opportunities',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                    ],
+                        if (_isLoadingMarketData)
+                          Text(
+                            'Analyzing $_loadingProgress of $_totalCards cards...',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          )
+                        else
+                          Text(
+                            'Based on current eBay market prices',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                if (_isLoadingMarketData)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: () => _loadMarketData(cards),
-                  ),
-              ],
-            ),
-            if (_marketDataError != null) ...[
-              const SizedBox(height: 16),
-              _buildErrorState(_marketDataError!, () => _loadMarketData(cards)),
-            ] else if (_isLoadingMarketData) ...[
-              const SizedBox(height: 16),
-              _buildLoadingState(),
-            ] else if (_marketOpportunities != null) ...[
-              const SizedBox(height: 16),
-              if ((_marketOpportunities!['undervalued'] as List).isNotEmpty)
-                _buildOpportunitySection(
-                  'Selling Opportunities',
-                  'Cards you could sell for profit',
-                  _marketOpportunities!['undervalued'] as List,
-                  Colors.green,
-                  Icons.trending_up,
-                ),
-              if ((_marketOpportunities!['overvalued'] as List).isNotEmpty)
-                _buildOpportunitySection(
-                  'Buying Opportunities',
-                  'Cards you might want to wait to buy',
-                  _marketOpportunities!['overvalued'] as List,
-                  Colors.orange,
-                  Icons.trending_down,
-                ),
-            ] else if (!_isLoadingMarketData)
-              Center(
-                child: TextButton.icon(
-                  onPressed: () => _loadMarketData(cards),
-                  icon: const Icon(Icons.update),
-                  label: const Text('Analyze Market Data'),
-                ),
+                  if (_isLoadingMarketData)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    IconButton(
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () => _loadMarketData(cards),
+                    ),
+                ],
               ),
-          ],
+              if (_marketDataError != null) ...[
+                const SizedBox(height: 16),
+                _buildErrorState(_marketDataError!, () => _loadMarketData(cards)),
+              ] else if (_isLoadingMarketData) ...[
+                const SizedBox(height: 16),
+                _buildLoadingState(),
+              ] else if (_marketOpportunities != null) ...[
+                const SizedBox(height: 16),
+                if ((_marketOpportunities!['undervalued'] as List).isNotEmpty)
+                  _buildOpportunitySection(
+                    'Selling Opportunities',
+                    'Cards you could sell for profit',
+                    _marketOpportunities!['undervalued'] as List,
+                    Colors.green,
+                    Icons.trending_up,
+                  ),
+                if ((_marketOpportunities!['overvalued'] as List).isNotEmpty)
+                  _buildOpportunitySection(
+                    'Buying Opportunities',
+                    'Cards you might want to wait to buy',
+                    _marketOpportunities!['overvalued'] as List,
+                    Colors.orange,
+                    Icons.trending_down,
+                  ),
+              ] else if (!_isLoadingMarketData)
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () => _loadMarketData(cards),
+                    icon: const Icon(Icons.update),
+                    label: const Text('Analyze Market Data'),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -2228,53 +2231,56 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           color: Colors.transparent,
           child: InkWell(
             onTap: () => purchaseService.purchasePremium(),
-            child: Center( // Added Center widget
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 300), // Added constraints
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.bar_chart_rounded,
-                      size: 48,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Premium Analytics',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+            child: SingleChildScrollView(  // Add this wrapper
+              child: Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 300),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24), // Reduced vertical padding
+                  margin: const EdgeInsets.symmetric(vertical: 16), // Add margin
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,  // Add this
+                    children: [
+                      Icon(
+                        Icons.bar_chart_rounded,
+                        size: 48,
                         color: Theme.of(context).colorScheme.primary,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Unlock detailed collection insights\nand advanced analytics',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () => purchaseService.purchasePremium(),
-                        icon: const Text('✨'),
-                        label: const Text('Upgrade to Premium'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Premium Analytics',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'Unlock detailed collection insights\nand advanced analytics',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () => purchaseService.purchasePremium(),
+                          icon: const Text('✨'),
+                          label: const Text('Upgrade to Premium'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
