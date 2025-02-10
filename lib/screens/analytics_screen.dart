@@ -330,8 +330,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildValueTrendCard(List<TcgCard> cards) {
-    final hasEnoughData = cards.any((card) => card.priceHistory.length > 1);
-    
+    final hasEnoughData = cards.where((card) => 
+      card.priceHistory.length >= 2 && 
+      card.priceHistory.any((p) => p.price > 0)
+    ).isNotEmpty;
+
     if (!hasEnoughData) {
       return Card(
         child: Padding(
@@ -346,14 +349,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Tracking Price Changes',
+                'Building Price History',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'We\'ll start showing value trends once we have more price history data. Come back tomorrow!',
+                'Use the refresh button (↻) in the top right to collect price data. Each refresh adds a new data point.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
@@ -428,6 +431,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       timelinePoints[date] = totalValue;
     }
 
+    // Calculate portfolio value for now
+    double currentTotalValue = 0;
+    for (final card in cards) {
+      currentTotalValue += card.price ?? 0;
+    }
+
+    // Always include current total as the last point
+    timelinePoints[DateTime.now()] = currentTotalValue;
+
     if (timelinePoints.isEmpty) return const SizedBox.shrink();
 
     final maxY = timelinePoints.values.reduce(max);
@@ -480,6 +492,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     touchTooltipData: LineTouchTooltipData(
                       tooltipBgColor: Theme.of(context).colorScheme.surface,
                       tooltipRoundedRadius: 8,
+                      fitInsideHorizontally: true,  // Add this
+                      fitInsideVertically: true,    // Add this
+                      tooltipMargin: 8,            // Add this
+                      maxContentWidth: 150,         // Add this to limit tooltip width
                       getTooltipItems: (spots) {
                         return spots.map((spot) {
                           final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
@@ -488,6 +504,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             TextStyle(
                               color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.w600,
+                              fontSize: 12,  // Slightly smaller font
                             ),
                           );
                         }).toList();
@@ -1052,12 +1069,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         .where((tuple) => tuple.$2 != null && tuple.$2 != 0) // Filter out null and 0 changes
         .toList()
         ..sort((a, b) => (b.$2 ?? 0).abs().compareTo((a.$2 ?? 0).abs()));
-
-    // Debug print
-    print('Found ${cardsWithChanges.length} cards with price changes');
-    for (final (card, change, period) in cardsWithChanges.take(5)) {
-      print('${card.name}: ${change?.toStringAsFixed(1)}% ($period) - Price: ${card.price}, History: ${card.priceHistory.length} entries');
-    }
 
     if (cardsWithChanges.isEmpty) {
       return Card(

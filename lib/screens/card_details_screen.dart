@@ -1258,85 +1258,77 @@ Widget _buildPricingSection() {
           child: Column(
             children: [
               Container(
-                color: isDark ? Colors.black : Colors.grey[100],
-                height: MediaQuery.of(context).size.width * 1.2, // Reduced from 1.4
-                padding: const EdgeInsets.symmetric(vertical: 24), // Add padding
-                child: Center( // Center the card
-                  child: Container(
-                    width: MediaQuery.of(context).size.width * 0.7, // Card width
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
+                color: isDark ? Colors.black : Colors.white, // Changed from grey
+                height: MediaQuery.of(context).size.width * 1.0, // Reduced from 1.2
+                child: Stack(
+                  children: [
+                    // Background gradient overlay
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              isDark ? Colors.black : Colors.white,
+                              isDark ? Colors.black.withOpacity(0.7) : Colors.grey[100]!,
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ),
-                    child: GestureDetector(
-                      onTapDown: (_) => _wobbleCard(),
-                      child: AnimatedBuilder(
-                        animation: _wobbleController,
-                        builder: (context, child) {
-                          return Transform.rotate(
-                            angle: sin(_wobbleController.value * pi) * 0.02,
-                            child: child,
-                          );
-                        },
-                        child: Hero(
-                          tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
-                          child: ClipRRect( // Add rounded corners
-                            borderRadius: BorderRadius.circular(12),
-                            child: CachedNetworkImage(
-                              imageUrl: widget.card.imageUrl,
-                              fit: BoxFit.contain,
-                              errorWidget: (context, url, error) => Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.broken_image_outlined,
-                                      size: 48,
-                                      color: Theme.of(context).colorScheme.error,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Failed to load image',
-                                      style: TextStyle(
-                                        color: Theme.of(context).colorScheme.error,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    TextButton(
-                                      onPressed: () {
-                                        CachedNetworkImage.evictFromCache(widget.card.imageUrl);
-                                        setState(() {}); // Trigger rebuild to retry loading
-                                      },
-                                      child: const Text('Retry'),
-                                    ),
-                                  ],
-                                ),
+                    // Card image
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16), // Reduced padding
+                        child: Container(
+                          width: MediaQuery.of(context).size.width * 0.75, // Slightly larger
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
                               ),
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
                               ),
-                              fadeInDuration: const Duration(milliseconds: 300),
-                              fadeOutDuration: const Duration(milliseconds: 300),
-                              maxHeightDiskCache: 800,
-                              memCacheHeight: 800,
-                              cacheKey: '${widget.card.id}_${widget.card.imageUrl.hashCode}',
-                              errorListener: (error) {
-                                print('Error loading image: ${widget.card.imageUrl} - $error');
+                            ],
+                          ),
+                          child: GestureDetector(
+                            onTapDown: (_) => _wobbleController.forward(),
+                            onTapUp: (_) => _wobbleController.reverse(),
+                            child: AnimatedBuilder(
+                              animation: _wobbleController,
+                              builder: (context, child) {
+                                return Transform(
+                                  transform: Matrix4.identity()
+                                    ..setEntry(3, 2, 0.001)
+                                    ..rotateY(sin(_wobbleController.value * pi) * 0.02),
+                                  alignment: Alignment.center,
+                                  child: child,
+                                );
                               },
+                              child: Hero(
+                                tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: CachedNetworkImage(
+                                    imageUrl: widget.card.imageUrl,
+                                    fit: BoxFit.contain,
+                                    // ...existing CachedNetworkImage properties...
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
               Padding(

@@ -61,52 +61,42 @@ class BackgroundService {
   }
 
   Future<void> refreshPrices() async {
-    if (!_isEnabled) return;
-
     print('Starting price refresh...');
-    final cards = await _storage.getAllCards();
-    if (cards.isEmpty) return;
-
-    var progress = 0;
-    final total = cards.length;
     
-    _storage.notifyPriceUpdateProgress(0, total);
+    try {
+      final cards = await _storage.getCards();
+      print('Found ${cards.length} cards to update');
 
-    final updatedCards = <TcgCard>[];
-    var updatedCount = 0;
+      for (var i = 0; i < cards.length; i++) {
+        final card = cards[i];
+        final currentPrice = card.price;
+        
+        // Get card details first, then extract price
+        final cardDetails = await _api.getCardById(card.id);
+        final newPrice = cardDetails?['cardmarket']?['prices']?['averageSellPrice'] as double?;
+        
+        print('Card: ${card.name}');
+        print('Old price: $currentPrice');
+        print('New price: $newPrice');
+        print('History before: ${card.priceHistory.length} entries');
 
-    for (final card in cards) {
-      try {
-        progress++;
-        _storage.notifyPriceUpdateProgress(progress, total);
-
-        // Get eBay price
-        final newPrice = await _ebayApi.getAveragePrice(
-          card.name,
-          setName: card.setName,
-          number: card.number,
-        );
-
-        if (newPrice != null) {
-          // Always add price to history even if it hasn't changed significantly
+        if (newPrice != null && newPrice != currentPrice) {
           final updatedCard = card.updatePrice(newPrice);
+          print('History after: ${updatedCard.priceHistory.length} entries');
           await _storage.updateCard(updatedCard);
-          if ((card.price ?? 0) != newPrice) {
-            updatedCount++;
-            print('📊 Price change for ${card.name}: ${card.price?.toStringAsFixed(2) ?? "0.00"} -> ${newPrice.toStringAsFixed(2)}');
-          }
         }
 
-      } catch (e) {
-        print('Error updating price for ${card.name}: $e');
+        // Notify progress
+        _storage.notifyPriceUpdateProgress(i + 1, cards.length);
       }
 
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
+      print('Price refresh completed');
+      _storage.notifyPriceUpdateComplete(cards.length);
 
-    _storage.notifyPriceUpdateComplete(updatedCount);
-    _lastUpdateTime = DateTime.now();
-    print('Price refresh complete. Updated $updatedCount cards.');
+    } catch (e) {
+      print('Error during price refresh: $e');
+      rethrow;
+    }
   }
 
   Future<DateTime?> getLastUpdateTime() async {

@@ -107,42 +107,48 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   Widget _buildPriceChart(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
     
-    // Check if we have enough price history data
-    final hasEnoughData = cards.any((card) => card.priceHistory.length > 1);
-    if (!hasEnoughData) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.show_chart,
-                size: 48,
-                color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
+    final hasEnoughData = cards.where((card) => 
+      card.priceHistory.length >= 2 && 
+      card.priceHistory.any((p) => p.price > 0)
+    ).isNotEmpty;
+
+    // Early returns for empty states...
+    if (!hasEnoughData) return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.show_chart,
+              size: 48,
+              color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Price Trend Coming Soon',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Price Trend Coming Soon',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Check back tomorrow to see how your collection value changes over time!',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Check back tomorrow to see how your collection value changes over time!',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
-    }
-    
+      ),
+    );
     if (cards.isEmpty) return const SizedBox.shrink();
+
+    // Calculate current total value
+    final currentTotalValue = cards.fold<double>(
+      0, (sum, card) => sum + (card.price ?? 0)
+    );
 
     // Create timeline of portfolio value changes
     final timelinePoints = <DateTime, double>{};
@@ -153,40 +159,37 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
         p.date.year, 
         p.date.month, 
         p.date.day,
-        p.date.hour,  // Include hour for more granular data points
       ))
     ).toSet().toList()
       ..sort();
 
-    // For each date, calculate total portfolio value
+    // For each date, calculate total portfolio value using CURRENT card list
     for (final date in allDates) {
       double totalValue = 0;
       for (final card in cards) {
-        // Find price closest to this date
+        // Find price closest to this date, fallback to current price
         final pricePoint = card.priceHistory
             .where((p) => p.date.isBefore(date) || p.date.isAtSameMomentAs(date))
             .lastOrNull;
         
-        if (pricePoint != null) {
-          totalValue += pricePoint.price;
-        }
+        totalValue += pricePoint?.price ?? card.price ?? 0;
       }
       timelinePoints[date] = totalValue;
     }
+
+    // Always include current total as the last point
+    timelinePoints[DateTime.now()] = currentTotalValue;
 
     if (timelinePoints.isEmpty) return const SizedBox.shrink();
 
     final maxY = timelinePoints.values.reduce(max);
     final minY = timelinePoints.values.reduce(min);
+    
+    // Safety checks...
+    if (maxY <= 0 || maxY == minY) return const SizedBox.shrink();
+
     final padding = maxY * 0.1;
-
-    // Add these checks
-    if (maxY <= 0 || maxY == minY) {
-      return const SizedBox.shrink();
-    }
-
-    // Ensure horizontal interval is never zero
-    final horizontalInterval = max(maxY / 4, 0.1);
+    final horizontalInterval = max((maxY - minY) / 4, 1.0);  // Changed minimum from 0.1 to 1.0
 
     // Convert to spots for the chart
     final chartSpots = timelinePoints.entries.map((entry) {

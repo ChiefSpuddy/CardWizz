@@ -97,10 +97,8 @@ class TcgCard {
             ? DateTime.parse(json['addedToCollection'])
             : DateTime.now(),
       );
-    } catch (e, stack) {
+    } catch (e) {
       print('Error creating TcgCard from JSON: $e');
-      print('JSON data: $json');
-      print('Stack trace: $stack');
       rethrow;
     }
   }
@@ -142,7 +140,7 @@ class TcgCard {
   double? getPriceChange(Duration period) {
     if (priceHistory.length < 2) return null;
     
-    // Sort all prices by date first
+    // Sort all prices by date
     final sortedPrices = priceHistory.toList()
       ..sort((a, b) => a.date.compareTo(b.date));
     
@@ -150,27 +148,28 @@ class TcgCard {
     final targetTime = now.subtract(period);
     
     // Find closest price point before target time
-    var oldPrice = price ?? sortedPrices.last.price;  // Default to current price
-    var foundOldPrice = false;
-    
-    for (final entry in sortedPrices.reversed) {
+    PriceHistoryEntry? oldEntry;
+    for (final entry in sortedPrices) {
       if (entry.date.isBefore(targetTime)) {
-        oldPrice = entry.price;
-        foundOldPrice = true;
-        break;
+        oldEntry = entry;
+      } else {
+        break;  // Stop when we hit newer entries
       }
     }
     
-    if (!foundOldPrice) return null;  // No price found before target time
+    if (oldEntry == null) return null;  // No price found before target time
+    
+    // Get current/latest price
+    final currentPrice = price ?? sortedPrices.last.price;
+    if (oldEntry.price == 0 || currentPrice == 0) return null;
     
     // Calculate percentage change
-    final currentPrice = price ?? sortedPrices.last.price;
-    if (oldPrice == 0 || currentPrice == 0) return null;
-    
-    final change = ((currentPrice - oldPrice) / oldPrice) * 100;
+    final change = ((currentPrice - oldEntry.price) / oldEntry.price) * 100;
     
     // Filter out unrealistic changes
-    if (change.abs() > 50) return null;  // More than 50% change is unlikely
+    if (period.inDays <= 1 && change.abs() > 15) return null;  // Max 15% daily change
+    if (period.inDays <= 7 && change.abs() > 30) return null;  // Max 30% weekly change
+    if (change.abs() > 50) return null;  // Max 50% monthly change
     
     return change;
   }
@@ -263,10 +262,8 @@ class SetInfo {
         total: total,
         releaseDate: json['releaseDate']?.toString(),
       );
-    } catch (e, stack) {
+    } catch (e) {
       print('Error creating SetInfo from JSON: $e');
-      print('JSON data: $json');
-      print('Stack trace: $stack');
       return SetInfo();
     }
   }

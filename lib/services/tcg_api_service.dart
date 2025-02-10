@@ -431,4 +431,40 @@ class TcgApiService {
     'ecard2': 'https://images.pokemontcg.io/ecard2/logo.png', // Aquapolis
     'ecard3': 'https://images.pokemontcg.io/ecard3/logo.png', // Skyridge
   };
+
+  // Add this method near the getCardPrice and searchCards methods
+  Future<Map<String, dynamic>?> getCardById(String cardId) async {
+    try {
+      final cacheKey = 'card_$cardId';
+      
+      // Check cache first
+      final cacheEntry = _cache[cacheKey];
+      if (cacheEntry != null && !cacheEntry.isExpired) {
+        return cacheEntry.data as Map<String, dynamic>;
+      }
+
+      await _waitForRateLimit();
+      final response = await _dio.get('/cards/$cardId');
+      final data = response.data['data'] as Map<String, dynamic>;
+      
+      // Cache the response
+      _cache[cacheKey] = _CacheEntry(data);
+      
+      return data;
+    } catch (e) {
+      print('Error getting card by ID: $e');
+      return null;
+    }
+  }
+
+  // Add this method
+  Future<double?> getCardPrice(String cardId) async {
+    try {
+      final data = await getCardById(cardId);
+      return data?['cardmarket']?['prices']?['averageSellPrice'] as double?;
+    } catch (e) {
+      print('Error getting card price: $e');
+      return null;
+    }
+  }
 }
