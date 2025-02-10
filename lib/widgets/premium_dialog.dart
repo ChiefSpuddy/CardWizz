@@ -36,11 +36,26 @@ class PremiumDialog extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  'Get unlimited cards and more premium features',
+                  'CardWizz Premium - Monthly Subscription',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  '\$2.99 per month - Auto-renewable subscription',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
                 const SizedBox(height: 16),
-                ...['✨ Unlimited cards', '📊 Advanced analytics', '🔔 Price alerts']
+                const Text(
+                  'With Premium, you get:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ...['✨ Unlimited card collection (Free: 200 cards)',
+                    '🔍 Unlimited card scanning (Free: 50/month)',
+                    '📊 Advanced analytics and price tracking',
+                    '📱 Custom themes and background refresh',
+                    '💾 Cloud backup and restore',
+                    '📈 Enhanced real-time market data']
                     .map((feature) => ListTile(
                           leading: const Icon(Icons.check_circle, color: Colors.green),
                           title: Text(feature),
@@ -54,13 +69,73 @@ class PremiumDialog extends StatelessWidget {
                     color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    '\$2.99/month',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '\$2.99/month',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Auto-renewable, cancel anytime',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Theme.of(context).dividerColor),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Subscription Information',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '• Monthly subscription period\n'
+                        '• Subscription price: \$2.99 USD per month\n'
+                        '• Payment charged to Apple ID account\n'
+                        '• Auto-renews unless cancelled 24h before renewal\n'
+                        '• Manage subscriptions in App Store Settings\n'
+                        '• Cancel anytime to stop future renewals',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton(
+                      onPressed: () => launchUrl(
+                        Uri.parse('https://chiefspuddy.github.io/CardWizz/#privacy-policy'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      child: Text(localizations.translate('privacyPolicy')),
+                    ),
+                    const SizedBox(width: 16),
+                    TextButton(
+                      onPressed: () => launchUrl(
+                        Uri.parse('https://chiefspuddy.github.io/CardWizz/#terms-of-service'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      child: const Text('Terms of Service'),
+                    ),
+                  ],
                 ),
               ],
             ),

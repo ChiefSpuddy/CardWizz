@@ -93,6 +93,7 @@ class AppLocalizations {
       'profile': 'Profile',
       'welcomeUser': 'Welcome, {user}',
       'noAnalyticsYet': 'No Analytics Yet',
+      'privacyPolicy': 'Privacy Policy',
     },
     'es': {
       'totalCards': 'Total de Cartas',
@@ -173,6 +174,7 @@ class AppLocalizations {
       'timeframe_YTD': 'Año',
       'unknownRarity': 'Rareza Desconocida',
       'total': 'Total',
+      'privacyPolicy': 'Política de Privacidad',
     },
     'ja': {
       'totalCards': 'カード総数',
@@ -253,6 +255,7 @@ class AppLocalizations {
       'timeframe_YTD': '年初来',
       'unknownRarity': '不明なレア度',
       'total': '合計',
+      'privacyPolicy': 'プライバシーポリシー',
     },
     'fr': {
       'totalCards': 'Cartes Totales',

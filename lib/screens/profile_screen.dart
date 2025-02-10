@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:url_launcher/url_launcher.dart';  // Add this import
 import '../providers/app_state.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
@@ -538,6 +539,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                   ),
                   const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: const Text('Data Sources'),
+                    subtitle: const Text('Card data and prices powered by third-party APIs'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showDataAttributionDialog(context),
+                  ),
+                  const Divider(height: 1),
                 ],
               ),
             ),
@@ -569,6 +578,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       MaterialPageRoute(
                         builder: (context) => const PrivacySettingsScreen(),
                       ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.privacy_tip_outlined),
+                    title: Text(localizations.translate('privacyPolicy')),
+                    onTap: () => launchUrl(
+                      Uri.parse('https://chiefspuddy.github.io/CardWizz/#privacy-policy'),
+                      mode: LaunchMode.externalApplication,
                     ),
                   ),
                   const Divider(height: 1),
@@ -609,22 +627,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             : Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            if (purchaseService.isLoading) return;
-            try {
-              if (!purchaseService.isPremium) {
-                await purchaseService.purchasePremium();
-              } else {
-                await purchaseService.restorePurchases();
-              }
-            } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
-                );
-              }
-            }
-          },
+          onTap: purchaseService.isPremium 
+              ? null  // Disable tap when premium
+              : () async {
+                  if (purchaseService.isLoading) return;
+                  try {
+                    await purchaseService.purchasePremium();
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: $e')),
+                      );
+                    }
+                  }
+                },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
@@ -662,15 +678,37 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 else if (purchaseService.isPremium)
-                  Icon(
-                    Icons.check_circle,
-                    color: colorScheme.primary,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.info_outline),
+                        onPressed: () => _showPremiumInfoDialog(context),
+                        tooltip: 'Premium Features',
+                      ),
+                    ],
                   )
                 else
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    size: 16,
-                    color: colorScheme.onSurfaceVariant,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.info_outline),
+                        onPressed: () => _showPremiumInfoDialog(context),
+                        tooltip: 'Premium Features',
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        size: 16,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
                   ),
                 if (kDebugMode && purchaseService.isPremium) ...[
                   const SizedBox(width: 8),
@@ -683,6 +721,101 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showPremiumInfoDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.workspace_premium,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            const Text('Premium Features'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Your premium subscription includes:'),
+            const SizedBox(height: 16),
+            ...['✨ Unlimited card collection',
+                '📊 Advanced analytics and tracking',
+                '📱 Custom themes and card scanning',
+                '💾 Cloud backup and restore',
+                '📈 Real-time market data']
+                .map((feature) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(feature)),
+                        ],
+                      ),
+                    )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDataAttributionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            const Text('Data Attribution'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'CardWizz uses the following data sources:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '• Card data and market prices are provided by the Pokémon TCG API\n'
+              '• Images and card information are owned by their respective copyright holders\n'
+              '• CardWizz is not affiliated with or endorsed by these services',
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => launchUrl(
+                Uri.parse('https://docs.pokemontcg.io/'),
+                mode: LaunchMode.externalApplication,
+              ),
+              child: const Text('API Documentation'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }

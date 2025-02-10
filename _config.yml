@@ -1,0 +1,11 @@
+theme: jekyll-theme-minimal  # or whatever theme you're using
+title: CardWizz
+description: Your Trading Card Collection Manager
+show_downloads: false
+
+# Navigation
+navigation:
+  - title: Home
+    url: /
+  - title: Privacy Policy
+    url: /privacy_policy.html  # Make sure this matches your file name

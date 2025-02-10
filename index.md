@@ -1,7 +1,20 @@
 # CardWizz Documentation
 
-## App Store Disclaimer
-CardWizz is not affiliated with, endorsed by, or sponsored by any trading card company or brand. All trademarks and copyrights belong to their respective owners.
+## Legal Disclaimers and Attributions
+
+### Third-Party Content Disclaimer
+CardWizz is an independent card collection management tool and is not affiliated with, endorsed by, sponsored by, or officially connected with Nintendo, The Pokémon Company, Game Freak, or any of their subsidiaries or affiliates. All card images, names, and related information are copyrighted by their respective owners.
+
+### Data Attribution
+- Card data and market prices are provided by the Pokémon TCG API (pokemontcg.io)
+- CardWizz is a third-party application that uses this data under the API's terms of service
+- Visit [pokemontcg.io](https://pokemontcg.io) for more information about the data source
+
+### Trademarks
+All company names, brand names, trademarks, and registered trademarks displayed in this application belong to their respective owners. Their use in CardWizz is for identification purposes only and does not imply any affiliation with or endorsement by their owners.
+
+### Fair Use Statement
+CardWizz uses card images and data under fair use for the purpose of enabling users to manage their personal collections. We do not claim ownership of any copyrighted material displayed in the application.
 
 ## Quick Links
 - [Privacy Policy](#privacy-policy)
