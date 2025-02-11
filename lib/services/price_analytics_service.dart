@@ -1,5 +1,6 @@
 import 'dart:math';
 import '../models/tcg_card.dart';
+import '../models/price_change.dart';
 
 class PriceAnalyticsService {
   static const List<Duration> standardPeriods = [
@@ -13,7 +14,7 @@ class PriceAnalyticsService {
     if (cards.isEmpty) return {};
 
     final now = DateTime.now();
-    final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+    final totalValue = calculateTotalValue(cards);
     
     // Calculate period changes
     final changes = <String, double>{};
@@ -42,13 +43,28 @@ class PriceAnalyticsService {
     };
   }
 
-  static List<TcgCard> getTopMovers(List<TcgCard> cards, {Duration period = const Duration(hours: 24)}) {
+  static double calculateTotalValue(List<TcgCard> cards) {
+    return cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+  }
+
+  static List<PriceChange> getTopMovers(List<TcgCard> cards, {Duration period = const Duration(hours: 24)}) {
     return cards
         .where((card) => card.priceHistory.length > 1)
-        .map((card) => (card, card.getPriceChange(period) ?? 0))
-        .where((tuple) => tuple.$2.abs() > 0.1)  // Filter out tiny changes
+        .map((card) {
+          final change = card.getPriceChange(period) ?? 0;
+          final currentPrice = card.price ?? 0;
+          final previousPrice = card.getPriceAtDate(DateTime.now().subtract(period)) ?? currentPrice;
+          
+          return PriceChange(
+            card: card,
+            currentPrice: currentPrice,
+            previousPrice: previousPrice,
+            percentageChange: change,
+          );
+        })
+        .where((priceChange) => priceChange.percentageChange.abs() > 0.1)  // Filter out tiny changes
         .toList()
-      ..sort((a, b) => b.$2.abs().compareTo(a.$2.abs()));
+      ..sort((a, b) => b.percentageChange.abs().compareTo(a.percentageChange.abs()));
   }
 
   static List<MapEntry<DateTime, double>> getValueTimeline(
@@ -66,15 +82,22 @@ class PriceAnalyticsService {
       double totalValue = 0;
       
       for (final card in cards) {
-        final price = card.priceHistory
+        // Find the closest price point before or at this date
+        final pricePoint = card.priceHistory
             .where((p) => !p.timestamp.isAfter(date))
-            .lastOrNull
-            ?.price ?? card.price ?? 0;
-        totalValue += price;
+            .lastOrNull;
+            
+        // Use historical price if available, otherwise current price
+        totalValue += pricePoint?.price ?? card.price ?? 0;
       }
       
-      dailyValues[date] = totalValue;
+      if (totalValue > 0) {  // Only add points with value
+        dailyValues[date] = totalValue;
+      }
     }
+
+    // Always include current total value
+    dailyValues[now] = calculateTotalValue(cards);
 
     return dailyValues.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));

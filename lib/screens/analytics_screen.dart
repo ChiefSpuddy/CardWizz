@@ -26,6 +26,7 @@ import '../services/analytics_service.dart';  // Add this import
 import '../services/ebay_api_service.dart';  // Add this import
 // Add this import for launchUrl
 import 'package:url_launcher/url_launcher.dart';
+import '../services/price_analytics_service.dart';  // Add this import
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -402,48 +403,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     if (cards.isEmpty) return const SizedBox.shrink();
 
     // Create timeline of portfolio value changes
-    final timelinePoints = <DateTime, double>{};
-    
-    // First, get all unique dates from price histories
-    final allDates = cards.expand((card) => 
-      card.priceHistory.map((p) => DateTime(
-        p.date.year, 
-        p.date.month, 
-        p.date.day,
-        p.date.hour,  // Include hour for more granular data points
-      ))
-    ).toSet().toList()
-      ..sort();
+    final timelinePoints = PriceAnalyticsService.getValueTimeline(cards);
 
-    // For each date, calculate total portfolio value
-    for (final date in allDates) {
-      double totalValue = 0;
-      for (final card in cards) {
-        // Find price closest to this date
-        final pricePoint = card.priceHistory
-            .where((p) => p.date.isBefore(date) || p.date.isAtSameMomentAs(date))
-            .lastOrNull;
-        
-        if (pricePoint != null) {
-          totalValue += pricePoint.price;
-        }
-      }
-      timelinePoints[date] = totalValue;
-    }
-
-    // Calculate portfolio value for now
-    double currentTotalValue = 0;
-    for (final card in cards) {
-      currentTotalValue += card.price ?? 0;
-    }
-
-    // Always include current total as the last point
-    timelinePoints[DateTime.now()] = currentTotalValue;
-
+    // Early return conditions
     if (timelinePoints.isEmpty) return const SizedBox.shrink();
 
-    final maxY = timelinePoints.values.reduce(max);
-    final minY = timelinePoints.values.reduce(min);
+    final maxY = timelinePoints.map((e) => e.value).reduce(max);
+    final minY = timelinePoints.map((e) => e.value).reduce(min);
     
     // Add these safety checks
     if (maxY <= 0 || maxY == minY) {
@@ -452,10 +418,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     final padding = maxY * 0.1;
     // Ensure horizontal interval is never zero and is proportional to the data range
-    final horizontalInterval = max((maxY - minY) / 4, 1.0);  // Changed minimum from 0.1 to 1.0
+    final horizontalInterval = max<double>((maxY - minY) / 4, 1.0);  // Changed minimum from 0.1 to 1.0
 
     // Convert to spots for the chart
-    final chartSpots = timelinePoints.entries.map((entry) {
+    final chartSpots = timelinePoints.map((entry) {
       return FlSpot(
         entry.key.millisecondsSinceEpoch.toDouble(),
         entry.value,
@@ -2065,8 +2031,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildValueSummary(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
     final localizations = AppLocalizations.of(context);
-    final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
-    final weeklyChange = 5.8;
+    final totalValue = PriceAnalyticsService.calculateTotalValue(cards);
+    
+    // Calculate weekly change
+    final timeline = PriceAnalyticsService.getValueTimeline(
+      cards, 
+      period: const Duration(days: 7)
+    );
+    
+    double weeklyChange = 0;
+    if (timeline.length >= 2) {
+      final oldValue = timeline.first.value;
+      final newValue = timeline.last.value;
+      if (oldValue > 0) {
+        weeklyChange = ((newValue - oldValue) / oldValue) * 100;
+      }
+    }
 
     return Card(
       elevation: 4,

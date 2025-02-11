@@ -233,6 +233,13 @@ class TcgCard {
       addedToCollection: addedToCollection ?? this.addedToCollection,  // Add this line
     );
   }
+
+  double? getPriceAtDate(DateTime date) {
+    final historicalPrice = priceHistory
+        .where((p) => p.timestamp.isBefore(date) || p.timestamp.isAtSameMomentAs(date))
+        .lastOrNull;
+    return historicalPrice?.price ?? price;
+  }
 }
 
 class SetInfo {

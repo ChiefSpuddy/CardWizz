@@ -58,14 +58,27 @@ class PriceSyncService {
       for (final card in cards) {
         final newPrice = await _fetchLatestPrice(card.id);
         if (newPrice != null && newPrice != card.price) {
+          // Add price history before updating current price
+          await storage.addPriceHistoryPoint(
+            card.id, 
+            card.price ?? 0,
+            DateTime.now(),
+          );
+          
+          // Update current price
           await storage.updateCardPrice(card.id, newPrice);
           updatedCount++;
           print('Updated price for ${card.name}: ${card.price} -> $newPrice');
         }
       }
+      
+      // Update last sync time
+      await storage.backgroundService?.setLastUpdateTime(DateTime.now());
+      
       print('Completed price sync. Updated $updatedCount cards');
     } catch (e) {
       print('Error during price sync: $e');
+      rethrow;  // Rethrow to handle in UI
     }
   }
 
