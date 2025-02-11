@@ -27,6 +27,7 @@ import '../services/ebay_api_service.dart';  // Add this import
 // Add this import for launchUrl
 import 'package:url_launcher/url_launcher.dart';
 import '../services/price_analytics_service.dart';  // Add this import
+import 'dart:math' as math;  // Add this import at the top
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -78,6 +79,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   void initState() {
     super.initState();
     _updateLastRefreshTime();
+    // Initialize DialogManager with context in next frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      DialogManager.instance.init(context);
+    });
   }
 
   @override
@@ -402,25 +407,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     if (cards.isEmpty) return const SizedBox.shrink();
 
-    // Create timeline of portfolio value changes
-    final timelinePoints = PriceAnalyticsService.getValueTimeline(cards);
+    // Create timeline of portfolio value changes - removed minYPercentage parameter
+    final timelinePoints = PriceAnalyticsService.getValueTimeline(
+      cards,
+      period: const Duration(days: 30),
+    );
 
-    // Early return conditions
-    if (timelinePoints.isEmpty) return const SizedBox.shrink();
-
-    final maxY = timelinePoints.map((e) => e.value).reduce(max);
-    final minY = timelinePoints.map((e) => e.value).reduce(min);
+    // Extract values and calculate ranges once
+    final values = timelinePoints.map((entry) => entry.value).toList();
+    final maxValue = values.reduce(max);
+    final minValue = values.reduce(min);
+    final chartPadding = (maxValue - minValue) * 0.1;
     
-    // Add these safety checks
-    if (maxY <= 0 || maxY == minY) {
+    // Calculate nice intervals for the chart
+    final interval = _calculateNiceInterval(maxValue - minValue);
+    final adjustedMin = (minValue / interval).floor() * interval;
+    final adjustedMax = ((maxValue / interval).ceil()) * interval;
+    
+    // Safety check
+    if (maxValue <= 0 || maxValue == minValue) {
       return const SizedBox.shrink();
     }
 
-    final padding = maxY * 0.1;
-    // Ensure horizontal interval is never zero and is proportional to the data range
-    final horizontalInterval = max<double>((maxY - minY) / 4, 1.0);  // Changed minimum from 0.1 to 1.0
+    // Calculate horizontal interval using adjusted values
+    final horizontalInterval = max<double>((adjustedMax - adjustedMin) / 4, 1.0);
 
-    // Convert to spots for the chart
+    // Convert data points to chart spots
     final chartSpots = timelinePoints.map((entry) {
       return FlSpot(
         entry.key.millisecondsSinceEpoch.toDouble(),
@@ -442,7 +454,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              currencyProvider.formatValue(maxY),
+              currencyProvider.formatValue(maxValue),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Colors.green.shade600,
                 fontWeight: FontWeight.w600,
@@ -477,13 +489,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       },
                     ),
                     handleBuiltInTouches: true,
-                    getTouchLineStart: (data, index) => -padding,
-                    getTouchLineEnd: (data, index) => maxY + padding,
+                    getTouchLineStart: (data, index) => -chartPadding,
+                    getTouchLineEnd: (data, index) => maxValue + chartPadding,
                   ),
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: true,  // Show vertical grid lines
-                    horizontalInterval: horizontalInterval, // Use safe interval
+                    horizontalInterval: interval,
                     verticalInterval: const Duration(days: 7).inMilliseconds.toDouble(),
                     getDrawingHorizontalLine: (value) => FlLine(
                       color: Theme.of(context).dividerColor.withOpacity(0.1),
@@ -524,7 +536,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 46,
-                        interval: maxY / 4,
+                        interval: interval, // Use calculated interval
                         getTitlesWidget: (value, _) => Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: Text(
@@ -539,8 +551,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   ),
                   borderData: FlBorderData(show: false),
-                  minY: minY,
-                  maxY: maxY + padding,
+                  minY: adjustedMin.toDouble(),
+                  maxY: adjustedMax.toDouble(),
                   lineBarsData: [
                     LineChartBarData(
                       spots: chartSpots,
@@ -1198,8 +1210,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         throw Exception('Failed to initialize background service');
       }
 
-      // Show initial dialog
-      if (!dialogManager.isDialogVisible && mounted) {
+      // Show initial dialog only if DialogManager is initialized
+      if (dialogManager.context != null && !dialogManager.isDialogVisible && mounted) {
         dialogManager.showCustomDialog(
           PriceUpdateDialog(current: 0, total: 1),
         );
@@ -2279,6 +2291,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         ),
       ),
     );
+  }
+
+  // Add this helper method
+  double _calculateNiceInterval(double range) {
+    // Find the magnitude of the range
+    final magnitude = range.toString().split('.')[0].length;
+    final powerOf10 = math.pow(10, magnitude - 1).toDouble();
+    
+    // Try standard intervals
+    final candidates = [1.0, 2.0, 2.5, 5.0, 10.0];
+    for (final multiplier in candidates) {
+      final interval = multiplier * powerOf10;
+      if (range / interval <= 6) { // Aim for 4-6 intervals
+        return interval;
+      }
+    }
+    
+    return powerOf10 * 10;
   }
 }
 

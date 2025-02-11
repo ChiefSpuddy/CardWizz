@@ -240,6 +240,27 @@ class TcgCard {
         .lastOrNull;
     return historicalPrice?.price ?? price;
   }
+
+  void addPriceHistoryPoint(double price, DateTime date) {
+    // Normalize date to start of day
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    
+    // Don't add duplicate prices for same day
+    if (priceHistory.isNotEmpty && 
+        priceHistory.last.date.isAtSameMomentAs(normalizedDate) &&
+        priceHistory.last.price == price) {
+      return;
+    }
+
+    priceHistory.add(PriceHistoryEntry(
+      price: price,
+      date: normalizedDate,
+    ));
+
+    // Keep only last 90 days of history
+    final cutoff = DateTime.now().subtract(const Duration(days: 90));
+    priceHistory.removeWhere((point) => point.date.isBefore(cutoff));
+  }
 }
 
 class SetInfo {

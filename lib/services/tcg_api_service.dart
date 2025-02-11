@@ -13,6 +13,7 @@ class _CacheEntry {
 }
 
 class TcgApiService {
+  static const String apiKey = 'eebb53a0-319a-4231-9244-fd7ea48b5d2c';  // Add this line
   static final TcgApiService _instance = TcgApiService._internal();
   final Dio _dio;
   static const String _baseUrl = 'https://api.pokemontcg.io/v2';
@@ -37,7 +38,7 @@ class TcgApiService {
   
   TcgApiService._internal() : _dio = Dio(BaseOptions(
     baseUrl: _baseUrl,
-    headers: {'X-Api-Key': 'your-api-key-here'}, // Replace with your Pokemon TCG API key
+    headers: {'X-Api-Key': apiKey},  // Now this will work
   ));
 
   // Add rate limiting method
@@ -466,5 +467,33 @@ class TcgApiService {
       print('Error getting card price: $e');
       return null;
     }
+  }
+
+  Future<double?> fetchCardPrice(String cardId) async {
+    try {
+      final response = await _dio.get(
+        '/cards/$cardId',
+        options: Options(
+          headers: {'X-Api-Key': apiKey},
+        ),
+      );
+
+      // Add logging
+      print('Fetching price for card $cardId');
+      if (response.statusCode == 429) {
+        print('Rate limit hit, waiting before retry...');
+        await Future.delayed(const Duration(seconds: 1));
+        return fetchCardPrice(cardId); // Retry once
+      }
+
+      if (response.statusCode == 200) {
+        final price = response.data['data']['cardmarket']['prices']['averageSellPrice'];
+        print('Got price for $cardId: $price');
+        return (price as num?)?.toDouble();
+      }
+    } catch (e) {
+      print('Error fetching price for card $cardId: $e');
+    }
+    return null;
   }
 }

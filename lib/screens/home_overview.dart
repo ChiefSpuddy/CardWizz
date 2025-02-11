@@ -1,4 +1,5 @@
-import 'dart:math';
+import 'dart:math' as math show pow;  // Replace this line
+import 'dart:math' show max, min;  // Add this line
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
@@ -14,8 +15,8 @@ import '../l10n/app_localizations.dart';  // Add this import
 import '../widgets/sign_in_view.dart';  // Add this import
 import '../screens/home_screen.dart';  // Add this import at the top with other imports
 import '../utils/hero_tags.dart';  // Add this import
-import '../services/collection_value_service.dart';  // Add this import
 import '../utils/cache_manager.dart';  // Add this import
+import '../services/price_analytics_service.dart';  // Add this import
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -146,53 +147,25 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     if (cards.isEmpty) return const SizedBox.shrink();
 
     // Calculate current total value
-    final currentTotalValue = cards.fold<double>(
-      0, (sum, card) => sum + (card.price ?? 0)
-    );
+    final currentTotalValue = PriceAnalyticsService.calculateTotalValue(cards);
 
-    // Create timeline of portfolio value changes
-    final timelinePoints = <DateTime, double>{};
-    
-    // First, get all unique dates from price histories
-    final allDates = cards.expand((card) => 
-      card.priceHistory.map((p) => DateTime(
-        p.date.year, 
-        p.date.month, 
-        p.date.day,
-      ))
-    ).toSet().toList()
-      ..sort();
-
-    // For each date, calculate total portfolio value using CURRENT card list
-    for (final date in allDates) {
-      double totalValue = 0;
-      for (final card in cards) {
-        // Find price closest to this date, fallback to current price
-        final pricePoint = card.priceHistory
-            .where((p) => p.date.isBefore(date) || p.date.isAtSameMomentAs(date))
-            .lastOrNull;
-        
-        totalValue += pricePoint?.price ?? card.price ?? 0;
-      }
-      timelinePoints[date] = totalValue;
-    }
-
-    // Always include current total as the last point
-    timelinePoints[DateTime.now()] = currentTotalValue;
-
+    // Get timeline points from service with 80% minimum Y scaling
+    final timelinePoints = PriceAnalyticsService.getValueTimeline(cards);
     if (timelinePoints.isEmpty) return const SizedBox.shrink();
 
-    final maxY = timelinePoints.values.reduce(max);
-    final minY = timelinePoints.values.reduce(min);
+    // Extract values and calculate ranges once
+    final values = timelinePoints.map((entry) => entry.value).toList();
+    final maxValue = values.reduce(max);
+    final minValue = values.reduce(min);
+    final chartPadding = (maxValue - minValue) * 0.1;
     
-    // Safety checks...
-    if (maxY <= 0 || maxY == minY) return const SizedBox.shrink();
-
-    final padding = maxY * 0.1;
-    final horizontalInterval = max((maxY - minY) / 4, 1.0);  // Changed minimum from 0.1 to 1.0
-
+    // Calculate nice intervals for the chart
+    final interval = _calculateNiceInterval(maxValue - minValue);
+    final adjustedMin = (minValue / interval).floor() * interval;
+    final adjustedMax = ((maxValue / interval).ceil()) * interval;
+    
     // Convert to spots for the chart
-    final chartSpots = timelinePoints.entries.map((entry) {
+    final spots = timelinePoints.map((entry) {
       return FlSpot(
         entry.key.millisecondsSinceEpoch.toDouble(),
         entry.value,
@@ -212,7 +185,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
             ),
             const Spacer(),
             Text(
-              currencyProvider.formatValue(maxY),
+              currencyProvider.formatValue(maxValue),
               style: TextStyle(
                 color: Colors.green.shade700,
                 fontWeight: FontWeight.w600,
@@ -250,7 +223,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
               gridData: FlGridData(
                 show: true,
                 drawVerticalLine: true,
-                horizontalInterval: horizontalInterval, // Use safe interval
+                horizontalInterval: interval, // Use calculated interval
                 verticalInterval: const Duration(days: 7).inMilliseconds.toDouble(),
                 getDrawingHorizontalLine: (value) => FlLine(
                   color: Theme.of(context).dividerColor.withOpacity(0.1),
@@ -286,7 +259,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    interval: maxY / 4,
+                    interval: interval,  // Use calculated interval
                     reservedSize: 46,
                     getTitlesWidget: (value, _) => Padding(
                       padding: const EdgeInsets.only(right: 8),
@@ -302,11 +275,11 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 ),
               ),
               borderData: FlBorderData(show: false),
-              minY: minY,
-              maxY: maxY + padding,
+              minY: adjustedMin,
+              maxY: adjustedMax,
               lineBarsData: [
                 LineChartBarData(
-                  spots: chartSpots,
+                  spots: spots,  // Use spots instead of chartSpots
                   isCurved: true,
                   curveSmoothness: 0.5, // Increased from 0.35
                   preventCurveOverShooting: false, // Changed to false to allow smoother curves
@@ -343,6 +316,19 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     );
   }
 
+  double _calculateNiceInterval(double range) {
+    final magnitude = range.toString().split('.')[0].length;
+    final powerOf10 = math.pow(10, magnitude - 1).toDouble();
+    
+    final candidates = [1.0, 2.0, 2.5, 5.0, 10.0];
+    for (final multiplier in candidates) {
+      final interval = multiplier * powerOf10;
+      if (range / interval <= 6) return interval;
+    }
+    
+    return powerOf10 * 10;
+  }
+
   Widget _buildTopCards(List<TcgCard> cards) {
     final localizations = AppLocalizations.of(context);
     final currencyProvider = context.watch<CurrencyProvider>();
@@ -366,11 +352,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
               ),
               const Spacer(),
               TextButton(
-                onPressed: () {
-                  if (context.mounted) {
-                    Navigator.pushNamed(context, '/collection');
-                  }
-                },
+                onPressed: _navigateToCollection,
                 child: Text(localizations.translate('viewAll')),
               ),
             ],
@@ -690,6 +672,15 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     );
   }
 
+  void _navigateToCollection() {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+        Navigator.pushNamed(context, '/collection');
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
@@ -821,11 +812,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                             ),
                             const Spacer(),
                             TextButton(
-                              onPressed: () {
-                                if (context.mounted) {
-                                  Navigator.pushNamed(context, '/collection');
-                                }
-                              },
+                              onPressed: _navigateToCollection,
                               child: Text(localizations.translate('viewAll')),
                             ),
                           ],

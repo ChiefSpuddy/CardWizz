@@ -73,31 +73,42 @@ class PriceAnalyticsService {
   }) {
     final now = DateTime.now();
     final startDate = now.subtract(period);
-    
-    // Group price points by date
     final dailyValues = <DateTime, double>{};
     
-    for (var i = 0; i <= period.inDays; i++) {
-      final date = startDate.add(Duration(days: i));
+    // First, collect all unique dates from all cards
+    final allDates = <DateTime>{startDate, now};
+    for (final card in cards) {
+      for (final point in card.priceHistory) {
+        if (point.date.isAfter(startDate)) {
+          final normalizedDate = DateTime(
+            point.date.year, point.date.month, point.date.day,
+          );
+          allDates.add(normalizedDate);
+        }
+      }
+    }
+
+    // Sort dates chronologically
+    final sortedDates = allDates.toList()..sort();
+    
+    // Calculate collection value for each date
+    for (final date in sortedDates) {
       double totalValue = 0;
-      
       for (final card in cards) {
-        // Find the closest price point before or at this date
-        final pricePoint = card.priceHistory
-            .where((p) => !p.timestamp.isAfter(date))
+        final historicalPrice = card.priceHistory
+            .where((p) => !p.date.isAfter(date))
             .lastOrNull;
-            
-        // Use historical price if available, otherwise current price
-        totalValue += pricePoint?.price ?? card.price ?? 0;
+        totalValue += historicalPrice?.price ?? card.price ?? 0;
       }
       
-      if (totalValue > 0) {  // Only add points with value
+      if (totalValue > 0) {
         dailyValues[date] = totalValue;
       }
     }
 
-    // Always include current total value
-    dailyValues[now] = calculateTotalValue(cards);
+    // Always include current total
+    final currentTotal = calculateTotalValue(cards);
+    dailyValues[now] = currentTotal;
 
     return dailyValues.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));

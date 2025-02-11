@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/tcg_card.dart';
 import '../services/storage_service.dart';
-import '../providers/currency_provider.dart';  // Add this import
-import '../services/purchase_service.dart';  // Add this import
+import '../providers/currency_provider.dart';
+import '../services/purchase_service.dart';
+import '../screens/card_details_screen.dart';  // Add this import
 
 class CardGridItem extends StatefulWidget {
   final TcgCard card;
   final VoidCallback? onTap;
   final bool showQuickAdd;  // Add this parameter
   final Image? cached;  // Add this parameter
+  final String? heroContext;  // Add this property
 
   const CardGridItem({
     super.key,
@@ -17,6 +19,7 @@ class CardGridItem extends StatefulWidget {
     this.onTap,
     this.showQuickAdd = false,  // Default to false
     this.cached,  // Add this parameter
+    this.heroContext,  // Add this parameter
   });
 
   @override
@@ -213,7 +216,20 @@ class _CardGridItemState extends State<CardGridItem> {
             clipBehavior: Clip.antiAlias,
             elevation: 2,
             child: InkWell(
-              onTap: widget.onTap,
+              onTap: () {
+                if (!context.mounted) return;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CardDetailsScreen(
+                        card: widget.card,
+                        heroContext: widget.heroContext ?? 'grid',
+                      ),
+                    ),
+                  );
+                });
+              },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

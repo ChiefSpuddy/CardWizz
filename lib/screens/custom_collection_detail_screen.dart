@@ -385,15 +385,19 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
   }
 
   void _showCardDetails(BuildContext context, TcgCard card) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CardDetailsScreen(
-          card: card,
-          heroContext: 'binder_${widget.collection.id}',  // Make hero tag unique
-          isFromBinder: true,  // Always true when viewing from binder
+    if (!mounted) return;
+    // Add check to ensure we're not in the middle of navigation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CardDetailsScreen(
+            card: card,
+            heroContext: 'binder_${widget.collection.id}',  // Make hero tag unique
+            isFromBinder: true,  // Always true when viewing from binder
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
