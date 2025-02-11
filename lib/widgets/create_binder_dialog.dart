@@ -196,7 +196,8 @@ class _CreateBinderDialogState extends State<CreateBinderDialog> {
                           }
 
                           if (context.mounted) {
-                            Navigator.of(context).pop(true);  // Return true instead of collectionId
+                            // Return collectionId instead of true
+                            Navigator.of(context).pop(collectionId);
                           }
                         } catch (e) {
                           if (context.mounted) {
