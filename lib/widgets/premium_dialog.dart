@@ -1,170 +1,242 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PremiumDialog extends StatelessWidget {
   const PremiumDialog({super.key});
+
+  Future<void> _launchUrl(String url) async {
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.diamond_outlined, color: Colors.white),
-                SizedBox(width: 8),
-                Text(
-                  'Unlock Premium',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  'CardWizz Premium - Monthly Subscription',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '\$2.99 per month - Auto-renewable subscription',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'With Premium, you get:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                ...['✨ Unlimited card collection (Free: 200 cards)',
-                    '🔍 Unlimited card scanning (Free: 50/month)',
-                    '📊 Advanced analytics and price tracking',
-                    '📱 Custom themes and background refresh',
-                    '💾 Cloud backup and restore',
-                    '📈 Enhanced real-time market data']
-                    .map((feature) => ListTile(
-                          leading: const Icon(Icons.check_circle, color: Colors.green),
-                          title: Text(feature),
-                          dense: true,
-                          visualDensity: VisualDensity.compact,
-                        )),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '\$2.99/month',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
+      child: SingleChildScrollView(  // Add this wrapper
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with subscription title
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.diamond_outlined, color: Colors.white),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'CardWizz Premium Subscription',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Auto-renewable, cancel anytime',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
+            ),
+
+            // Add prominent subscription info at the top
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Theme.of(context).dividerColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Subscription Details:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 8),
+                  const Text(
+                    '• Title: CardWizz Premium Subscription\n'
+                    '• Length: Monthly subscription\n'
+                    '• Price: \$2.99 USD per month\n'
+                    '• Billing: Charged to Apple ID account\n'
+                    '• Renewal: Automatically renews unless cancelled\n'
+                    '• Cancellation: At least 24h before renewal',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Subscription details
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Monthly Auto-Renewable Subscription',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '\$2.99 USD per month',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Subscription automatically renews unless cancelled at least 24 hours before the end of the current period',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Premium features list - updated list without unavailable features
+                  const Text(
+                    'Premium Features Included:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  ...[
+                    '✨ Unlimited card collection (Free: 200)',  // Shortened text
+                    '🔍 Unlimited card scanning (Free: 50/mo)',  // Shortened text
+                    '📊 Advanced analytics and tracking',
+                    '📈 Enhanced market data',
+                    '📱 Multiple collections (Free: 4)',
+                  ].map((feature) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, 
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            feature,
+                            style: const TextStyle(fontSize: 13),  // Added size constraint
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+
+                  const SizedBox(height: 16),
+                  // Subscription information
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Theme.of(context).dividerColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Subscription Information:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '• Subscription length: 1 month\n'
+                          '• Price: \$2.99 USD per month\n'
+                          '• Payment charged to Apple ID account\n'
+                          '• Subscription automatically renews unless cancelled\n'
+                          '• Cancel anytime in App Store Settings',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  // Required links
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'Subscription Information',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _launchUrl('https://chiefspuddy.github.io/CardWizz/#terms-of-service'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            alignment: Alignment.center,
+                          ),
+                          child: const Text(
+                            'Terms of Use',
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '• Monthly subscription period\n'
-                        '• Subscription price: \$2.99 USD per month\n'
-                        '• Payment charged to Apple ID account\n'
-                        '• Auto-renews unless cancelled 24h before renewal\n'
-                        '• Manage subscriptions in App Store Settings\n'
-                        '• Cancel anytime to stop future renewals',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _launchUrl('https://cardwizz.app/privacy'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            alignment: Alignment.center,
+                          ),
+                          child: const Text(
+                            'Privacy Policy',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton(
-                      onPressed: () => launchUrl(
-                        Uri.parse('https://chiefspuddy.github.io/CardWizz/#privacy-policy'),
-                        mode: LaunchMode.externalApplication,
-                      ),
-                      child: Text(localizations.translate('privacyPolicy')),
-                    ),
-                    const SizedBox(width: 16),
-                    TextButton(
-                      onPressed: () => launchUrl(
-                        Uri.parse('https://chiefspuddy.github.io/CardWizz/#terms-of-service'),
-                        mode: LaunchMode.externalApplication,
-                      ),
-                      child: const Text('Terms of Service'),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Maybe Later'),
+
+            // Action buttons
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Not Now'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/profile');
-                    },
-                    child: const Text('UPGRADE NOW'),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton.icon(
+                      onPressed: () => Navigator.pop(context, true),
+                      icon: const Text('💎'),
+                      label: const Text('Subscribe Now'),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

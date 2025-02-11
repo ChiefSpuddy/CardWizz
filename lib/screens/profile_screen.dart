@@ -29,6 +29,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   double? _scrollPosition;
   bool _showSensitiveInfo = false;
   bool _notificationsEnabled = false;
+  bool _showPremiumInfo = false;
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   void initState() {
@@ -591,6 +599,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ),
                   const Divider(height: 1),
                   _buildPremiumTile(context),
+                  _buildPremiumInfoSection(context, purchaseService.isPremium),
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.logout, color: Colors.red),
@@ -725,6 +734,224 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
   }
 
+  Widget _buildPremiumInfoSection(BuildContext context, bool isPremium) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),  // Reduced horizontal margin
+      child: AnimatedCrossFade(
+        duration: const Duration(milliseconds: 300),
+        crossFadeState: _showPremiumInfo ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+        firstChild: TextButton(
+          onPressed: () => setState(() => _showPremiumInfo = true),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Show subscription details',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const Icon(Icons.expand_more, size: 20),
+            ],
+          ),
+        ),
+        secondChild: Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,  // Add this
+            children: [
+              ListTile(
+                title: const Text('Subscription Details'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.expand_less),
+                  onPressed: () => setState(() => _showPremiumInfo = false),
+                ),
+              ),
+              const Divider(),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'CardWizz Premium',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Monthly Auto-Renewable Subscription',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text('\$2.99 USD per month'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFeatureComparison(),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Subscription Information:',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            '• Subscription length: 1 month\n'
+                            '• Payment charged to Apple ID account\n'
+                            '• Subscription renews automatically\n'
+                            '• Cancel anytime in App Store Settings\n'
+                            '• Cancel at least 24h before renewal',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _launchUrl('https://chiefspuddy.github.io/CardWizz/#terms-of-service'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Center(  // Wrap with Center
+                              child: Text(
+                                'Terms of Use',
+                                maxLines: 1,  // Add this to prevent text wrapping
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _launchUrl('https://chiefspuddy.github.io/CardWizz/#privacy-policy'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            child: const Center(  // Wrap with Center
+                              child: Text(
+                                'Privacy Policy',
+                                maxLines: 1,  // Add this to prevent text wrapping
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureComparison() {
+    return Table(
+      columnWidths: const {
+        0: FlexColumnWidth(4),    // Feature description
+        1: FlexColumnWidth(2.5),  // Free column - increased for better text fit
+        2: FlexColumnWidth(2.5),  // Premium column - increased for better text fit
+      },
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      children: [
+        TableRow(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+          ),
+          children: const [
+            Padding(
+              padding: EdgeInsets.all(8),
+              child: Text('Feature', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            Padding(
+              padding: EdgeInsets.all(8),
+              child: Text('Free', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            Padding(
+              padding: EdgeInsets.all(8),
+              child: Text('Premium', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        _buildFeatureRow('Collection Size', '200', 'Unlimited'),
+        _buildFeatureRow('Card Scanning', '50/mo', 'Unlimited'),
+        _buildFeatureRow('Collections', '4 max', 'Unlimited'),  // Changed from Collections/Binders
+        _buildFeatureRow('Analytics', 'Basic', 'Advanced'),
+        _buildFeatureRow('Market Data', 'Basic', 'Enhanced'),
+        // Removed custom themes and background refresh as they're not implemented
+      ],
+    );
+  }
+
+  TableRow _buildFeatureRow(String feature, String free, String premium) {
+    return TableRow(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: Text(
+            feature,
+            style: const TextStyle(fontSize: 13),
+          ),
+        ),
+        Center(  // Add Center wrapper
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              free,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        ),
+        Center(  // Add Center wrapper
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                premium,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _showPremiumInfoDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -739,30 +966,85 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             const Text('Premium Features'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Your premium subscription includes:'),
-            const SizedBox(height: 16),
-            ...['✨ Unlimited card collection',
-                '📊 Advanced analytics and tracking',
-                '📱 Custom themes and card scanning',
-                '💾 Cloud backup and restore',
-                '📈 Real-time market data']
-                .map((feature) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.check_circle, color: Colors.green, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(feature)),
-                        ],
-                      ),
-                    )),
-          ],
+        content: SingleChildScrollView(  // Add scroll support for smaller screens
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Subscription Details',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                  ),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '• Monthly subscription\n'
+                      '• \$2.99 USD per month\n'
+                      '• Auto-renews unless cancelled\n'
+                      '• Cancel anytime in App Store',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Premium Features Include:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...['✨ Unlimited card collection (Free: 200)',
+                  '🔍 Unlimited card scanning (Free: 50/mo)',
+                  '📊 Advanced analytics and tracking',
+                  '📈 Enhanced market data',
+                  '📱 Multiple collections (Free: 4)']
+                  .map((feature) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, 
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            feature,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+            ],
+          ),
         ),
         actions: [
+          TextButton(
+            onPressed: () => _launchUrl('https://chiefspuddy.github.io/CardWizz/#terms-of-service'),
+            child: const Text('Terms'),
+          ),
+          TextButton(
+            onPressed: () => _launchUrl('https://chiefspuddy.github.io/CardWizz/#privacy-policy'),
+            child: const Text('Privacy'),
+          ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Close'),
