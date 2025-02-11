@@ -216,19 +216,17 @@ class _CardGridItemState extends State<CardGridItem> {
             clipBehavior: Clip.antiAlias,
             elevation: 2,
             child: InkWell(
-              onTap: () {
-                if (!context.mounted) return;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CardDetailsScreen(
-                        card: widget.card,
-                        heroContext: widget.heroContext ?? 'grid',
-                      ),
+              onTap: widget.onTap ?? () {
+                if (!mounted) return;
+                // Replace safeNavigate with simpler navigation
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => CardDetailsScreen(
+                      card: widget.card,
+                      heroContext: widget.heroContext ?? 'grid',
                     ),
-                  );
-                });
+                  ),
+                );
               },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
