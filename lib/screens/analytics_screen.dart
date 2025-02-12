@@ -1142,7 +1142,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       SizedBox(
                         width: 28,
                         child: Hero(
-                          tag: HeroTags.cardImage(card.id, context: 'analytics_movers_${card.id}'),
+                          tag: HeroTags.cardImage(card.id, context: 'analytics_movers'),
                           child: _buildCardImage(card.imageUrl),
                         ),
                       ),
