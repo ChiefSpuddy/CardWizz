@@ -38,6 +38,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     }
   }
 
+  Future<void> _openAppStoreReview() async {
+    const appStoreId = '6740775089';  // Updated with your actual App Store ID
+    final url = Uri.parse('https://apps.apple.com/app/id$appStoreId?action=write-review');
+    
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -553,6 +562,34 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     subtitle: const Text('Card data and prices powered by third-party APIs'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _showDataAttributionDialog(context),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: ShaderMask(
+                      shaderCallback: (Rect bounds) {
+                        return LinearGradient(
+                          colors: [
+                            Colors.amber.shade300,
+                            Colors.amber.shade600,
+                          ],
+                        ).createShader(bounds);
+                      },
+                      child: const Icon(
+                        Icons.star_rounded, // Using rounded star for better appearance
+                        size: 28, // Slightly larger icon
+                      ),
+                    ),
+                    title: const Text(
+                      'Rate CardWizz',  // Updated text to be more specific
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,  // Semi-bold text
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Love the app? Let us know!',  // Added encouraging subtitle
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    onTap: _openAppStoreReview,
                   ),
                   const Divider(height: 1),
                 ],

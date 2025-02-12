@@ -71,46 +71,46 @@ class PriceAnalyticsService {
     List<TcgCard> cards, {
     Duration period = const Duration(days: 30),
   }) {
+    if (cards.isEmpty) return [];
+
+    // Calculate cutoff date based on period
     final now = DateTime.now();
-    final startDate = now.subtract(period);
-    final dailyValues = <DateTime, double>{};
-    
-    // First, collect all unique dates from all cards
-    final allDates = <DateTime>{startDate, now};
+    final cutoffDate = now.subtract(period);
+
+    // Get all unique dates from price histories within the period
+    final allDates = <DateTime>{};
     for (final card in cards) {
-      for (final point in card.priceHistory) {
-        if (point.date.isAfter(startDate)) {
-          final normalizedDate = DateTime(
-            point.date.year, point.date.month, point.date.day,
-          );
-          allDates.add(normalizedDate);
-        }
-      }
+      allDates.addAll(card.priceHistory
+          .where((e) => e.date.isAfter(cutoffDate))
+          .map((e) => DateTime(
+                e.date.year,
+                e.date.month,
+                e.date.day,
+              )));
+    }
+
+    // Add today's date if we have current prices
+    if (cards.any((card) => card.price != null)) {
+      allDates.add(DateTime(now.year, now.month, now.day));
     }
 
     // Sort dates chronologically
     final sortedDates = allDates.toList()..sort();
-    
-    // Calculate collection value for each date
+
+    // Calculate total value for each date
+    final timeline = <MapEntry<DateTime, double>>[];
     for (final date in sortedDates) {
       double totalValue = 0;
       for (final card in cards) {
+        // Get the price point closest to but not after this date
         final historicalPrice = card.priceHistory
-            .where((p) => !p.date.isAfter(date))
+            .where((p) => p.date.isBefore(date) || p.date.isAtSameMomentAs(date))
             .lastOrNull;
         totalValue += historicalPrice?.price ?? card.price ?? 0;
       }
-      
-      if (totalValue > 0) {
-        dailyValues[date] = totalValue;
-      }
+      timeline.add(MapEntry(date, totalValue));
     }
 
-    // Always include current total
-    final currentTotal = calculateTotalValue(cards);
-    dailyValues[now] = currentTotal;
-
-    return dailyValues.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+    return timeline;
   }
 }

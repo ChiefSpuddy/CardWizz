@@ -250,6 +250,22 @@ class StorageService {
     if (_currentUserId == null) return;
 
     try {
+      // Initialize price history if card has a price
+      if (card.price != null && card.price! > 0) {
+        final now = DateTime.now();
+        final cardWithHistory = card.copyWith(
+          priceHistory: [
+            PriceHistoryEntry(
+              price: card.price!,
+              date: now,
+            )
+          ],
+          lastPriceUpdate: now,
+          addedToCollection: now,
+        );
+        card = cardWithHistory;
+      }
+
       final cardsKey = _getUserKey('cards');
       final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
       
@@ -279,6 +295,10 @@ class StorageService {
       existingCards.removeWhere((c) => c.id == card.id);
       
       // Add the new card
+      if (card.price != null && card.price! > 0) {
+        // Add initial price point to history
+        card.addPriceHistoryPoint(card.price!, DateTime.now());
+      }
       existingCards.add(card);
 
       // Save back to storage with validation
@@ -495,25 +515,35 @@ class StorageService {
   bool get isPremium => _purchaseService.isPremium;
 
   Future<void> updateCard(TcgCard card) async {
-    if (_currentUserId == null) return;  // Changed from _userId to _currentUserId
+    if (_currentUserId == null) return;
 
     final cards = await getCards();
-    
-    // Find and update the existing card
     final index = cards.indexWhere((c) => c.id == card.id);
+    
     if (index != -1) {
-      cards[index] = card;
+      final existingCard = cards[index];
       
-      // Save all cards back to storage
-      final cardsKey = _getUserKey('cards');
-      final updatedCardsJson = cards
-          .map((c) => jsonEncode(c.toJson()))
-          .toList();
-      
-      await _prefs.setStringList(cardsKey, updatedCardsJson);
-      
-      // Notify listeners
-      _cardsController.add(cards);
+      // Only add price history if price has changed
+      if (card.price != null && card.price! > 0 && card.price != existingCard.price) {
+        final now = DateTime.now();
+        final updatedCard = existingCard.copyWith(
+          price: card.price,
+          lastPriceUpdate: now,
+        );
+        
+        // Add new price point to history
+        updatedCard.addPriceHistoryPoint(card.price!, now);
+        
+        cards[index] = updatedCard;
+        
+        final cardsKey = _getUserKey('cards');
+        final updatedCardsJson = cards
+            .map((c) => jsonEncode(c.toJson()))
+            .toList();
+        
+        await _prefs.setStringList(cardsKey, updatedCardsJson);
+        _cardsController.add(cards);
+      }
     }
   }
 
