@@ -25,6 +25,7 @@ import '../services/chart_service.dart';
 import '../services/ebay_api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math' as math;
+import '../widgets/empty_collection_view.dart';  // Fix the quote and semicolon
 
 // Remove these imports:
 // import '../services/price_analytics_service.dart';
@@ -1227,50 +1228,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).size.height * LayoutConstants.emptyStatePaddingBottom,
-      ),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.query_stats,
-                size: 64,
-                color: Theme.of(context).colorScheme.secondary,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                localizations.translate('noAnalyticsYet'),
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                localizations.translate('addCardsForAnalytics'),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 32),
-              FilledButton.icon(
-                onPressed: () {
-                  final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                  homeState?.setSelectedIndex(2); // Navigate to search tab
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Add Cards'),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return const EmptyCollectionView(
+      title: 'No Analytics Yet',
+      message: 'Add cards to your collection to see detailed analytics and insights',
+      icon: Icons.query_stats,
     );
   }
 

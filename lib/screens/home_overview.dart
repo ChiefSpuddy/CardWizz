@@ -16,7 +16,8 @@ import '../widgets/sign_in_view.dart';
 import '../screens/home_screen.dart';
 import '../utils/hero_tags.dart';
 import '../utils/cache_manager.dart';
-import '../services/chart_service.dart';  // Add this import
+import '../services/chart_service.dart';
+import '../widgets/empty_collection_view.dart';  // Add this import
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -622,48 +623,11 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   }
 
   Widget _buildEmptyState() {
-    final localizations = AppLocalizations.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.style_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.secondary,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              localizations.translate('emptyCollection'),
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              localizations.translate('addFirstCard'),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 32),
-            FilledButton.icon(
-              onPressed: () {
-                final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                if (homeState != null) {
-                  homeState.setSelectedIndex(2); // Navigate to scan/add card
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: Text(localizations.translate('addCard')),
-            ),
-          ],
-        ),
-      ),
+    return const EmptyCollectionView(
+      title: 'Welcome to CardWizz',
+      message: 'Start building your collection by adding cards',
+      buttonText: 'Add Your First Card',
+      icon: Icons.add_circle_outline,
     );
   }
 

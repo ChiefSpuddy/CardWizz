@@ -10,6 +10,8 @@ import '../providers/app_state.dart';
 import '../widgets/sign_in_button.dart';
 import '../utils/notification_manager.dart';
 import '../providers/sort_provider.dart';
+import '../screens/home_screen.dart';  // Add this import
+import '../widgets/empty_collection_view.dart';
 
 class CollectionGrid extends StatefulWidget {
   final bool keepAlive;  // Add this
@@ -417,6 +419,17 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
         final cards = snapshot.data ?? [];
         final sortOption = context.watch<SortProvider>().currentSort;
     
+        if (cards.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 64.0),
+            child: const EmptyCollectionView(
+              title: 'Your Collection is Empty',
+              message: 'Start building your collection by searching for cards you own',
+              icon: Icons.style_outlined,
+            ),
+          );
+        }
+
         // Sort the cards based on selected option
         final sortedCards = List<TcgCard>.from(cards);
         switch (sortOption) {
@@ -445,23 +458,10 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
         }
 
         if (sortedCards.isEmpty) {
-          return const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.collections_bookmark_outlined, size: 64, color: Colors.grey),
-                SizedBox(height: 16),
-                Text(
-                  'Your collection is empty',
-                  style: TextStyle(fontSize: 18),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Add cards from the Search tab',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
+          return const EmptyCollectionView(
+            title: 'Your Collection is Empty',
+            message: 'Start building your collection by searching for cards you own',
+            icon: Icons.style_outlined,
           );
         }
 

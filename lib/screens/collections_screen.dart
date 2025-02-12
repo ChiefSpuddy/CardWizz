@@ -521,13 +521,19 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
             onPressed: () => _showSortMenu(context),
           ),
         ] : null,  // Return null when not signed in
-        bottom: isSignedIn ? PreferredSize(  // Add this condition
+        bottom: isSignedIn ? PreferredSize(
           preferredSize: const Size.fromHeight(52),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _buildToggle(),
+          child: StreamBuilder<List<TcgCard>>(
+            stream: Provider.of<StorageService>(context).watchCards(),
+            builder: (context, snapshot) {
+              final cards = snapshot.data ?? [];
+              return cards.isNotEmpty ? Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildToggle(),
+              ) : const SizedBox.shrink();
+            }
           ),
-        ) : null,  // Return null when not signed in
+        ) : null,
       ),
       drawer: const AppDrawer(),  // Remove scaffoldKey parameter
       body: AnimatedBackground(
