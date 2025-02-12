@@ -14,6 +14,7 @@ import '../screens/privacy_settings_screen.dart';
 import '../services/purchase_service.dart';  // Make sure this is added
 import 'package:flutter/foundation.dart';  // Add this import for kDebugMode
 import '../widgets/sign_in_view.dart';
+import '../services/collection_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -667,14 +668,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Material(
-        borderRadius: BorderRadius.circular(12),
+        elevation: 0,
+        borderRadius: BorderRadius.circular(16),
         color: purchaseService.isPremium 
             ? colorScheme.primaryContainer.withOpacity(0.3)
-            : Colors.transparent,
+            : colorScheme.surface,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           onTap: purchaseService.isPremium 
-              ? null  // Disable tap when premium
+              ? () => _showPremiumInfoDialog(context)
               : () async {
                   if (purchaseService.isLoading) return;
                   try {
@@ -687,24 +689,62 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     }
                   }
                 },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: purchaseService.isPremium 
+                    ? colorScheme.primary.withOpacity(0.3)
+                    : colorScheme.outline.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
             child: Row(
               children: [
-                Icon(
-                  Icons.workspace_premium,
-                  color: purchaseService.isPremium ? colorScheme.primary : Colors.amber,
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: purchaseService.isPremium
+                          ? [colorScheme.primary, colorScheme.tertiary]
+                          : [Colors.amber.shade300, Colors.amber.shade700],
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.workspace_premium,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Premium',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'Premium',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: purchaseService.isPremium 
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                          if (purchaseService.isPremium) ...[
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.check_circle,
+                              color: colorScheme.primary,
+                              size: 18,
+                            ),
+                          ],
+                        ],
                       ),
                       if (purchaseService.error != null)
                         Text(
@@ -713,56 +753,33 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             color: colorScheme.error,
                             fontSize: 12,
                           ),
+                        )
+                      else
+                        Text(
+                          purchaseService.isPremium
+                              ? 'All premium features unlocked'
+                              : 'Unlock unlimited collections & more',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
                     ],
                   ),
                 ),
                 if (purchaseService.isLoading)
-                  const SizedBox(
+                  SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else if (purchaseService.isPremium)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        color: colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.info_outline),
-                        onPressed: () => _showPremiumInfoDialog(context),
-                        tooltip: 'Premium Features',
-                      ),
-                    ],
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(colorScheme.primary),
+                    ),
                   )
                 else
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.info_outline),
-                        onPressed: () => _showPremiumInfoDialog(context),
-                        tooltip: 'Premium Features',
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        size: 16,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ],
+                  Icon(
+                    Icons.chevron_right,
+                    color: colorScheme.onSurfaceVariant,
                   ),
-                if (kDebugMode && purchaseService.isPremium) ...[
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.refresh, size: 20),
-                    onPressed: () => purchaseService.clearPremiumStatus(),
-                  ),
-                ],
               ],
             ),
           ),
@@ -1154,38 +1171,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     });
   }
 
-  Widget _buildDangerZone() {
-    final colorScheme = Theme.of(context).colorScheme;
-    return _buildSection(
-      context: context,
-      title: 'Danger Zone',
-      titleColor: colorScheme.error,
-      backgroundColor: colorScheme.errorContainer.withOpacity(0.1),
-      children: [
-        ListTile(
-          leading: Icon(
-            Icons.delete_forever,
-            color: colorScheme.error,
-          ),
-          title: Text(
-            'Delete Account',
-            style: TextStyle(
-              color: colorScheme.error,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          subtitle: Text(
-            'Warning - This will permanently delete your account and all associated data.',
-            style: TextStyle(
-              color: colorScheme.onSurface.withOpacity(0.7),
-            ),
-          ),
-          onTap: _showDeleteAccountDialog,
-        ),
-      ],
-    );
-  }
-
   Widget _buildSection({
     required BuildContext context,
     required String title,
@@ -1214,6 +1199,276 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         ],
       ),
     );
+  }
+
+  Widget _buildDangerZone() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return _buildSection(
+      context: context,
+      title: 'Danger Zone',
+      titleColor: colorScheme.error,
+      backgroundColor: colorScheme.errorContainer.withOpacity(0.1),
+      children: [
+        ListTile(
+          leading: Icon(
+            Icons.cleaning_services,  // New icon for clear data
+            color: colorScheme.error,
+          ),
+          title: Text(
+            'Clear Collection Data',
+            style: TextStyle(
+              color: colorScheme.error,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: Text(
+            'Remove all cards and collection history. This cannot be undone.',
+            style: TextStyle(
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          onTap: _showClearDataDialog,
+        ),
+        const Divider(height: 1),
+        ListTile(
+          leading: Icon(
+            Icons.delete_forever,
+            color: colorScheme.error,
+          ),
+          title: Text(
+            'Delete Account',
+            style: TextStyle(
+              color: colorScheme.error,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: Text(
+            'Warning - This will permanently delete your account and all associated data.',
+            style: TextStyle(
+              color: colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          onTap: _showDeleteAccountDialog,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showClearDataDialog() async {
+    double sliderValue = 0.0;
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_rounded,
+              color: colorScheme.error,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Clear Collection Data',
+                style: TextStyle(
+                  color: colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: StatefulBuilder(
+          builder: (context, setState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colorScheme.errorContainer.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: colorScheme.error.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'This will permanently remove:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.error,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...['All cards in your collection',
+                        'Price history data',
+                        'Collection statistics',
+                        'Custom binders and organization']
+                        .map((text) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.remove_circle_outline,
+                                size: 18,
+                                color: colorScheme.error,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  text,
+                                  style: TextStyle(
+                                    color: colorScheme.onSurface.withOpacity(0.8),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                sliderValue > 0.9 ? 'Release to confirm' : 'Slide to confirm',
+                style: TextStyle(
+                  color: colorScheme.onSurface.withOpacity(0.7),
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    colors: [
+                      colorScheme.error.withOpacity(0.1),
+                      colorScheme.error.withOpacity(0.2),
+                    ],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Background gradient for the active part
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: MediaQuery.of(context).size.width * sliderValue,
+                        height: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              colorScheme.error.withOpacity(0.5),
+                              colorScheme.error,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Slider instruction text
+                    if (sliderValue < 0.9)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Icon(
+                            Icons.arrow_forward,
+                            color: colorScheme.onSurfaceVariant,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 4),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Text(
+                              'Slide to clear data',
+                              style: TextStyle(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    // The actual slider
+                    SliderTheme(
+                      data: SliderThemeData(
+                        trackHeight: 56,
+                        activeTrackColor: Colors.transparent,
+                        inactiveTrackColor: Colors.transparent,
+                        thumbColor: colorScheme.error,
+                        overlayColor: colorScheme.error.withOpacity(0.12),
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 14,
+                          elevation: 4,
+                          pressedElevation: 8,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 24,
+                        ),
+                      ),
+                      child: Slider(
+                        value: sliderValue,
+                        onChanged: (value) {
+                          setState(() => sliderValue = value);
+                          if (value >= 0.95) {
+                            Navigator.of(context).pop(true);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final storage = context.read<StorageService>();
+        final collections = await CollectionService.getInstance();
+        
+        // Clear all data
+        await storage.clearUserData();
+        await collections.clearUserData();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Collection data cleared successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error clearing data: $e')),
+          );
+        }
+      }
+    }
   }
 
   @override

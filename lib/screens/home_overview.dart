@@ -1,5 +1,5 @@
-import 'dart:math' as math show pow;  // Replace this line
-import 'dart:math' show max, min;  // Add this line
+import 'dart:math' as math show pow;
+import 'dart:math' show max, min;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
@@ -9,14 +9,14 @@ import '../services/tcg_api_service.dart';
 import '../providers/app_state.dart';
 import '../models/tcg_card.dart';
 import '../screens/card_details_screen.dart';
-import '../widgets/sign_in_button.dart';  // Remove sign_in_prompt import
-import '../providers/currency_provider.dart';  // Add this import
-import '../l10n/app_localizations.dart';  // Add this import
-import '../widgets/sign_in_view.dart';  // Add this import
-import '../screens/home_screen.dart';  // Add this import at the top with other imports
-import '../utils/hero_tags.dart';  // Add this import
-import '../utils/cache_manager.dart';  // Add this import
-import '../services/price_analytics_service.dart';  // Add this import
+import '../widgets/sign_in_button.dart';
+import '../providers/currency_provider.dart';
+import '../l10n/app_localizations.dart';
+import '../widgets/sign_in_view.dart';
+import '../screens/home_screen.dart';
+import '../utils/hero_tags.dart';
+import '../utils/cache_manager.dart';
+import '../services/chart_service.dart';  // Add this import
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -108,13 +108,11 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   Widget _buildPriceChart(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
     
-    final hasEnoughData = cards.where((card) => 
-      card.priceHistory.length >= 2 && 
-      card.priceHistory.any((p) => p.price > 0)
-    ).isNotEmpty;
-
+    // Get timeline points from service
+    final points = ChartService.getPortfolioHistory(cards);
+    
     // Early returns for empty states...
-    if (!hasEnoughData) return Card(
+    if (points.length < 2) return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -144,42 +142,17 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
         ),
       ),
     );
-    if (cards.isEmpty) return const SizedBox.shrink();
 
     // Calculate current total value
-    final currentTotalValue = PriceAnalyticsService.calculateTotalValue(cards);
+    final currentTotalValue = ChartService.calculateTotalValue(cards);
 
-    // Get timeline points from service with 80% minimum Y scaling
-    var timelinePoints = PriceAnalyticsService.getValueTimeline(cards);
-    if (timelinePoints.isEmpty) return const SizedBox.shrink();
-
-    // Extract values and calculate ranges once
-    var values = timelinePoints.map((entry) => entry.value).toList();
-
-    // If we only have one data point, create a simulated trend
-    if (timelinePoints.length == 1) {
-      final currentPoint = timelinePoints.first;
-      final now = DateTime.now();
-      final oneDayAgo = now.subtract(const Duration(days: 1));
-      
-      // Create a slight variation for visual interest
-      final currentValue = currentPoint.value;
-      final previousValue = currentValue * 0.99; // Show 1% less than current
-      
-      timelinePoints = [
-        MapEntry(oneDayAgo, previousValue),
-        MapEntry(now, currentValue),
-      ];
-      
-      // Update values array for min/max calculation
-      values = [previousValue, currentValue];
-    }
-
+    // Extract values and calculate ranges
+    final values = points.map((p) => p.$2).toList();
     final maxValue = values.reduce(max);
     final minValue = values.reduce(min);
     
     // Increase the chart padding for better visualization
-    final chartPadding = (maxValue - minValue) * 0.15; // Increased from 0.1 to 0.15
+    final chartPadding = (maxValue - minValue) * 0.15;
     
     // Calculate nice intervals for the chart
     final interval = _calculateNiceInterval(maxValue - minValue);
@@ -187,10 +160,10 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     final adjustedMax = ((maxValue / interval).ceil()) * interval;
 
     // Convert to spots for the chart
-    final spots = timelinePoints.map((entry) {
+    final spots = points.map((point) {
       return FlSpot(
-        entry.key.millisecondsSinceEpoch.toDouble(),
-        entry.value,
+        point.$1.millisecondsSinceEpoch.toDouble(),
+        point.$2,
       );
     }).toList();
 
@@ -396,7 +369,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                         MaterialPageRoute(
                           builder: (context) => CardDetailsScreen(
                             card: card,
-                            heroContext: 'home_top',
+                            heroContext: 'home_topcard_${card.id}', // Update this line
                           ),
                         ),
                       ),
@@ -407,7 +380,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                           children: [
                             Expanded(
                               child: Hero(
-                                tag: HeroTags.cardImage(card.id, context: 'home_top'),
+                                tag: 'home_topcard_${card.id}', // Update this line
                                 child: Image.network(
                                   card.imageUrl,
                                   fit: BoxFit.contain,

@@ -9,6 +9,8 @@ import '../services/purchase_service.dart';
 import '../services/tcg_api_service.dart';
 import '../services/background_service.dart';
 import 'package:rxdart/rxdart.dart'; // Add this import
+import 'package:path/path.dart' show join;
+import 'package:sqflite/sqflite.dart' show Database, openDatabase, getDatabasesPath;
 
 class StorageService {
   static const int _freeUserCardLimit = 25;  // Changed from 10 to 25
@@ -97,14 +99,39 @@ class StorageService {
   Future<void> clearUserData() async {
     if (_currentUserId == null) return;
 
-    // Store the current user ID before clearing
-    final currentId = _currentUserId;  // Save the ID before clearing
-    
-    // Don't clear the actual data, just remove the current user reference
-    _currentUserId = null;
-    _cardsController.add([]);
-    
-    print('Cleared current user, data remains in storage for: $currentId');
+    try {
+      final userId = _currentUserId;  // Store the ID before clearing
+      
+      // Remove all user-specific data
+      final userKeys = _prefs.getKeys()
+          .where((key) => key.startsWith('user_${userId}_'))
+          .toList();
+
+      // Remove each key
+      for (final key in userKeys) {
+        await _prefs.remove(key);
+      }
+
+      // Clear cards specifically
+      final cardsKey = _getUserKey('cards');
+      await _prefs.remove(cardsKey);
+
+      // Clear local cache
+      _cardCache.clear();
+      _lastRemovedCard = null;
+      
+      // Notify listeners
+      _cardsController.add([]);
+      
+      print('Cleared all data for user: $userId');
+      
+      // Don't clear _currentUserId here, just the data
+      // This allows the user to continue using the app
+      
+    } catch (e) {
+      print('Error clearing user data: $e');
+      rethrow;
+    }
   }
 
   final _isReadyNotifier = ValueNotifier<bool>(false);
@@ -250,21 +277,15 @@ class StorageService {
     if (_currentUserId == null) return;
 
     try {
-      // Initialize price history if card has a price
-      if (card.price != null && card.price! > 0) {
-        final now = DateTime.now();
-        final cardWithHistory = card.copyWith(
-          priceHistory: [
-            PriceHistoryEntry(
-              price: card.price!,
-              date: now,
-            )
-          ],
-          lastPriceUpdate: now,
-          addedToCollection: now,
-        );
-        card = cardWithHistory;
-      }
+      // Always ensure new cards have a dateAdded
+      final now = DateTime.now();
+      final cardWithDate = card.copyWith(
+        dateAdded: card.dateAdded ?? now,  // Only set if not already set
+        price: card.price,
+        priceHistory: card.priceHistory.isEmpty && card.price != null ? 
+          [PriceHistoryEntry(price: card.price!, date: now)] : 
+          card.priceHistory,
+      );
 
       final cardsKey = _getUserKey('cards');
       final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
@@ -567,4 +588,79 @@ class StorageService {
 
   // Add this getter
   String? get currentUserId => _currentUserId;
+
+  Future<void> addPriceHistoryPoint(String cardId, double price, DateTime timestamp) async {
+    final db = await _getDb();
+    
+    // Ensure we don't add duplicate entries for the same day
+    final today = DateTime(timestamp.year, timestamp.month, timestamp.day);
+    final existingEntry = await db.query(
+      'price_history',
+      where: 'card_id = ? AND DATE(timestamp) = DATE(?)',
+      whereArgs: [cardId, today.toIso8601String()],
+    );
+
+    if (existingEntry.isEmpty) {
+      await db.insert('price_history', {
+        'card_id': cardId,
+        'price': price,
+        'timestamp': timestamp.toIso8601String(),
+        'source': 'api',
+      });
+      print('Added price history point for $cardId: $price at $timestamp');
+    }
+  }
+
+  // Add these database-related fields at the top of the class
+  static const String _dbName = 'cardwizz.db';
+  static const int _dbVersion = 1;
+  Database? _db;
+
+  // Add this method to get database instance
+  Future<Database> _getDb() async {
+    if (_db != null) return _db!;
+
+    // Initialize the database
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, _dbName);
+
+    _db = await openDatabase(
+      path,
+      version: _dbVersion,
+      onCreate: (Database db, int version) async {
+        // Create price history table
+        await db.execute('''
+          CREATE TABLE price_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            card_id TEXT NOT NULL,
+            price REAL NOT NULL,
+            timestamp TEXT NOT NULL,
+            source TEXT NOT NULL,
+            UNIQUE(card_id, timestamp)
+          )
+        ''');
+      },
+    );
+
+    return _db!;
+  }
+
+  Future<void> updateCardPrice(TcgCard card, double newPrice) async {
+    if (card.price == newPrice) return;
+    
+    final now = DateTime.now();
+    final updatedCard = card.copyWith(
+      price: newPrice,
+      lastPriceUpdate: now,
+      priceHistory: [
+        ...card.priceHistory,
+        PriceHistoryEntry(
+          price: newPrice,
+          date: now,
+        ),
+      ],
+    );
+
+    await saveCard(updatedCard);
+  }
 }

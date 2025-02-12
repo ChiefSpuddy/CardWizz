@@ -2,32 +2,33 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'dart:math' show max, min;  // Add min here
-import 'package:flutter/gestures.dart';  // Add this import for PointerExitEvent
+import 'dart:math' show max, min;
+import 'package:flutter/gestures.dart';
 import '../services/storage_service.dart';
 import '../models/tcg_card.dart';
 import '../widgets/animated_background.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/sign_in_view.dart';
 import '../providers/app_state.dart';
-import '../widgets/app_drawer.dart';  // Add this if it's missing
-import '../l10n/app_localizations.dart';  // Add this import
-import '../screens/card_details_screen.dart';  // Add this import
-import 'dart:ui';  // Add this for ImageFilter
-import '../services/purchase_service.dart';  // Add this import
-import 'package:flutter/services.dart'; // Add this import at the top
-import '../screens/home_screen.dart';  // Add this import at the top with other imports
-import '../constants/layout.dart';  // Add this import
+import '../widgets/app_drawer.dart';
+import '../l10n/app_localizations.dart';
+import '../screens/card_details_screen.dart';
+import 'dart:ui';
+import '../services/purchase_service.dart';
+import '../screens/home_screen.dart';
+import '../constants/layout.dart';
 import '../widgets/price_update_dialog.dart';
-import '../services/dialog_manager.dart';  // Add this import
+import '../services/dialog_manager.dart';
 import '../services/dialog_service.dart';
-import '../utils/hero_tags.dart';  // Add this import
-import '../services/analytics_service.dart';  // Add this import
-import '../services/ebay_api_service.dart';  // Add this import
-// Add this import for launchUrl
+import '../utils/hero_tags.dart';
+import '../services/chart_service.dart';
+import '../services/ebay_api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../services/price_analytics_service.dart';  // Add this import
-import 'dart:math' as math;  // Add this import at the top
+import 'dart:math' as math;
+
+// Remove these imports:
+// import '../services/price_analytics_service.dart';
+// import '../services/analytics_service.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -282,7 +283,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   MaterialPageRoute(
                     builder: (context) => CardDetailsScreen(
                       card: card,
-                      heroContext: 'analytics',  // Add this line
+                      heroContext: 'analytics_topcard_${card.id}', // Update this line
                     ),
                   ),
                 );
@@ -294,7 +295,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     SizedBox(
                       width: 28,
                       child: Hero(
-                        tag: HeroTags.cardImage(card.id, context: 'analytics_top'),
+                        tag: 'analytics_topcard_${card.id}', // Update this line
                         child: _buildCardImage(card.imageUrl),
                       ),
                     ),
@@ -336,12 +337,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildValueTrendCard(List<TcgCard> cards) {
-    final hasEnoughData = cards.where((card) => 
-      card.priceHistory.length >= 2 && 
-      card.priceHistory.any((p) => p.price > 0)
-    ).isNotEmpty;
-
-    if (!hasEnoughData) {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    final points = ChartService.getPortfolioHistory(cards);
+    
+    if (points.length < 2) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -362,7 +361,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Use the refresh button (↻) in the top right to collect price data. Each refresh adds a new data point.',
+                'Tap refresh (↻) in top right to collect price data',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
@@ -374,91 +373,76 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       );
     }
 
-    final currencyProvider = context.watch<CurrencyProvider>();
-    final localizations = AppLocalizations.of(context);
+    final (minValue, maxValue) = ChartService.getValueRange(points);
+    final percentageChange = ChartService.calculatePercentageChange(points);
+    final isPositive = percentageChange >= 0;
     
-    if (cards.length < 2) {
-      return Card(
-        child: SizedBox(
-          height: 200,
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.show_chart,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  localizations.translate('needMoreCards'),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    // Add 10% padding to the value range
+    final padding = (maxValue - minValue) * 0.1;
+    final yMin = minValue - padding;
+    final yMax = maxValue + padding;
 
-    if (cards.isEmpty) return const SizedBox.shrink();
-
-    // Create timeline of portfolio value changes - removed minYPercentage parameter
-    final timelinePoints = PriceAnalyticsService.getValueTimeline(
-      cards,
-      period: const Duration(days: 30),
+    // Ensure we have a minimum interval for both horizontal and vertical axes
+    final horizontalInterval = max((yMax - yMin) / 4, 0.1);
+    final verticalInterval = max(
+      const Duration(days: 7).inMilliseconds.toDouble(),
+      (points.last.$1.difference(points.first.$1).inMilliseconds / 4).toDouble()
     );
-
-    // Extract values and calculate ranges once
-    final values = timelinePoints.map((entry) => entry.value).toList();
-    final maxValue = values.reduce(max);
-    final minValue = values.reduce(min);
-    final chartPadding = (maxValue - minValue) * 0.1;
-    
-    // Calculate nice intervals for the chart
-    final interval = _calculateNiceInterval(maxValue - minValue);
-    final adjustedMin = (minValue / interval).floor() * interval;
-    final adjustedMax = ((maxValue / interval).ceil()) * interval;
-    
-    // Safety check
-    if (maxValue <= 0 || maxValue == minValue) {
-      return const SizedBox.shrink();
-    }
-
-    // Calculate horizontal interval using adjusted values
-    final horizontalInterval = max<double>((adjustedMax - adjustedMin) / 4, 1.0);
-
-    // Convert data points to chart spots
-    final chartSpots = timelinePoints.map((entry) {
-      return FlSpot(
-        entry.key.millisecondsSinceEpoch.toDouble(),
-        entry.value,
-      );
-    }).toList();
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16), // Reduced horizontal padding from 16 to 8
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              localizations.translate('valueOverTime'),
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              currencyProvider.formatValue(maxValue),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.green.shade600,
-                fontWeight: FontWeight.w600,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Portfolio Value',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Last 30 days',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isPositive ? Icons.trending_up : Icons.trending_down,
+                        size: 16,
+                        color: isPositive ? Colors.green : Colors.red,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${isPositive ? '+' : ''}${percentageChange.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          color: isPositive ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -470,53 +454,35 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     touchTooltipData: LineTouchTooltipData(
                       tooltipBgColor: Theme.of(context).colorScheme.surface,
                       tooltipRoundedRadius: 8,
-                      fitInsideHorizontally: true,  // Add this
-                      fitInsideVertically: true,    // Add this
-                      tooltipMargin: 8,            // Add this
-                      maxContentWidth: 150,         // Add this to limit tooltip width
+                      tooltipPadding: const EdgeInsets.all(12),
+                      tooltipMargin: 8,
                       getTooltipItems: (spots) {
                         return spots.map((spot) {
                           final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
                           return LineTooltipItem(
                             '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
-                            TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,  // Slightly smaller font
-                            ),
+                            const TextStyle(fontWeight: FontWeight.bold),
                           );
                         }).toList();
                       },
                     ),
-                    handleBuiltInTouches: true,
-                    getTouchLineStart: (data, index) => -chartPadding,
-                    getTouchLineEnd: (data, index) => maxValue + chartPadding,
                   ),
                   gridData: FlGridData(
                     show: true,
-                    drawVerticalLine: true,  // Show vertical grid lines
-                    horizontalInterval: interval,
-                    verticalInterval: const Duration(days: 7).inMilliseconds.toDouble(),
+                    drawVerticalLine: false,
+                    horizontalInterval: horizontalInterval,  // Use the calculated interval
                     getDrawingHorizontalLine: (value) => FlLine(
-                      color: Theme.of(context).dividerColor.withOpacity(0.1),
-                      strokeWidth: 1,
-                    ),
-                    getDrawingVerticalLine: (value) => FlLine(
-                      color: Theme.of(context).dividerColor.withOpacity(0.1),
+                      color: Theme.of(context).dividerColor.withOpacity(0.15),
                       strokeWidth: 1,
                     ),
                   ),
                   titlesData: FlTitlesData(
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        interval: const Duration(days: 7).inMilliseconds.toDouble(),
+                        interval: verticalInterval,  // Use calculated vertical interval
                         getTitlesWidget: (value, _) {
                           final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
                           return Padding(
@@ -525,7 +491,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               _formatDate(date),
                               style: TextStyle(
                                 fontSize: 10,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                               ),
                             ),
                           );
@@ -536,14 +502,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 46,
-                        interval: interval, // Use calculated interval
+                        interval: horizontalInterval,  // Use calculated horizontal interval
                         getTitlesWidget: (value, _) => Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: Text(
                             currencyProvider.formatChartValue(value),
                             style: TextStyle(
                               fontSize: 10,
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                             ),
                           ),
                         ),
@@ -551,26 +517,29 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   ),
                   borderData: FlBorderData(show: false),
-                  minY: adjustedMin.toDouble(),
-                  maxY: adjustedMax.toDouble(),
+                  minX: points.first.$1.millisecondsSinceEpoch.toDouble(),
+                  maxX: points.last.$1.millisecondsSinceEpoch.toDouble(),
+                  minY: yMin,
+                  maxY: yMax,
                   lineBarsData: [
                     LineChartBarData(
-                      spots: chartSpots,
+                      spots: points.map((point) => FlSpot(
+                        point.$1.millisecondsSinceEpoch.toDouble(),
+                        point.$2,
+                      )).toList(),
                       isCurved: true,
-                      curveSmoothness: 0.5, // Increased from 0.35
-                      preventCurveOverShooting: false, // Changed to false to allow smoother curves
+                      curveSmoothness: 0.35,
+                      preventCurveOverShooting: true,
                       color: Colors.green.shade600,
-                      barWidth: 2.5, // Slightly increased for better visibility
+                      barWidth: 3,
                       dotData: FlDotData(
                         show: true,
-                        getDotPainter: (spot, percent, bar, index) {
-                          return FlDotCirclePainter(
-                            radius: 4,
-                            color: Colors.white,
-                            strokeWidth: 2,
-                            strokeColor: Colors.green.shade600,
-                          );
-                        },
+                        getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+                          radius: 6,
+                          color: Colors.white,
+                          strokeWidth: 2,
+                          strokeColor: Colors.green.shade600,
+                        ),
                       ),
                       belowBarData: BarAreaData(
                         show: true,
@@ -578,9 +547,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            Colors.green.shade600.withOpacity(0.2),
+                            Colors.green.shade600.withOpacity(0.3),
                             Colors.green.shade600.withOpacity(0.0),
                           ],
+                          stops: const [0.0, 0.8],
                         ),
                       ),
                     ),
@@ -1131,7 +1101,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   MaterialPageRoute(
                     builder: (context) => CardDetailsScreen(
                       card: card,
-                      heroContext: 'analytics',
+                      heroContext: 'analytics_mover_${card.id}', // Update this line
                     ),
                   ),
                 ),
@@ -1142,7 +1112,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       SizedBox(
                         width: 28,
                         child: Hero(
-                          tag: HeroTags.cardImage(card.id, context: 'analytics_movers'),
+                          tag: 'analytics_mover_${card.id}', // Update this line
                           child: _buildCardImage(card.imageUrl),
                         ),
                       ),
@@ -2043,18 +2013,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildValueSummary(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
     final localizations = AppLocalizations.of(context);
-    final totalValue = PriceAnalyticsService.calculateTotalValue(cards);
     
-    // Calculate weekly change
-    final timeline = PriceAnalyticsService.getValueTimeline(
-      cards, 
-      period: const Duration(days: 7)
+    // Calculate total value directly instead of using PriceAnalyticsService
+    final totalValue = cards.fold<double>(
+      0, 
+      (sum, card) => sum + (card.price ?? 0)
     );
     
+    // Calculate weekly change using ChartService
+    final points = ChartService.getPortfolioHistory(cards);
+    
     double weeklyChange = 0;
-    if (timeline.length >= 2) {
-      final oldValue = timeline.first.value;
-      final newValue = timeline.last.value;
+    if (points.length >= 2) {
+      final oldValue = points.first.$2;
+      final newValue = points.last.$2;
       if (oldValue > 0) {
         weeklyChange = ((newValue - oldValue) / oldValue) * 100;
       }

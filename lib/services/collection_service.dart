@@ -118,9 +118,28 @@ class CollectionService {
   }
 
   Future<void> clearUserData() async {
-    // Remove this method or modify it to not delete data
-    _currentUserId = null;
-    _collectionsController.add([]);
+    if (_currentUserId == null) return;
+    
+    try {
+      final userId = _currentUserId;
+      _currentUserId = null;
+
+      // Delete all collections for the user from the database
+      await _db.delete(
+        'collections',
+        where: 'user_id = ?',
+        whereArgs: [userId],
+      );
+
+      // Clear in-memory collections
+      _collections = [];
+      _collectionsController.add([]);
+
+      print('Cleared all collections for user: $userId');
+    } catch (e) {
+      print('Error clearing collections: $e');
+      rethrow;
+    }
   }
 
   Future<void> _refreshCollections() async {

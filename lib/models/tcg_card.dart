@@ -15,6 +15,7 @@ class TcgCard {
   final DateTime? lastPriceUpdate;
   final DateTime? lastPriceCheck;
   final DateTime? addedToCollection;  // Make nullable
+  final DateTime? dateAdded;  // Add this property
 
   TcgCard({
     required this.id,
@@ -30,6 +31,7 @@ class TcgCard {
     this.lastPriceUpdate,
     this.lastPriceCheck,
     DateTime? addedToCollection,
+    this.dateAdded,  // Add this parameter
   }) : _price = price,
        priceHistory = priceHistory ?? [],
        addedToCollection = addedToCollection ?? DateTime.now();  // Set default value
@@ -96,6 +98,9 @@ class TcgCard {
         addedToCollection: json['addedToCollection'] != null 
             ? DateTime.parse(json['addedToCollection'])
             : DateTime.now(),
+        dateAdded: json['dateAdded'] != null ? 
+          DateTime.parse(json['dateAdded']) : 
+          null,  // Add this
       );
     } catch (e) {
       print('Error creating TcgCard from JSON: $e');
@@ -121,6 +126,7 @@ class TcgCard {
       'total': setTotal,
     },
     'addedToCollection': addedToCollection?.toIso8601String(),  // Make nullable
+    'dateAdded': dateAdded?.toIso8601String(),  // Add this
   };
 
   void addPricePoint(double newPrice) {
@@ -216,6 +222,7 @@ class TcgCard {
     DateTime? lastPriceCheck,
     DateTime? lastPriceUpdate,  // Add this parameter
     DateTime? addedToCollection,  // Add this parameter
+    DateTime? dateAdded,  // Add this parameter
   }) {
     return TcgCard(
       id: id ?? this.id,
@@ -231,6 +238,7 @@ class TcgCard {
       lastPriceCheck: lastPriceCheck ?? this.lastPriceCheck,
       lastPriceUpdate: lastPriceUpdate ?? this.lastPriceUpdate,  // Add this line
       addedToCollection: addedToCollection ?? this.addedToCollection,  // Add this line
+      dateAdded: dateAdded ?? this.dateAdded,  // Add this line
     );
   }
 
