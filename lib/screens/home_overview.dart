@@ -496,7 +496,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 ),
               ),
               Text(
-                'Prismatic Evolution',  // Updated set name
+                'Prismatic Evolutions',  // Updated set name
                 style: TextStyle(
                   color: Colors.grey[600],
                   fontSize: 14,

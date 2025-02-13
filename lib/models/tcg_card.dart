@@ -9,7 +9,7 @@ class TcgCard {
   final String? rarity;
   final String? setName;
   double? _price;
-  final List<PriceHistoryEntry> priceHistory;
+  List<PriceHistoryEntry> _priceHistory; // Change to private
   final SetInfo? set;
   final String? setTotal;
   final DateTime? lastPriceUpdate;
@@ -33,7 +33,7 @@ class TcgCard {
     DateTime? addedToCollection,
     this.dateAdded,  // Add this parameter
   }) : _price = price,
-       priceHistory = priceHistory ?? [],
+       _priceHistory = priceHistory ?? [], // Update initialization
        addedToCollection = addedToCollection ?? DateTime.now();  // Set default value
 
   double? get price => _price;
@@ -42,7 +42,7 @@ class TcgCard {
     if (newPrice != _price) {
       _price = newPrice;
       if (newPrice != null) {
-        priceHistory.add(PriceHistoryEntry(
+        _priceHistory.add(PriceHistoryEntry(
           price: newPrice,
           date: DateTime.now(),
         ));
@@ -50,11 +50,17 @@ class TcgCard {
     }
   }
 
+  // Add getter and setter for priceHistory
+  List<PriceHistoryEntry> get priceHistory => _priceHistory;
+  set priceHistory(List<PriceHistoryEntry> value) {
+    _priceHistory = value;
+  }
+
   TcgCard updatePrice(double? newPrice) {
     if (newPrice == null || newPrice == price) return this;
     
     final now = DateTime.now();
-    final updatedHistory = List<PriceHistoryEntry>.from(priceHistory)
+    final updatedHistory = List<PriceHistoryEntry>.from(_priceHistory)
       ..add(PriceHistoryEntry(
         price: newPrice,
         date: now,
@@ -119,7 +125,7 @@ class TcgCard {
         'averageSellPrice': price,
       },
     },
-    'priceHistory': priceHistory.map((p) => p.toJson()).toList(),
+    'priceHistory': _priceHistory.map((p) => p.toJson()).toList(),
     'lastPriceUpdate': lastPriceUpdate?.toIso8601String(),
     'lastPriceCheck': lastPriceCheck?.toIso8601String(),
     'set': set?.toJson() ?? {
@@ -131,59 +137,61 @@ class TcgCard {
 
   void addPricePoint(double newPrice) {
     final roundedPrice = double.parse(newPrice.toStringAsFixed(2));
-    if (priceHistory.isEmpty || priceHistory.last.price != roundedPrice) {
-      priceHistory.add(PriceHistoryEntry(
+    if (_priceHistory.isEmpty || _priceHistory.last.price != roundedPrice) {
+      _priceHistory.add(PriceHistoryEntry(
         price: roundedPrice,
         date: DateTime.now(),
       ));
       
       // Keep only last 30 days of history
       final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-      priceHistory.removeWhere((point) => point.date.isBefore(thirtyDaysAgo));
+      _priceHistory.removeWhere((point) => point.date.isBefore(thirtyDaysAgo));
     }
   }
 
   double? getPriceChange(Duration period) {
     if (priceHistory.length < 2) return null;
     
-    // Sort all prices by date
-    final sortedPrices = priceHistory.toList()
-      ..sort((a, b) => a.date.compareTo(b.date));
-    
     final now = DateTime.now();
-    final targetTime = now.subtract(period);
+    final cutoff = now.subtract(period);
     
-    // Find closest price point before target time
-    PriceHistoryEntry? oldEntry;
-    for (final entry in sortedPrices) {
-      if (entry.date.isBefore(targetTime)) {
-        oldEntry = entry;
-      } else {
-        break;  // Stop when we hit newer entries
-      }
-    }
+    // Get the most recent price
+    final currentPrice = price ?? priceHistory.last.price;
     
-    if (oldEntry == null) return null;  // No price found before target time
-    
-    // Get current/latest price
-    final currentPrice = price ?? sortedPrices.last.price;
-    if (oldEntry.price == 0 || currentPrice == 0) return null;
+    // Find the oldest price within the period
+    final oldestInPeriod = priceHistory
+        .where((entry) => entry.date.isAfter(cutoff))
+        .fold<PriceHistoryEntry?>(
+          null,
+          (oldest, entry) => oldest == null || entry.date.isBefore(oldest.date)
+              ? entry
+              : oldest,
+        );
+
+    if (oldestInPeriod == null) return null;
     
     // Calculate percentage change
-    final change = ((currentPrice - oldEntry.price) / oldEntry.price) * 100;
+    if (oldestInPeriod.price == 0) return 0;
+    return ((currentPrice - oldestInPeriod.price) / oldestInPeriod.price) * 100;
+  }
+
+  String getPriceChangePeriod() {
+    final change = getPriceChange(const Duration(days: 1));
+    if (change != null) return '24h';
     
-    // Filter out unrealistic changes
-    if (period.inDays <= 1 && change.abs() > 15) return null;  // Max 15% daily change
-    if (period.inDays <= 7 && change.abs() > 30) return null;  // Max 30% weekly change
-    if (change.abs() > 50) return null;  // Max 50% monthly change
+    final weekChange = getPriceChange(const Duration(days: 7));
+    if (weekChange != null) return '7d';
     
-    return change;
+    final monthChange = getPriceChange(const Duration(days: 30));
+    if (monthChange != null) return '30d';
+    
+    return '';
   }
 
   Map<String, double> getPriceStats() {
-    if (priceHistory.isEmpty) return {};
+    if (_priceHistory.isEmpty) return {};
     
-    final prices = priceHistory.map((p) => p.price).toList();
+    final prices = _priceHistory.map((p) => p.price).toList();
     final avg = prices.reduce((a, b) => a + b) / prices.length;
     
     return {
@@ -201,7 +209,7 @@ class TcgCard {
   }
 
   PriceHistoryEntry? _findClosestPricePoint(DateTime targetDate) {
-    return priceHistory
+    return _priceHistory
         .where((pp) => pp.date.isBefore(targetDate))
         .reduce((a, b) => 
           a.date.difference(targetDate).abs() < 
@@ -232,7 +240,7 @@ class TcgCard {
       rarity: rarity ?? this.rarity,
       setName: setName ?? this.setName,
       price: price ?? this.price,
-      priceHistory: priceHistory ?? this.priceHistory,
+      priceHistory: priceHistory ?? _priceHistory,
       set: set ?? this.set,
       setTotal: setTotal ?? this.setTotal,
       lastPriceCheck: lastPriceCheck ?? this.lastPriceCheck,
@@ -243,31 +251,17 @@ class TcgCard {
   }
 
   double? getPriceAtDate(DateTime date) {
-    final historicalPrice = priceHistory
+    final historicalPrice = _priceHistory
         .where((p) => p.timestamp.isBefore(date) || p.timestamp.isAtSameMomentAs(date))
         .lastOrNull;
     return historicalPrice?.price ?? price;
   }
 
   void addPriceHistoryPoint(double price, DateTime date) {
-    // Normalize date to start of day
-    final normalizedDate = DateTime(date.year, date.month, date.day);
-    
-    // Don't add duplicate prices for same day
-    if (priceHistory.isNotEmpty && 
-        priceHistory.last.date.isAtSameMomentAs(normalizedDate) &&
-        priceHistory.last.price == price) {
-      return;
-    }
-
-    priceHistory.add(PriceHistoryEntry(
-      price: price,
-      date: normalizedDate,
-    ));
-
-    // Keep only last 90 days of history
-    final cutoff = DateTime.now().subtract(const Duration(days: 90));
-    priceHistory.removeWhere((point) => point.date.isBefore(cutoff));
+    _priceHistory = [
+      ..._priceHistory,
+      PriceHistoryEntry(price: price, date: date),
+    ];
   }
 }
 

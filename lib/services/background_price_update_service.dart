@@ -7,6 +7,7 @@ class BackgroundPriceUpdateService {
   Timer? _timer;
   bool _isRunning = false;
   DateTime? _lastUpdateTime;
+  bool _isRefreshing = false;
 
   BackgroundPriceUpdateService(this._storageService);
 
@@ -82,6 +83,59 @@ class BackgroundPriceUpdateService {
   }
 
   Future<void> refreshPrices() async {
-    await _updatePrices();
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    
+    try {
+      final cards = await _storageService.getCards();
+      DateTime lastUpdate = DateTime.now();
+      int batchSize = 0;
+      
+      for (var i = 0; i < cards.length; i++) {
+        final card = cards[i];
+        batchSize++;
+        
+        // Only notify every 5 cards or 500ms, whichever comes first
+        final now = DateTime.now();
+        if (batchSize >= 5 || now.difference(lastUpdate) >= const Duration(milliseconds: 500)) {
+          _storageService.notifyPriceUpdateProgress(i + 1, cards.length);
+          lastUpdate = now;
+          batchSize = 0;
+        }
+        
+        print('🔍 Checking price for ${card.name} (${i + 1}/${cards.length})');
+        final newPrice = await TcgApiService().fetchCardPrice(card.id);
+        
+        if (newPrice != null) {
+          print('💰 Found price for ${card.name}: ${card.price} -> $newPrice');
+          if (newPrice != card.price) {
+            await _storageService.updateCardPrice(card, newPrice);
+            print('✅ Updated price for ${card.name}');
+            
+            // Add price history point right after price update
+            await _storageService.addPriceHistoryPoint(card.id, newPrice, DateTime.now());
+          } else {
+            print('ℹ️ No price change for ${card.name}');
+          }
+        } else {
+          print('❌ Failed to get price for ${card.name}');
+        }
+      }
+      
+      // Final update
+      _storageService.notifyPriceUpdateProgress(cards.length, cards.length);
+      
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  Future<void> _saveLastUpdateTime() async {
+    if (_lastUpdateTime != null) {
+      await _storageService.setString(
+        'last_price_update',
+        _lastUpdateTime!.toIso8601String(),
+      );
+    }
   }
 }

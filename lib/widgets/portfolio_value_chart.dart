@@ -1,3 +1,4 @@
+import 'dart:async';  // Add this import
 import 'dart:math' show min, max;
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -7,8 +8,33 @@ import '../services/storage_service.dart';
 import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
 
-class PortfolioValueChart extends StatelessWidget {
+class PortfolioValueChart extends StatefulWidget {  // Change to StatefulWidget
   const PortfolioValueChart({Key? key}) : super(key: key);
+
+  @override
+  State<PortfolioValueChart> createState() => _PortfolioValueChartState();
+}
+
+class _PortfolioValueChartState extends State<PortfolioValueChart> {
+  late final StorageService _storage;
+  late final StreamSubscription _cardsChangedSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _storage = Provider.of<StorageService>(context, listen: false);
+    
+    // Listen for card changes to refresh chart
+    _cardsChangedSubscription = _storage.onCardsChanged.listen((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _cardsChangedSubscription.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

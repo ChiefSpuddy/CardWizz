@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';  // Add this line
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -27,6 +28,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:math' as math;
 import '../widgets/empty_collection_view.dart';  // Fix the quote and semicolon
 import '../widgets/portfolio_value_chart.dart';
+import '../widgets/styled_toast.dart';
+import 'package:rxdart/rxdart.dart';  // Add this import at the top
+import '../widgets/market_scan_button.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -770,32 +774,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildTopMovers(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
     final localizations = AppLocalizations.of(context);
-    
-    // Calculate changes for all periods at once
+
+    // Filter cards with price history and calculate changes
     final cardsWithChanges = cards
         .where((card) => card.price != null && card.priceHistory.length >= 2)
         .map((card) {
-          // Try daily change first
-          var change = card.getPriceChange(const Duration(days: 1));
-          var period = '24h';
+          // Try to get changes in order of priority
+          final change = card.getPriceChange(const Duration(days: 1)) ??
+                        card.getPriceChange(const Duration(days: 7)) ??
+                        card.getPriceChange(const Duration(days: 30));
           
-          // If no daily change, try weekly
-          if (change == null || change == 0) {
-            change = card.getPriceChange(const Duration(days: 7));
-            period = '7d';
-          }
-          
-          // If still no change, try monthly
-          if (change == null || change == 0) {
-            change = card.getPriceChange(const Duration(days: 30));
-            period = '30d';
-          }
-          
-          return (card, change, period);
+          return (card, change);
         })
-        .where((tuple) => tuple.$2 != null && tuple.$2 != 0) // Filter out null and 0 changes
-        .toList()
-        ..sort((a, b) => (b.$2 ?? 0).abs().compareTo((a.$2 ?? 0).abs()));
+        .where((tuple) => tuple.$2 != null) // Filter out cards with no change
+        .toList();
+
+    // Sort by absolute change percentage
+    cardsWithChanges.sort((a, b) => (b.$2?.abs() ?? 0).compareTo(a.$2?.abs() ?? 0));
 
     if (cardsWithChanges.isEmpty) {
       return Card(
@@ -811,6 +806,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               const SizedBox(height: 16),
               Center(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       Icons.show_chart,
@@ -819,8 +815,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'No price changes detected',
+                      'No recent price changes',
                       style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Check back after the next price update',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -839,40 +842,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Fix the overflowing row
-            Wrap(
-              spacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  localizations.translate('topMovers'),
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 16,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Based on recent changes',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            Text(
+              localizations.translate('topMovers'),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             ...topMovers.map((tuple) {
               final card = tuple.$1;
               final change = tuple.$2 ?? 0;
-              final period = tuple.$3;
-              final isPositive = change >= 0;
+              final period = card.getPriceChangePeriod();
               
               return InkWell(
                 onTap: () => Navigator.push(
@@ -880,7 +858,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   MaterialPageRoute(
                     builder: (context) => CardDetailsScreen(
                       card: card,
-                      heroContext: 'analytics_mover_${card.id}', // Update this line
+                      heroContext: 'analytics_mover_${card.id}',
                     ),
                   ),
                 ),
@@ -891,7 +869,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       SizedBox(
                         width: 28,
                         child: Hero(
-                          tag: 'analytics_mover_${card.id}', // Update this line
+                          tag: 'analytics_mover_${card.id}',
                           child: _buildCardImage(card.imageUrl),
                         ),
                       ),
@@ -940,69 +918,112 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Future<void> _refreshPrices() async {
-    if (!mounted) return;
-    if (_isRefreshing) return;
-    
+    if (!mounted || _isRefreshing) return;
     setState(() => _isRefreshing = true);
     
     try {
       final storage = Provider.of<StorageService>(context, listen: false);
       final dialogManager = DialogManager.instance;
       
+      await storage.initializeBackgroundService();
+      final service = storage.backgroundService;
+      if (service == null) throw Exception('Failed to initialize background service');
+
       // Cancel existing subscriptions
       _progressSubscription?.cancel();
       _completeSubscription?.cancel();
 
-      await storage.initializeBackgroundService();
-      final service = storage.backgroundService;
-      if (service == null) {
-        throw Exception('Failed to initialize background service');
-      }
+      // Setup progress listener with debounce
+      _progressSubscription = storage.priceUpdateProgress
+          .distinct()
+          .debounceTime(const Duration(milliseconds: 100)) // Reduced debounce time
+          .listen((progress) {
+            final (current, total) = progress;
+            if (dialogManager.context != null) {
+              dialogManager.updateDialog(
+                PriceUpdateDialog(
+                  current: current, 
+                  total: total,
+                  showProgressBar: true,
+                ),
+              );
+            }
+          });
 
-      // Show initial dialog
-      if (dialogManager.context != null && !dialogManager.isDialogVisible && mounted) {
-        dialogManager.showCustomDialog(
-          PriceUpdateDialog(current: 0, total: 1),
+      // Show initial dialog with current card count
+      final cardCount = await storage.getCards().then((cards) => cards.length);
+      dialogManager.showCustomDialog(
+        PriceUpdateDialog(
+          current: 0,
+          total: cardCount,
+          showProgressBar: true,
+        ),
+      );
+
+      // Setup completion listener
+      _completeSubscription = storage.priceUpdateComplete.listen((updatedCount) async {
+        print('Price update complete: $updatedCount cards updated'); // Add debug log
+        
+        // Show completion state for 1.5 seconds
+        final completeDialog = PriceUpdateDialog(
+          current: cardCount,
+          total: cardCount,
+          showProgressBar: true,
         );
-      }
-
-      // Setup completion handler before starting refresh
-      bool isCompleted = false;
-      _completeSubscription = storage.priceUpdateComplete.listen((updatedCount) {
-        isCompleted = true;
+        dialogManager.updateDialog(completeDialog);
+        
+        // Wait for animation and user to see completion
+        await Future.delayed(const Duration(milliseconds: 1500));
+        
         dialogManager.hideDialog();
+
+        if (!mounted) return;
+
+        // Get fresh cards data
+        final cards = await storage.getCards();
+        final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+        await storage.savePortfolioValue(totalValue);
+        storage.notifyCardChange();
+
+        // Show toast
         if (mounted) {
+          // Use ScaffoldMessenger.showSnackBar instead of MaterialBanner
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Updated prices for $updatedCount cards'),
+              content: StyledToast(
+                title: updatedCount > 0 
+                    ? 'Updated $updatedCount cards'
+                    : 'Prices are up to date',
+                subtitle: updatedCount > 0
+                    ? 'Your collection value has been updated'
+                    : 'No price changes found',
+                icon: updatedCount > 0 
+                    ? Icons.update
+                    : Icons.check_circle_outline,
+                backgroundColor: updatedCount > 0
+                    ? Colors.green
+                    : Theme.of(context).colorScheme.primary,
+              ),
+              duration: const Duration(seconds: 3),
               behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              margin: EdgeInsets.only(
+                bottom: MediaQuery.of(context).padding.bottom + 8,
+                left: 8,
+                right: 8,
+              ),
             ),
           );
         }
+
+        // Update last refresh time
+        await _updateLastRefreshTime();
       });
 
-      // Listen for progress updates
-      _progressSubscription = storage.priceUpdateProgress.listen((progress) {
-        final (current, total) = progress;
-        dialogManager.updateDialog(
-          PriceUpdateDialog(current: current, total: total),
-        );
-      });
-
-      // Start the price refresh
+      // Start the refresh
       await service.refreshPrices();
-      await _updateLastRefreshTime();
 
-      // If we didn't get a completion event, ensure dialog is hidden
-      if (!isCompleted) {
-        dialogManager.hideDialog();
-      }
-
-      // Save portfolio value after refresh
-      final cards = await storage.getCards();
-      final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
-      await storage.savePortfolioValue(totalValue);
-      
     } catch (e) {
       print('Error refreshing prices: $e');
       DialogManager.instance.hideDialog();
@@ -1034,86 +1055,71 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildMarketInsightsCard(List<TcgCard> cards) {
     return Card(
-      child: SingleChildScrollView(  // Add this wrapper
+      elevation: 2,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Theme.of(context).colorScheme.surface,
+              Theme.of(context).colorScheme.surface.withOpacity(0.95),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
-            mainAxisSize: MainAxisSize.min,  // Add this
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.trending_up,
+                      color: Colors.blue.shade600,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Market Opportunities',
+                          'Market Scanner',
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (_isLoadingMarketData)
-                          Text(
-                            'Analyzing $_loadingProgress of $_totalCards cards...',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          )
-                        else
-                          Text(
-                            'Based on current eBay market prices',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
+                        Text(
+                          'Find selling opportunities and track market trends',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
+                        ),
                       ],
                     ),
                   ),
-                  if (_isLoadingMarketData)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: () => _loadMarketData(cards),
-                    ),
                 ],
               ),
-              if (_marketDataError != null) ...[
-                const SizedBox(height: 16),
-                _buildErrorState(_marketDataError!, () => _loadMarketData(cards)),
-              ] else if (_isLoadingMarketData) ...[
-                const SizedBox(height: 16),
-                _buildLoadingState(),
-              ] else if (_marketOpportunities != null) ...[
-                const SizedBox(height: 16),
-                if ((_marketOpportunities!['undervalued'] as List).isNotEmpty)
-                  _buildOpportunitySection(
-                    'Selling Opportunities',
-                    'Cards you could sell for profit',
-                    _marketOpportunities!['undervalued'] as List,
-                    Colors.green,
-                    Icons.trending_up,
-                  ),
-                if ((_marketOpportunities!['overvalued'] as List).isNotEmpty)
-                  _buildOpportunitySection(
-                    'Buying Opportunities',
-                    'Cards you might want to wait to buy',
-                    _marketOpportunities!['overvalued'] as List,
-                    Colors.orange,
-                    Icons.trending_down,
-                  ),
-              ] else if (!_isLoadingMarketData)
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () => _loadMarketData(cards),
-                    icon: const Icon(Icons.update),
-                    label: const Text('Analyze Market Data'),
-                  ),
+              const SizedBox(height: 24),
+              if (_isLoadingMarketData)
+                _buildLoadingState()
+              else if (_marketDataError != null)
+                _buildErrorState(_marketDataError!, () => _loadMarketData(cards))
+              else if (_marketOpportunities != null)
+                ..._buildOpportunities()
+              else
+                MarketScanButton(
+                  onPressed: () => _loadMarketData(cards),
+                  isLoading: _isLoadingMarketData,
                 ),
             ],
           ),
@@ -1138,36 +1144,36 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
           child: Stack(
             children: [
-              // Animated progress bar
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 500),
-                curve: Curves.easeInOut,
-                height: double.infinity,
-                width: MediaQuery.of(context).size.width * progress,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.green.shade400,
-                      Colors.green.shade500,
+              // Only show progress bar if we have started loading
+              if (_loadingProgress > 0)
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeInOut,
+                  height: double.infinity,
+                  width: MediaQuery.of(context).size.width * progress,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.green.shade600,
+                        Colors.green.shade700,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.shade600.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
-              ),
-              // Centered percentage text
               Center(
                 child: Text(
                   '$percentage%',
                   style: TextStyle(
-                    color: percentage > 50 
-                        ? Colors.white 
+                    color: _loadingProgress > 0 && percentage > 50
+                        ? Colors.white
                         : Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
@@ -1188,7 +1194,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.green.shade500,
+                    Colors.green.shade600,
                   ),
                 ),
               ),
@@ -1301,6 +1307,34 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       }
     }
   }
+
+  List<Widget> _buildOpportunities() {
+  final opportunities = _marketOpportunities!;
+  final widgets = <Widget>[];
+
+  if ((opportunities['undervalued'] as List).isNotEmpty) {
+    widgets.add(_buildOpportunitySection(
+      'Selling Opportunities',
+      'Cards you could sell for profit',
+      opportunities['undervalued'] as List,
+      Colors.green,
+      Icons.trending_up,
+    ));
+    widgets.add(const SizedBox(height: 16));
+  }
+
+  if ((opportunities['overvalued'] as List).isNotEmpty) {
+    widgets.add(_buildOpportunitySection(
+      'Buying Opportunities',
+      'Cards you might want to wait to buy',
+      opportunities['overvalued'] as List,
+      Colors.orange,
+      Icons.trending_down,
+    ));
+  }
+
+  return widgets;
+}
 
   Widget _buildOpportunitySection(
     String title,
@@ -1736,6 +1770,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     print('AnalyticsScreen: cards.length = ${cards.length}');
 
                     return CustomScrollView(
+                      key: const ValueKey('analytics_scroll_view'), // Add this key
                       slivers: [
                         SliverToBoxAdapter(
                           child: Padding(
@@ -1775,97 +1810,121 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildValueSummary(List<TcgCard> cards) {
-    final currencyProvider = context.watch<CurrencyProvider>();
-    final localizations = AppLocalizations.of(context);
-    
-    // Calculate total value directly instead of using PriceAnalyticsService
-    final totalValue = cards.fold<double>(
-      0, 
-      (sum, card) => sum + (card.price ?? 0)
-    );
-    
-    // Calculate weekly change using ChartService
-    final storageService = Provider.of<StorageService>(context, listen: false);
-    final points = ChartService.getPortfolioHistory(storageService, cards);
-    
-    double weeklyChange = 0;
-    if (points.length >= 2) {
-      final oldValue = points.first.$2;
-      final newValue = points.last.$2;
-      if (oldValue > 0) {
-        weeklyChange = ((newValue - oldValue) / oldValue) * 100;
+  final currencyProvider = context.watch<CurrencyProvider>();
+  final localizations = AppLocalizations.of(context);
+  final storageService = Provider.of<StorageService>(context, listen: false);
+  
+  // Get portfolio value points
+  final portfolioHistoryKey = storageService.getUserKey('portfolio_history');
+  final portfolioHistoryJson = storageService.prefs.getString(portfolioHistoryKey);
+  
+  double totalValue = 0;
+  if (portfolioHistoryJson != null) {
+    try {
+      final List<dynamic> history = json.decode(portfolioHistoryJson);
+      if (history.isNotEmpty) {
+        final latestPoint = history.last;
+        final eurValue = (latestPoint['value'] as num).toDouble();
+        totalValue = eurValue * currencyProvider.rate;
       }
+    } catch (e) {
+      print('Error parsing portfolio history: $e');
+      totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
     }
+  } else {
+    totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+  }
+  
+  final points = ChartService.getPortfolioHistory(storageService, cards);
+  double weeklyChange = 0;
+  if (points.length >= 2) {
+    final oldValue = points.first.$2;
+    final newValue = points.last.$2;
+    if (oldValue > 0) {
+      weeklyChange = ((newValue - oldValue) / oldValue) * 100;
+    }
+  }
 
-    return Card(
-      elevation: 4,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.8),
-              Theme.of(context).colorScheme.secondary.withOpacity(0.8),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    localizations.translate('portfolioValue'),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.white.withOpacity(0.9),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    currencyProvider.formatValue(totalValue),
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.trending_up,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '+${weeklyChange.toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+  return Card(
+    elevation: 2,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.green.shade500, // Darker shade
+            Colors.green.shade700, // Even darker
           ],
         ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-    );
-  }
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  localizations.translate('portfolioValue'),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  currencyProvider.formatValue(totalValue),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.trending_up,
+                  size: 16,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '+${weeklyChange.toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildChangeIndicator(double change) {
     final isPositive = change >= 0;

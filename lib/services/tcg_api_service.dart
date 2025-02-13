@@ -471,29 +471,25 @@ class TcgApiService {
 
   Future<double?> fetchCardPrice(String cardId) async {
     try {
-      final response = await _dio.get(
-        '/cards/$cardId',
-        options: Options(
-          headers: {'X-Api-Key': apiKey},
-        ),
-      );
-
-      // Add logging
-      print('Fetching price for card $cardId');
-      if (response.statusCode == 429) {
-        print('Rate limit hit, waiting before retry...');
-        await Future.delayed(const Duration(seconds: 1));
-        return fetchCardPrice(cardId); // Retry once
+      print('🔍 Fetching price for card $cardId');
+      final response = await _makeRequestWithRetry('/cards/$cardId');
+      
+      if (response == null) {
+        print('❌ No response for card $cardId');
+        return null;
       }
 
-      if (response.statusCode == 200) {
-        final price = response.data['data']['cardmarket']['prices']['averageSellPrice'];
-        print('Got price for $cardId: $price');
-        return (price as num?)?.toDouble();
+      final price = response['data']?['cardmarket']?['prices']?['averageSellPrice'];
+      if (price != null) {
+        print('✅ Found price $price for card $cardId');
+        return (price as num).toDouble();
+      } else {
+        print('❌ No price data found for card $cardId');
+        return null;
       }
     } catch (e) {
-      print('Error fetching price for card $cardId: $e');
+      print('❌ Error fetching card price: $e');
+      return null;
     }
-    return null;
   }
 }
