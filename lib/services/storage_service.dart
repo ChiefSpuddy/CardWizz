@@ -719,6 +719,7 @@ class StorageService {
   }
 
   Future<void> _addPortfolioValuePoint(double value, DateTime timestamp) async {
+    // Always store value in EUR
     final portfolioHistoryKey = _getUserKey('portfolio_history');
     List<Map<String, dynamic>> history = [];
 
@@ -728,6 +729,14 @@ class StorageService {
         history = (jsonDecode(historyJson) as List)
             .cast<Map<String, dynamic>>();
       }
+
+      // Store value in EUR
+      final newDataPoint = {
+        'timestamp': timestamp.toIso8601String(),
+        'value': value,  // Make sure this is in EUR
+      };
+
+      history.add(newDataPoint);
 
       // Clean up any future dates
       final now = DateTime.now();
@@ -763,4 +772,35 @@ class StorageService {
       print('Error saving portfolio value point: $e');
     }
   }
+
+  Future<void> updatePortfolioHistory(double currentValue) async {
+    if (_currentUserId == null) return;  // Use _currentUserId instead of currentUserId
+
+    // Ensure value is in EUR before storing
+    final portfolioHistoryKey = getUserKey('portfolio_history');
+    final historyJson = prefs.getString(portfolioHistoryKey);
+    
+    List<Map<String, dynamic>> history = [];
+    if (historyJson != null) {
+      history = List<Map<String, dynamic>>.from(json.decode(historyJson));
+    }
+
+    // Add new data point with current timestamp
+    final newDataPoint = {
+      'timestamp': DateTime.now().toIso8601String(),
+      'value': currentValue,  // Store in EUR
+    };
+
+    history.add(newDataPoint);
+
+    // Keep only last 30 days of data
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    history.removeWhere((point) => 
+      DateTime.parse(point['timestamp']).isBefore(thirtyDaysAgo));
+
+    await prefs.setString(portfolioHistoryKey, json.encode(history));
+  }
+
+  // Add this getter
+  String? get currentUserId => _currentUserId;
 }

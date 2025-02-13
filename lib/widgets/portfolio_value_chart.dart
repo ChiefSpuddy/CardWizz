@@ -25,13 +25,13 @@ class PortfolioValueChart extends StatelessWidget {
     }
 
     try {
-      // Parse and convert all values to current currency
+      // Parse and convert all values to current currency using base EUR rate
       final List<dynamic> history = json.decode(portfolioHistoryJson);
       final points = history.map((point) {
         final timestamp = DateTime.parse(point['timestamp']);
-        // Convert value to current currency
-        final rawValue = (point['value'] as num).toDouble();
-        final convertedValue = rawValue * currencyProvider.rate;
+        // Values are stored in EUR, convert to target currency using current rate
+        final eurValue = (point['value'] as num).toDouble();
+        final convertedValue = eurValue * currencyProvider.rate;
         return (timestamp, convertedValue);
       }).toList();
 
@@ -39,32 +39,63 @@ class PortfolioValueChart extends StatelessWidget {
         return _buildEmptyState(context);
       }
 
-      // Convert to chart spots and apply currency conversion
-      final currencyRate = currencyProvider.rate;
       final spots = points.map((point) {
         return FlSpot(
           point.$1.millisecondsSinceEpoch.toDouble(),
-          point.$2 * currencyRate, // Apply currency conversion
+          point.$2,
         );
       }).toList();
 
-      // Calculate value range with currency conversion
-      final values = points.map((p) => p.$2 * currencyRate).toList();
+      // Calculate value range
+      final values = points.map((p) => p.$2).toList();
       final maxY = values.reduce(max);
       final minY = values.reduce(min);
       final yRange = maxY - minY;
-      final yPadding = yRange * 0.15; // Increased padding
+      final yPadding = yRange * 0.15;
 
       return Card(
         elevation: 2,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(0, 16, 8, 16), // Reduced left padding
+          padding: const EdgeInsets.fromLTRB(0, 16, 8, 16),
           child: SizedBox(
-            height: 250, // Increased height
+            height: 250,
             child: LineChart(
               LineChartData(
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    curveSmoothness: 0.35,
+                    preventCurveOverShooting: true,
+                    color: Colors.green.shade600,
+                    barWidth: 2.5,
+                    isStrokeCapRound: true,
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.green.shade600.withOpacity(0.15),
+                          Colors.green.shade600.withOpacity(0.0),
+                        ],
+                        stops: const [0.2, 0.9],
+                      ),
+                    ),
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+                        radius: 2.5,
+                        color: Colors.white,
+                        strokeWidth: 1.5,
+                        strokeColor: Colors.green.shade600,
+                      ),
+                    ),
+                  ),
+                ],
                 minY: (minY - yPadding).clamp(0, double.infinity),
-                maxY: maxY + (yPadding * 2), // Double top padding
+                maxY: maxY + yPadding,
+                borderData: FlBorderData(show: false),
                 clipData: FlClipData.all(),
                 lineTouchData: LineTouchData(
                   enabled: true,
@@ -149,57 +180,26 @@ class PortfolioValueChart extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 40, // Reduced width
-                      getTitlesWidget: (value, _) => Padding(
-                        padding: const EdgeInsets.only(right: 4), // Reduced padding
-                        child: Text(
-                          _formatValue(value, currencyProvider),
-                          style: TextStyle(
-                            fontSize: 10, // Smaller font
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      getTitlesWidget: (value, _) {
+                        // Only show label if it's not at the very top or bottom of the range
+                        if (value == minY || value == maxY) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4), // Reduced padding
+                          child: Text(
+                            _formatValue(value, currencyProvider),
+                            style: TextStyle(
+                              fontSize: 10, // Smaller font
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
+                      interval: yRange / 3, // Show fewer labels
                     ),
                   ),
                 ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: _normalizeSpots(spots), // Normalize spot spacing
-                    isCurved: true,
-                    curveSmoothness: 0.5, // Adjusted for smoother curves
-                    preventCurveOverShooting: true,
-                    color: Colors.green.shade600,
-                    barWidth: 2.5, // Slightly thinner line
-                    isStrokeCapRound: true,
-                    dotData: FlDotData(
-                      show: true, // Always show dots
-                      getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-                        radius: 2.5, // Smaller dots
-                        color: Colors.white,
-                        strokeWidth: 1.5, // Thinner stroke
-                        strokeColor: Colors.green.shade600,
-                      ),
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.green.shade600.withOpacity(0.15),
-                          Colors.green.shade600.withOpacity(0.0),
-                        ],
-                        stops: const [0.2, 0.9],
-                      ),
-                    ),
-                    shadow: Shadow(
-                      color: Colors.green.shade900.withOpacity(0.25),
-                      offset: const Offset(0, 3),
-                      blurRadius: 6,
-                    ),
-                  ),
-                ],
                 extraLinesData: ExtraLinesData(
                   horizontalLines: [
                     HorizontalLine(

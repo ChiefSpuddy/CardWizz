@@ -49,10 +49,12 @@ class CurrencyProvider extends ChangeNotifier {
 
   // For chart axes (with K/M formatting)
   String formatChartValue(double value) {
-    final convertedValue = value * rate;  // Apply rate here
-    if (convertedValue >= 1000) {
-      return '$symbol${(convertedValue / 1000).round()}k';
+    // Value is already in target currency, just format it
+    if (value >= 1000000) {
+      return '$symbol${(value / 1000000).toStringAsFixed(1)}M';
+    } else if (value >= 1000) {
+      return '$symbol${(value / 1000).toStringAsFixed(1)}k';
     }
-    return '$symbol${convertedValue.round()}';
+    return '$symbol${value.toInt()}';
   }
 }

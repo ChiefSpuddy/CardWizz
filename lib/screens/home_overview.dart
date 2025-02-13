@@ -704,9 +704,13 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
               builder: (context, snapshot) {
                 final currencyProvider = context.watch<CurrencyProvider>();
                 final cards = snapshot.data ?? [];
+                final totalValueEur = cards.fold<double>(
+                  0, 
+                  (sum, card) => sum + (card.price ?? 0)
+                );
+                // Convert from EUR to target currency
+                final totalValue = totalValueEur * currencyProvider.rate;
                 final reversedCards = cards.reversed.toList();  // Add this line
-                final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
-                
                 if (cards.isEmpty) {
                   return _buildEmptyState();
                 }
@@ -734,7 +738,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                             child: _buildSummaryCard(
                               context,
                               'Collection Value',
-                              currencyProvider.formatValue(totalValue),  // Update this line
+                              currencyProvider.formatValue(totalValue),  // Now using converted value
                               Icons.currency_exchange,  // This will be overridden by the logic above
                             ),
                           ),
