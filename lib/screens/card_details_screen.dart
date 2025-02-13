@@ -14,6 +14,7 @@ import 'package:cached_network_image/cached_network_image.dart';  // Add this im
 import '../services/collection_service.dart';  // Add this import
 import '../widgets/create_collection_sheet.dart';  // Add this import
 import '../widgets/create_binder_dialog.dart';  // Add this import
+import '../widgets/styled_toast.dart';  // Add this import
 import '../screens/custom_collection_detail_screen.dart';  // Add this import
 
 extension StringExtension on String {
@@ -1147,7 +1148,16 @@ Widget _buildPricingSection() {
                       await service.addCardToCollection(collection.id, widget.card.id);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Added to ${collection.name}')),
+                          SnackBar(
+                            padding: EdgeInsets.zero,
+                            backgroundColor: Colors.transparent,
+                            elevation: 0,
+                            content: StyledToast(
+                              title: 'Added to ${collection.name}',
+                              subtitle: 'Card added to binder successfully',
+                              backgroundColor: Theme.of(context).colorScheme.secondary,
+                            ),
+                          ),
                         );
                       }
                     },
@@ -1205,10 +1215,11 @@ Widget _buildPricingSection() {
   }
 
   Future<void> _showCreateBinderDialog(BuildContext context) async {
-    final collectionId = await showDialog<String>(
+    final collectionId = await showDialog<String?>(
       context: context,
+      barrierDismissible: true,  // Allow tapping outside to dismiss
       builder: (context) => CreateBinderDialog(
-        cardToAdd: widget.card.id,  // Pass the card ID
+        cardToAdd: widget.card.id,
       ),
     );
 
@@ -1224,21 +1235,13 @@ Widget _buildPricingSection() {
       if (context.mounted && collection != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Created "${collection.name}" and added ${widget.card.name}'),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-            action: SnackBarAction(
-              label: 'View',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CustomCollectionDetailScreen(
-                      collection: collection,
-                    ),
-                  ),
-                );
-              },
+            padding: EdgeInsets.zero,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            content: StyledToast(
+              title: 'New Binder Created',
+              subtitle: 'Added ${widget.card.name} to ${collection.name}',
+              backgroundColor: Theme.of(context).colorScheme.secondary,
             ),
           ),
         );

@@ -3,8 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import 'dart:math';
-import '../services/collection_service.dart';  // Add this import
-// Add this import for String.characters
+import '../services/collection_service.dart';
+import '../services/storage_service.dart';  // Add this import
 import 'package:characters/characters.dart';
 
 class AuthService {
@@ -140,32 +140,40 @@ class AuthService {
   Future<void> signOut() async {
     if (_currentUser != null) {
       final prefs = await SharedPreferences.getInstance();
-      // Don't remove user data on sign out, just clear the current session
+      // Only remove the active session marker
       await prefs.remove('user_id');
+
+      // Just clear current session state without deleting any data
+      final collectionService = await CollectionService.getInstance();
+      await collectionService.clearSessionState();  // This only clears in-memory state
+
+      final storage = await StorageService.init(null);
+      await storage.clearSessionState();  // This only clears in-memory state
+
+      _isAuthenticated = false;
+      _currentUser = null;
     }
-
-    // Clear CollectionService user
-    final collectionService = await CollectionService.getInstance();
-    await collectionService.setCurrentUser(null);
-
-    _isAuthenticated = false;
-    _currentUser = null;
   }
 
   Future<void> deleteAccount() async {
     if (_currentUser != null) {
+      final userId = _currentUser!.id;
       final prefs = await SharedPreferences.getInstance();
-      // Remove all user data
-      await prefs.remove('${_currentUser!.id}_email');
-      await prefs.remove('${_currentUser!.id}_name');
-      await prefs.remove('${_currentUser!.id}_avatar');
-      await prefs.remove('${_currentUser!.id}_locale');
-      await prefs.remove('${_currentUser!.id}_username');
+      
+      // Actually delete all user data
+      await prefs.remove('${userId}_email');
+      await prefs.remove('${userId}_name');
+      await prefs.remove('${userId}_avatar');
+      await prefs.remove('${userId}_locale');
+      await prefs.remove('${userId}_username');
       await prefs.remove('user_id');
 
-      // Clear CollectionService user
+      // Delete data from services
+      final storage = await StorageService.init(null);
+      await storage.permanentlyDeleteUserData();
+
       final collectionService = await CollectionService.getInstance();
-      await collectionService.deleteUserData(_currentUser!.id);
+      await collectionService.permanentlyDeleteUserData(userId);
 
       _isAuthenticated = false;
       _currentUser = null;

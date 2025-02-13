@@ -85,9 +85,9 @@ class AppState with ChangeNotifier {
     final userId = _authService.currentUser?.id;
     if (userId != null) {
       print('Signing out user: $userId');
-      // Clear in correct order
-      await _storageService.clearUserData();
-      await _collectionService?.clearUserData();
+      // Just clear session state without deleting data
+      await _storageService.clearSessionState();
+      await _collectionService?.clearSessionState();
       await _authService.signOut();
     }
     notifyListeners();
@@ -143,15 +143,9 @@ class AppState with ChangeNotifier {
 
   Future<void> deleteAccount() async {
     try {
-      // Delete user data from storage
-      await _storageService.clearAllData();
-      
-      // Sign out user
-      await signOut();
-      
-      // Delete authentication data
       await _authService.deleteAccount();
-      
+      // Change clearUserData to permanentlyDeleteUserData
+      await _storageService.permanentlyDeleteUserData();
       notifyListeners();
     } catch (e) {
       print('Error deleting account: $e');

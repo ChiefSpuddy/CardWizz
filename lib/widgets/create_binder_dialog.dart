@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import '../services/collection_service.dart';
 
 class CreateBinderDialog extends StatefulWidget {
-  final String? cardToAdd;  // Add this parameter
+  /// Shows a dialog to create a new binder.
+  /// Returns the ID of the created collection as String, or null if cancelled.
+  final String? cardToAdd;
 
   const CreateBinderDialog({
     super.key,
-    this.cardToAdd,  // Add this
+    this.cardToAdd,
   });
 
   @override
@@ -152,7 +154,7 @@ class _CreateBinderDialogState extends State<CreateBinderDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context, null),
                     child: const Text('Cancel'),
                   ),
                   const SizedBox(width: 8),
@@ -195,16 +197,13 @@ class _CreateBinderDialogState extends State<CreateBinderDialog> {
                             await service.addCardToCollection(collectionId, widget.cardToAdd!);
                           }
 
-                          if (context.mounted) {
-                            // Return collectionId instead of true
-                            Navigator.of(context).pop(collectionId);
-                          }
+                          if (!mounted) return;
+                          Navigator.of(context).pop(collectionId);
                         } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(e.toString())),
-                            );
-                          }
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
                         }
                       },
                       style: FilledButton.styleFrom(

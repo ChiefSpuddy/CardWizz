@@ -273,13 +273,13 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
   }
 
   Future<void> _showCreateBinderDialog(BuildContext context) async {
-    final success = await showDialog<bool>(
+    final collectionId = await showDialog<String>(  // Change return type to String
       context: context,
       builder: (context) => const CreateBinderDialog(),
       useSafeArea: true,
     );
 
-    if (success == true && mounted) {
+    if (collectionId != null && mounted) {  // Check for collectionId instead of bool
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 2),

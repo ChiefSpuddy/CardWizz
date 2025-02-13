@@ -1465,15 +1465,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       try {
         final storage = context.read<StorageService>();
         final collections = await CollectionService.getInstance();
+        final appState = context.read<AppState>();
         
-        // Clear all data
-        await storage.clearUserData();
-        await collections.clearUserData();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Collection data cleared successfully')),
-          );
+        // Use current user from AppState
+        if (appState.currentUser != null) {
+          await storage.permanentlyDeleteUserData();
+          await collections.permanentlyDeleteUserData(appState.currentUser!.id);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Collection data cleared successfully')),
+            );
+          }
         }
       } catch (e) {
         if (mounted) {

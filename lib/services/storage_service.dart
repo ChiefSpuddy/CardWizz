@@ -57,11 +57,25 @@ class StorageService {
     return _instance!;
   }
 
+  // This method only clears in-memory state
+  Future<void> clearSessionState() async {
+    _cardCache.clear();
+    _lastRemovedCard = null;
+    _cardsController.add([]);
+    _currentUserId = null;
+  }
+
   void setCurrentUser(String? userId) {
     print('Setting current user: $userId');
     _currentUserId = userId;
     
-    // Remove await since _loadInitialData is void
+    if (userId == null) {
+      // Just clear in-memory state
+      clearSessionState();
+      return;
+    }
+    
+    // Load the user's data
     Future.delayed(const Duration(milliseconds: 100), () {
       _loadInitialData();
       final cards = _getCards();
@@ -70,41 +84,28 @@ class StorageService {
     });
   }
 
-  // Add method to clear user data
-  Future<void> clearUserData() async {
+  // Only used during account deletion
+  Future<void> permanentlyDeleteUserData() async {
     if (_currentUserId == null) return;
 
     try {
-      final userId = _currentUserId;  // Store the ID before clearing
+      final userId = _currentUserId;
       
-      // Remove all user-specific data
+      // Delete all data for this user
       final userKeys = _prefs.getKeys()
           .where((key) => key.startsWith('user_${userId}_'))
           .toList();
 
-      // Remove each key
       for (final key in userKeys) {
         await _prefs.remove(key);
       }
 
-      // Clear cards specifically
-      final cardsKey = _getUserKey('cards');
-      await _prefs.remove(cardsKey);
-
-      // Clear local cache
-      _cardCache.clear();
-      _lastRemovedCard = null;
+      await clearSessionState();
       
-      // Notify listeners
-      _cardsController.add([]);
-      
-      print('Cleared all data for user: $userId');
-      
-      // Don't clear _currentUserId here, just the data
-      // This allows the user to continue using the app
+      print('Permanently deleted all data for user: $userId');
       
     } catch (e) {
-      print('Error clearing user data: $e');
+      print('Error deleting user data: $e');
       rethrow;
     }
   }

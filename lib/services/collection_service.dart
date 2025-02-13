@@ -68,43 +68,28 @@ class CollectionService {
     return _instance!;
   }
 
+  // This method only clears in-memory state
+  Future<void> clearSessionState() async {
+    _collections = [];
+    _collectionsController.add([]);
+    _currentUserId = null;
+  }
+
   Future<void> setCurrentUser(String? userId) async {
     print('Setting collection service user: $userId');
     _currentUserId = userId;
     
-    // Save user ID to SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    if (userId != null) {
-      await prefs.setString('current_user_id', userId);
-    } else {
-      await prefs.remove('current_user_id');
-    }
-    
-    // If signing out, don't clear collections from database
     if (userId == null) {
-      _collectionsController.add([]);
+      // Just clear in-memory state
+      await clearSessionState();
       return;
     }
 
-    // Handle existing collections migration if needed
-    final unassignedCollections = await _db.query(
-      'collections',
-      where: 'user_id IS NULL OR user_id = ""',
-    );
+    // Save user ID to SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('current_user_id', userId);
 
-    if (unassignedCollections.isNotEmpty) {
-      // Migrate existing collections to the current user
-      for (final collection in unassignedCollections) {
-        await _db.update(
-          'collections',
-          {'user_id': userId},
-          where: 'id = ?',
-          whereArgs: [collection['id']],
-        );
-      }
-    }
-
-    // Refresh collections after migration
+    // Load the collections for this user
     await _refreshCollections();
   }
 
@@ -407,6 +392,25 @@ class CollectionService {
     await prefs.remove('${userId}_binders');
     await prefs.remove('${userId}_cards');
     // Add any other user-specific data that needs to be removed
+  }
+
+  // Only used during account deletion
+  Future<void> permanentlyDeleteUserData(String userId) async {
+    try {
+      // Actually delete from database
+      await _db.delete(
+        'collections',
+        where: 'user_id = ?',
+        whereArgs: [userId],
+      );
+
+      await clearSessionState();
+      
+      print('Permanently deleted all collections for user: $userId');
+    } catch (e) {
+      print('Error deleting collections: $e');
+      rethrow;
+    }
   }
 
   void dispose() {
