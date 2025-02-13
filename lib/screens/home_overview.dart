@@ -18,6 +18,7 @@ import '../utils/hero_tags.dart';
 import '../utils/cache_manager.dart';
 import '../services/chart_service.dart';
 import '../widgets/empty_collection_view.dart';  // Add this import
+import '../widgets/portfolio_value_chart.dart';
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -108,9 +109,10 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
 
   Widget _buildPriceChart(List<TcgCard> cards) {
     final currencyProvider = context.watch<CurrencyProvider>();
+    final storageService = Provider.of<StorageService>(context, listen: false);
     
     // Get timeline points from service
-    final points = ChartService.getPortfolioHistory(cards);
+    final points = ChartService.getPortfolioHistory(storageService, cards);
     
     // Early returns for empty states...
     if (points.length < 2) return Card(
@@ -192,119 +194,122 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
         const SizedBox(height: 24),
         SizedBox(
           height: 200,
-          child: LineChart(
-            LineChartData(
-              lineTouchData: LineTouchData(
-                enabled: true,
-                touchTooltipData: LineTouchTooltipData(
-                  tooltipBgColor: Theme.of(context).colorScheme.surface,
-                  tooltipRoundedRadius: 8,
-                  fitInsideHorizontally: true,  // Add this line
-                  fitInsideVertically: true,    // Add this line
-                  getTooltipItems: (spots) {
-                    return spots.map((spot) {
-                      final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
-                      return LineTooltipItem(
-                        '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
-                        TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      );
-                    }).toList();
-                  },
+          child: Padding(
+            padding: const EdgeInsets.only(left: 8, right: 24), // Add left padding and increase right padding
+            child: LineChart(
+              LineChartData(
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    tooltipBgColor: Theme.of(context).colorScheme.surface,
+                    tooltipRoundedRadius: 8,
+                    fitInsideHorizontally: true,  // Add this line
+                    fitInsideVertically: true,    // Add this line
+                    getTooltipItems: (spots) {
+                      return spots.map((spot) {
+                        final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
+                        return LineTooltipItem(
+                          '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
+                          TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      }).toList();
+                    },
+                  ),
+                  handleBuiltInTouches: true,
                 ),
-                handleBuiltInTouches: true,
-              ),
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: true,
-                horizontalInterval: interval, // Use calculated interval
-                verticalInterval: const Duration(days: 7).inMilliseconds.toDouble(),
-                getDrawingHorizontalLine: (value) => FlLine(
-                  color: Theme.of(context).dividerColor.withOpacity(0.1),
-                  strokeWidth: 1,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: true,
+                  horizontalInterval: interval, // Use calculated interval
+                  verticalInterval: const Duration(days: 7).inMilliseconds.toDouble(),
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: Theme.of(context).dividerColor.withOpacity(0.1),
+                    strokeWidth: 1,
+                  ),
+                  getDrawingVerticalLine: (value) => FlLine(
+                    color: Theme.of(context).dividerColor.withOpacity(0.1),
+                    strokeWidth: 1,
+                  ),
                 ),
-                getDrawingVerticalLine: (value) => FlLine(
-                  color: Theme.of(context).dividerColor.withOpacity(0.1),
-                  strokeWidth: 1,
-                ),
-              ),
-              titlesData: FlTitlesData(
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    interval: const Duration(days: 7).inMilliseconds.toDouble(),
-                    getTitlesWidget: (value, _) {
-                      final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 8),
+                titlesData: FlTitlesData(
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: const Duration(days: 7).inMilliseconds.toDouble(),
+                      getTitlesWidget: (value, _) {
+                        final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            _formatDate(date),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: interval,  // Use calculated interval
+                      reservedSize: 46,
+                      getTitlesWidget: (value, _) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
                         child: Text(
-                          _formatDate(date),
+                          currencyProvider.formatChartValue(value),
                           style: TextStyle(
                             fontSize: 10,
                             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    interval: interval,  // Use calculated interval
-                    reservedSize: 46,
-                    getTitlesWidget: (value, _) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Text(
-                        currencyProvider.formatChartValue(value),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              borderData: FlBorderData(show: false),
-              minY: adjustedMin,
-              maxY: adjustedMax,
-              lineBarsData: [
-                LineChartBarData(
-                  spots: spots,  // Use spots instead of chartSpots
-                  isCurved: true,
-                  curveSmoothness: 0.8, // Increased from 0.3 to 0.8 for more curve
-                  preventCurveOverShooting: false, // Changed to false to allow smoother curves
-                  color: Colors.green.shade600,
-                  barWidth: 3, // Slightly increased for better visibility
-                  dotData: FlDotData(
-                    show: true,
-                    getDotPainter: (spot, percent, bar, index) {
-                      return FlDotCirclePainter(
-                        radius: 6, // Increased from 4
-                        color: Colors.white,
-                        strokeWidth: 2.5, // Increased from 2
-                        strokeColor: Colors.green.shade600,
-                      );
-                    },
-                  ),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.green.shade600.withOpacity(0.3), // Slightly increased opacity
-                        Colors.green.shade600.withOpacity(0.0),
-                      ],
+                borderData: FlBorderData(show: false),
+                minY: adjustedMin,
+                maxY: adjustedMax,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,  // Use spots instead of chartSpots
+                    isCurved: true,
+                    curveSmoothness: 0.8, // Increased from 0.3 to 0.8 for more curve
+                    preventCurveOverShooting: false, // Changed to false to allow smoother curves
+                    color: Colors.green.shade600,
+                    barWidth: 3, // Slightly increased for better visibility
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, bar, index) {
+                        return FlDotCirclePainter(
+                          radius: 6, // Increased from 4
+                          color: Colors.white,
+                          strokeWidth: 2.5, // Increased from 2
+                          strokeColor: Colors.green.shade600,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.green.shade600.withOpacity(0.3), // Slightly increased opacity
+                          Colors.green.shade600.withOpacity(0.0),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -706,6 +711,9 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                   return _buildEmptyState();
                 }
 
+                // Add logging here
+                print('HomeOverview: cards.length = ${cards.length}');
+
                 return ListView(
                   children: [
                     // Summary Cards
@@ -742,7 +750,10 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                           crossAxisAlignment: CrossAxisAlignment.stretch,  // Changed from start
                           children: [
                             const SizedBox(height: 24),  // Adjusted spacing
-                            _buildPriceChart(cards),
+                            Provider<List<TcgCard>>.value(
+                              value: cards,
+                              child: const PortfolioValueChart(),
+                            ),
                           ],
                         ),
                       ),

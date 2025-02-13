@@ -93,6 +93,9 @@ class BackgroundService {
       print('Price refresh completed');
       _storage.notifyPriceUpdateComplete(cards.length);
 
+      // Recalculate portfolio history
+      await _storage.recalculatePortfolioHistory();
+
     } catch (e) {
       print('Error during price refresh: $e');
       rethrow;

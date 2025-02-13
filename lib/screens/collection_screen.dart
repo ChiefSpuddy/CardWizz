@@ -1,24 +1,23 @@
-import '../models/tcg_card.dart';
-import 'storage_service.dart';
-import 'collection_index_service.dart';  // Make sure this import is used
-import 'poke_api_service.dart';
 import 'dart:async';
+import 'poke_api_service.dart';
+import 'collection_index_service.dart';  // Make sure this import is used
+import 'storage_service.dart';
+import '../models/tcg_card.dart';
 
 class CollectionTrackingService {
   final StorageService _storage;
-  final CollectionIndexService _namesService;  // Update this type
   final PokeApiService _pokeApi;
-  final Map<String, bool> _collectionCache = {};
+  final CollectionIndexService _namesService;  // Update this type
   final Map<String, List<TcgCard>> _cardCache = {};
+  final Map<String, bool> _collectionCache = {};
   List<TcgCard>? _allCards;
   bool _isInitialized = false;
   final _updateController = StreamController<void>.broadcast();
   Stream<void> get onUpdate => _updateController.stream;
 
-  CollectionTrackingService(this._storage) :
-    _namesService = CollectionIndexService(),  // Update constructor
-    _pokeApi = PokeApiService() {
-    // Make listener more robust
+  CollectionTrackingService(this._storage)
+      : _pokeApi = PokeApiService(),
+        _namesService = CollectionIndexService() {
     _storage.onCardsChanged.listen((_) {
       if (!_isRefreshing) {  // Add guard here too
         _refreshCollection();
@@ -27,23 +26,20 @@ class CollectionTrackingService {
   }
 
   Future<void> initialize() async {
-    // Clear caches first
-    _collectionCache.clear();
-    _cardCache.clear();
-    _allCards = null;
     _isInitialized = false;
-    
+    _allCards = null;
+    _cardCache.clear();
+    _collectionCache.clear();
+    // Clear caches first
     try {
-      // Only proceed if we have a user
       if (_storage.prefs.getString('user_id') != null) {
-        // Always get fresh cards
+        // Only proceed if we have a user
         _allCards = await _storage.getCards();
-        
+        // Always get fresh cards
         // Rebuild caches
         for (final card in _allCards!) {
           final baseName = _normalizeCardName(card.name);
           _collectionCache[baseName] = true;
-          
           if (!_cardCache.containsKey(baseName)) {
             _cardCache[baseName] = [];
           }
@@ -51,7 +47,6 @@ class CollectionTrackingService {
             _cardCache[baseName]!.add(card);
           }
         }
-        
         _isInitialized = true;
         print('DexCollection initialized with ${_allCards?.length ?? 0} cards');
       }
@@ -71,13 +66,9 @@ class CollectionTrackingService {
       .trim();
   }
 
-  bool _isRefreshing = false;  // Add this flag
-
-  // Make refresh more robust
   Future<void> _refreshCollection() async {
     if (_isRefreshing) return;
     _isRefreshing = true;
-    
     try {
       await initialize();  // This will handle all the cache clearing
       _updateController.add(null);
@@ -86,41 +77,37 @@ class CollectionTrackingService {
     }
   }
 
-  // Public refresh method
   Future<void> refresh() async {
     await _refreshCollection();
   }
 
   Future<void> refreshCollection() async {
     // Force clear caches
-    _collectionCache.clear();
-    _cardCache.clear();
-    _allCards = null;
     _isInitialized = false;
-    
+    _allCards = null;
+    _cardCache.clear();
+    _collectionCache.clear();
     // Reinitialize with fresh data
     await initialize();
-    
     // Notify listeners
     _updateController.add(null);
   }
 
-  bool isCardCollected(String name) {  // Changed from isPokemonCollected
+  bool isCardCollected(String name) {
     final normalized = _normalizeCardName(name);
     final isCollected = _collectionCache[normalized] ?? false;
     return isCollected;
   }
 
-  List<TcgCard> getCardsForName(String name) {  // Changed from getCardsForPokemon
+  List<TcgCard> getCardsForName(String name) {
     final normalized = _normalizeCardName(name);
     return _cardCache[normalized] ?? [];
   }
 
-  Future<Map<String, dynamic>> getSetStats(int startNum, int endNum) async {  // Changed from getGenerationStats
+  Future<Map<String, dynamic>> getSetStats(int startNum, int endNum) async {
     if (!_isInitialized) {
       await refresh();
     }
-
     final stats = {
       'cardCount': 0,
       'totalValue': 0.0,
@@ -128,35 +115,27 @@ class CollectionTrackingService {
       'collectedPokemon': <String>[],
       'spriteUrls': <String, String>{},
     };
-
-    // Get sprite URLs in batch
     final dexNumbers = List.generate(endNum - startNum + 1, (i) => startNum + i);
     final pokemonData = await _pokeApi.fetchPokemonBatch(dexNumbers);
-
     for (final data in pokemonData) {
       final name = data['name'].toString();
       (stats['spriteUrls'] as Map<String, String>)[name] = data['sprite'];
-      
       if (isCardCollected(name)) {
         (stats['collectedPokemon'] as List<String>).add(name);
         final cards = getCardsForName(name);
         stats['cardCount'] = (stats['cardCount'] as int) + cards.length;
-        stats['totalValue'] = (stats['totalValue'] as double) + 
-          cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+        stats['totalValue'] = (stats['totalValue'] as double) +
+            cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
       }
     }
-
     stats['uniquePokemon'] = (stats['collectedPokemon'] as List).length;
     return stats;
   }
 
-  // Simplified Pokemon stats
-  Map<String, dynamic> getCardStats(String name) {  // Changed from getCreatureStats
+  Map<String, dynamic> getCardStats(String name) {
     if (!_isInitialized) return {'isCollected': false, 'cardCount': 0};
-    
     final normalized = name.toLowerCase();
     final cards = _cardCache[normalized] ?? [];
-    
     return {
       'isCollected': _collectionCache[normalized] ?? false,
       'cardCount': cards.length,
@@ -165,7 +144,6 @@ class CollectionTrackingService {
     };
   }
 
-  // Clear cache when needed
   void clearCache() {
     _collectionCache.clear();
     _cardCache.clear();
@@ -173,26 +151,33 @@ class CollectionTrackingService {
     _isInitialized = false;
   }
 
-  // Update this method to handle Future<List<TcgCard>>
   int getCollectedInRange(int start, int end) {
     if (!_isInitialized || _allCards == null) {
       return 0;
     }
-    
     Set<String> collectedCreatures = {};
-    
-    // Use _allCards which is already loaded in initialize()
     for (var card in _allCards!) {
       final dexNumber = _getDexNumber(card.name);
       if (dexNumber >= start && dexNumber <= end) {
         collectedCreatures.add(dexNumber.toString());
       }
     }
-    
     return collectedCreatures.length;
   }
 
-  // Helper method to extract dex number from card name
+  int getCollectedCount(int start, int end) {
+    if (!_isInitialized || _allCards == null) return 0;
+    Set<int> collectedNumbers = {};
+    for (var card in _allCards!) {
+      final name = _normalizeCardName(card.name);
+      final dexNumber = _getDexNumber(name);
+      if (dexNumber >= start && dexNumber <= end) {
+        collectedNumbers.add(dexNumber);
+      }
+    }
+    return collectedNumbers.length;
+  }
+
   int _getDexNumber(String cardName) {
     // Special cases first
     final specialCases = {
@@ -203,25 +188,22 @@ class CollectionTrackingService {
       'farfetch\'d': 83,
       // Add more special cases as needed
     };
-
     for (final entry in specialCases.entries) {
       if (cardName.contains(entry.key)) {
         return entry.value;
       }
     }
-
     // Try to match against the name mapping
     for (final entry in _dexNumbers.entries) {
       if (cardName.startsWith(entry.key)) {
         return entry.value;
       }
     }
-
     return 0;
   }
 
-  // Add this map of known Pokémon names to their dex numbers
   static final Map<String, int> _dexNumbers = {
+    // Add this map of known Pokémon names to their dex numbers
     'bulbasaur': 1,
     'ivysaur': 2,
     'venusaur': 3,
@@ -289,8 +271,6 @@ class CollectionTrackingService {
     'machop': 66,
     'machoke': 67,
     'machamp': 68,
-    // Add more as needed...
-    
     // Add Series 2 (Generation 2) mappings
     'chikorita': 152,
     'bayleef': 153,
@@ -392,7 +372,6 @@ class CollectionTrackingService {
     'lugia': 249,
     'ho-oh': 250,
     'celebi': 251,
-
     // Add Series 3 (Generation 3) mappings
     'treecko': 252,
     'grovyle': 253,
@@ -529,31 +508,30 @@ class CollectionTrackingService {
     'rayquaza': 384,
     'jirachi': 385,
     'deoxys': 386,
+    // Add more as needed...
   };
-
-  int getCollectedCount(int start, int end) {
-    if (!_isInitialized || _allCards == null) return 0;
-    
-    Set<int> collectedNumbers = {};
-    
-    for (var card in _allCards!) {
-      // Clean the name first
-      final name = _normalizeCardName(card.name);
-      
-      // Get the dex number for this card
-      final dexNumber = _getDexNumber(name);
-      
-      // If it's in our range, count it
-      if (dexNumber >= start && dexNumber <= end) {
-        collectedNumbers.add(dexNumber);
-      }
-    }
-    
-    return collectedNumbers.length;
-  }
 
   @override
   void dispose() {
     _updateController.close();
   }
 }
+
+// ...existing code...
+itemBuilder: (context, index) {
+  final card = cards[index];
+  return CardTile(
+    card: card,
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CardDetailsScreen(
+          card: card,
+          heroContext: 'collection_${card.id}',  // Make tag unique
+        ),
+      ),
+    ),
+    heroTag: 'collection_${card.id}',  // Make tag unique
+  );
+},
+// ...existing code...

@@ -11,6 +11,7 @@ import '../services/background_service.dart';
 import 'package:rxdart/rxdart.dart'; // Add this import
 import 'package:path/path.dart' show join;
 import 'package:sqflite/sqflite.dart' show Database, openDatabase, getDatabasesPath;
+import 'background_price_update_service.dart'; // Add this import
 
 class StorageService {
   static const int _freeUserCardLimit = 25;  // Changed from 10 to 25
@@ -18,7 +19,6 @@ class StorageService {
   static StorageService? _instance;
 
   // Change from late final to nullable
-  BackgroundService? backgroundService;
 
   // Add these fields
   late final SharedPreferences _prefs;
@@ -53,38 +53,13 @@ class StorageService {
       
       // Initialize in sequence
       await _instance!._init();  // First initialize storage
-      await _instance!.initializeBackgroundService();  // Then initialize background service
     }
     return _instance!;
-  }
-
-  // Change from private to public
-  Future<void> initializeBackgroundService() async {
-    if (backgroundService != null) return; // Already initialized
-    
-    try {
-      final apiService = TcgApiService();
-      backgroundService = BackgroundService(this, apiService);
-      await backgroundService!.initialize();  // Initialize after creation
-      print('Background service initialized successfully');
-    } catch (e) {
-      print('Error initializing background service: $e');
-      backgroundService = null;  // Reset on error
-    }
   }
 
   void setCurrentUser(String? userId) {
     print('Setting current user: $userId');
     _currentUserId = userId;
-    
-    // Initialize background service when user is set
-    initializeBackgroundService().then((_) {
-      if (userId != null) {
-        backgroundService?.startPriceUpdates();
-      } else {
-        backgroundService?.stopPriceUpdates();
-      }
-    });
     
     // Remove await since _loadInitialData is void
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -241,46 +216,14 @@ class StorageService {
     return _getCards();
   }
 
-  // Changed to internal sync method
-  Future<void> _saveCard(TcgCard card) async {
-    if (_currentUserId == null) return;
-    
-    final cardsKey = _getUserKey('cards');
-    print('Saving card to key: $cardsKey');
-    
-    final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
-    print('Found existing cards: ${existingCardsJson.length}');
-    
-    final existingCards = existingCardsJson
-        .map((json) => jsonDecode(json) as Map<String, dynamic>)
-        .toList();
-    
-    if (!existingCards.any((c) => c['id'] == card.id)) {
-      existingCards.add(card.toJson());
-      
-      final updatedCardsJson = existingCards
-          .map((c) => jsonEncode(c))
-          .cast<String>()
-          .toList();
-      
-      await _prefs.setStringList(cardsKey, updatedCardsJson);
-      print('Saved cards. New total: ${existingCards.length}');
-      
-      // Ensure cards are reloaded
-      final updatedCards = _getCards();
-      _cardsController.add(updatedCards);
-    }
-  }
-
   // Make saveCard public method async
   Future<void> saveCard(TcgCard card) async {
     if (_currentUserId == null) return;
 
     try {
-      // Always ensure new cards have a dateAdded
       final now = DateTime.now();
       final cardWithDate = card.copyWith(
-        dateAdded: card.dateAdded ?? now,  // Only set if not already set
+        dateAdded: card.dateAdded ?? now,
         price: card.price,
         priceHistory: card.priceHistory.isEmpty && card.price != null ? 
           [PriceHistoryEntry(price: card.price!, date: now)] : 
@@ -316,11 +259,16 @@ class StorageService {
       existingCards.removeWhere((c) => c.id == card.id);
       
       // Add the new card
-      if (card.price != null && card.price! > 0) {
-        // Add initial price point to history
-        card.addPriceHistoryPoint(card.price!, DateTime.now());
-      }
       existingCards.add(card);
+
+      // Calculate new total value immediately after adding the card
+      final newTotalValue = existingCards.fold<double>(
+        0, 
+        (sum, card) => sum + (card.price ?? 0)
+      );
+
+      // Save portfolio value point using the same 'now' variable
+      await _addPortfolioValuePoint(newTotalValue, now);
 
       // Save back to storage with validation
       final updatedCardsJson = existingCards
@@ -345,6 +293,9 @@ class StorageService {
       _cardsController.add(existingCards);
       _notifyCardChange();
       
+      // Recalculate portfolio history
+      await recalculatePortfolioHistory();
+
     } catch (e) {
       print('Error saving card: $e');
       rethrow;
@@ -391,13 +342,20 @@ class StorageService {
       _lastRemovedCard = (cardId, removedCard);
 
       // Remove from storage
+      final remainingCards = cards.where((card) => card.id != cardId).toList();
+      
+      // Calculate new total value after removal
+      final totalValue = remainingCards.fold<double>(
+        0, 
+        (sum, card) => sum + (card.price ?? 0)
+      );
+
+      // Save the portfolio value point
+      await _savePortfolioValuePoint(totalValue, DateTime.now());
+
       final cardsKey = _getUserKey('cards');
-      final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
-      final updatedCardsJson = existingCardsJson
-          .where((json) {
-            final card = TcgCard.fromJson(jsonDecode(json));
-            return card.id != cardId;
-          })
+      final updatedCardsJson = remainingCards
+          .map((card) => jsonEncode(card.toJson()))
           .toList();
 
       await _prefs.setStringList(cardsKey, updatedCardsJson);
@@ -409,6 +367,9 @@ class StorageService {
       // Make sure to notify card changes
       _notifyCardChange();
       
+      // Recalculate portfolio history
+      await recalculatePortfolioHistory();
+
     } catch (e) {
       print('Error removing card: $e');
       rethrow;
@@ -527,7 +488,6 @@ class StorageService {
     _isReadyNotifier.dispose();  // Add this
     _cardsController.close();
     _cardChangeController.close();
-    backgroundService?.dispose();
     _priceUpdateController.close();
     _priceUpdateCompleteController.close();
   }
@@ -561,7 +521,7 @@ class StorageService {
         final updatedCardsJson = cards
             .map((c) => jsonEncode(c.toJson()))
             .toList();
-        
+         
         await _prefs.setStringList(cardsKey, updatedCardsJson);
         _cardsController.add(cards);
       }
@@ -587,7 +547,10 @@ class StorageService {
   }
 
   // Add this getter
-  String? get currentUserId => _currentUserId;
+  String getUserKey(String key) => _getUserKey(key);
+
+  // Add this getter
+  SharedPreferences get prefs => _prefs;
 
   Future<void> addPriceHistoryPoint(String cardId, double price, DateTime timestamp) async {
     final db = await _getDb();
@@ -662,5 +625,142 @@ class StorageService {
     );
 
     await saveCard(updatedCard);
+
+    // Recalculate portfolio history
+    await recalculatePortfolioHistory();
+  }
+
+  Future<void> recalculatePortfolioHistory() async {
+    if (_currentUserId == null) return;
+
+    final cards = _getCards();
+    final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+    await _addPortfolioValuePoint(totalValue, DateTime.now());
+  }
+
+  // Add this method to save portfolio history
+  Future<void> savePortfolioValue(double value) async {
+    final userId = prefs.getString('user_id');
+    if (userId == null) return;
+
+    final key = getUserKey('portfolio_history');
+    List<dynamic> history = [];
+
+    final existingHistoryJson = prefs.getString(key);
+    if (existingHistoryJson != null) {
+      try {
+        history = jsonDecode(existingHistoryJson);
+      } catch (e) {
+        print('Error decoding existing portfolio history: $e');
+      }
+    }
+
+    history.add({
+      'timestamp': DateTime.now().toIso8601String(),
+      'value': value,
+    });
+
+    // Limit history size (e.g., keep last 100 entries)
+    if (history.length > 100) {
+      history = history.sublist(history.length - 100);
+    }
+
+    await prefs.setString(key, jsonEncode(history));
+  }
+
+  // Modify addCard, removeCard, and updateCard methods to save portfolio value
+
+  BackgroundPriceUpdateService? backgroundService;
+
+  Future<void> initializeBackgroundService() async {
+    if (backgroundService != null) return; // Already initialized
+    
+    try {
+      final apiService = TcgApiService();
+      backgroundService = BackgroundPriceUpdateService(this);
+      await backgroundService!.initialize();  // Initialize after creation
+      print('Background service initialized successfully');
+    } catch (e) {
+      print('Error initializing background service: $e');
+      backgroundService = null;  // Reset on error
+    }
+  }
+
+  // Add this getter
+  bool get isBackgroundServiceEnabled => backgroundService?.isEnabled ?? false;
+
+  Future<void> _savePortfolioValuePoint(double value, DateTime timestamp) async {
+    final portfolioHistoryKey = _getUserKey('portfolio_history');
+    List<Map<String, dynamic>> history = [];
+
+    try {
+      final historyJson = _prefs.getString(portfolioHistoryKey);
+      if (historyJson != null) {
+        history = (jsonDecode(historyJson) as List)
+            .cast<Map<String, dynamic>>();
+      }
+
+      // Add new point
+      history.add({
+        'timestamp': timestamp.toIso8601String(),
+        'value': value,
+      });
+
+      // Sort by timestamp
+      history.sort((a, b) => DateTime.parse(a['timestamp'])
+          .compareTo(DateTime.parse(b['timestamp'])));
+
+      // Save back to storage
+      await _prefs.setString(portfolioHistoryKey, jsonEncode(history));
+      
+    } catch (e) {
+      print('Error saving portfolio value point: $e');
+    }
+  }
+
+  Future<void> _addPortfolioValuePoint(double value, DateTime timestamp) async {
+    final portfolioHistoryKey = _getUserKey('portfolio_history');
+    List<Map<String, dynamic>> history = [];
+
+    try {
+      final historyJson = _prefs.getString(portfolioHistoryKey);
+      if (historyJson != null) {
+        history = (jsonDecode(historyJson) as List)
+            .cast<Map<String, dynamic>>();
+      }
+
+      // Clean up any future dates
+      final now = DateTime.now();
+      history.removeWhere((point) {
+        final pointDate = DateTime.parse(point['timestamp']);
+        return pointDate.isAfter(now);
+      });
+
+      // Add new point
+      history.add({
+        'timestamp': timestamp.toIso8601String(),
+        'value': value,
+      });
+
+      // Keep only points from the last 30 days
+      final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+      history.removeWhere((point) {
+        final pointDate = DateTime.parse(point['timestamp']);
+        return pointDate.isBefore(thirtyDaysAgo);
+      });
+
+      // Sort by timestamp
+      history.sort((a, b) => 
+        DateTime.parse(a['timestamp']).compareTo(DateTime.parse(b['timestamp']))
+      );
+
+      // Save back to storage
+      await _prefs.setString(portfolioHistoryKey, jsonEncode(history));
+      
+      print('Added portfolio value point: \$${value.toStringAsFixed(2)} at ${timestamp.toIso8601String()}');
+      
+    } catch (e) {
+      print('Error saving portfolio value point: $e');
+    }
   }
 }

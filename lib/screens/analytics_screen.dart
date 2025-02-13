@@ -26,10 +26,7 @@ import '../services/ebay_api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math' as math;
 import '../widgets/empty_collection_view.dart';  // Fix the quote and semicolon
-
-// Remove these imports:
-// import '../services/price_analytics_service.dart';
-// import '../services/analytics_service.dart';
+import '../widgets/portfolio_value_chart.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -338,229 +335,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildValueTrendCard(List<TcgCard> cards) {
-    final currencyProvider = context.watch<CurrencyProvider>();
-    final points = ChartService.getPortfolioHistory(cards);
-    
-    if (points.length < 2) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.trending_up,
-                size: 48,
-                color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Building Price History',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tap refresh (↻) in top right to collect price data',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final (minValue, maxValue) = ChartService.getValueRange(points);
-    final percentageChange = ChartService.calculatePercentageChange(points);
-    final isPositive = percentageChange >= 0;
-    
-    // Add 10% padding to the value range
-    final padding = (maxValue - minValue) * 0.1;
-    final yMin = minValue - padding;
-    final yMax = maxValue + padding;
-
-    // Ensure we have a minimum interval for both horizontal and vertical axes
-    final horizontalInterval = max((yMax - yMin) / 4, 0.1);
-    final verticalInterval = max(
-      const Duration(days: 7).inMilliseconds.toDouble(),
-      (points.last.$1.difference(points.first.$1).inMilliseconds / 4).toDouble()
-    );
-
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Portfolio Value',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Last 30 days',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isPositive ? Icons.trending_up : Icons.trending_down,
-                        size: 16,
-                        color: isPositive ? Colors.green : Colors.red,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${isPositive ? '+' : ''}${percentageChange.toStringAsFixed(1)}%',
-                        style: TextStyle(
-                          color: isPositive ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  lineTouchData: LineTouchData(
-                    enabled: true,
-                    touchTooltipData: LineTouchTooltipData(
-                      tooltipBgColor: Theme.of(context).colorScheme.surface,
-                      tooltipRoundedRadius: 8,
-                      tooltipPadding: const EdgeInsets.all(12),
-                      tooltipMargin: 8,
-                      getTooltipItems: (spots) {
-                        return spots.map((spot) {
-                          final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
-                          return LineTooltipItem(
-                            '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
-                            const TextStyle(fontWeight: FontWeight.bold),
-                          );
-                        }).toList();
-                      },
-                    ),
-                  ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: horizontalInterval,  // Use the calculated interval
-                    getDrawingHorizontalLine: (value) => FlLine(
-                      color: Theme.of(context).dividerColor.withOpacity(0.15),
-                      strokeWidth: 1,
-                    ),
-                  ),
-                  titlesData: FlTitlesData(
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: verticalInterval,  // Use calculated vertical interval
-                        getTitlesWidget: (value, _) {
-                          final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              _formatDate(date),
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 46,
-                        interval: horizontalInterval,  // Use calculated horizontal interval
-                        getTitlesWidget: (value, _) => Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: Text(
-                            currencyProvider.formatChartValue(value),
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  minX: points.first.$1.millisecondsSinceEpoch.toDouble(),
-                  maxX: points.last.$1.millisecondsSinceEpoch.toDouble(),
-                  minY: yMin,
-                  maxY: yMax,
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: points.map((point) => FlSpot(
-                        point.$1.millisecondsSinceEpoch.toDouble(),
-                        point.$2,
-                      )).toList(),
-                      isCurved: true,
-                      curveSmoothness: 0.35,
-                      preventCurveOverShooting: true,
-                      color: Colors.green.shade600,
-                      barWidth: 3,
-                      dotData: FlDotData(
-                        show: true,
-                        getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-                          radius: 6,
-                          color: Colors.white,
-                          strokeWidth: 2,
-                          strokeColor: Colors.green.shade600,
-                        ),
-                      ),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.green.shade600.withOpacity(0.3),
-                            Colors.green.shade600.withOpacity(0.0),
-                          ],
-                          stops: const [0.0, 0.8],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
+        child: PortfolioValueChart(),
       ),
     );
   }
@@ -1211,6 +989,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
       await service.refreshPrices();
       await _updateLastRefreshTime();
+
+      // Save portfolio value after refresh
+      final cards = await storage.getCards();
+      final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+      await storage.savePortfolioValue(totalValue);
       
     } catch (e) {
       print('Error refreshing prices: $e');
@@ -1935,6 +1718,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       return _buildEmptyState();
                     }
 
+                    // Add logging here
+                    print('AnalyticsScreen: cards.length = ${cards.length}');
+
                     return CustomScrollView(
                       slivers: [
                         SliverToBoxAdapter(
@@ -1946,7 +1732,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               children: [
                                 _buildValueSummary(cards),
                                 const SizedBox(height: 12),
-                                _buildValueTrendCard(cards),
+                                Provider<List<TcgCard>>.value(
+                                  value: cards,
+                                  child: const PortfolioValueChart(),
+                                ),
                                 const SizedBox(height: 16),
                                 _buildMarketInsightsCard(cards), // Add this line
                                 const SizedBox(height: 16),
@@ -1982,7 +1771,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
     
     // Calculate weekly change using ChartService
-    final points = ChartService.getPortfolioHistory(cards);
+    final storageService = Provider.of<StorageService>(context, listen: false);
+    final points = ChartService.getPortfolioHistory(storageService, cards);
     
     double weeklyChange = 0;
     if (points.length >= 2) {

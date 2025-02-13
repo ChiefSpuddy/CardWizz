@@ -1300,7 +1300,7 @@ String _formatSearchForDisplay(String query) {
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    onTap: () => Navigator.pushNamed(context, '/scanner'),
+                    onTap: _clearSearch,
                     child: const Icon(
                       Icons.camera_alt_outlined,
                       size: 20,
@@ -1325,25 +1325,28 @@ String _formatSearchForDisplay(String query) {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: _searchMode == SearchMode.cards 
-                          ? 'Search cards...' 
-                          : 'Search sets...',
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                        hintStyle: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                    child: GestureDetector(
+                      onTap: _clearSearch,
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: _searchMode == SearchMode.cards 
+                            ? 'Search cards...' 
+                            : 'Search sets...',
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          hintStyle: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                          ),
                         ),
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        onChanged: _onSearchChanged,
+                        textInputAction: TextInputAction.search,
                       ),
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      onChanged: _onSearchChanged,
-                      textInputAction: TextInputAction.search,
                     ),
                   ),
                   if (_searchController.text.isNotEmpty)
@@ -1760,6 +1763,7 @@ String _formatSearchForDisplay(String query) {
       _showCategories = true;
       _currentPage = 1;
       _hasMorePages = true;
+      _lastQuery = null; // Clear the last query
       if (_currentSort != 'cardmarket.prices.averageSellPrice') {
         _currentSort = 'cardmarket.prices.averageSellPrice';
         _sortAscending = false;

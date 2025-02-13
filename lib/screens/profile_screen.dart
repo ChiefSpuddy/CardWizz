@@ -593,6 +593,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     onTap: _openAppStoreReview,
                   ),
                   const Divider(height: 1),
+                  SwitchListTile(
+                    title: Text(localizations.translate('analyticsEnabled')),
+                    value: context.select((StorageService s) => 
+                        s.isBackgroundServiceEnabled),
+                    onChanged: (bool value) {
+                      final storage = Provider.of<StorageService>(context, listen: false);
+                      if (value) {
+                        storage.backgroundService?.startPriceUpdates();
+                      } else {
+                        storage.backgroundService?.stopPriceUpdates();
+                      }
+                      setState(() {});
+                    },
+                  ),
                 ],
               ),
             ),
