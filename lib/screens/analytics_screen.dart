@@ -959,23 +959,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         throw Exception('Failed to initialize background service');
       }
 
-      // Show initial dialog only if DialogManager is initialized
+      // Show initial dialog
       if (dialogManager.context != null && !dialogManager.isDialogVisible && mounted) {
         dialogManager.showCustomDialog(
           PriceUpdateDialog(current: 0, total: 1),
         );
       }
 
-      // Listen for progress updates
-      _progressSubscription = storage.priceUpdateProgress.listen((progress) {
-        final (current, total) = progress;
-        dialogManager.updateDialog(
-          PriceUpdateDialog(current: current, total: total),
-        );
-      });
-
-      // Listen for completion
+      // Setup completion handler before starting refresh
+      bool isCompleted = false;
       _completeSubscription = storage.priceUpdateComplete.listen((updatedCount) {
+        isCompleted = true;
         dialogManager.hideDialog();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -987,8 +981,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         }
       });
 
+      // Listen for progress updates
+      _progressSubscription = storage.priceUpdateProgress.listen((progress) {
+        final (current, total) = progress;
+        dialogManager.updateDialog(
+          PriceUpdateDialog(current: current, total: total),
+        );
+      });
+
+      // Start the price refresh
       await service.refreshPrices();
       await _updateLastRefreshTime();
+
+      // If we didn't get a completion event, ensure dialog is hidden
+      if (!isCompleted) {
+        dialogManager.hideDialog();
+      }
 
       // Save portfolio value after refresh
       final cards = await storage.getCards();
@@ -1000,13 +1008,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       DialogManager.instance.hideDialog();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating prices: $e')),
+          SnackBar(
+            content: Text('Error updating prices: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
       if (mounted) {
         setState(() => _isRefreshing = false);
       }
+      // Cleanup subscriptions
+      _progressSubscription?.cancel();
+      _completeSubscription?.cancel();
     }
   }
 
