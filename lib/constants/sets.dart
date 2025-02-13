@@ -1,6 +1,7 @@
 class PokemonSets {
   // Map of set names to their IDs
   static const Map<String, String> setIdMap = {
+    'prismatic evolution': 'sv8pt5',  // Add this first
     'lost origin': 'swsh11',  // Add this first
     'crown zenith': 'swsh12pt5',
     'silver tempest': 'swsh12',
@@ -29,6 +30,7 @@ class PokemonSets {
   ];
 
   static const Map<String, Map<String, String>> setQueries = {
+    'Prismatic Evolution': {'query': 'set.id:sv8pt5', 'icon': '✨'},  // Add this first
     'Crown Zenith': {'query': 'set.id:swsh12pt5', 'icon': '👑'},
     '151': {'query': 'set.id:sv5', 'icon': '🎮'},
     'Silver Tempest': {'query': 'set.id:swsh12', 'icon': '⚡'},
@@ -113,7 +115,7 @@ class PokemonSets {
   };
 
   static const modernEra = {
-    // Recent Sword & Shield Sets
+    'Prismatic Evolution': {'code': 'sv8pt5', 'year': '2024', 'icon': '✨'},  // Add this first
     'Crown Zenith': {'code': 'swsh12pt5', 'year': '2023', 'icon': '👑'},
     'Silver Tempest': {'code': 'swsh12', 'year': '2022', 'icon': '🌪️'},
     'Lost Origin': {'code': 'swsh11', 'year': '2022', 'icon': '🌌'},
