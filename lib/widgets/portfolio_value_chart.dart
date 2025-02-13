@@ -29,22 +29,22 @@ class PortfolioValueChart extends StatelessWidget {
       final List<dynamic> history = json.decode(portfolioHistoryJson);
       final points = history.map((point) {
         final timestamp = DateTime.parse(point['timestamp']);
-        // Values are stored in EUR, convert to target currency using current rate
         final eurValue = (point['value'] as num).toDouble();
         final convertedValue = eurValue * currencyProvider.rate;
         return (timestamp, convertedValue);
-      }).toList();
+      }).toList()
+        ..sort((a, b) => a.$1.compareTo(b.$1)); // Make sure points are sorted by time
 
       if (points.length < 2) {
         return _buildEmptyState(context);
       }
 
-      final spots = points.map((point) {
-        return FlSpot(
-          point.$1.millisecondsSinceEpoch.toDouble(),
-          point.$2,
-        );
-      }).toList();
+      // Create normalized spots with equal spacing
+      final spots = List<FlSpot>.generate(points.length, (index) {
+        // Normalize x values to be between 0 and 100
+        final normalizedX = index * (100 / (points.length - 1));
+        return FlSpot(normalizedX, points[index].$2);
+      });
 
       // Calculate value range
       final values = points.map((p) => p.$2).toList();
@@ -52,6 +52,17 @@ class PortfolioValueChart extends StatelessWidget {
       final minY = values.reduce(min);
       final yRange = maxY - minY;
       final yPadding = yRange * 0.15;
+
+      // Calculate time range and adapt interval
+      final timeRange = points.last.$1.difference(points.first.$1);
+      final daysSpan = timeRange.inDays;
+      
+      // Adjust interval based on time range
+      final interval = daysSpan <= 7 
+          ? const Duration(days: 1).inMilliseconds.toDouble()
+          : daysSpan <= 14 
+              ? const Duration(days: 2).inMilliseconds.toDouble()
+              : const Duration(days: 5).inMilliseconds.toDouble();
 
       return Card(
         elevation: 2,
@@ -84,12 +95,17 @@ class PortfolioValueChart extends StatelessWidget {
                     ),
                     dotData: FlDotData(
                       show: true,
-                      getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-                        radius: 2.5,
-                        color: Colors.white,
-                        strokeWidth: 1.5,
-                        strokeColor: Colors.green.shade600,
-                      ),
+                      getDotPainter: (spot, percent, bar, index) {
+                        // Only show dots for actual data points (not interpolated)
+                        final isActualDataPoint = points.any((p) => 
+                          p.$1.millisecondsSinceEpoch == spot.x.toInt());
+                        return FlDotCirclePainter(
+                          radius: isActualDataPoint ? 3.0 : 0.0,
+                          color: Colors.white,
+                          strokeWidth: 1.5,
+                          strokeColor: Colors.green.shade600,
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -160,19 +176,24 @@ class PortfolioValueChart extends StatelessWidget {
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      interval: const Duration(days: 5).inMilliseconds.toDouble(),
+                      interval: 20, // Show 5 evenly spaced dates
                       getTitlesWidget: (value, _) {
-                        final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            _formatDate(date),
-                            style: TextStyle(
-                              fontSize: 10, // Smaller font
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        // Convert normalized value back to date
+                        final index = (value * (points.length - 1) / 100).round();
+                        if (index >= 0 && index < points.length) {
+                          final date = points[index].$1;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              _formatDate(date),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                        }
+                        return const SizedBox.shrink();
                       },
                     ),
                   ),
