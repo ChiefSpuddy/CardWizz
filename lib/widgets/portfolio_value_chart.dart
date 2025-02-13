@@ -122,15 +122,20 @@ class PortfolioValueChart extends StatelessWidget {
                     tooltipMargin: 8,
                     getTooltipItems: (spots) {
                       return spots.map((spot) {
-                        final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
-                        return LineTooltipItem(
-                          '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
-                          const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            height: 1.5,
-                          ),
-                        );
-                      }).toList();
+                        // Convert normalized x value back to actual timestamp
+                        final index = (spot.x * (points.length - 1) / 100).round();
+                        if (index >= 0 && index < points.length) {
+                          final date = points[index].$1;  // Get actual date from points
+                          return LineTooltipItem(
+                            '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
+                            const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              height: 1.5,
+                            ),
+                          );
+                        }
+                        return null;
+                      }).whereType<LineTooltipItem>().toList();
                     },
                   ),
                   touchSpotThreshold: 30, // Increased for better touch detection
@@ -329,6 +334,7 @@ class PortfolioValueChart extends StatelessWidget {
   }
 
   String _formatDate(DateTime date) {
+    // Fix date formatting to ensure two digits for both day and month
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
   }
 
