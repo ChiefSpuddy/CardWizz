@@ -481,12 +481,6 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
                 final isSelected = _selectedCards.contains(card.id);
                 
                 return GestureDetector(
-                  onLongPress: () {
-                    setState(() {
-                      _isMultiSelectMode = true;
-                      _toggleCardSelection(card.id);
-                    });
-                  },
                   onTap: () {
                     if (_isMultiSelectMode) {
                       _toggleCardSelection(card.id);
@@ -494,32 +488,75 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
                       _showCardDetails(context, card);
                     }
                   },
-                  child: Stack(
-                    children: [
-                      CardGridItem(
-                        card: card,
-                        onTap: null,
-                      ),
-                      if (_isMultiSelectMode)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isSelected 
-                                ? Theme.of(context).primaryColor 
-                                : Colors.grey.withOpacity(0.5),
-                            ),
-                            padding: const EdgeInsets.all(2),
-                            child: Icon(
-                              isSelected ? Icons.check_circle : Icons.circle_outlined,
-                              color: Colors.white,
-                              size: 20,
-                            ),
+                  onLongPress: () {
+                    setState(() {
+                      _isMultiSelectMode = true;
+                      _toggleCardSelection(card.id);
+                    });
+                  },
+                  child: Container( // Wrap in Container to ensure gestures work
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: isSelected ? Border.all(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 2,
+                      ) : null,
+                    ),
+                    child: Stack(
+                      children: [
+                        Opacity(
+                          opacity: isSelected ? 0.8 : 1.0,
+                          child: CardGridItem(
+                            card: card,
+                            onTap: null, // Important: disable CardGridItem's tap handler
                           ),
                         ),
-                    ],
+                        if (_isMultiSelectMode)
+                          Positioned.fill(
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              decoration: BoxDecoration(
+                                color: isSelected 
+                                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                                  : Colors.transparent,
+                              ),
+                              child: Center(
+                                child: AnimatedScale(
+                                  scale: _isMultiSelectMode ? 1.0 : 0.0,
+                                  duration: const Duration(milliseconds: 200),
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isSelected 
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(context).colorScheme.surface.withOpacity(0.8),
+                                      border: Border.all(
+                                        color: isSelected
+                                          ? Colors.transparent
+                                          : Theme.of(context).colorScheme.primary,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: AnimatedScale(
+                                      scale: isSelected ? 1.0 : 0.8,
+                                      duration: const Duration(milliseconds: 200),
+                                      child: Icon(
+                                        isSelected ? Icons.check : Icons.add,
+                                        color: isSelected 
+                                          ? Colors.white
+                                          : Theme.of(context).colorScheme.primary,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 );
               },
