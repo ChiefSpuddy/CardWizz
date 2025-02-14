@@ -102,10 +102,10 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
                   LineChartBarData(
                     spots: spots,
                     isCurved: true,
-                    curveSmoothness: 0.35,
-                    preventCurveOverShooting: true,
+                    curveSmoothness: 0.7, // Increased for more pronounced curves
+                    preventCurveOverShooting: false, // Allow natural curve flow
                     color: Colors.green.shade600,
-                    barWidth: 2.5,
+                    barWidth: 2.5, // Slightly thinner for elegance
                     isStrokeCapRound: true,
                     belowBarData: BarAreaData(
                       show: true,
@@ -113,7 +113,7 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.green.shade600.withOpacity(0.15),
+                          Colors.green.shade600.withOpacity(0.25),
                           Colors.green.shade600.withOpacity(0.0),
                         ],
                         stops: const [0.2, 0.9],
@@ -122,13 +122,12 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
                     dotData: FlDotData(
                       show: true,
                       getDotPainter: (spot, percent, bar, index) {
-                        // Only show dots for actual data points (not interpolated)
                         final isActualDataPoint = points.any((p) => 
                           p.$1.millisecondsSinceEpoch == spot.x.toInt());
                         return FlDotCirclePainter(
-                          radius: isActualDataPoint ? 3.0 : 0.0,
+                          radius: isActualDataPoint ? 3.5 : 0.0,
                           color: Colors.white,
-                          strokeWidth: 1.5,
+                          strokeWidth: 2.0,
                           strokeColor: Colors.green.shade600,
                         );
                       },
