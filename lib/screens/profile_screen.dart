@@ -267,7 +267,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     return AnimatedContainer( // Add animation to header
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
-      margin: const EdgeInsets.only(bottom: 4), // Reduced from 8
+      // Remove the bottom margin entirely since we'll control spacing in the parent
       child: Column(
         children: [
           TweenAnimationBuilder(
@@ -389,7 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
           children: [
             _buildProfileHeader(context, user),
-            const SizedBox(height: 8), // Reduced from 16
+            const SizedBox(height: 1), // Reduced from 8
 
             // Settings Section
             Card(
