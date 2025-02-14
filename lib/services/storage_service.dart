@@ -720,6 +720,7 @@ class StorageService {
   Future<void> _addPortfolioValuePoint(double value, DateTime timestamp) async {
     if (_currentUserId == null) return;
 
+    // Always store values in EUR (base currency)
     final portfolioHistoryKey = _getUserKey('portfolio_history');
     List<Map<String, dynamic>> history = [];
 
@@ -730,29 +731,22 @@ class StorageService {
             .cast<Map<String, dynamic>>();
       }
 
-      // Always add new point with exact timestamp
-      final newPoint = {
+      // Add new point (storing in EUR)
+      history.add({
         'timestamp': timestamp.toIso8601String(),
-        'value': value,
-      };
-      
-      // Add the new point
-      history.add(newPoint);
+        'value': value,  // Value should already be in EUR when passed to this method
+      });
 
-      // Keep only last 30 days of data
+      // Keep only last 30 days and sort
       final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-      history.removeWhere((point) => 
-        DateTime.parse(point['timestamp']).isBefore(thirtyDaysAgo));
+      history.removeWhere((point) => DateTime.parse(point['timestamp']).isBefore(thirtyDaysAgo));
+      history.sort((a, b) => DateTime.parse(a['timestamp']).compareTo(DateTime.parse(b['timestamp'])));
 
-      // Sort by timestamp
-      history.sort((a, b) => 
-        DateTime.parse(a['timestamp']).compareTo(DateTime.parse(b['timestamp'])));
-
-      // Save back to storage
+      // Save and notify
       await _prefs.setString(portfolioHistoryKey, jsonEncode(history));
+      _notifyCardChange();
       
       print('Added portfolio value point: \$${value.toStringAsFixed(2)} at ${timestamp.toIso8601String()}');
-      
     } catch (e) {
       print('Error saving portfolio value point: $e');
     }

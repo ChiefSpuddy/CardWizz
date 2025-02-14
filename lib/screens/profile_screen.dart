@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:url_launcher/url_launcher.dart';  // Add this import
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';  // Add this import
 import '../providers/app_state.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
@@ -258,42 +259,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     }
   }
 
-  Widget _buildStatsCard(String title, String value, Color color) {
-    final localizations = AppLocalizations.of(context);
-    return Card(
-      elevation: 1, // Reduced elevation
-      margin: EdgeInsets.zero, // Remove margin
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8), // Reduced padding
-        child: Column(
-          children: [
-            FittedBox(  // Add this wrapper
-              fit: BoxFit.scaleDown,
-              child: Text(
-                value,
-                style: TextStyle(
-                  fontSize: 18, // Reduced from 20
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-                textAlign: TextAlign.center,  // Add this
-                overflow: TextOverflow.ellipsis,  // Add this
-              ),
-            ),
-            const SizedBox(height: 2), // Reduced from 4
-            Text(
-              localizations.translate(title),  // Use translation here
-              style: TextStyle(
-                fontSize: 11, // Reduced from 12
-                color: Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildProfileHeader(BuildContext context, AuthUser user) {
     final colorScheme = Theme.of(context).colorScheme;
     final displayName = user.name ?? '';
@@ -411,52 +376,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final localizations = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final currencyProvider = context.watch<CurrencyProvider>();
-    final purchaseService = context.watch<PurchaseService>();  // Move this outside StreamBuilder
+    final purchaseService = context.watch<PurchaseService>();
+    final storageService = Provider.of<StorageService>(context);
     
     return StreamBuilder<List<TcgCard>>(
-      stream: Provider.of<StorageService>(context).watchCards(),
+      stream: storageService.watchCards(),
       builder: (context, snapshot) {
         final cards = snapshot.data ?? [];
-        final totalValue = cards.fold<double>(
-          0,
-          (sum, card) => sum + (card.price ?? 0),
-        );
-
+        
         return ListView(
-          controller: _scrollController,  // Add this
-          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16), // Remove top padding
+          controller: _scrollController,
+          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
           children: [
             _buildProfileHeader(context, user),
-            const SizedBox(height: 4), // Reduced from 8
-
-            // Stats Row
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatsCard(
-                    'totalCards',  // Use translation key instead of direct string
-                    cards.length.toString(),
-                    Colors.blue,
-                  ),
-                ),
-                const SizedBox(width: 2), // Reduced from 4
-                Expanded(
-                  child: _buildStatsCard(
-                    'collections',
-                    (cards.isEmpty ? '0' : '1'),
-                    Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 2), // Reduced from 4
-                Expanded(
-                  child: _buildStatsCard(
-                    'value',
-                    currencyProvider.formatValue(totalValue),
-                    Colors.orange,
-                  ),
-                ),
-              ],
-            ),
             const SizedBox(height: 8), // Reduced from 16
 
             // Settings Section
@@ -592,21 +524,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                     onTap: _openAppStoreReview,
                   ),
-                  const Divider(height: 1),
-                  SwitchListTile(
-                    title: Text(localizations.translate('analyticsEnabled')),
-                    value: context.select((StorageService s) => 
-                        s.isBackgroundServiceEnabled),
-                    onChanged: (bool value) {
-                      final storage = Provider.of<StorageService>(context, listen: false);
-                      if (value) {
-                        storage.backgroundService?.startPriceUpdates();
-                      } else {
-                        storage.backgroundService?.stopPriceUpdates();
-                      }
-                      setState(() {});
-                    },
-                  ),
                 ],
               ),
             ),
@@ -650,18 +567,49 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                   ),
                   const Divider(height: 1),
-                  _buildPremiumTile(context),
-                  _buildPremiumInfoSection(context, purchaseService.isPremium),
+                  Container( // Add container for consistent padding
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: _buildPremiumTile(context),
+                  ),
+                  if (_showPremiumInfo) ...[
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: _buildPremiumInfoSection(context, purchaseService.isPremium),
+                    ),
+                  ] else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: TextButton(
+                        onPressed: () => setState(() => _showPremiumInfo = true),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'View Subscription Details',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.expand_more, 
+                              size: 20,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.logout, color: Colors.red),
                     title: Text(
-                      localizations.translate('signOut'),  // Add new translation
+                      localizations.translate('signOut'),
                       style: const TextStyle(color: Colors.red),
                     ),
-                    onTap: () {
-                      context.read<AppState>().signOut();
-                    },
+                    onTap: () => context.read<AppState>().signOut(),
                   ),
                 ],
               ),
@@ -1486,6 +1434,66 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         }
       }
     }
+  }
+
+  Widget _buildSummaryCard(
+    BuildContext context,
+    String title,
+    String value,
+    IconData icon,
+  ) {
+    final localizations = AppLocalizations.of(context);
+    final currencyProvider = context.watch<CurrencyProvider>();
+    final translationKey = title == 'Total Cards' ? 'totalCards' : 
+                          title == 'Collection Value' ? 'portfolioValue' : 
+                          title.toLowerCase().replaceAll(' ', '_');
+    
+    // Format the value if it's currency related
+    final String formattedValue;
+    if (title.toLowerCase().contains('value')) {
+      final numericValue = double.tryParse(value.replaceAll(RegExp(r'[^\d.]'), ''));
+      formattedValue = numericValue != null 
+          ? currencyProvider.formatValue(numericValue)
+          : value;
+    } else {
+      formattedValue = value;
+    }
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Icon(
+              title.toLowerCase().contains('value') 
+                  ? Icons.currency_exchange
+                  : icon,
+              size: 32,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              localizations.translate(translationKey),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              formattedValue,  // Use the formatted value
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
