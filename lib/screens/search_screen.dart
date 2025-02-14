@@ -259,6 +259,7 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
                 width: 48,
@@ -471,11 +472,11 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
     print('- OrderByDesc: ${!_sortAscending}');
 
     if (mounted) {
-      List<dynamic> cardData = results['data'] as List? ?? [];
-      final totalCount = results['totalCount'] as int? ?? 0;
+      final List<dynamic> data = results['data'] as List? ?? [];  // Changed from cardData to data
+      final totalCount = results['totalCount'] as int;
       
       // If set search failed, try by name
-      if (cardData.isEmpty && query.startsWith('set.id:')) {
+      if (data.isEmpty && query.startsWith('set.id:')) {
         final setMap = searchCategories['modern']!
             .firstWhere((s) => s['query'] == query, orElse: () => {'name': ''});
         final setName = setMap['name'];
@@ -491,20 +492,18 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
             orderByDesc: !_sortAscending,
           );
           if (nameResults['data'] != null) {
-            final List<dynamic> newCardData = nameResults['data'] as List;
-            if (newCardData.isNotEmpty) {
-              cardData = newCardData;
-              final newTotalCount = (nameResults['totalCount'] as int?) ?? 0;
-              print('Found $newTotalCount cards using set name');
-              setState(() => _totalCards = newTotalCount);
-            }
+            data.clear();
+            data.addAll(nameResults['data'] as List);
+            final newTotalCount = (nameResults['totalCount'] as int?) ?? 0;
+            print('Found $newTotalCount cards using set name');
+            setState(() => _totalCards = newTotalCount);
           }
         }
       }
 
       print('📊 Found $totalCount cards total');
       
-      final newCards = cardData
+      final newCards = data
           .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
           .toList();
 
@@ -598,8 +597,8 @@ void _onSearchChanged(String query) {
       _searchResults = null;
       _currentPage = 1;
       _hasMorePages = true;
-      _showCategories = false;  // Hide categories when searching
-      _lastQuery = searchItem['query'];  // Add this line
+      _showCategories = false;
+      _lastQuery = searchItem['query'];
     });
 
     try {
@@ -616,20 +615,23 @@ void _onSearchChanged(String query) {
       );
 
       if (mounted) {
-        final List<dynamic> cardData = results['data'] as List? ?? [];
-        final totalCount = results['totalCount'] as int? ?? 0;
+        final cardData = results['data'] as List;
+        final totalCount = results['totalCount'] as int;
         
-        final newCards = cardData
-            .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
-            .toList();
+        try {
+          final newCards = cardData.map((card) => TcgCard.fromJson(card as Map<String, dynamic>)).toList();
 
-        setState(() {
-          _searchResults = newCards;
-          _totalCards = totalCount;
-          _isLoading = false;
-          _hasMorePages = (_currentPage * 30) < totalCount;
-          _lastQuery = query;  // Store query for pagination
-        });
+          setState(() {
+            _searchResults = newCards;
+            _totalCards = totalCount;
+            _isLoading = false;
+            _hasMorePages = (_currentPage * 30) < totalCount;
+            _lastQuery = query;
+          });
+        } catch (e) {
+          print('Error parsing card data: $e');
+          throw e;
+        }
       }
     } catch (e) {
       print('Quick search error: $e');

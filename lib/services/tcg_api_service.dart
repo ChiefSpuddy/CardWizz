@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 import 'dart:async';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../models/tcg_card.dart';
 
 // Move cache entry class outside
 class _CacheEntry {
@@ -85,7 +88,7 @@ class TcgApiService {
     }
   }
 
-  // Core search method
+  // Core search method - combining both implementations
   Future<Map<String, dynamic>> searchCards({
     required String query,
     String orderBy = 'number',
@@ -102,7 +105,6 @@ class TcgApiService {
     }
 
     try {
-      // Don't clean set.id queries
       final cleanedQuery = query.startsWith('set.id:') ? query : _cleanupQuery(query);
       print('Searching with query: $cleanedQuery');
 
@@ -116,13 +118,19 @@ class TcgApiService {
         },
       );
 
-      if (response['data'] == null || (response['data'] as List).isEmpty) {
-        print('No results found for query: $cleanedQuery');
-        return {'data': [], 'totalCount': 0, 'page': page};
+      if (response['data'] != null) {
+        // Convert the raw data to a format that matches our expected structure
+        final result = {
+          'data': response['data'],  // Keep as raw Map data
+          'totalCount': response['totalCount'] ?? 0,
+          'page': page,
+        };
+
+        _cache[cacheKey] = _CacheEntry(result);
+        return result;
       }
 
-      _cache[cacheKey] = _CacheEntry(response);
-      return response;
+      return {'data': [], 'totalCount': 0, 'page': page};
 
     } catch (e) {
       print('Search error: $e');
@@ -270,7 +278,7 @@ class TcgApiService {
     }
   }
 
-  // Update searchSet to handle pagination
+  // Update searchSet to handle pagination - removing duplicate implementation
   Future<Map<String, dynamic>> searchSet(
     String setId, {
     int page = 1,
@@ -491,5 +499,23 @@ class TcgApiService {
       print('❌ Error fetching card price: $e');
       return null;
     }
+  }
+
+  TcgCard _convertToTcgCard(Map<String, dynamic> data) {
+    return TcgCard(
+      id: data['id'] as String,
+      name: data['name'] as String,
+      number: data['number']?.toString() ?? '',
+      rarity: data['rarity'] as String?,
+      imageUrl: data['images']?['small'] as String? ?? '',
+      largeImageUrl: data['images']?['large'] as String? ?? '',
+      price: data['cardmarket']?['prices']?['averageSellPrice'] as double?,
+      set: data['set'] != null ? TcgSet(
+        id: data['set']['id'] as String,
+        name: data['set']['name'] as String,
+        series: data['set']['series'] as String,
+        total: data['set']['total'] as int,
+      ) : null,
+    );
   }
 }

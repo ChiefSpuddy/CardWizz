@@ -158,9 +158,17 @@ class _CardGridItemState extends State<CardGridItem> {
 
   // Update _buildImage method
   Widget _buildImage() {
+    // Add validation for empty URLs
     if (widget.card.imageUrl.isEmpty) {
-      return const Center(
-        child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.grey),
+      return Container(
+        color: Theme.of(context).colorScheme.surfaceVariant,
+        child: Center(
+          child: Icon(
+            Icons.broken_image_outlined,
+            size: 48,
+            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+          ),
+        ),
       );
     }
 
@@ -173,9 +181,23 @@ class _CardGridItemState extends State<CardGridItem> {
       return widget.cached!;
     }
 
+    // Add null safety check for URL before creating NetworkImage
     return Image.network(
       widget.card.imageUrl,
       fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        _hasError = true;
+        return Container(
+          color: Theme.of(context).colorScheme.surfaceVariant,
+          child: Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              size: 48,
+              color: Theme.of(context).colorScheme.error.withOpacity(0.5),
+            ),
+          ),
+        );
+      },
       loadingBuilder: (context, child, progress) {
         if (progress == null) {
           if (mounted && !_hasError) {
@@ -192,12 +214,6 @@ class _CardGridItemState extends State<CardGridItem> {
                 ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
                 : null,
           ),
-        );
-      },
-      errorBuilder: (context, error, stackTrace) {
-        _hasError = true;
-        return const Center(
-          child: Icon(Icons.broken_image_outlined, size: 48, color: Colors.red),
         );
       },
     );
