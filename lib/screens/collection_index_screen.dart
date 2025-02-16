@@ -13,6 +13,8 @@ import '../services/tcg_api_service.dart';
 import 'card_details_screen.dart';
 import 'home_screen.dart';  // This imports HomeScreenState too
 import 'dart:math' as math;
+import '../widgets/sign_in_view.dart';  // Update this import (remove sign_in_prompt.dart)
+import '../providers/app_state.dart';  // Add this import
 
 class CollectionIndexScreen extends StatefulWidget {
   const CollectionIndexScreen({super.key});
@@ -549,6 +551,14 @@ class _CollectionIndexScreenState extends State<CollectionIndexScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAuthenticated = context.select<AppState, bool>((state) => state.isAuthenticated);
+
+    if (!isAuthenticated) {
+      return const Scaffold(
+        body: SignInView(),  // Replace SignInPrompt with SignInView
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,

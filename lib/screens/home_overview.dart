@@ -659,10 +659,11 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     final localizations = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(
+      // Only show AppBar if signed in
+      appBar: isSignedIn ? AppBar(
         toolbarHeight: 44,
         automaticallyImplyLeading: false,
-        title: isSignedIn && user?.username != null ? RichText(  // Add null check here
+        title: user?.username != null ? RichText(
           text: TextSpan(
             style: Theme.of(context).textTheme.titleMedium,
             children: [
@@ -670,7 +671,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 text: '${localizations.translate('welcome')} ',
               ),
               TextSpan(
-                text: '@${user?.username ?? 'Guest'}',  // Add fallback to 'Guest'
+                text: '@${user?.username ?? 'Guest'}',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.bold,
@@ -685,7 +686,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
           visualDensity: VisualDensity.compact,
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
-      ),
+      ) : null,
       body: !isSignedIn 
         ? const SignInView()
         : Stack(

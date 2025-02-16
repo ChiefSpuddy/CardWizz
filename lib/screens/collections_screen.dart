@@ -381,12 +381,13 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
 
     return Scaffold(
       key: _scaffoldKey,
-      appBar: AppBar(
-        toolbarHeight: 44, // Match home screen height
+      // Only show AppBar if signed in
+      appBar: isSignedIn ? AppBar(
+        toolbarHeight: 44,
         centerTitle: false,
         automaticallyImplyLeading: true,
-        titleSpacing: 0, // Add this to fix spacing
-        title: isSignedIn ? StreamBuilder<List<TcgCard>>(  // Add this condition
+        titleSpacing: 0,
+        title: StreamBuilder<List<TcgCard>>(
           stream: Provider.of<StorageService>(context).watchCards(),
           builder: (context, snapshot) {
             final cards = snapshot.data ?? [];
@@ -505,8 +506,8 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
               ),
             );
           },
-        ) : null,  // Return null when not signed in
-        actions: isSignedIn ? [  // Add this condition
+        ),
+        actions: [
           IconButton(
             icon: const Icon(Icons.analytics_outlined),
             onPressed: () {
@@ -520,8 +521,8 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
             icon: const Icon(Icons.sort),
             onPressed: () => _showSortMenu(context),
           ),
-        ] : null,  // Return null when not signed in
-        bottom: isSignedIn ? PreferredSize(
+        ],
+        bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: StreamBuilder<List<TcgCard>>(
             stream: Provider.of<StorageService>(context).watchCards(),
@@ -533,8 +534,8 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
               ) : const SizedBox.shrink();
             }
           ),
-        ) : null,
-      ),
+        ),
+      ) : null,
       drawer: const AppDrawer(),  // Remove scaffoldKey parameter
       body: AnimatedBackground(
         child: !isSignedIn

@@ -1641,16 +1641,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      appBar: AppBar(
+      // Only show AppBar if signed in
+      appBar: isSignedIn ? AppBar(
         toolbarHeight: 44,
         automaticallyImplyLeading: false,
         leading: IconButton(
           icon: const Icon(Icons.menu),
           padding: EdgeInsets.zero,
           visualDensity: VisualDensity.compact,
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(), // Update this line
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
-        actions: isSignedIn ? [  // Add this condition
+        actions: [
           Tooltip(
             message: _lastUpdateTime != null 
               ? 'Last updated: ${_formatDateTime(_lastUpdateTime!)}\nTap to check for new prices'
@@ -1672,9 +1673,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
           ),
           const SizedBox(width: 8),
-        ] : null,  // Return null when not signed in
-      ),
-      drawer: const AppDrawer(),  // Remove scaffoldKey parameter
+        ],
+      ) : null,
+      drawer: const AppDrawer(),
       body: AnimatedBackground(
         child: SafeArea(
           child: !isSignedIn

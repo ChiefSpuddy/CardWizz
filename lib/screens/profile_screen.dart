@@ -1499,11 +1499,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
-    final user = appState.currentUser;
     final isSignedIn = appState.isAuthenticated;
+    final user = appState.currentUser;
 
     return Scaffold(
-      appBar: AppBar(
+      // Only show AppBar if signed in
+      appBar: isSignedIn ? AppBar(
         toolbarHeight: 44,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -1515,7 +1516,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           constraints: const BoxConstraints(minWidth: 40),
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
-      ),
+      ) : null,
       body: Stack(
         children: [
           Positioned.fill(
