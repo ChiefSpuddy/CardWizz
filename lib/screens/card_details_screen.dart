@@ -780,144 +780,6 @@ Widget _buildPricingSection() {
     );
   }
 
-  Widget _buildPriceHistory() {
-    final currencyProvider = context.watch<CurrencyProvider>();
-    final stats = AnalyticsService.getCardPriceStats(widget.card);
-    if (stats.isEmpty) return const SizedBox.shrink();
-
-    final pricePoints = widget.card.priceHistory;
-    if (pricePoints.isEmpty) return const SizedBox.shrink();
-
-    // Calculate price changes for different periods
-    final changes = AnalyticsService.calculatePriceChanges(widget.card);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Price History',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // Price change indicators
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: changes.entries.map((entry) {
-                final isPositive = entry.value >= 0;
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (isPositive ? Colors.green : Colors.red)
-                        .withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        entry.key,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${isPositive ? '+' : ''}${entry.value.toStringAsFixed(1)}%',
-                        style: TextStyle(
-                          color: isPositive ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Price statistics
-            Row(
-              children: [
-                _buildPriceStat(
-                  'Min',
-                  currencyProvider.formatValue(stats['minimum']),
-                ),
-                _buildPriceStat(
-                  'Avg',
-                  currencyProvider.formatValue(stats['average']),
-                ),
-                _buildPriceStat(
-                  'Max',
-                  currencyProvider.formatValue(stats['maximum']),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Price chart
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  // ...existing chart configuration...
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: pricePoints.asMap().entries.map((e) {
-                        return FlSpot(
-                          e.key.toDouble(),
-                          e.value.price,
-                        );
-                      }).toList(),
-                      isCurved: true,
-                      // ...existing line configuration...
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPriceStat(String label, String value) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildRecentSales() {
     final currencyProvider = context.watch<CurrencyProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -930,9 +792,13 @@ Widget _buildPricingSection() {
     }
 
     if (_recentSales!.isEmpty) {
-      return const SizedBox(
-        height: 100,
-        child: Center(
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[850] : Colors.grey[50],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Center(
           child: Text('No recent sales data available'),
         ),
       );
@@ -960,35 +826,38 @@ Widget _buildPricingSection() {
           ],
         ),
         const SizedBox(height: 16),
-        ..._recentSales!.map((sale) => Material( // Wrap with Material
-          color: Colors.transparent,
-          child: InkWell( // Add InkWell
-            onTap: () => _launchUrl(sale['link'] ?? ''), // Use 'link' instead of 'url'
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[850] : Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: Theme.of(context).dividerColor.withOpacity(0.1),
+        ..._recentSales!.map((sale) {
+          final price = sale['price'];
+          if (price == null) return const SizedBox.shrink();
+
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () {
+                final link = sale['link'] as String?;
+                if (link?.isNotEmpty ?? false) {
+                  _launchUrl(link!);
+                }
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[850] : Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Theme.of(context).dividerColor.withOpacity(0.1),
+                  ),
                 ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: GestureDetector(  // Add this wrapper
-                      onTap: () {
-                        if (sale['url'] != null) {
-                          _launchUrl(sale['url']);
-                        }
-                      },
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            sale['title'],
+                            sale['title'] as String? ?? 'Unknown Item',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1012,7 +881,7 @@ Widget _buildPricingSection() {
                                   ),
                                 ),
                                 child: Text(
-                                  sale['condition'] ?? 'Unknown',
+                                  sale['condition'] as String? ?? 'Unknown',
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Colors.green.shade600,
@@ -1020,10 +889,10 @@ Widget _buildPricingSection() {
                                   ),
                                 ),
                               ),
-                              if (sale['soldDate'] != null) ...[
+                              if (sale['date'] != null) ...[
                                 const SizedBox(width: 8),
                                 Text(
-                                  _formatSaleDate(sale['soldDate']),
+                                  _formatSaleDate(sale['date'] as String),
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
@@ -1035,22 +904,20 @@ Widget _buildPricingSection() {
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    currencyProvider.formatValue(
-                      double.parse(sale['price'].toString()),
+                    const SizedBox(width: 16),
+                    Text(
+                      currencyProvider.formatValue(price as double),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        )).toList(),
+          );
+        }).toList(),
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
@@ -1358,18 +1225,6 @@ Widget _buildPricingSection() {
                       ),
                       child: _buildRecentSales(),
                     ),
-                    // We'll use widget.card.priceHistory.isNotEmpty check directly here
-                    if (widget.card.priceHistory.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.grey[900] : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: _buildPriceHistory(),
-                      ),
-                    ],
                   ],
                 ),
               ),

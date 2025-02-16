@@ -38,82 +38,183 @@ class EbayApiService {
     }
   }
 
+  // Add this helper method near the top of the class
+  String _toTitleCase(String text) {
+    if (text.isEmpty) return text;
+    
+    return text.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
   Future<List<Map<String, dynamic>>> getRecentSales(String cardName, {
     String? setName,
-    String? number,  // Add card number parameter
-    Duration lookbackPeriod = const Duration(days: 90),  // Add lookback period
+    String? number,
+    Duration lookbackPeriod = const Duration(days: 90),
   }) async {
     final token = await _getAccessToken();
     
     try {
       // Build search query
-      String baseQuery = '$cardName pokemon card';
-      if (number != null) {
-        baseQuery += ' $number';
+      final queryParts = <String>[cardName];
+      if (number != null && number.isNotEmpty) {
+        queryParts.add(number);
       }
+      if (setName?.isNotEmpty ?? false) {
+        queryParts.add(setName!);
+      }
+      queryParts.add('pokemon card');
+      final searchQuery = queryParts.join(' ');
+      
+      print('Searching eBay with query: $searchQuery');
       
       final response = await http.get(
         Uri.https(_baseUrl, '/buy/browse/v1/item_summary/search', {
-          'q': baseQuery,
-          'filter': 'soldItems',  // Add this filter for completed sales
-          'sort': '-endingSoonest',  // Sort by most recent
+          'q': searchQuery,
+          'category_ids': '183454',
+          'filter': 'buyingOptions:{FIXED_PRICE}',
           'limit': '100',
         }),
         headers: {
           'Authorization': 'Bearer $token',
           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          'Content-Type': 'application/json',
         },
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final sales = (data['itemSummaries'] as List?)
-            ?.where((item) {
-              final title = (item['title'] as String).toLowerCase();
-              final soldDate = DateTime.parse(item['soldDate']);
-              
-              // Filter by date range and exclude unwanted items
-              return soldDate.isAfter(DateTime.now().subtract(lookbackPeriod)) &&
-                     !_isGradedCard(title) &&
-                     !title.contains('lot') &&
-                     !title.contains('bulk');
-            })
-            .map((item) => {
-              'price': _extractPrice(item['price']),
-              'date': item['soldDate'],
-              'condition': item['condition'],
-              'title': item['title'],
-            })
-            .toList() ?? [];
+        final items = data['itemSummaries'] as List?;
+        
+        if (items == null || items.isEmpty) {
+          print('No items found in eBay response');
+          return [];
+        }
 
-        // Convert the daily averages map to a list of sales data
-        final averages = _calculateDailyAverages(sales);
-        return averages.entries.map((entry) => {
-          'date': entry.key,
-          'price': entry.value,
-        }).toList();
+        print('Found ${items.length} items in eBay response');
+        final sales = <Map<String, dynamic>>[];
+        
+        for (final dynamic rawItem in items) {
+          try {
+            // Ensure the item is a Map
+            if (rawItem is! Map<String, dynamic>) {
+              print('Invalid item format: $rawItem');
+              continue;
+            }
+
+            // Extract price data safely
+            final priceData = rawItem['price'];
+            if (priceData == null) continue;
+
+            double? price;
+            if (priceData is Map) {
+              final value = priceData['value'];
+              final currency = priceData['currency']?.toString();
+              
+              if (currency != 'USD') continue;
+              
+              if (value is String) {
+                price = double.tryParse(value.replaceAll(RegExp(r'[^\d.]'), ''));
+              } else if (value is num) {
+                price = value.toDouble();
+              }
+            }
+
+            if (price == null || price <= 0) continue;
+
+            // Extract other fields safely
+            final rawTitle = rawItem['title']?.toString() ?? '';
+            final title = _toTitleCase(rawTitle); // Convert to title case
+            final searchTitle = rawTitle.toLowerCase(); // Use lowercase for searching
+            final link = rawItem['itemWebUrl']?.toString();
+            var condition = 'Unknown';
+            
+            // Handle condition data more carefully
+            final conditionData = rawItem['condition'];
+            if (conditionData is Map<String, dynamic>) {
+              condition = conditionData['conditionDisplayName']?.toString() ?? condition;
+            } else if (conditionData is String) {
+              condition = conditionData;
+            }
+            
+            // Skip invalid items
+            if (title.isEmpty || link == null) continue;
+
+            // Skip if title doesn't match card name (use searchTitle for comparison)
+            if (!searchTitle.contains(cardName.toLowerCase())) continue;
+
+            // Skip if number is provided and doesn't match (use searchTitle for comparison)
+            if (number?.isNotEmpty ?? false) {
+              if (!searchTitle.contains(number!)) continue;
+            }
+
+            // Skip lots and bulk listings (use searchTitle for comparison)
+            if (searchTitle.contains('lot') || 
+                searchTitle.contains('bulk') ||
+                searchTitle.contains('mystery') ||
+                searchTitle.contains('pack')) {
+              continue;
+            }
+
+            // Add valid sale with properly cased title
+            sales.add({
+              'price': price,
+              'date': DateTime.now().toIso8601String(),
+              'condition': condition,
+              'title': title, // Use the title-cased version
+              'link': link,
+            });
+          } catch (e, stack) {
+            print('Error processing item: $e');
+            print('Stack trace: $stack');
+            continue;
+          }
+        }
+
+        print('Successfully filtered to ${sales.length} valid sales');
+        return sales;
       }
-    } catch (e) {
+      
+      print('eBay API error: ${response.statusCode}');
+      print('Response body: ${response.body}');
+      return [];
+    } catch (e, stack) {
       print('Error fetching eBay sales history: $e');
+      print('Stack trace: $stack');
+      return [];
     }
-    return [];
   }
 
-  Map<String, double> _calculateDailyAverages(List<Map<String, dynamic>> sales) {
-    final dailyPrices = <String, List<double>>{};
+  // Update price extraction to be more robust
+  double? _extractPrice(Map<String, dynamic>? priceInfo) {
+    if (priceInfo == null) return null;
     
-    // Group prices by day
-    for (final sale in sales) {
-      final date = DateTime.parse(sale['date']).toIso8601String().split('T')[0];
-      final price = sale['price'] as double?;
-      if (price != null) {
-        dailyPrices.putIfAbsent(date, () => []).add(price);
+    try {
+      // Check for required fields
+      final value = priceInfo['value'];
+      final currency = priceInfo['currency']?.toString();
+      
+      // Only process USD prices
+      if (currency != 'USD') {
+        return null;
       }
-    }
 
-    // Calculate averages
-    return dailyPrices.map((date, prices) => 
-      MapEntry(date, prices.reduce((a, b) => a + b) / prices.length));
+      // Handle different value types
+      if (value is num) {
+        return value.toDouble();
+      }
+      
+      if (value is String) {
+        final cleaned = value.replaceAll(RegExp(r'[^\d.]'), '');
+        return double.tryParse(cleaned);
+      }
+      
+      return null;
+    } catch (e) {
+      print('Error extracting price from: $priceInfo - $e');
+      return null;
+    }
   }
 
   Future<List<Map<String, dynamic>>> _searchWithQuery(String query) async {
@@ -182,27 +283,6 @@ class EbayApiService {
     } catch (e) {
       print('Error searching eBay: $e');
       return [];
-    }
-  }
-
-  double? _extractPrice(Map<String, dynamic>? priceInfo) {
-    if (priceInfo == null) return null;
-    
-    try {
-      final value = priceInfo['value'];
-      if (value == null) return null;
-      
-      // Handle different numeric formats
-      if (value is num) {
-        return value.toDouble();
-      } else if (value is String) {
-        return double.tryParse(value);
-      }
-      
-      return null;
-    } catch (e) {
-      print('Error extracting price: $e');
-      return null;
     }
   }
 
