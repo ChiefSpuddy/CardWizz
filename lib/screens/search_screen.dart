@@ -113,7 +113,6 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
       {'name': 'Special Illustration', 'icon': '🎨', 'query': 'rarity:"Special Illustration Rare"', 'description': 'Special art cards'},
       {'name': 'Ancient', 'icon': '🗿', 'query': 'subtypes:ancient', 'description': 'Ancient variant cards'},
       {'name': 'Full Art', 'icon': '👤', 'query': 'subtypes:"Trainer Gallery" OR rarity:"Rare Ultra" -subtypes:VMAX', 'description': 'Full art cards'},
-      {'name': 'Gold', 'icon': '✨', 'query': 'rarity:"Rare Secret"', 'description': 'Gold rare cards'},
     ],
     'popular': [
       {
@@ -181,6 +180,141 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
       {'name': 'Rising Rivals', 'icon': '⚔️', 'release': '2009', 'query': 'set.id:pl2', 'description': 'Rivals set'},
       {'name': 'Supreme Victors', 'icon': '👑', 'release': '2009', 'query': 'set.id:pl3', 'description': 'Victors set'},
       {'name': 'Arceus', 'icon': '🔱', 'release': '2009', 'query': 'set.id:pl4', 'description': 'Arceus set'},
+    ],
+    'rarities': [
+      // Ultra Rares
+      {
+        'name': 'Secret Rare',
+        'icon': '🌟',
+        'query': 'rarity:"Rare Secret"',
+        'description': 'Secret Rare cards'
+      },
+      {
+        'name': 'Rainbow Rare',
+        'icon': '🌈',
+        'query': 'rarity:"Rare Rainbow"',
+        'description': 'Rainbow Rare cards'
+      },
+      {
+        'name': 'Amazing Rare',
+        'icon': '✨',
+        'query': 'rarity:"Amazing Rare"',
+        'description': 'Amazing Rare cards'
+      },
+      {
+        'name': 'Shining',
+        'icon': '💫',
+        'query': 'rarity:"Rare Shining"',
+        'description': 'Shining cards'
+      },
+
+      // Modern Era
+      {
+        'name': 'VMAX',
+        'icon': '⚡',
+        'query': 'rarity:"Rare Holo VMAX"',
+        'description': 'VMAX cards'
+      },
+      {
+        'name': 'V Cards',
+        'icon': '⚔️',
+        'query': 'rarity:"Rare Holo V"',
+        'description': 'V cards'
+      },
+      {
+        'name': 'GX Cards',
+        'icon': '🔥',
+        'query': 'rarity:"Rare Holo GX"',
+        'description': 'GX cards'
+      },
+      {
+        'name': 'Shiny GX',
+        'icon': '✨',
+        'query': 'rarity:"Rare Shiny GX"',
+        'description': 'Shiny GX cards'
+      },
+
+      // Classic Era
+      {
+        'name': 'EX Cards',
+        'icon': '💪',
+        'query': 'rarity:"Rare Holo EX"',
+        'description': 'EX cards'
+      },
+      {
+        'name': 'LEGEND',
+        'icon': '👑',
+        'query': 'rarity:"LEGEND"',
+        'description': 'LEGEND cards'
+      },
+      {
+        'name': 'LV.X',
+        'icon': '⭐',
+        'query': 'rarity:"Rare Holo LV.X"',
+        'description': 'Level X cards'
+      },
+      {
+        'name': 'Prime',
+        'icon': '🏆',
+        'query': 'rarity:"Rare Prime"',
+        'description': 'Prime cards'
+      },
+      {
+        'name': 'Star Cards',
+        'icon': '⭐',
+        'query': 'rarity:"Rare Holo Star"',
+        'description': 'Star cards'
+      },
+      {
+        'name': 'BREAK',
+        'icon': '💥',
+        'query': 'rarity:"Rare BREAK"',
+        'description': 'BREAK cards'
+      },
+      {
+        'name': 'ACE SPEC',
+        'icon': '🎯',
+        'query': 'rarity:"Rare ACE"',
+        'description': 'ACE SPEC cards'
+      },
+      {
+        'name': 'Prism Star',
+        'icon': '💎',
+        'query': 'rarity:"Rare Prism Star"',
+        'description': 'Prism Star cards'
+      },
+
+      // Basic Rarities
+      {
+        'name': 'Holo Rare',
+        'icon': '✨',
+        'query': 'rarity:"Rare Holo"',
+        'description': 'Holo Rare cards'
+      },
+      {
+        'name': 'Rare',
+        'icon': '⚪',
+        'query': 'rarity:"Rare"',
+        'description': 'Rare cards'
+      },
+      {
+        'name': 'Uncommon',
+        'icon': '⚫',
+        'query': 'rarity:"Uncommon"',
+        'description': 'Uncommon cards'
+      },
+      {
+        'name': 'Common',
+        'icon': '⚫',
+        'query': 'rarity:"Common"',
+        'description': 'Common cards'
+      },
+      {
+        'name': 'Promo',
+        'icon': '🎁',
+        'query': 'rarity:"Promo"',
+        'description': 'Promotional cards'
+      },
     ],
   };
 
@@ -706,13 +840,17 @@ Widget _buildSearchCategories() {
       _buildSearchSection('EX Series', searchCategories['ex']!, Icons.extension),
       _buildSpecialSearches('Special Cards', searchCategories['special']!, Icons.stars),
       _buildSpecialSearches('Popular', searchCategories['popular']!, Icons.local_fire_department),
+      _buildSearchSection('Card Rarities', searchCategories['rarities']!, Icons.auto_awesome),
     ],
   );
 }
 
 Widget _buildSearchSection(String title, List<Map<String, dynamic>> items, IconData icon) {
   final colorScheme = Theme.of(context).colorScheme;
-    
+  final showLabels = title == 'Special Cards' || 
+                     title == 'Popular' || 
+                     title == 'Card Rarities';
+  
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -738,12 +876,15 @@ Widget _buildSearchSection(String title, List<Map<String, dynamic>> items, IconD
         ),
       ),
       SizedBox(
-        height: 80, // Increased height for better logos
+        height: showLabels ? 108 : 80, // Adjust height based on whether labels are shown
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           itemCount: items.length,
-          itemBuilder: (context, index) => _buildSetCard(items[index]),
+          itemBuilder: (context, index) => _buildSetCard(
+            items[index],
+            showLabel: showLabels, // Pass showLabel parameter
+          ),
         ),
       ),
     ],
@@ -1818,57 +1959,76 @@ String _formatSearchForDisplay(String query) {
     });
   }
 
-  Widget _buildSetCard(Map<String, dynamic> item) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final query = item['query'] as String;
-    final isSetQuery = query.startsWith('set.id:');
-    
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        onTap: () {
-          // Set price sorting by default for set searches
-          if (isSetQuery) {
-            setState(() {
-              _currentSort = 'cardmarket.prices.averageSellPrice';
-              _sortAscending = false;
-            });
-          }
-          _performQuickSearch(item);
-        },
-        child: isSetQuery
-          ? AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Padding( // Add padding to make logos smaller
-                padding: const EdgeInsets.all(16),
-                child: Image.network(
-                  _apiService.getSetLogo(query),
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Center(
-                    child: Text(
+  Widget _buildSetCard(Map<String, dynamic> item, {bool showLabel = false}) { // Add showLabel parameter
+  final colorScheme = Theme.of(context).colorScheme;
+  final query = item['query'] as String;
+  final isSetQuery = query.startsWith('set.id:');
+  
+  return Card(
+    elevation: 0,
+    margin: const EdgeInsets.symmetric(horizontal: 4),
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: InkWell(
+      onTap: () {
+        if (isSetQuery) {
+          setState(() {
+            _currentSort = 'cardmarket.prices.averageSellPrice';
+            _sortAscending = false;
+          });
+        }
+        _performQuickSearch(item);
+      },
+      child: SizedBox(
+        width: 100,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSetQuery)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Image.network(
+                    _apiService.getSetLogo(query),
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Text(
                       item['icon'],
                       style: const TextStyle(fontSize: 24),
                     ),
                   ),
                 ),
-              ),
-            )
-          : Container(
-              padding: const EdgeInsets.all(12),
-              child: Center(
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(
                   item['icon'],
                   style: const TextStyle(fontSize: 24),
                 ),
               ),
-            ),
+            // Only show label if showLabel is true
+            if (showLabel)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Text(
+                  item['name'],
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
