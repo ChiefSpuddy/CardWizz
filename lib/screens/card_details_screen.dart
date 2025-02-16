@@ -42,13 +42,15 @@ class CardDetailsScreen extends StatefulWidget {
   State<CardDetailsScreen> createState() => _CardDetailsScreenState();
 }
 
-class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTickerProviderStateMixin {
+class _CardDetailsScreenState extends State<CardDetailsScreen> with TickerProviderStateMixin {
   late AnimationController _wobbleController;
+  late AnimationController _flipController;
   final _cardKey = GlobalKey();
   final _apiService = TcgApiService();
   final _ebayService = EbayApiService();  // Add this
   late final StorageService _storage;  // Add this field
   bool _isLoading = true;
+  bool _showingFront = true;
   Map<String, dynamic>? _additionalData;
   Map<String, List<Map<String, dynamic>>>? _salesByCategory;  // Add this field
 
@@ -60,6 +62,10 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    _flipController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
     _loadAdditionalData();
     _loadRecentSales();  // Add this
   }
@@ -69,11 +75,26 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
     // Clear image cache when disposing
     CachedNetworkImage.evictFromCache(widget.card.imageUrl);
     _wobbleController.dispose();
+    _flipController.dispose();
     super.dispose();
   }
 
   void _wobbleCard() {
     _wobbleController.forward().then((_) => _wobbleController.reverse());
+  }
+
+  void _flipCard() {
+    if (_flipController.isAnimating) return;
+    
+    if (_showingFront) {
+      _flipController.forward();
+    } else {
+      _flipController.reverse();
+    }
+    
+    setState(() {
+      _showingFront = !_showingFront;
+    });
   }
 
   Future<void> _loadAdditionalData() async {
@@ -1320,30 +1341,43 @@ Widget _buildPricingSection() {
                             ],
                           ),
                           child: GestureDetector(
-                            onTapDown: (_) => _wobbleController.forward(),
-                            onTapUp: (_) => _wobbleController.reverse(),
+                            onTap: _flipCard,
                             child: AnimatedBuilder(
-                              animation: _wobbleController,
+                              animation: _flipController,
                               builder: (context, child) {
                                 return Transform(
                                   transform: Matrix4.identity()
                                     ..setEntry(3, 2, 0.001)
-                                    ..rotateY(sin(_wobbleController.value * pi) * 0.02),
+                                    ..rotateY(_flipController.value * pi),
                                   alignment: Alignment.center,
-                                  child: child,
+                                  child: _flipController.value < 0.5 ?
+                                    // Front of card
+                                    Hero(
+                                      tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: CachedNetworkImage(
+                                          imageUrl: widget.card.imageUrl,
+                                          fit: BoxFit.contain,
+                                          // ...existing CachedNetworkImage properties...
+                                        ),
+                                      ),
+                                    )
+                                    :
+                                    // Back of card
+                                    Transform(
+                                      transform: Matrix4.identity()..rotateY(pi),
+                                      alignment: Alignment.center,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Image.asset(
+                                          'assets/images/cardback.png',
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                    ),
                                 );
                               },
-                              child: Hero(
-                                tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: CachedNetworkImage(
-                                    imageUrl: widget.card.imageUrl,
-                                    fit: BoxFit.contain,
-                                    // ...existing CachedNetworkImage properties...
-                                  ),
-                                ),
-                              ),
                             ),
                           ),
                         ),

@@ -16,6 +16,7 @@ import '../services/purchase_service.dart';  // Make sure this is added
 import 'package:flutter/foundation.dart';  // Add this import for kDebugMode
 import '../widgets/sign_in_view.dart';
 import '../services/collection_service.dart';
+import '../widgets/styled_toast.dart';  // Add this import
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -86,13 +87,33 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Avatar updated successfully')),
+            SnackBar(
+              content: StyledToast(
+                title: 'Avatar Updated',
+                subtitle: 'Your profile picture has been changed successfully',
+                icon: Icons.check_circle_outline,
+                backgroundColor: Colors.green,
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
           );
         }
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to update avatar')),
+            SnackBar(
+              content: StyledToast(
+                title: 'Update Failed',
+                subtitle: 'Could not update avatar',
+                icon: Icons.error_outline,
+                backgroundColor: Colors.red,
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
           );
         }
       }
@@ -185,13 +206,33 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Username updated successfully')),
+            SnackBar(
+              content: StyledToast(
+                title: 'Username Updated',
+                subtitle: 'Your username has been changed successfully',
+                icon: Icons.check_circle_outline,
+                backgroundColor: Colors.green,
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
           );
         }
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to update username')),
+            SnackBar(
+              content: StyledToast(
+                title: 'Update Failed',
+                subtitle: 'Could not update username',
+                icon: Icons.error_outline,
+                backgroundColor: Colors.red,
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
           );
         }
       }
@@ -262,111 +303,108 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget _buildProfileHeader(BuildContext context, AuthUser user) {
     final colorScheme = Theme.of(context).colorScheme;
     final displayName = user.name ?? '';
-    final initial = user.name?.isNotEmpty == true ? user.name![0].toUpperCase() : '';
 
-    return AnimatedContainer( // Add animation to header
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
-      // Remove the bottom margin entirely since we'll control spacing in the parent
-      child: Column(
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Stack(
         children: [
-          TweenAnimationBuilder(
-            duration: const Duration(milliseconds: 400),
-            tween: Tween<double>(begin: 0.5, end: 1.0),
-            curve: Curves.elasticOut,
-            builder: (context, double value, child) {
-              return Transform.scale(
-                scale: value,
-                child: child,
-              );
-            },
-            child: GestureDetector(
-              onTap: () => _selectAvatar(context),
-              child: Stack(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: colorScheme.primary.withOpacity(0.2),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: CircleAvatar(
-                      radius: 40, // Slightly larger avatar
-                      backgroundColor: colorScheme.primaryContainer,
-                      child: user.avatarPath != null
-                          ? ClipOval(
-                              child: Image.asset(
-                                user.avatarPath!,
-                                width: 80,
-                                height: 80,
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : initial.isNotEmpty
-                              ? Text(
-                                  initial,
-                                  style: const TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                )
-                              : const Icon(Icons.person, size: 40),
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Theme.of(context).scaffoldBackgroundColor,
-                          width: 2,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.edit,
-                        size: 12,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primaryContainer,
+                  colorScheme.secondaryContainer,
                 ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.shadow.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8), // Reduced from 12
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                user.username ?? 'Set username',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () => _selectAvatar(context),
+                  child: Hero(
+                    tag: 'profileAvatar',
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.primary.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: CircleAvatar(
+                        radius: 40,
+                        backgroundColor: colorScheme.primary.withOpacity(0.1),
+                        child: user.avatarPath != null
+                            ? ClipOval(
+                                child: Image.asset(
+                                  user.avatarPath!,
+                                  width: 80,
+                                  height: 80,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 40,
+                                color: colorScheme.primary,
+                              ),
+                      ),
                     ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit, size: 16),
-                onPressed: () => _editUsername(context, user),
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.all(4),
-              ),
-            ],
-          ),
-          if (user.email != null)
-            Text(
-              user.email!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
                   ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            user.username ?? 'Set username',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSecondaryContainer,
+                                ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.edit_outlined,
+                              size: 16,
+                              color: colorScheme.onSecondaryContainer,
+                            ),
+                            onPressed: () => _editUsername(context, user),
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(4),
+                          ),
+                        ],
+                      ),
+                      if (user.email != null)
+                        Text(
+                          user.email!,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSecondaryContainer.withOpacity(0.7),
+                              ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -386,7 +424,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         
         return ListView(
           controller: _scrollController,
-          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           children: [
             _buildProfileHeader(context, user),
             const SizedBox(height: 1), // Reduced from 8
@@ -527,7 +565,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),  // Reduced from 16
 
             // Account Section
             Card(
@@ -614,9 +652,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 ],
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),  // Reduced from 32
             _buildDangerZone(),
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),  // Reduced from 32
           ],
         );
       },
@@ -624,125 +662,89 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Widget _buildPremiumTile(BuildContext context) {
-    final purchaseService = context.watch<PurchaseService>();
     final colorScheme = Theme.of(context).colorScheme;
+    final purchaseService = context.watch<PurchaseService>();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Material(
-        elevation: 0,
-        borderRadius: BorderRadius.circular(16),
-        color: purchaseService.isPremium 
-            ? colorScheme.primaryContainer.withOpacity(0.3)
-            : colorScheme.surface,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: purchaseService.isPremium 
-              ? () => _showPremiumInfoDialog(context)
-              : () async {
-                  if (purchaseService.isLoading) return;
-                  try {
-                    await purchaseService.purchasePremium();
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e')),
-                      );
-                    }
-                  }
-                },
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: purchaseService.isPremium 
-                    ? colorScheme.primary.withOpacity(0.3)
-                    : colorScheme.outline.withOpacity(0.2),
-                width: 1,
-              ),
+        color: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: purchaseService.isPremium
+                  ? [
+                      colorScheme.primaryContainer,
+                      colorScheme.primary.withOpacity(0.2),
+                    ]
+                  : [
+                      Colors.amber.shade200,
+                      Colors.amber.shade100,
+                    ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: purchaseService.isPremium
-                          ? [colorScheme.primary, colorScheme.tertiary]
-                          : [Colors.amber.shade300, Colors.amber.shade700],
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: (purchaseService.isPremium
+                        ? colorScheme.primary
+                        : Colors.amber.shade300)
+                    .withOpacity(0.15),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => _showPremiumInfoDialog(context),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: purchaseService.isPremium
+                          ? colorScheme.primary
+                          : Colors.amber.shade400,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.workspace_premium,
+                      color: Colors.white,
+                      size: 24,
                     ),
                   ),
-                  child: Icon(
-                    Icons.workspace_premium,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Premium',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: purchaseService.isPremium 
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurface,
-                            ),
-                          ),
-                          if (purchaseService.isPremium) ...[
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.check_circle,
-                              color: colorScheme.primary,
-                              size: 18,
-                            ),
-                          ],
-                        ],
-                      ),
-                      if (purchaseService.error != null)
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          purchaseService.error!,
-                          style: TextStyle(
-                            color: colorScheme.error,
-                            fontSize: 12,
-                          ),
-                        )
-                      else
+                          purchaseService.isPremium ? 'Premium Active' : 'Upgrade to Premium',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
                         Text(
                           purchaseService.isPremium
-                              ? 'All premium features unlocked'
+                              ? 'All features unlocked'
                               : 'Unlock unlimited collections & more',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                                color: colorScheme.onSurface.withOpacity(0.7),
+                              ),
                         ),
-                    ],
-                  ),
-                ),
-                if (purchaseService.isLoading)
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(colorScheme.primary),
+                      ],
                     ),
-                  )
-                else
+                  ),
                   Icon(
                     Icons.chevron_right,
-                    color: colorScheme.onSurfaceVariant,
+                    color: colorScheme.onSurface.withOpacity(0.7),
                   ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

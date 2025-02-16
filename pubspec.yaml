@@ -73,10 +73,12 @@ flutter:
   assets:
     - assets/animations/
     - assets/names.json
-    - assets/avatars/    # Add this line
+    - assets/avatars/
     - assets/animations/background.json
     - assets/animations/SplashAnimation.json  # Add this specific file
     - assets/animations/Loading.json
+    - assets/images/cardback.png
+    - assets/images/             # Add this line to include all images in the directory
 
 flutter_launcher_icons:
   android: "launcher_icon"
