@@ -36,48 +36,41 @@ class TcgCard {
 
   double? getPriceChange(Duration period) {
     if (priceHistory.length < 2) return null;
-    
-    final now = DateTime.now();
-    final cutoff = now.subtract(period);
-    
-    final currentPrice = price ?? priceHistory.last.price;
-    final oldestInPeriod = priceHistory
-        .where((entry) => entry.date.isAfter(cutoff))
-        .fold<PriceHistoryEntry?>(
-          null,
-          (oldest, entry) => oldest == null || entry.date.isBefore(oldest.date)
-              ? entry
-              : oldest,
-        );
 
-    if (oldestInPeriod == null) return null;
+    final now = DateTime.now();
+    final targetDate = now.subtract(period);
     
-    if (oldestInPeriod.price == 0) return 0;
-    return ((currentPrice - oldestInPeriod.price) / oldestInPeriod.price) * 100;
+    // Find closest historical price to target date
+    final oldPrice = priceHistory
+        .where((entry) => entry.timestamp.isAfter(targetDate))
+        .firstOrNull
+        ?.price;
+
+    if (oldPrice == null || oldPrice == 0) return null;
+    
+    final currentPrice = price ?? 0;
+    if (currentPrice == 0) return null;
+
+    return ((currentPrice - oldPrice) / oldPrice) * 100;
   }
 
   String getPriceChangePeriod() {
-    final change = getPriceChange(const Duration(days: 1));
-    if (change != null) return '24h';
-    
-    final weekChange = getPriceChange(const Duration(days: 7));
-    if (weekChange != null) return '7d';
-    
-    final monthChange = getPriceChange(const Duration(days: 30));
-    if (monthChange != null) return '30d';
-    
+    // Try to get changes in order of priority
+    if (getPriceChange(const Duration(days: 1)) != null) return '24h';
+    if (getPriceChange(const Duration(days: 7)) != null) return '7d';
+    if (getPriceChange(const Duration(days: 30)) != null) return '30d';
     return '';
   }
 
-  void addPriceHistoryPoint(double price, DateTime date) {
+  void addPriceHistoryPoint(double price, DateTime timestamp) {
     priceHistory.add(PriceHistoryEntry(
       price: price,
-      date: date,
+      timestamp: timestamp,
     ));
     
     // Keep only last 30 days of history
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    priceHistory.removeWhere((entry) => entry.date.isBefore(thirtyDaysAgo));
+    priceHistory.removeWhere((entry) => entry.timestamp.isBefore(thirtyDaysAgo));
   }
 
   factory TcgCard.fromJson(Map<String, dynamic> json) {
@@ -205,37 +198,43 @@ class TcgSet {
 
 class PriceHistoryEntry {
   final double price;
-  final DateTime date;
-  final String source;
+  final DateTime timestamp;  // Changed from 'date' to 'timestamp'
   final String? currency;
+  final PriceSource source;
 
   PriceHistoryEntry({
     required this.price, 
-    required this.date,
-    this.source = 'TCG',
+    required this.timestamp,  // Changed parameter name to match field
+    this.source = PriceSource.tcg,  // Default to TCG API
     this.currency = 'USD',
   });
 
   Map<String, dynamic> toJson() => {
     'price': price,
-    'timestamp': date.toIso8601String(),
-    'source': source,
+    'timestamp': timestamp.toIso8601String(),
+    'source': source.toString().split('.').last,
     'currency': currency,
   };
 
   factory PriceHistoryEntry.fromJson(Map<String, dynamic> json) {
-    final dateStr = json['date'] ?? json['timestamp'];
-    if (dateStr == null) {
-      throw FormatException('Missing date/timestamp in price history entry');
+    final timestampStr = json['timestamp'] ?? json['date'];
+    if (timestampStr == null) {
+      throw FormatException('Missing timestamp/date in price history entry');
     }
     
     return PriceHistoryEntry(
       price: (json['price'] as num).toDouble(),
-      date: DateTime.parse(dateStr as String),
-      source: json['source'] as String? ?? 'TCG',
+      timestamp: DateTime.parse(timestampStr as String),
+      source: PriceSource.values.firstWhere(
+        (e) => e.toString().split('.').last == json['source'],
+        orElse: () => PriceSource.tcg,
+      ),
       currency: json['currency'] as String? ?? 'USD',
     );
   }
+}
 
-  DateTime get timestamp => date;
+enum PriceSource {
+  tcg,
+  ebay,
 }

@@ -41,30 +41,79 @@ class EbayApiService {
   Future<List<Map<String, dynamic>>> getRecentSales(String cardName, {
     String? setName,
     String? number,  // Add card number parameter
+    Duration lookbackPeriod = const Duration(days: 90),  // Add lookback period
   }) async {
     final token = await _getAccessToken();
     
-    // Build search query with card number
-    String baseQuery = '$cardName pokemon card';
-    if (number != null) {
-      baseQuery += ' $number';  // Add card number to search
+    try {
+      // Build search query
+      String baseQuery = '$cardName pokemon card';
+      if (number != null) {
+        baseQuery += ' $number';
+      }
+      
+      final response = await http.get(
+        Uri.https(_baseUrl, '/buy/browse/v1/item_summary/search', {
+          'q': baseQuery,
+          'filter': 'soldItems',  // Add this filter for completed sales
+          'sort': '-endingSoonest',  // Sort by most recent
+          'limit': '100',
+        }),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final sales = (data['itemSummaries'] as List?)
+            ?.where((item) {
+              final title = (item['title'] as String).toLowerCase();
+              final soldDate = DateTime.parse(item['soldDate']);
+              
+              // Filter by date range and exclude unwanted items
+              return soldDate.isAfter(DateTime.now().subtract(lookbackPeriod)) &&
+                     !_isGradedCard(title) &&
+                     !title.contains('lot') &&
+                     !title.contains('bulk');
+            })
+            .map((item) => {
+              'price': _extractPrice(item['price']),
+              'date': item['soldDate'],
+              'condition': item['condition'],
+              'title': item['title'],
+            })
+            .toList() ?? [];
+
+        // Convert the daily averages map to a list of sales data
+        final averages = _calculateDailyAverages(sales);
+        return averages.entries.map((entry) => {
+          'date': entry.key,
+          'price': entry.value,
+        }).toList();
+      }
+    } catch (e) {
+      print('Error fetching eBay sales history: $e');
     }
+    return [];
+  }
+
+  Map<String, double> _calculateDailyAverages(List<Map<String, dynamic>> sales) {
+    final dailyPrices = <String, List<double>>{};
     
-    // Build filters
-    const excludedTerms = '-psa -bgs -cgc -ace -graded -sgc -case -slab';
-    
-    // Try first with set name if provided
-    List<Map<String, dynamic>> results = [];
-    if (setName != null) {
-      results = await _searchWithQuery('$baseQuery $setName $excludedTerms');
+    // Group prices by day
+    for (final sale in sales) {
+      final date = DateTime.parse(sale['date']).toIso8601String().split('T')[0];
+      final price = sale['price'] as double?;
+      if (price != null) {
+        dailyPrices.putIfAbsent(date, () => []).add(price);
+      }
     }
-    
-    // If no results or no set name, try without set name
-    if (results.isEmpty) {
-      results = await _searchWithQuery('$baseQuery $excludedTerms');
-    }
-    
-    return results;
+
+    // Calculate averages
+    return dailyPrices.map((date, prices) => 
+      MapEntry(date, prices.reduce((a, b) => a + b) / prices.length));
   }
 
   Future<List<Map<String, dynamic>>> _searchWithQuery(String query) async {

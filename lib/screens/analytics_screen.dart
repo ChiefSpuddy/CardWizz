@@ -777,20 +777,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     // Filter cards with price history and calculate changes
     final cardsWithChanges = cards
-        .where((card) => card.price != null && card.priceHistory.length >= 2)
+        .where((card) => card.price != null && card.priceHistory.isNotEmpty)  // Changed condition
         .map((card) {
-          // Try to get changes in order of priority
+          // Try to get the most recent change first
           final change = card.getPriceChange(const Duration(days: 1)) ??
                         card.getPriceChange(const Duration(days: 7)) ??
                         card.getPriceChange(const Duration(days: 30));
           
+          // Make threshold smaller to catch more changes
+          if (change == null || change.abs() < 0.01) return null;  // Changed from 0.1 to 0.01
+          
           return (card, change);
         })
-        .where((tuple) => tuple.$2 != null) // Filter out cards with no change
+        .whereType<(TcgCard, double)>()  // Filter out null values
         .toList();
 
-    // Sort by absolute change percentage
-    cardsWithChanges.sort((a, b) => (b.$2?.abs() ?? 0).compareTo(a.$2?.abs() ?? 0));
+    // Sort by absolute change percentage (largest changes first)
+    cardsWithChanges.sort((a, b) => b.$2.abs().compareTo(a.$2.abs()));
 
     if (cardsWithChanges.isEmpty) {
       return Card(

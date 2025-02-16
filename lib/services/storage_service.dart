@@ -227,7 +227,7 @@ class StorageService {
         addedToCollection: card.addedToCollection ?? now,
         price: card.price,
         priceHistory: card.priceHistory.isEmpty && card.price != null ? 
-          [PriceHistoryEntry(price: card.price!, date: now)] : 
+          [PriceHistoryEntry(price: card.price!, timestamp: now)] : 
           card.priceHistory,
       );
 
@@ -514,24 +514,41 @@ class StorageService {
   SharedPreferences get prefs => _prefs;
 
   Future<void> addPriceHistoryPoint(String cardId, double price, DateTime timestamp) async {
-    final db = await _getDb();
-    
-    // Ensure we don't add duplicate entries for the same day
-    final today = DateTime(timestamp.year, timestamp.month, timestamp.day);
-    final existingEntry = await db.query(
-      'price_history',
-      where: 'card_id = ? AND DATE(timestamp) = DATE(?)',
-      whereArgs: [cardId, today.toIso8601String()],
-    );
+    if (_currentUserId == null) return;
 
-    if (existingEntry.isEmpty) {
-      await db.insert('price_history', {
-        'card_id': cardId,
-        'price': price,
-        'timestamp': timestamp.toIso8601String(),
-        'source': 'api',
-      });
-      print('Added price history point for $cardId: $price at $timestamp');
+    try {
+      final cards = await getCards();
+      final cardIndex = cards.indexWhere((c) => c.id == cardId);
+      
+      if (cardIndex != -1) {
+        final card = cards[cardIndex];
+        
+        // Ensure we don't add duplicate entries for the same day
+        final today = DateTime(timestamp.year, timestamp.month, timestamp.day);
+        final hasTodayEntry = card.priceHistory
+            .any((entry) => entry.timestamp.day == today.day && 
+                          entry.timestamp.month == today.month &&
+                          entry.timestamp.year == today.year);
+        
+        if (!hasTodayEntry) {
+          card.priceHistory.add(PriceHistoryEntry(
+            price: price,
+            timestamp: timestamp,
+          ));
+          
+          // Keep only last 30 days of history
+          final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+          card.priceHistory.removeWhere((entry) => 
+            entry.timestamp.isBefore(thirtyDaysAgo));
+            
+          // Sort by date
+          card.priceHistory.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          
+          await saveCard(card);
+        }
+      }
+    } catch (e) {
+      print('Error adding price history point: $e');
     }
   }
 
@@ -586,7 +603,7 @@ class StorageService {
             lastPriceUpdate: now,
             priceHistory: [
               ...existingCard.priceHistory,
-              PriceHistoryEntry(price: newPrice, date: now),
+              PriceHistoryEntry(price: newPrice, timestamp: now),
             ],
           );
           
