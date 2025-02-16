@@ -19,6 +19,14 @@ enum SearchMode { cards, sets }
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
+  // Update the static method to always clear state
+  static void clearSearchState(BuildContext context) {
+    final state = context.findRootAncestorStateOfType<_SearchScreenState>();
+    if (state != null) {
+      state._clearSearch();
+    }
+  }
+
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
@@ -277,13 +285,6 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
         'query': 'rarity:"Rare ACE"',
         'description': 'ACE SPEC cards'
       },
-      {
-        'name': 'Prism Star',
-        'icon': '💎',
-        'query': 'rarity:"Rare Prism Star"',
-        'description': 'Prism Star cards'
-      },
-
       // Basic Rarities
       {
         'name': 'Holo Rare',
@@ -354,6 +355,24 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
         _performSearch(_searchController.text);
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Get the current route
+    final route = ModalRoute.of(context);
+    
+    // Check if this is a navigation triggered by bottom nav tap
+    if (route?.isCurrent == true) {
+      final currentRoute = ModalRoute.of(context)?.settings.name;
+      final fromBottomNav = route?.isFirst == true || currentRoute == '/search';
+      
+      if (fromBottomNav) {
+        _clearSearch();
+      }
+    }
   }
 
   Future<void> _initSearchHistory() async {
@@ -562,14 +581,9 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
       _currentPage = 1;
       _searchResults = null;
       _showCategories = false;  // Hide categories when searching
+      _isLoading = true;  // Move this here to not affect _searchController.text state
     });
   }
-
-  setState(() {
-    if (!isLoadingMore) {
-      _isLoading = true;
-    }
-  });
 
   try {
     if (!isLoadingMore) {
@@ -662,7 +676,7 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
         _isLoading = false;
         _isLoadingMore = false;
 
-        // Save to recent searches
+        // Don't clear searchController text when results load
         if (!isLoadingMore && _searchHistory != null && newCards.isNotEmpty) {
           _searchHistory!.addSearch(
             _formatSearchForDisplay(query), // Use formatted query
@@ -1513,31 +1527,29 @@ String _formatSearchForDisplay(String query) {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: GestureDetector(
-                      onTap: _clearSearch,
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: _searchMode == SearchMode.cards 
-                            ? 'Search cards...' 
-                            : 'Search sets...',
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                          hintStyle: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
-                          ),
+                    child: TextField( // Remove GestureDetector wrapper
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: _searchMode == SearchMode.cards 
+                          ? 'Search cards...' 
+                          : 'Search sets...',
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        hintStyle: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
                         ),
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                        onChanged: _onSearchChanged,
-                        textInputAction: TextInputAction.search,
                       ),
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      onChanged: _onSearchChanged,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (value) => _performSearch(value), // Add this line
                     ),
                   ),
-                  if (_searchController.text.isNotEmpty)
+                  if (_searchController.text.isNotEmpty || _searchResults != null) // Update this condition
                     IconButton(
                       icon: Icon(
                         Icons.clear,
@@ -1941,6 +1953,11 @@ String _formatSearchForDisplay(String query) {
         ),
       ),
     );
+  }
+
+  static void clearSearchScreen(BuildContext context) {
+    final state = context.findAncestorStateOfType<_SearchScreenState>();
+    state?._clearSearch();
   }
 
   void _clearSearch() {
