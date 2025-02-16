@@ -11,9 +11,9 @@ class ChartService {
     final portfolioHistoryJson = storage.prefs.getString(portfolioHistoryKey);
     
     if (portfolioHistoryJson == null) {
-      // If no history exists, create initial point with current value
+      // Store initial point with current EUR value
       final now = DateTime.now();
-      final currentValue = calculateTotalValue(cards);
+      final currentValue = calculateTotalValue(cards); // Values are already in EUR
       return [(now, currentValue)];
     }
 
@@ -22,7 +22,7 @@ class ChartService {
       var points = history.map<(DateTime, double)>((point) {
         return (
           DateTime.parse(point['timestamp'] as String),
-          (point['value'] as num).toDouble(),
+          (point['value'] as num).toDouble(), // Keep as EUR value
         );
       }).toList();
       
@@ -33,11 +33,10 @@ class ChartService {
       final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
       points = points.where((p) => p.$1.isAfter(thirtyDaysAgo)).toList();
       
-      // Ensure current value is represented
+      // Add current value if different (in EUR)
       final currentValue = calculateTotalValue(cards);
       final now = DateTime.now();
       
-      // Only add current value if it's different from last point
       if (points.isEmpty || points.last.$2 != currentValue) {
         points.add((now, currentValue));
       }
@@ -45,7 +44,6 @@ class ChartService {
       return points;
     } catch (e) {
       print('Error parsing portfolio history: $e');
-      // Return at least current value on error
       return [(DateTime.now(), calculateTotalValue(cards))];
     }
   }

@@ -1,5 +1,5 @@
-import 'dart:async';  // Add this import
-import 'dart:math' show min, max;
+import 'dart:async';
+import 'dart:math' show min, max, pow, log;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -8,7 +8,7 @@ import '../services/storage_service.dart';
 import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
 
-class PortfolioValueChart extends StatefulWidget {  // Change to StatefulWidget
+class PortfolioValueChart extends StatefulWidget {
   const PortfolioValueChart({Key? key}) : super(key: key);
 
   @override
@@ -51,13 +51,13 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
     }
 
     try {
-      // Parse and convert all values to current currency using base EUR rate
+      // Parse points but DON'T convert to target currency here
       final List<dynamic> history = json.decode(portfolioHistoryJson);
       final points = history.map((point) {
         final timestamp = DateTime.parse(point['timestamp']);
         final eurValue = (point['value'] as num).toDouble();
-        final convertedValue = eurValue * currencyProvider.rate;
-        return (timestamp, convertedValue);
+        // Keep as EUR value
+        return (timestamp, eurValue);
       }).toList()
         ..sort((a, b) => a.$1.compareTo(b.$1));
 
@@ -240,24 +240,25 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      reservedSize: 40, // Reduced width
+                      reservedSize: 46,
+                      interval: _calculateNiceInterval(maxY - minY), // Calculate nice interval
                       getTitlesWidget: (value, _) {
-                        // Only show label if it's not at the very top or bottom of the range
+                        // Don't show labels too close to min/max to prevent overlap
                         if (value == minY || value == maxY) {
                           return const SizedBox.shrink();
                         }
+                        
                         return Padding(
-                          padding: const EdgeInsets.only(right: 4), // Reduced padding
+                          padding: const EdgeInsets.only(right: 8),
                           child: Text(
-                            _formatValue(value, currencyProvider),
+                            currencyProvider.formatChartValue(value),
                             style: TextStyle(
-                              fontSize: 10, // Smaller font
+                              fontSize: 10,
                               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                             ),
                           ),
                         );
                       },
-                      interval: yRange / 3, // Show fewer labels
                     ),
                   ),
                 ),
@@ -409,5 +410,35 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
       return '${currencyProvider.symbol}${(value / 1000).toStringAsFixed(1)}k';
     }
     return '${currencyProvider.symbol}${value.toInt()}';
+  }
+
+  double _calculateNiceInterval(double range) {
+    // Aim for 4-6 labels on the Y axis
+    const targetLabelCount = 5;
+    
+    // Calculate a rough interval
+    double interval = range / targetLabelCount;
+    
+    // Round to a nice number - use log10
+    final magnitude = (log(interval.abs()) / log(10)).floor();
+    final power = pow(10, magnitude);
+    
+    // Try standard intervals
+    final candidates = [1.0, 2.0, 2.5, 5.0, 10.0];
+    final normalizedInterval = interval / power;
+    
+    // Find the closest nice number
+    double niceInterval = candidates.first * power;
+    double minDiff = (normalizedInterval - candidates.first).abs();
+    
+    for (final candidate in candidates.skip(1)) {
+      final diff = (normalizedInterval - candidate).abs();
+      if (diff < minDiff) {
+        minDiff = diff;
+        niceInterval = candidate * power;
+      }
+    }
+    
+    return niceInterval;
   }
 }

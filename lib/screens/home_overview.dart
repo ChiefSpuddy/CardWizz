@@ -9,7 +9,6 @@ import '../services/tcg_api_service.dart';
 import '../providers/app_state.dart';
 import '../models/tcg_card.dart';
 import '../screens/card_details_screen.dart';
-import '../widgets/sign_in_button.dart';
 import '../providers/currency_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/sign_in_view.dart';
@@ -711,12 +710,15 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
               builder: (context, snapshot) {
                 final currencyProvider = context.watch<CurrencyProvider>();
                 final cards = snapshot.data ?? [];
+                // Get total value in EUR
                 final totalValueEur = cards.fold<double>(
                   0, 
                   (sum, card) => sum + (card.price ?? 0)
                 );
-                // Convert from EUR to target currency
-                final totalValue = totalValueEur * currencyProvider.rate;
+                
+                // Let the currency provider handle the conversion
+                final displayValue = currencyProvider.formatValue(totalValueEur);
+
                 final reversedCards = cards.reversed.toList();  // Add this line
                 if (cards.isEmpty) {
                   return _buildEmptyState();
@@ -745,7 +747,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                             child: _buildSummaryCard(
                               context,
                               'Collection Value',
-                              currencyProvider.formatValue(totalValue),  // Now using converted value
+                              displayValue,  // Use formatted value here
                               Icons.currency_exchange,  // This will be overridden by the logic above
                             ),
                           ),

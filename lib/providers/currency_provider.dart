@@ -42,19 +42,24 @@ class CurrencyProvider extends ChangeNotifier {
   Map<String, (String, double)> get currencies => _currencies;
 
   // For general use (exact values)
-  String formatValue(double value) {
-    final convertedValue = value * rate;  // Apply rate here
+  String formatValue(double eurValue) {
+    final convertedValue = eurValue * rate;
     return '$symbol${convertedValue.toStringAsFixed(2)}';
   }
 
+  // Convert EUR to current currency
+  double convertFromEur(double eurValue) {
+    return eurValue * rate;
+  }
+  
   // For chart axes (with K/M formatting)
-  String formatChartValue(double value) {
-    // Value is already in target currency, just format it
-    if (value >= 1000000) {
-      return '$symbol${(value / 1000000).toStringAsFixed(1)}M';
-    } else if (value >= 1000) {
-      return '$symbol${(value / 1000).toStringAsFixed(1)}k';
+  String formatChartValue(double eurValue) {
+    final convertedValue = eurValue * rate;
+    if (convertedValue >= 1000000) {
+      return '$symbol${(convertedValue / 1000000).toStringAsFixed(1)}M';
+    } else if (convertedValue >= 1000) {
+      return '$symbol${(convertedValue / 1000).toStringAsFixed(1)}k';
     }
-    return '$symbol${value.toInt()}';
+    return '$symbol${convertedValue.toInt()}';
   }
 }

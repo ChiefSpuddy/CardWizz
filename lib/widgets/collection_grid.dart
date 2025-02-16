@@ -7,11 +7,11 @@ import '../screens/card_details_screen.dart';
 import 'card_grid_item.dart';
 import '../models/custom_collection.dart';
 import '../providers/app_state.dart';
-import '../widgets/sign_in_button.dart';
 import '../utils/notification_manager.dart';
 import '../providers/sort_provider.dart';
 import '../screens/home_screen.dart';  // Add this import
 import '../widgets/empty_collection_view.dart';
+import '../widgets/sign_in_view.dart';  // Add this import
 
 class CollectionGrid extends StatefulWidget {
   final bool keepAlive;  // Add this
@@ -378,7 +378,7 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
     final storage = Provider.of<StorageService>(context);
     
     if (!appState.isAuthenticated) {
-      return const SignInButton();
+      return const SignInView(); // Changed from SignInButton to SignInView
     }
 
     return StreamBuilder<List<TcgCard>>(

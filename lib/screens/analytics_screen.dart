@@ -1740,23 +1740,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final storageService = Provider.of<StorageService>(context, listen: false);
   final points = ChartService.getPortfolioHistory(storageService, cards);
   
-  // Calculate 24h change
+  // Points are in EUR, keep them that way for calculations
   double dayChange = 0;
   if (points.length >= 2) {
     final now = DateTime.now();
     final oneDayAgo = now.subtract(const Duration(days: 1));
-    
-    // Find closest point to 24h ago
     final oldPoint = points.firstWhere(
       (p) => p.$1.isAfter(oneDayAgo),
       orElse: () => points.first,
     );
     
-    final latestValue = points.last.$2;
-    if (oldPoint.$2 > 0) {
-      dayChange = ((latestValue - oldPoint.$2) / oldPoint.$2) * 100;
+    final latestValue = points.last.$2;  // EUR value
+    final oldValue = oldPoint.$2;        // EUR value
+    if (oldValue > 0) {
+      dayChange = ((latestValue - oldValue) / oldValue) * 100;
     }
   }
+
+  // Keep everything in EUR until display
+  final valueInEur = points.last.$2;
 
   return Card(
     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1793,7 +1795,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 TweenAnimationBuilder<double>(
                   duration: const Duration(milliseconds: 1500),
                   curve: Curves.easeOutCubic,
-                  tween: Tween(begin: 0, end: points.last.$2),
+                  tween: Tween(begin: 0, end: valueInEur),
                   builder: (context, value, child) => Text(
                     currencyProvider.formatValue(value),
                     style: const TextStyle(
@@ -1822,17 +1824,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             color: Colors.white.withOpacity(0.9),
                           ),
                           const SizedBox(width: 4),
-                          TweenAnimationBuilder<int>(
-                            duration: const Duration(milliseconds: 800),
-                            curve: Curves.easeOut,
-                            tween: IntTween(begin: 0, end: cards.length),
-                            builder: (context, value, child) => Text(
-                              '$value Cards',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
+                          Text(
+                            '${cards.length} Cards',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
