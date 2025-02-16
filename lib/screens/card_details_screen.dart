@@ -50,7 +50,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
   late final StorageService _storage;  // Add this field
   bool _isLoading = true;
   Map<String, dynamic>? _additionalData;
-  List<Map<String, dynamic>>? _recentSales;  // Add this
+  Map<String, List<Map<String, dynamic>>>? _salesByCategory;  // Add this field
 
   @override
   void initState() {
@@ -94,13 +94,13 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
 
   Future<void> _loadRecentSales() async {
     try {
-      final sales = await _ebayService.getRecentSales(
+      final sales = await _ebayService.getRecentSalesWithGraded(
         widget.card.name,
         setName: widget.card.setName,
-        number: widget.card.number,  // Add card number
+        number: widget.card.number,
       );
       if (mounted) {
-        setState(() => _recentSales = sales.take(5).toList());
+        setState(() => _salesByCategory = sales);
       }
     } catch (e) {
       print('Error loading recent sales: $e');
@@ -781,158 +781,117 @@ Widget _buildPricingSection() {
   }
 
   Widget _buildRecentSales() {
-    final currencyProvider = context.watch<CurrencyProvider>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    if (_recentSales == null) {
-      return const SizedBox(
-        height: 100,
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+    if (_salesByCategory == null) {
+      return const Center(
+        child: CircularProgressIndicator(strokeWidth: 2),
       );
     }
 
-    if (_recentSales!.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? Colors.grey[850] : Colors.grey[50],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Center(
-          child: Text('No recent sales data available'),
-        ),
-      );
+    // Count total valid sales
+    final totalSales = _salesByCategory!.values
+        .map((list) => list.length)
+        .reduce((a, b) => a + b);
+
+    if (totalSales == 0) {
+      return _buildNoSalesMessage();
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Recent Sales',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              'Last 30 Days',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-              ),
-            ),
-          ],
-        ),
+        _buildSalesHeader(totalSales),
         const SizedBox(height: 16),
-        ..._recentSales!.map((sale) {
-          final price = sale['price'];
-          if (price == null) return const SizedBox.shrink();
+        
+        // Ungraded Sales Section
+        if (_salesByCategory!['ungraded']!.isNotEmpty)
+          _buildSalesCategory(
+            'Recent Sales',
+            _salesByCategory!['ungraded']!,
+            icon: Icons.sell_outlined,
+          ),
 
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                final link = sale['link'] as String?;
-                if (link?.isNotEmpty ?? false) {
-                  _launchUrl(link!);
-                }
-              },
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[850] : Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Theme.of(context).dividerColor.withOpacity(0.1),
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            sale['title'] as String? ?? 'Unknown Item',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade600.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: Colors.green.shade600.withOpacity(0.2),
-                                  ),
-                                ),
-                                child: Text(
-                                  sale['condition'] as String? ?? 'Unknown',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.green.shade600,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                              if (sale['date'] != null) ...[
-                                const SizedBox(width: 8),
-                                Text(
-                                  _formatSaleDate(sale['date'] as String),
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      currencyProvider.formatValue(price as double),
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+        // Graded Sales Sections
+        if (_hasGradedSales()) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(),
+          ),
+          _buildGradedSalesHeader(),
+          const SizedBox(height: 16),
+          
+          // Individual grading service sections
+          for (final entry in _salesByCategory!.entries)
+            if (entry.key != 'ungraded' && entry.value.isNotEmpty)
+              _buildSalesCategory(
+                _getGradingServiceName(entry.key),
+                entry.value,
+                icon: _getGradingServiceIcon(entry.key),
               ),
+        ],
+        
+        const SizedBox(height: 24),
+        _buildViewMoreButton(),
+      ],
+    );
+  }
+
+  Widget _buildNoSalesMessage() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 48,
+            color: Theme.of(context).colorScheme.secondary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Recent Sales',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No completed sales found in the last 90 days',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
             ),
-          );
-        }).toList(),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () => _launchUrl(_apiService.getEbaySearchUrl(
-              widget.card.name,
-              setName: widget.card.setName,
-            )),
-            icon: const Icon(Icons.shopping_bag_outlined, size: 18),
-            label: const Text('View More on eBay'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              side: BorderSide(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-              ),
+          ),
+          const SizedBox(height: 24),
+          _buildViewMoreButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSalesHeader(int totalSales) {
+    return Row(
+      children: [
+        Icon(
+          Icons.analytics_outlined,
+          size: 20,
+          color: Colors.green.shade600,  // Updated color
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'Market Activity',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            '$totalSales sales',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
@@ -940,20 +899,197 @@ Widget _buildPricingSection() {
     );
   }
 
-  String _formatSaleDate(String dateStr) {
-    final date = DateTime.parse(dateStr);
-    final now = DateTime.now();
-    final difference = now.difference(date);
+  Widget _buildSalesCategory(String title, List<Map<String, dynamic>> sales, {
+    IconData? icon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Category header
+        if (title != 'Recent Sales') ...[
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: Colors.green.shade600),  // Updated color
+                const SizedBox(width: 4),
+              ],
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Colors.green.shade600,  // Updated color
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${sales.length} sales',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+        
+        // Sales list
+        ...sales.take(3).map((sale) => _buildSaleItem(sale)),
+        
+        // Show more button if there are more sales
+        if (sales.length > 3)
+          TextButton(
+            onPressed: () => _showAllSales(title, sales, icon),  // Updated
+            child: Text(
+              'See ${sales.length - 3} more',
+              style: TextStyle(
+                color: Colors.green.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
-    if (difference.inDays == 0) {
-      return 'Today';
-    } else if (difference.inDays == 1) {
-      return 'Yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${date.day}/${date.month}';
+  void _showAllSales(String title, List<Map<String, dynamic>> sales, IconData? icon) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,  // Makes the modal expandable
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 20, color: Colors.green.shade600),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${sales.length} sales',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Sales list
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: sales.length,
+                itemBuilder: (context, index) => _buildSaleItem(sales[index]),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getGradingServiceIcon(String service) {
+    switch (service) {
+      case 'PSA': return Icons.verified_outlined;
+      case 'BGS': return Icons.grade_outlined;
+      case 'CGC': return Icons.workspace_premium_outlined;
+      case 'ACE': return Icons.military_tech_outlined;
+      case 'SGC': return Icons.shield_outlined;
+      default: return Icons.sell_outlined;
     }
+  }
+
+  String _getGradingServiceName(String key) {
+    switch (key) {
+      case 'PSA': return 'PSA Graded';
+      case 'BGS': return 'Beckett Graded';
+      case 'CGC': return 'CGC Graded';
+      case 'ACE': return 'ACE Graded';
+      case 'SGC': return 'SGC Graded';
+      default: return key;
+    }
+  }
+
+  bool _hasGradedSales() {
+    return _salesByCategory!.entries
+        .where((e) => e.key != 'ungraded')
+        .any((e) => e.value.isNotEmpty);
+  }
+
+  Widget _buildGradedSalesHeader() {
+    return Row(
+      children: [
+        Icon(
+          Icons.verified_outlined,
+          size: 20,
+          color: Colors.green.shade600,  // Updated color
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'Graded Listings',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildViewMoreButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _launchUrl(_apiService.getEbaySearchUrl(
+          widget.card.name,
+          setName: widget.card.setName,
+        )),
+        icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+        label: const Text('View More on eBay'),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          side: BorderSide(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _showAddToBinderDialog(BuildContext context) async {
@@ -1320,5 +1456,69 @@ Widget _buildPricingSection() {
   double? _calculateAverage(double? a, double? b) {
     if (a == null || b == null) return null;
     return (a + b) / 2;
+  }
+
+  Widget _buildSaleItem(Map<String, dynamic> sale) {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    final price = sale['price'] as double;
+    final condition = sale['condition'] as String? ?? 'Unknown';
+    final title = sale['title'] as String;
+    final link = sale['link'] as String;
+
+    return InkWell(
+      onTap: () => _launchUrl(link),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.green.shade600.withOpacity(0.1),  // Updated color
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                currencyProvider.formatValue(price),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade600,  // Updated color
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    condition,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

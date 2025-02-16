@@ -48,6 +48,17 @@ class EbayApiService {
     }).join(' ');
   }
 
+  // Add this method to classify grading service
+  String? _getGradingService(String title) {
+    title = title.toLowerCase();
+    if (title.contains('psa')) return 'PSA';
+    if (title.contains('bgs') || title.contains('beckett')) return 'BGS';
+    if (title.contains('cgc')) return 'CGC';
+    if (title.contains('ace')) return 'ACE';
+    if (title.contains('sgc')) return 'SGC';
+    return null;
+  }
+
   Future<List<Map<String, dynamic>>> getRecentSales(String cardName, {
     String? setName,
     String? number,
@@ -73,7 +84,8 @@ class EbayApiService {
         Uri.https(_baseUrl, '/buy/browse/v1/item_summary/search', {
           'q': searchQuery,
           'category_ids': '183454',
-          'filter': 'buyingOptions:{FIXED_PRICE}',
+          'filter': 'buyingOptions:{FIXED_PRICE} AND soldItemsOnly:true',  // Add soldItemsOnly filter
+          'sort': '-soldDate',  // Sort by most recent sales
           'limit': '100',
         }),
         headers: {
@@ -286,12 +298,9 @@ class EbayApiService {
     }
   }
 
+  // Update isGradedCard to use the new grading service check
   bool _isGradedCard(String title) {
-    final gradingTerms = [
-      'psa', 'bgs', 'cgc', 'ace', 'graded', 'sgc',
-      'gem mint', 'pristine', 'grade'
-    ];
-    return gradingTerms.any((term) => title.contains(term));
+    return _getGradingService(title) != null;
   }
 
   Future<double?> getAveragePrice(String cardName, {
@@ -509,5 +518,74 @@ class EbayApiService {
     }
 
     return activityMap;
+  }
+
+  Future<Map<String, List<Map<String, dynamic>>>> getRecentSalesWithGraded(String cardName, {
+    String? setName,
+    String? number,
+    Duration lookbackPeriod = const Duration(days: 90),
+  }) async {
+    // Get the sales first using existing method
+    final sales = await getRecentSales(
+      cardName,
+      setName: setName,
+      number: number,
+      lookbackPeriod: lookbackPeriod,
+    );
+
+    // Initialize result with empty lists for each category
+    final result = {
+      'ungraded': <Map<String, dynamic>>[],
+      'PSA': <Map<String, dynamic>>[],
+      'BGS': <Map<String, dynamic>>[],
+      'CGC': <Map<String, dynamic>>[],
+      'ACE': <Map<String, dynamic>>[],
+      'SGC': <Map<String, dynamic>>[],
+    };
+
+    // Process sales...
+    for (final sale in sales) {
+      if (!_isValidSale(sale)) continue;
+      
+      final title = sale['title'].toString().toLowerCase();
+      final gradingService = _getGradingService(title);
+      
+      if (gradingService != null) {
+        result[gradingService]!.add(sale);
+      } else {
+        result['ungraded']!.add(sale);
+      }
+    }
+
+    // Sort each category by date (most recent first)
+    for (final sales in result.values) {
+      sales.sort((a, b) {
+        final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime(1900);
+        final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime(1900);
+        return dateB.compareTo(dateA);
+      });
+    }
+
+    return result;
+  }
+
+  bool _isValidSale(Map<String, dynamic> sale) {
+    final price = sale['price'] as double?;
+    final title = sale['title'].toString().toLowerCase();
+    
+    // Price sanity checks
+    if (price == null || price <= 0.99 || price > 10000) return false;
+    
+    // Filter out obvious non-card listings
+    if (title.contains('mystery') || 
+        title.contains('bulk') ||
+        title.contains('lot') ||
+        title.contains('pack') ||
+        title.contains('box') ||
+        title.contains('case')) {
+      return false;
+    }
+
+    return true;
   }
 }
