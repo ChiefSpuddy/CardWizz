@@ -116,6 +116,13 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
       {'name': 'Gold', 'icon': '✨', 'query': 'rarity:"Rare Secret"', 'description': 'Gold rare cards'},
     ],
     'popular': [
+      {
+        'name': 'Most Valuable', 
+        'icon': '💰',
+        'query': 'supertype:pokemon', // Keep query simple
+        'description': 'Most valuable cards',
+        'isValueSearch': true,
+      },
       {'name': 'Charizard', 'icon': '🔥', 'query': 'name:charizard', 'description': 'All Charizard cards'},
       {'name': 'Lugia', 'icon': '🌊', 'query': 'name:lugia', 'description': 'All Lugia cards'},
       {'name': 'Giratina', 'icon': '👻', 'query': 'name:giratina', 'description': 'All Giratina cards'},
@@ -315,16 +322,18 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   }
 
 // Add helper method to detect set searches
-bool _isSetSearch(String query) {
-  // Check if query matches known set names
-  final allSets = [
+List<Map<String, dynamic>> _getAllSets() {
+  return [
     ...searchCategories['vintage']!,
     ...searchCategories['modern']!,
   ];
-  
+}
+
+bool _isSetSearch(String query) {
+  final allSets = _getAllSets();
   final normalizedQuery = query.toLowerCase().trim();
   return allSets.any((set) => 
-    set['name']!.toLowerCase() == normalizedQuery ||
+    (set['name'] as String).toLowerCase() == normalizedQuery ||
     query.startsWith('set.id:') ||
     query.startsWith('set:')
   );
@@ -333,31 +342,26 @@ bool _isSetSearch(String query) {
 // Add helper method to get set ID from name
 String? _getSetIdFromName(String query) {
   final normalizedQuery = query.toLowerCase().trim();
-  
-  // Check all set categories
-  final allSets = [
-    ...searchCategories['vintage']!,
-    ...searchCategories['modern']!,
-  ];
+  final allSets = _getAllSets();
   
   // Try exact match first
   final exactMatch = allSets.firstWhere(
-    (set) => set['name']!.toLowerCase() == normalizedQuery,
+    (set) => (set['name'] as String).toLowerCase() == normalizedQuery,
     orElse: () => {'query': ''},
   );
   
-  if (exactMatch['query']?.isNotEmpty ?? false) {
-    return exactMatch['query'];
+  if ((exactMatch['query'] as String?)?.isNotEmpty ?? false) {
+    return exactMatch['query'] as String;
   }
 
   // Try contains match
   final containsMatch = allSets.firstWhere(
-    (set) => set['name']!.toLowerCase().contains(normalizedQuery) ||
-            normalizedQuery.contains(set['name']!.toLowerCase()),
+    (set) => (set['name'] as String).toLowerCase().contains(normalizedQuery) ||
+            normalizedQuery.contains((set['name'] as String).toLowerCase()),
     orElse: () => {'query': ''},
   );
 
-  return containsMatch['query']?.isNotEmpty ?? false ? containsMatch['query'] : null;
+  return (containsMatch['query'] as String?)?.isNotEmpty ?? false ? containsMatch['query'] as String : null;
 }
 
 // Update _buildSearchQuery method to handle raw number searches better
@@ -443,7 +447,12 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
     if (useOriginalQuery) {
       searchQuery = query;
     } else {
-      searchQuery = query.startsWith('set.id:') ? query : _buildSearchQuery(query.trim());
+      // Special handling for price queries
+      if (query.contains('cardmarket.prices.averageSellPrice')) {
+        searchQuery = query;  // Use raw query without modification
+      } else {
+        searchQuery = query.startsWith('set.id:') ? query : _buildSearchQuery(query.trim());
+      }
       
       // Only set default number sorting for new set searches if no explicit sort has been chosen
       if (searchQuery.startsWith('set.id:') && !isLoadingMore && 
@@ -479,7 +488,7 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
       if (data.isEmpty && query.startsWith('set.id:')) {
         final setMap = searchCategories['modern']!
             .firstWhere((s) => s['query'] == query, orElse: () => {'name': ''});
-        final setName = setMap['name'];
+        final String? setName = setMap['name'] as String?;
         
         if (setName?.isNotEmpty ?? false) {
           print('Retrying search with set name: $setName');
@@ -590,60 +599,96 @@ void _onSearchChanged(String query) {
   });
 }
 
-  Future<void> _performQuickSearch(Map<String, dynamic> searchItem) async {
-    setState(() {
-      _searchController.text = searchItem['name'];
-      _isLoading = true;
-      _searchResults = null;
-      _currentPage = 1;
-      _hasMorePages = true;
-      _showCategories = false;
-      _lastQuery = searchItem['query'];
-    });
+Future<void> _performQuickSearch(Map<String, dynamic> searchItem) async {
+  setState(() {
+    _searchController.text = searchItem['name'];
+    _isLoading = true;
+    _searchResults = null;
+    _currentPage = 1;
+    _hasMorePages = true;
+    _showCategories = false;
+  });
 
-    try {
-      final query = searchItem['query'] as String;
+  try {
+    // Special handling for Most Valuable search
+    if (searchItem['isValueSearch'] == true) {
+      setState(() {
+        _currentSort = 'cardmarket.prices.averageSellPrice';
+        _sortAscending = false;
+      });
       
-      print('Executing quick search: $query');
-      
+      // Use regular pagination with smaller page size
       final results = await _apiService.searchCards(
-        query: query,
-        page: 1,
-        pageSize: 30,
+        query: searchItem['query'],
         orderBy: _currentSort,
-        orderByDesc: !_sortAscending,
+        orderByDesc: true,
+        pageSize: 30, // Standard page size
+        page: _currentPage
       );
-
+      
       if (mounted) {
-        final cardData = results['data'] as List;
+        final List<dynamic> data = results['data'] as List? ?? [];
         final totalCount = results['totalCount'] as int;
         
-        try {
-          final newCards = cardData.map((card) => TcgCard.fromJson(card as Map<String, dynamic>)).toList();
+        final newCards = data
+            .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+            .where((card) => card.price != null && card.price! > 0)
+            .toList();
 
-          setState(() {
-            _searchResults = newCards;
-            _totalCards = totalCount;
-            _isLoading = false;
-            _hasMorePages = (_currentPage * 30) < totalCount;
-            _lastQuery = query;
-          });
-        } catch (e) {
-          print('Error parsing card data: $e');
-          throw e;
-        }
-      }
-    } catch (e) {
-      print('Quick search error: $e');
-      if (mounted) {
         setState(() {
+          _searchResults = newCards;
+          _totalCards = totalCount;
           _isLoading = false;
-          _searchResults = [];
-          _totalCards = 0;
+          _hasMorePages = (_currentPage * 30) < totalCount;
+          _lastQuery = searchItem['query'];
         });
       }
+      return;
+    }
+
+    // Regular search for other items
+    final query = searchItem['query'] as String;
+    
+    print('Executing quick search: $query');
+    
+    final results = await _apiService.searchCards(
+      query: query,
+      page: 1,
+      pageSize: 30,
+      orderBy: _currentSort,
+      orderByDesc: !_sortAscending,
+    );
+
+    if (mounted) {
+      final cardData = results['data'] as List;
+      final totalCount = results['totalCount'] as int;
+      
+      try {
+        final newCards = cardData.map((card) => TcgCard.fromJson(card as Map<String, dynamic>)).toList();
+
+        setState(() {
+          _searchResults = newCards;
+          _totalCards = totalCount;
+          _isLoading = false;
+          _hasMorePages = (_currentPage * 30) < totalCount;
+          _lastQuery = query;
+        });
+      } catch (e) {
+        print('Error parsing card data: $e');
+        throw e;
+      }
+    }
+  } catch (e) {
+    print('Quick search error: $e');
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _searchResults = [];
+        _totalCards = 0;
+      });
     }
   }
+}
 
 // Update _buildQuickSearches method to use the new scroll indicator
 Widget _buildSearchCategories() {
@@ -975,22 +1020,22 @@ String _formatSearchForDisplay(String query) {
   // Remove technical prefixes and format for display
   if (query.startsWith('set.id:')) {
     // Find matching set name from categories
-    final allSets = [...searchCategories['vintage']!, ...searchCategories['modern']!];
+    final allSets = _getAllSets();
     final matchingSet = allSets.firstWhere(
-      (set) => set['query'] == query,
+      (set) => set['query'] as String == query,
       orElse: () => {'name': query.replaceAll('set.id:', '')},
     );
-    return matchingSet['name']!;
+    return matchingSet['name'] as String;
   }
   
   if (query.contains('subtypes:') || query.contains('rarity:')) {
     // Find matching special category
     final specials = searchCategories['special']!;
     final matchingSpecial = specials.firstWhere(
-      (special) => special['query'] == query,
+      (special) => special['query'] as String == query,
       orElse: () => {'name': query},
     );
-    return matchingSpecial['name']!;
+    return matchingSpecial['name'] as String;
   }
   
   return query;
@@ -1163,14 +1208,14 @@ String _formatSearchForDisplay(String query) {
     // Look in all categories for the set icon
     for (final category in searchCategories.values) {
       final matchingSet = category.firstWhere(
-        (set) => set['name'] == setName,
-        orElse: () => {'icon': '📦'}, // Default icon if not found
+        (set) => (set['name'] as String) == setName,
+        orElse: () => <String, String>{'icon': '📦', 'name': ''}, // Fixed typo in parameter name
       );
-      if (matchingSet['name'] == setName) {
-        return matchingSet['icon']!;
+      if ((matchingSet['name'] as String) == setName) {
+        return matchingSet['icon'] as String;
       }
     }
-    return '📦'; // Default icon if not found in any category
+    return '📦';
   }
 
   // Add method to manage image loading

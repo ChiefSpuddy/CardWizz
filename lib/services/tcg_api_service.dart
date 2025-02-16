@@ -518,4 +518,45 @@ class TcgApiService {
       ) : null,
     );
   }
+
+  // Add new method to get most valuable cards
+  Future<Map<String, dynamic>> searchMostValuableCards() async {
+    final params = {
+      'page': '1',
+      'pageSize': '250',
+      'orderBy': 'cardmarket.prices.avg1',
+      'desc': 'true',
+      'q': 'cardmarket.prices.avg1:exists' // Only get cards with prices
+    };
+
+    final response = await _makeRequest('cards', params);
+    return jsonDecode(response.body);
+  }
+
+  // Fix the _makeRequest method
+  Future<http.Response> _makeRequest(String endpoint, Map<String, dynamic> params) async {
+    await _waitForRateLimit();
+    
+    // Fix the URL construction
+    final uri = Uri.parse('https://api.pokemontcg.io/v2/$endpoint').replace(
+      queryParameters: params.map((key, value) => MapEntry(key, value.toString())),
+    );
+    
+    try {
+      final response = await http.get(
+        uri,
+        headers: {'X-Api-Key': apiKey},
+      );
+
+      if (response.statusCode == 429) {
+        await Future.delayed(_rateLimitDelay);
+        return _makeRequest(endpoint, params);
+      }
+
+      return response;
+    } catch (e) {
+      print('API request failed: $e');
+      rethrow;
+    }
+  }
 }
