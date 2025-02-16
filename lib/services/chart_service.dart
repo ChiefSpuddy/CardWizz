@@ -9,65 +9,44 @@ class ChartService {
   static List<(DateTime, double)> getPortfolioHistory(StorageService storage, List<TcgCard> cards) {
     final portfolioHistoryKey = storage.getUserKey('portfolio_history');
     final portfolioHistoryJson = storage.prefs.getString(portfolioHistoryKey);
-
+    
     if (portfolioHistoryJson == null) {
-      return [];
+      // If no history exists, create initial point with current value
+      final now = DateTime.now();
+      final currentValue = calculateTotalValue(cards);
+      return [(now, currentValue)];
     }
 
     try {
-      final now = DateTime.now();
-      final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+      final List<dynamic> history = json.decode(portfolioHistoryJson);
+      var points = history.map<(DateTime, double)>((point) {
+        return (
+          DateTime.parse(point['timestamp'] as String),
+          (point['value'] as num).toDouble(),
+        );
+      }).toList();
       
-      final history = (jsonDecode(portfolioHistoryJson) as List)
-          .cast<Map<String, dynamic>>();
-
-      // Convert and sort all points first
-      var allPoints = history.map((point) {
-        try {
-          final timestamp = DateTime.parse(point['timestamp']);
-          final value = (point['value'] as num).toDouble();
-          return (timestamp, value);
-        } catch (e) {
-          print('Error parsing point: $e');
-          return null;
-        }
-      })
-      .where((point) => point != null)
-      .cast<(DateTime, double)>()
-      .toList()
-        ..sort((a, b) => a.$1.compareTo(b.$1));
-
-      // Combine points that are too close together
-      var points = _combineClosePoints(allPoints);
-
-      // Filter date range
-      points = points
-          .where((point) => 
-              point.$1.isAfter(thirtyDaysAgo) && 
-              !point.$1.isAfter(now) &&
-              point.$2 >= 0)
-          .toList();
-
-      // Handle empty or single point cases
-      if (points.isEmpty) {
-        points = [(thirtyDaysAgo, 0.0), (now, calculateTotalValue(cards))];
-      } else if (points.length == 1) {
-        points.insert(0, (thirtyDaysAgo, points[0].$2));
-      }
-
-      // Ensure even distribution of points
-      points = _distributePoints(points, 20); // Aim for ~20 points on chart
-
-      // Always include latest value
+      // Sort by date
+      points.sort((a, b) => a.$1.compareTo(b.$1));
+      
+      // Remove points older than 30 days
+      final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+      points = points.where((p) => p.$1.isAfter(thirtyDaysAgo)).toList();
+      
+      // Ensure current value is represented
       final currentValue = calculateTotalValue(cards);
-      if (points.isEmpty || points.last.$1.isBefore(now.subtract(const Duration(minutes: 5)))) {
+      final now = DateTime.now();
+      
+      // Only add current value if it's different from last point
+      if (points.isEmpty || points.last.$2 != currentValue) {
         points.add((now, currentValue));
       }
-
+      
       return points;
     } catch (e) {
-      print('Error getting portfolio history: $e');
-      return [];
+      print('Error parsing portfolio history: $e');
+      // Return at least current value on error
+      return [(DateTime.now(), calculateTotalValue(cards))];
     }
   }
 

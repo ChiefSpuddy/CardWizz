@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'storage_service.dart';
 import 'tcg_api_service.dart';
+import 'dialog_manager.dart';  // Add this import
 
 class BackgroundPriceUpdateService {
   final StorageService _storageService;
@@ -8,6 +9,7 @@ class BackgroundPriceUpdateService {
   bool _isRunning = false;
   DateTime? _lastUpdateTime;
   bool _isRefreshing = false;
+  bool _cancelled = false;
 
   BackgroundPriceUpdateService(this._storageService);
 
@@ -82,51 +84,77 @@ class BackgroundPriceUpdateService {
     return _lastUpdateTime;
   }
 
+  void cancelRefresh() {
+    _cancelled = true;
+  }
+
   Future<void> refreshPrices() async {
     if (_isRefreshing) return;
     _isRefreshing = true;
+    _cancelled = false;
     
     try {
+      final apiService = TcgApiService();
       final cards = await _storageService.getCards();
-      DateTime lastUpdate = DateTime.now();
-      int batchSize = 0;
+      
+      // Start with 0 progress
+      _storageService.notifyPriceUpdateProgress(0, cards.length);
+      
+      double totalValue = 0;
       
       for (var i = 0; i < cards.length; i++) {
+        if (_cancelled) break;
+
         final card = cards[i];
-        batchSize++;
-        
-        // Only notify every 5 cards or 500ms, whichever comes first
-        final now = DateTime.now();
-        if (batchSize >= 5 || now.difference(lastUpdate) >= const Duration(milliseconds: 500)) {
-          _storageService.notifyPriceUpdateProgress(i + 1, cards.length);
-          lastUpdate = now;
-          batchSize = 0;
-        }
-        
         print('🔍 Checking price for ${card.name} (${i + 1}/${cards.length})');
-        final newPrice = await TcgApiService().fetchCardPrice(card.id);
         
-        if (newPrice != null) {
-          print('💰 Found price for ${card.name}: ${card.price} -> $newPrice');
-          if (newPrice != card.price) {
-            await _storageService.updateCardPrice(card, newPrice);
-            print('✅ Updated price for ${card.name}');
-            
-            // Add price history point right after price update
-            await _storageService.addPriceHistoryPoint(card.id, newPrice, DateTime.now());
+        try {
+          // Get latest price from API
+          final price = await apiService.getCardPrice(card.id);
+          
+          if (price != null && price != card.price) {
+            await _storageService.updateCardPrice(card, price);
+            print('✅ Updated price for ${card.name}: ${card.price} -> $price');
           } else {
             print('ℹ️ No price change for ${card.name}');
           }
-        } else {
-          print('❌ Failed to get price for ${card.name}');
+          
+          totalValue += price ?? card.price ?? 0;
+          
+        } catch (e) {
+          print('❌ Error updating price for ${card.name}: $e');
         }
+
+        // Show progress for current card
+        _storageService.notifyPriceUpdateProgress(i + 1, cards.length);
+        
+        // Small delay to prevent API rate limiting
+        await Future.delayed(const Duration(milliseconds: 100));
       }
       
-      // Final update
-      _storageService.notifyPriceUpdateProgress(cards.length, cards.length);
+      if (!_cancelled) {
+        // Save final portfolio value
+        await _storageService.savePortfolioValue(totalValue);
+        _lastUpdateTime = DateTime.now();
+        await _saveLastUpdateTime();
+        
+        // Wait a moment for UI to catch up
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Show final completion state
+        _storageService.notifyPriceUpdateProgress(cards.length, cards.length);
+        
+        // Notify completion after a delay
+        await Future.delayed(const Duration(seconds: 1));
+        _storageService.notifyPriceUpdateComplete(0);
+      }
       
+    } catch (e) {
+      print('Error refreshing prices: $e');
+      _storageService.notifyPriceUpdateComplete(-1);
     } finally {
       _isRefreshing = false;
+      _cancelled = false;
     }
   }
 
@@ -136,6 +164,26 @@ class BackgroundPriceUpdateService {
         'last_price_update',
         _lastUpdateTime!.toIso8601String(),
       );
+    }
+  }
+
+  Future<void> updatePrices() async {
+    try {
+      final cards = await _storageService.getCards();
+      DialogManager.instance.hideDialog(); // Now DialogManager is properly imported
+      
+      for (var i = 0; i < cards.length; i++) {
+        DialogManager.instance.showPriceUpdateDialog(i + 1, cards.length);
+        // ...rest of update logic...
+      }
+      
+      // Show completion for a moment before hiding
+      await Future.delayed(const Duration(seconds: 2));
+      DialogManager.instance.hideDialog();
+      
+    } catch (e) {
+      print('Error updating prices: $e');
+      DialogManager.instance.hideDialog();
     }
   }
 }

@@ -84,7 +84,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     _updateLastRefreshTime();
     // Initialize DialogManager with context in next frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      DialogManager.instance.init(context);
+      DialogManager.instance.setContext(context);
     });
   }
 
@@ -918,132 +918,54 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Future<void> _refreshPrices() async {
-    if (!mounted || _isRefreshing) return;
-    setState(() => _isRefreshing = true);
-    
-    try {
-      final storage = Provider.of<StorageService>(context, listen: false);
-      final dialogManager = DialogManager.instance;
-      
-      await storage.initializeBackgroundService();
-      final service = storage.backgroundService;
-      if (service == null) throw Exception('Failed to initialize background service');
+  if (!mounted || _isRefreshing) return;
+  setState(() => _isRefreshing = true);
+  
+  try {
+    final storage = Provider.of<StorageService>(context, listen: false);
+    await storage.initializeBackgroundService();
+    final service = storage.backgroundService;
+    if (service == null) throw Exception('Failed to initialize background service');
 
-      // Cancel existing subscriptions
-      _progressSubscription?.cancel();
-      _completeSubscription?.cancel();
+    // Cancel any existing subscriptions
+    _progressSubscription?.cancel();
+    _completeSubscription?.cancel();
 
-      // Setup progress listener with debounce
-      _progressSubscription = storage.priceUpdateProgress
-          .distinct()
-          .debounceTime(const Duration(milliseconds: 100)) // Reduced debounce time
-          .listen((progress) {
-            final (current, total) = progress;
-            if (dialogManager.context != null) {
-              dialogManager.updateDialog(
-                PriceUpdateDialog(
-                  current: current, 
-                  total: total,
-                  showProgressBar: true,
-                ),
-              );
-            }
-          });
+    // Setup progress subscription
+    _progressSubscription = storage.priceUpdateProgress
+        .distinct()
+        .listen((progress) {
+          final (current, total) = progress;
+          if (mounted) {
+            DialogService.instance.showPriceUpdateDialog(current, total);
+          }
+        });
 
-      // Show initial dialog with current card count
-      final cardCount = await storage.getCards().then((cards) => cards.length);
-      dialogManager.showCustomDialog(
-        PriceUpdateDialog(
-          current: 0,
-          total: cardCount,
-          showProgressBar: true,
-        ),
+    // Setup completion subscription
+    _completeSubscription = storage.priceUpdateComplete
+        .listen((_) {
+          // Don't automatically hide dialog, let user dismiss it
+          if (mounted) {
+            setState(() {});
+            _updateLastRefreshTime();
+          }
+        });
+
+    // Start the refresh
+    await service.refreshPrices();
+
+  } catch (e) {
+    print('Error refreshing prices: $e');
+    DialogService.instance.hideDialog();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating prices: $e')),
       );
-
-      // Setup completion listener
-      _completeSubscription = storage.priceUpdateComplete.listen((updatedCount) async {
-        print('Price update complete: $updatedCount cards updated'); // Add debug log
-        
-        // Show completion state for 1.5 seconds
-        final completeDialog = PriceUpdateDialog(
-          current: cardCount,
-          total: cardCount,
-          showProgressBar: true,
-        );
-        dialogManager.updateDialog(completeDialog);
-        
-        // Wait for animation and user to see completion
-        await Future.delayed(const Duration(milliseconds: 1500));
-        
-        dialogManager.hideDialog();
-
-        if (!mounted) return;
-
-        // Get fresh cards data
-        final cards = await storage.getCards();
-        final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
-        await storage.savePortfolioValue(totalValue);
-        storage.notifyCardChange();
-
-        // Show toast
-        if (mounted) {
-          // Use ScaffoldMessenger.showSnackBar instead of MaterialBanner
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: StyledToast(
-                title: updatedCount > 0 
-                    ? 'Updated $updatedCount cards'
-                    : 'Prices are up to date',
-                subtitle: updatedCount > 0
-                    ? 'Your collection value has been updated'
-                    : 'No price changes found',
-                icon: updatedCount > 0 
-                    ? Icons.update
-                    : Icons.check_circle_outline,
-                backgroundColor: updatedCount > 0
-                    ? Colors.green
-                    : Theme.of(context).colorScheme.primary,
-              ),
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              margin: EdgeInsets.only(
-                bottom: MediaQuery.of(context).padding.bottom + 8,
-                left: 8,
-                right: 8,
-              ),
-            ),
-          );
-        }
-
-        // Update last refresh time
-        await _updateLastRefreshTime();
-      });
-
-      // Start the refresh
-      await service.refreshPrices();
-
-    } catch (e) {
-      print('Error refreshing prices: $e');
-      DialogManager.instance.hideDialog();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating prices: $e'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
-      }
-      // Cleanup subscriptions
-      _progressSubscription?.cancel();
-      _completeSubscription?.cancel();
     }
+  } finally {
+    if (mounted) setState(() => _isRefreshing = false);
   }
+}
 
   Widget _buildEmptyState() {
     return const EmptyCollectionView(
@@ -1811,110 +1733,152 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildValueSummary(List<TcgCard> cards) {
   final currencyProvider = context.watch<CurrencyProvider>();
-  final localizations = AppLocalizations.of(context);
   final storageService = Provider.of<StorageService>(context, listen: false);
-  
-  // Get portfolio value points
-  final portfolioHistoryKey = storageService.getUserKey('portfolio_history');
-  final portfolioHistoryJson = storageService.prefs.getString(portfolioHistoryKey);
-  
-  double totalValue = 0;
-  if (portfolioHistoryJson != null) {
-    try {
-      final List<dynamic> history = json.decode(portfolioHistoryJson);
-      if (history.isNotEmpty) {
-        final latestPoint = history.last;
-        final eurValue = (latestPoint['value'] as num).toDouble();
-        totalValue = eurValue * currencyProvider.rate;
-      }
-    } catch (e) {
-      print('Error parsing portfolio history: $e');
-      totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
-    }
-  } else {
-    totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
-  }
-  
   final points = ChartService.getPortfolioHistory(storageService, cards);
-  double weeklyChange = 0;
+  
+  // Calculate 24h change
+  double dayChange = 0;
   if (points.length >= 2) {
-    final oldValue = points.first.$2;
-    final newValue = points.last.$2;
-    if (oldValue > 0) {
-      weeklyChange = ((newValue - oldValue) / oldValue) * 100;
+    final now = DateTime.now();
+    final oneDayAgo = now.subtract(const Duration(days: 1));
+    
+    // Find closest point to 24h ago
+    final oldPoint = points.firstWhere(
+      (p) => p.$1.isAfter(oneDayAgo),
+      orElse: () => points.first,
+    );
+    
+    final latestValue = points.last.$2;
+    if (oldPoint.$2 > 0) {
+      dayChange = ((latestValue - oldPoint.$2) / oldPoint.$2) * 100;
     }
   }
 
   return Card(
+    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     elevation: 2,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-    ),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.green.shade500, // Darker shade
-            Colors.green.shade700, // Even darker
+            Colors.green.shade400,
+            Colors.green.shade600,
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.2),
-            blurRadius: 12,
+            color: Colors.green.shade700.withOpacity(0.2),
+            blurRadius: 8,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  localizations.translate('portfolioValue'),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white.withOpacity(0.9),
+                TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 1500),
+                  curve: Curves.easeOutCubic,
+                  tween: Tween(begin: 0, end: points.last.$2),
+                  builder: (context, value, child) => Text(
+                    currencyProvider.formatValue(value),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  currencyProvider.formatValue(totalValue),
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.style_outlined,
+                            size: 12,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                          const SizedBox(width: 4),
+                          TweenAnimationBuilder<int>(
+                            duration: const Duration(milliseconds: 800),
+                            curve: Curves.easeOut,
+                            tween: IntTween(begin: 0, end: cards.length),
+                            builder: (context, value, child) => Text(
+                              '$value Cards',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
-              borderRadius: BorderRadius.circular(20),
+              color: dayChange >= 0 
+                  ? Colors.white.withOpacity(0.15)
+                  : Colors.red.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.1),
+              ),
             ),
-            child: Row(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.trending_up,
-                  size: 16,
-                  color: Colors.white,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      dayChange >= 0 ? Icons.trending_up : Icons.trending_down,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${dayChange >= 0 ? '+' : ''}${dayChange.toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(height: 2),
                 Text(
-                  '+${weeklyChange.toStringAsFixed(1)}%',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                  '24h',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white.withOpacity(0.8),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],

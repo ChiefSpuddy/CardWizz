@@ -224,6 +224,7 @@ class StorageService {
       final now = DateTime.now();
       final cardWithDate = card.copyWith(
         dateAdded: card.dateAdded ?? now,
+        addedToCollection: card.addedToCollection ?? now,
         price: card.price,
         priceHistory: card.priceHistory.isEmpty && card.price != null ? 
           [PriceHistoryEntry(price: card.price!, date: now)] : 
@@ -232,70 +233,30 @@ class StorageService {
 
       final cardsKey = _getUserKey('cards');
       final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
-      
-      // Clean and validate existing cards
       final existingCards = existingCardsJson
-          .map((json) {
-            try {
-              if (json.isEmpty) return null;
-              
-              final data = jsonDecode(json);
-              if (data == null || data is! Map<String, dynamic>) return null;
-              
-              // Validate required fields
-              if (data['id'] == null || data['name'] == null) return null;
-              
-              return TcgCard.fromJson(data);
-            } catch (e) {
-              print('Error parsing existing card: $e');
-              return null;
-            }
-          })
-          .where((card) => card != null)
-          .cast<TcgCard>()
+          .map((json) => jsonDecode(json))
+          .whereType<Map<String, dynamic>>()
+          .map((data) => TcgCard.fromJson(data))
           .toList();
-      
+
       // Remove any existing versions of this card
       existingCards.removeWhere((c) => c.id == card.id);
-      
-      // Add the new card
-      existingCards.add(card);
+      existingCards.add(cardWithDate);
 
-      // Calculate new total value immediately after adding the card
-      final newTotalValue = existingCards.fold<double>(
+      // Calculate and save new portfolio value
+      final totalValue = existingCards.fold<double>(
         0, 
         (sum, card) => sum + (card.price ?? 0)
       );
+      await savePortfolioValue(totalValue);
 
-      // Save portfolio value point using the same 'now' variable
-      await _addPortfolioValuePoint(newTotalValue, now);
-
-      // Save back to storage with validation
       final updatedCardsJson = existingCards
-          .map((c) {
-            try {
-              final json = jsonEncode(c.toJson());
-              // Verify the JSON is valid
-              jsonDecode(json);
-              return json;
-            } catch (e) {
-              print('Error encoding card: $e');
-              return null;
-            }
-          })
-          .where((json) => json != null)
-          .cast<String>()
+          .map((c) => jsonEncode(c.toJson()))
           .toList();
 
       await _prefs.setStringList(cardsKey, updatedCardsJson);
-      
-      // Update stream and notify listeners
       _cardsController.add(existingCards);
       _notifyCardChange();
-      
-      // Recalculate portfolio history
-      await recalculatePortfolioHistory();
-
     } catch (e) {
       print('Error saving card: $e');
       rethrow;
@@ -619,7 +580,6 @@ class StorageService {
         final now = DateTime.now();
         final existingCard = cards[index];
         
-        // Only update if price has changed
         if (newPrice != existingCard.price) {
           final updatedCard = existingCard.copyWith(
             price: newPrice,
@@ -632,13 +592,20 @@ class StorageService {
           
           cards[index] = updatedCard;
           
-          // Save updated cards
+          // Save updated cards and portfolio value
           final cardsKey = _getUserKey('cards');
           final updatedCardsJson = cards.map((c) => jsonEncode(c.toJson())).toList();
           await _prefs.setStringList(cardsKey, updatedCardsJson);
           
-          // Update stream without triggering full refresh
+          // Calculate and save new portfolio value
+          final totalValue = cards.fold<double>(
+            0, 
+            (sum, card) => sum + (card.price ?? 0)
+          );
+          await savePortfolioValue(totalValue);
+          
           _cardsController.add(cards);
+          _notifyCardChange();
         }
       }
     } catch (e) {

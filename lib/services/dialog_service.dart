@@ -2,52 +2,60 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/purchase_service.dart';
 import 'navigation_service.dart';
+import '../widgets/price_update_dialog.dart';  // Add this import
 
 class DialogService {
   static final DialogService _instance = DialogService._();
   bool _isDialogVisible = false;
+  BuildContext? _dialogContext;
 
   static DialogService get instance => _instance;
   DialogService._();
 
-  Future<T?> showCustomDialog<T>(Widget dialog) async {
-    if (!NavigationService.hasContext) {
-      print('Cannot show dialog - no valid context');
-      return null;
-    }
-
+  Future<void> showPriceUpdateDialog(int current, int total) async {
+    if (!NavigationService.hasContext) return;
+    
+    final context = NavigationService.currentContext!;
+    
+    // If a dialog is already showing, hide it first
     if (_isDialogVisible) {
       hideDialog();
     }
 
     _isDialogVisible = true;
-    try {
-      return await showDialog<T>(
-        context: NavigationService.currentContext!,
-        barrierDismissible: false,
-        useRootNavigator: true,
-        builder: (context) => WillPopScope(
-          onWillPop: () async => false,
-          child: dialog,
-        ),
-      );
-    } catch (e) {
-      print('Error showing dialog: $e');
-      return null;
-    } finally {
-      _isDialogVisible = false;
-    }
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.transparent,
+      builder: (dialogContext) {
+        _dialogContext = dialogContext;
+        return Theme(
+          data: Theme.of(context).copyWith(
+            dialogBackgroundColor: Colors.transparent,
+          ),
+          child: PopScope(
+            canPop: false,
+            child: PriceUpdateDialog(
+              current: current,
+              total: total,
+            ),
+          ),
+        );
+      },
+    );
+    
+    _isDialogVisible = false;
+    _dialogContext = null;
   }
 
   void hideDialog() {
-    if (_isDialogVisible && NavigationService.hasContext) {
-      Navigator.of(NavigationService.currentContext!).pop();
-      _isDialogVisible = false;
+    // Find the root navigator and pop ALL dialogs
+    final context = NavigationService.currentContext;
+    if (context != null) {
+      Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
     }
   }
 
-  bool get isDialogVisible => _isDialogVisible;
-  
   static void showPremiumDialog(BuildContext context, {
     required String title,
     required String message,
