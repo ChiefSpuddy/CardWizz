@@ -59,20 +59,28 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
         final convertedValue = eurValue * currencyProvider.rate;
         return (timestamp, convertedValue);
       }).toList()
-        ..sort((a, b) => a.$1.compareTo(b.$1)); // Make sure points are sorted by time
+        ..sort((a, b) => a.$1.compareTo(b.$1));
 
       if (points.length < 2) {
         return _buildEmptyState(context);
       }
 
+      // Sample points to reduce density (take every nth point)
+      final sampledPoints = points.asMap().entries
+          .where((entry) => 
+              entry.key % max(1, (points.length / 20).round()) == 0 || // Take every nth point
+              entry.key == 0 || // Always include first point
+              entry.key == points.length - 1) // Always include last point
+          .map((e) => e.value)
+          .toList();
+
       // Create normalized spots with equal spacing
-      final spots = List<FlSpot>.generate(points.length, (index) {
-        // Normalize x values to be between 0 and 100
-        final normalizedX = index * (100 / (points.length - 1));
-        return FlSpot(normalizedX, points[index].$2);
+      final spots = List<FlSpot>.generate(sampledPoints.length, (index) {
+        final normalizedX = index * (100 / (sampledPoints.length - 1));
+        return FlSpot(normalizedX, sampledPoints[index].$2);
       });
 
-      // Calculate value range
+      // Calculate value range using all points for accurate min/max
       final values = points.map((p) => p.$2).toList();
       final maxY = values.reduce(max);
       final minY = values.reduce(min);
@@ -102,8 +110,8 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
                   LineChartBarData(
                     spots: spots,
                     isCurved: true,
-                    curveSmoothness: 0.7, // Increased for more pronounced curves
-                    preventCurveOverShooting: false, // Allow natural curve flow
+                    curveSmoothness: 0.35,
+                    preventCurveOverShooting: true,
                     color: Colors.green.shade600,
                     barWidth: 2.5, // Slightly thinner for elegance
                     isStrokeCapRound: true,
@@ -145,6 +153,8 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
                     tooltipRoundedRadius: 12,
                     tooltipPadding: const EdgeInsets.all(12),
                     tooltipMargin: 8,
+                    fitInsideHorizontally: true, // Add this to prevent horizontal overflow
+                    fitInsideVertically: true, // Optional: Also prevent vertical overflow
                     getTooltipItems: (spots) {
                       return spots.map((spot) {
                         // Convert normalized x value back to actual timestamp
