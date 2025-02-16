@@ -114,17 +114,32 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with SingleTicker
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Added ${widget.card.name} to collection'),
-            behavior: SnackBarBehavior.floating,
+            padding: EdgeInsets.zero,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            content: StyledToast(
+              title: 'Added to Collection',
+              subtitle: '${widget.card.name} has been added to your collection',
+              backgroundColor: Theme.of(context).colorScheme.secondary,
+              actionLabel: 'Add to Binder',
+              onActionPressed: () => _showAddToBinderDialog(context),
+            ),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to add card'),
-            behavior: SnackBarBehavior.floating,
+          SnackBar(
+            padding: EdgeInsets.zero,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            content: StyledToast(
+              title: 'Failed to Add Card',
+              subtitle: 'There was an error adding the card to your collection',
+              icon: Icons.error_outline,
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
           ),
         );
       }

@@ -105,7 +105,15 @@ class TcgApiService {
     }
 
     try {
-      final cleanedQuery = query.startsWith('set.id:') ? query : _cleanupQuery(query);
+      // If this is a set.id query, check if it needs special handling
+      String cleanedQuery = query;
+      if (query.startsWith('set.id:')) {
+        final setId = query.replaceAll('set.id:', '').trim();
+        cleanedQuery = _buildSpecialSetQuery(setId);
+      } else {
+        cleanedQuery = _cleanupQuery(query);
+      }
+
       print('Searching with query: $cleanedQuery');
 
       final response = await _makeRequestWithRetry(
@@ -557,6 +565,22 @@ class TcgApiService {
     } catch (e) {
       print('API request failed: $e');
       rethrow;
+    }
+  }
+
+  String _buildSpecialSetQuery(String setId) {
+    // Special handling for sets with subsets
+    switch (setId) {
+      case 'swsh12pt5': // Crown Zenith
+        return 'set.id:swsh12pt5 OR set.id:swsh12pt5gg'; // Include Galarian Gallery
+      case 'swsh11': // Lost Origin
+        return 'set.id:swsh11 OR set.id:swsh11tg'; // Include Trainer Gallery
+      case 'swsh10': // Astral Radiance
+        return 'set.id:swsh10 OR set.id:swsh10tg'; // Include Trainer Gallery
+      case 'swsh9': // Brilliant Stars
+        return 'set.id:swsh9 OR set.id:swsh9tg'; // Include Trainer Gallery
+      default:
+        return 'set.id:$setId';
     }
   }
 }
