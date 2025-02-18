@@ -629,25 +629,25 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             behavior: SnackBarBehavior.floating,
                             backgroundColor: Colors.transparent,
                             elevation: 0,
-                            duration: const Duration(milliseconds: 1500), // Shorter duration for "Syncing..."
+                            duration: const Duration(milliseconds: 1500),
                           ),
                         );
                         
-                        final success = await storage.syncNow();
+                        final wasSuccessful = await storage.syncNow();
                         
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: StyledToast(
-                                title: success ? 'Sync Complete' : 'Sync Failed',
-                                subtitle: success ? 'Your collection is up to date' : 'Please try again later',
-                                icon: success ? Icons.check_circle_outline : Icons.error_outline,
-                                backgroundColor: success ? Colors.green : Colors.red,
+                                title: wasSuccessful ? 'Sync Complete' : 'Sync Failed',
+                                subtitle: wasSuccessful ? 'Your collection is up to date' : 'Please try again later',
+                                icon: wasSuccessful ? Icons.check_circle_outline : Icons.error_outline,
+                                backgroundColor: wasSuccessful ? Colors.green : Colors.red,
                               ),
                               behavior: SnackBarBehavior.floating,
                               backgroundColor: Colors.transparent,
                               elevation: 0,
-                              duration: const Duration(seconds: 2), // Reduced completion notification
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                         }

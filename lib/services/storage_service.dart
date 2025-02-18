@@ -75,8 +75,7 @@ class StorageService {
     }
     
     // Load the user's data
-    Future.delayed(const Duration(milliseconds: 100), () async {
-      await _loadSyncState(); // Add this
+    Future.delayed(const Duration(milliseconds: 100), () {
       _loadInitialData();
       final cards = _getCards();
       print('Loading cards with key: ${_getUserKey('cards')}');
@@ -118,6 +117,11 @@ class StorageService {
       _prefs = await SharedPreferences.getInstance();
       _isInitialized = true;
       _isReadyNotifier.value = true;  // Add this
+      _isSyncEnabled = _prefs.getBool('sync_enabled') ?? false;
+      if (_isSyncEnabled) {
+        // Start sync if it was enabled
+        _doSync(force: true);
+      }
       _loadInitialData();
     }
   }
@@ -164,38 +168,38 @@ class StorageService {
     await _loadCards();
   }
 
-  // Changed to synchronous internal method
+  // Simplify the card storage/retrieval methods
   List<TcgCard> _getCards() {
     if (_currentUserId == null) return [];
     
     final cardsKey = _getUserKey('cards');
-    final cardsJson = _prefs.getStringList(cardsKey) ?? [];
     
-    final cards = cardsJson
-        .where((json) => json.isNotEmpty)
-        .map((json) {
-          try {
-            final data = jsonDecode(json);
-            return TcgCard.fromJson(data);
-          } catch (e) {
-            return null;
-          }
-        })
-        .where((card) => card != null)
-        .cast<TcgCard>()
-        .toList();
+    try {
+      // Try to get the cards JSON string
+      final cardsJson = _prefs.getString(cardsKey);
+      if (cardsJson != null) {
+        try {
+          final List<dynamic> decoded = jsonDecode(cardsJson);
+          return decoded
+              .map((item) => TcgCard.fromJson(item as Map<String, dynamic>))
+              .toList();
+        } catch (e) {
+          print('Error decoding cards JSON: $e');
+        }
+      }
+    } catch (e) {
+      print('Error loading cards: $e');
+    }
     
-    return cards;
+    return [];
   }
 
   // Keep async public method
   Future<List<TcgCard>> getCards() async {
     try {
       final key = _getCardsKey();
-      final jsonList = _prefs.getStringList(key) ?? [];
-      return jsonList
-          .map((json) => TcgCard.fromJson(jsonDecode(json)))
-          .toList();
+      final cards = _getCards(); // Use the internal method directly
+      return cards;
     } catch (e) {
       print('❌ Storage error: $e');
       return [];
@@ -217,7 +221,10 @@ class StorageService {
     return _getCards();
   }
 
-  // Make saveCard public method async
+  // Update save method to use consistent format
+  Timer? _syncDebounceTimer;
+  static const _syncDebounceTime = Duration(seconds: 3);
+
   Future<void> saveCard(TcgCard card) async {
     if (_currentUserId == null) return;
 
@@ -232,32 +239,38 @@ class StorageService {
           card.priceHistory,
       );
 
+      // Get current cards
       final cardsKey = _getUserKey('cards');
-      final existingCardsJson = _prefs.getStringList(cardsKey) ?? [];
-      final existingCards = existingCardsJson
-          .map((json) => jsonDecode(json))
-          .whereType<Map<String, dynamic>>()
-          .map((data) => TcgCard.fromJson(data))
-          .toList();
+      final currentCards = _getCards();
+      
+      // Remove existing version if any
+      currentCards.removeWhere((c) => c.id == card.id);
+      currentCards.add(cardWithDate);
 
-      // Remove any existing versions of this card
-      existingCards.removeWhere((c) => c.id == card.id);
-      existingCards.add(cardWithDate);
+      // Save all cards as a single JSON string
+      final cardsJson = jsonEncode(currentCards.map((c) => c.toJson()).toList());
+      await _prefs.setString(cardsKey, cardsJson);
 
-      // Calculate and save new portfolio value
-      final totalValue = existingCards.fold<double>(
+      // Update portfolio value
+      final totalValue = currentCards.fold<double>(
         0, 
         (sum, card) => sum + (card.price ?? 0)
       );
       await savePortfolioValue(totalValue);
 
-      final updatedCardsJson = existingCards
-          .map((c) => jsonEncode(c.toJson()))
-          .toList();
-
-      await _prefs.setStringList(cardsKey, updatedCardsJson);
-      _cardsController.add(existingCards);
+      // Notify listeners
+      _cardsController.add(currentCards);
       _notifyCardChange();
+
+      // Debounce sync operation
+      if (_isSyncEnabled) {
+        _syncDebounceTimer?.cancel();
+        _syncDebounceTimer = Timer(_syncDebounceTime, () {
+          print('💾 Changes detected, syncing...');
+          syncNow();
+        });
+      }
+
     } catch (e) {
       print('Error saving card: $e');
       rethrow;
@@ -315,12 +328,10 @@ class StorageService {
       // Save the portfolio value point
       await _savePortfolioValuePoint(totalValue, DateTime.now());
 
+      // Save remaining cards using consistent JSON string format
       final cardsKey = _getUserKey('cards');
-      final updatedCardsJson = remainingCards
-          .map((card) => jsonEncode(card.toJson()))
-          .toList();
-
-      await _prefs.setStringList(cardsKey, updatedCardsJson);
+      final cardsJson = jsonEncode(remainingCards.map((c) => c.toJson()).toList());
+      await _prefs.setString(cardsKey, cardsJson);
       
       // Update the stream and notify listeners
       final updatedCards = await getCards();
@@ -447,14 +458,14 @@ class StorageService {
   // Remove the await from dispose since dispose is synchronous
   @override
   void dispose() {
-    _syncTimer?.cancel();
+    _syncDebounceTimer?.cancel();  // Add this
+    _syncStatusController.close();
+    _syncProgressController.close();
     _isReadyNotifier.dispose();  // Add this
     _cardsController.close();
     _cardChangeController.close();
     _priceUpdateController.close();
     _priceUpdateCompleteController.close();
-    _syncStatusController.close();
-    _syncProgressController.close();
   }
 
   // Add public getter for premium status
@@ -482,15 +493,22 @@ class StorageService {
         
         cards[index] = updatedCard;
         
+        // Save all cards as a single JSON string
         final cardsKey = _getUserKey('cards');
-        final updatedCardsJson = cards
-            .map((c) => jsonEncode(c.toJson()))
-            .toList();
-         
-        await _prefs.setStringList(cardsKey, updatedCardsJson);
+        final cardsJson = jsonEncode(cards.map((c) => c.toJson()).toList());
+        await _prefs.setString(cardsKey, cardsJson);
         _cardsController.add(cards);
       }
     }
+  }
+
+  // Replace all other similar occurrences of setString with JSON array
+  Future<void> saveCards(List<TcgCard> cards) async {
+    if (_currentUserId == null) return;
+    
+    final cardsKey = _getUserKey('cards');
+    final cardsJson = jsonEncode(cards.map((c) => c.toJson()).toList());
+    await _prefs.setString(cardsKey, cardsJson);
   }
 
   String _getCardsKey() {
@@ -615,8 +633,8 @@ class StorageService {
           
           // Save updated cards and portfolio value
           final cardsKey = _getUserKey('cards');
-          final updatedCardsJson = cards.map((c) => jsonEncode(c.toJson())).toList();
-          await _prefs.setStringList(cardsKey, updatedCardsJson);
+          final cardsJson = jsonEncode(cards.map((c) => c.toJson()).toList());
+          await _prefs.setString(cardsKey, cardsJson);
           
           // Calculate and save new portfolio value
           final totalValue = cards.fold<double>(
@@ -809,96 +827,77 @@ class StorageService {
     }
   }
 
-  static const Duration _syncInterval = Duration(minutes: 30);
-  DateTime? _lastSyncTime;
+  // Add these fields at top of class with other fields
   bool _isSyncEnabled = false;
-  Timer? _syncTimer;
+  bool _isSyncing = false;
+  DateTime? _lastSyncTime;
+  DateTime? _lastSyncAttempt;
   final _syncStatusController = StreamController<String>.broadcast();
   final _syncProgressController = StreamController<double>.broadcast();
+  final List<DateTime> _lastModifiedDates = [];
+  static const Duration _minSyncInterval = Duration(minutes: 15);
+  static const Duration _maxSyncInterval = Duration(hours: 4);
 
   // Add these getters
   bool get isSyncEnabled => _isSyncEnabled;
   Stream<String> get syncStatus => _syncStatusController.stream;
   Stream<double> get syncProgress => _syncProgressController.stream;
 
-  // Add this method to load saved sync state
-  Future<void> _loadSyncState() async {
-    if (_currentUserId != null) {
-      _isSyncEnabled = _prefs.getBool('${_currentUserId}_sync_enabled') ?? false;
-      if (_isSyncEnabled) {
-        startSync();
-      }
-    }
-  }
-
+  // Add sync control methods
   void startSync() {
     if (_isSyncEnabled) return;
     _isSyncEnabled = true;
-    _syncTimer?.cancel();
-    _syncTimer = Timer.periodic(_syncInterval, (_) => _doSync());
+    _prefs.setBool('sync_enabled', true);  // Save sync state
     _syncStatusController.add('Sync enabled');
-    if (_currentUserId != null) {
-      _prefs.setBool('${_currentUserId}_sync_enabled', true); // Save state
-    }
-    _doSync(force: true); // Do initial sync
+    _doSync(force: true);
   }
 
   void stopSync() {
     _isSyncEnabled = false;
-    _syncTimer?.cancel();
-    _syncTimer = null;
+    _prefs.setBool('sync_enabled', false);  // Save sync state
     _syncStatusController.add('Sync disabled');
-    if (_currentUserId != null) {
-      _prefs.setBool('${_currentUserId}_sync_enabled', false); // Save state
-    }
   }
 
   Future<bool> syncNow() async {
-    if (!_isSyncEnabled) return false;
-    return _doSync(force: true); // Return the sync result
+    if (_currentUserId == null) return false;
+
+    final now = DateTime.now();
+    if (_lastSyncTime != null) {
+      final timeSinceLastSync = now.difference(_lastSyncTime!);
+      if (timeSinceLastSync < const Duration(seconds: 3)) {
+        print('🕒 Last sync was ${timeSinceLastSync.inSeconds}s ago, waiting...');
+        return false;
+      }
+    }
+
+    return _doSync(force: true);
   }
 
-  // Update the _doSync method to return a completion status
   Future<bool> _doSync({bool force = false}) async {
-    if (!_isSyncEnabled || _currentUserId == null) return false;
+    if (_currentUserId == null) return false;
 
     try {
-      // Prevent multiple syncs running at once
       if (_isSyncing && !force) {
         print('🔄 Sync already in progress, skipping');
         return false;
       }
+      
       _isSyncing = true;
-
       _syncStatusController.add('Syncing...');
       _syncProgressController.add(0.0);
 
-      final now = DateTime.now();
-      if (!force && _lastSyncTime != null) {
-        final timeSinceLastSync = now.difference(_lastSyncTime!);
-        if (timeSinceLastSync < Duration(minutes: 5)) {
-          print('⏳ Skipping auto-sync - too soon (${timeSinceLastSync.inMinutes}m)');
-          _isSyncing = false;
-          return false;
-        }
-      }
-
-      print('🔄 Starting sync...');
       final cards = await getCards();
+      print('📤 Syncing ${cards.length} cards to cloud...');
+      _syncProgressController.add(0.5);
       
-      // TODO: Add actual cloud sync logic here
-      await Future.delayed(Duration(milliseconds: 500)); // Simulate work
-      
+      await _saveToCloud(cards);
       _syncProgressController.add(1.0);
-      _lastSyncTime = now;
       
-      // Format the timestamp nicely
-      final timestamp = now.toLocal().toString().split('.')[0];
-      print('✅ Sync completed: ${cards.length} cards at $timestamp');
-      _syncStatusController.add('Last synced: just now');
-
-      // Notify UI of completion
-      _notifyCardChange();
+      _lastSyncTime = DateTime.now();
+      final message = 'Last synced: just now (${cards.length} cards)';
+      print('✅ $message');
+      _syncStatusController.add(message);
+      
       _isSyncing = false;
       return true;
     } catch (e) {
@@ -909,6 +908,32 @@ class StorageService {
     }
   }
 
-  // Add this field at the top of the class
-  bool _isSyncing = false;
+  Future<void> _saveToCloud(List<TcgCard> cards) async {
+    try {
+      print('📦 Preparing cloud save...');
+      final cardsJson = cards.map((card) => card.toJson()).toList();
+      final key = 'user_${_currentUserId}_cards';
+      await _prefs.setString(key, jsonEncode(cardsJson));
+      
+      _lastModifiedDates.add(DateTime.now());
+      if (_lastModifiedDates.length > 100) {
+        _lastModifiedDates.removeAt(0);
+      }
+      print('✅ Successfully saved to cloud storage');
+    } catch (e) {
+      print('❌ Error saving to cloud: $e');
+      rethrow;
+    }
+  }
+
+  Duration _calculateNextSyncInterval() {
+    final changes = _lastModifiedDates.length;
+    if (changes > 10) {
+      return _minSyncInterval;
+    } else if (changes > 5) {
+      return Duration(minutes: 30);
+    } else {
+      return _maxSyncInterval;
+    }
+  }
 }
