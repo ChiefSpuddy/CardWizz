@@ -1,3 +1,4 @@
+import 'dart:async';  // Add this import
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
@@ -33,6 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   bool _showSensitiveInfo = false;
   bool _notificationsEnabled = false;
   bool _showPremiumInfo = false;
+  Timer? _syncCheckTimer;
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
@@ -63,10 +65,21 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     );
     _animationController.forward();
     _animationController.repeat(reverse: true);
+
+    // Add periodic sync check
+    _syncCheckTimer = Timer.periodic(const Duration(minutes: 15), (_) {
+      if (mounted) {
+        final storage = context.read<StorageService>();
+        if (storage.isSyncEnabled) {
+          storage.syncNow();
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    _syncCheckTimer?.cancel();
     _scrollController.dispose();  // Add this
     _animationController.dispose();
     super.dispose();
@@ -447,12 +460,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                   ),
                   const Divider(height: 1),
+                  // 1. Core App Settings
                   ListTile(
-                    leading: const Icon(Icons.notifications_outlined),
-                    title: Text(localizations.translate('notifications')),
+                    leading: Icon(
+                      Theme.of(context).brightness == Brightness.dark 
+                          ? Icons.dark_mode 
+                          : Icons.light_mode,
+                    ),
+                    title: const Text('Dark Mode'),
                     trailing: Switch(
-                      value: _notificationsEnabled,
-                      onChanged: null,
+                      value: Theme.of(context).brightness == Brightness.dark,
+                      onChanged: (_) => context.read<AppState>().toggleTheme(),
                     ),
                   ),
                   const Divider(height: 1),
@@ -470,16 +488,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ),
                   const Divider(height: 1),
                   ListTile(
-                    leading: const Icon(Icons.backup_outlined),
-                    title: Text(localizations.translate('backupCollection')),  // Add new translation
-                    onTap: () {
-                      // TODO: Implement backup
-                    },
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
                     leading: const Icon(Icons.currency_exchange),
-                    title: Text(localizations.translate('currency')),  // Add new translation
+                    title: Text(localizations.translate('currency')),
                     trailing: DropdownButton<String>(
                       value: currencyProvider.currentCurrency,
                       onChanged: (String? value) {
@@ -496,41 +506,112 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                   ),
                   const Divider(height: 1),
+                  // 2. Sync & Data
                   ListTile(
-                    leading: Icon(
-                      Theme.of(context).brightness == Brightness.dark 
-                          ? Icons.dark_mode 
-                          : Icons.light_mode,
-                    ),
-                    title: const Text('Dark Mode'),
+                    leading: const Icon(Icons.cloud_sync),
+                    title: const Text('Cloud Sync'),
+                    subtitle: Text(storageService.isSyncEnabled ? 'Auto-sync every 30 minutes' : 'Off'),
                     trailing: Switch(
-                      value: Theme.of(context).brightness == Brightness.dark,
-                      onChanged: (_) => context.read<AppState>().toggleTheme(),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.sync),
-                    title: const Text('Background Refresh'),
-                    trailing: Switch(
-                      value: context.select((StorageService s) => 
-                        s.backgroundService?.isEnabled ?? false),
-                      onChanged: (value) {
+                      value: storageService.isSyncEnabled,
+                      onChanged: (enabled) {
                         final storage = context.read<StorageService>();
-                        if (value) {
-                          storage.backgroundService?.startPriceUpdates();
+                        if (enabled) {
+                          storage.startSync();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: StyledToast(
+                                title: 'Cloud Sync Enabled',
+                                subtitle: 'Your collection will sync every 30 minutes',
+                                icon: Icons.cloud_done,
+                                backgroundColor: Colors.green,
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: Colors.transparent,
+                              elevation: 0,
+                              duration: const Duration(seconds: 2), // Reduced from default 4 seconds
+                            ),
+                          );
                         } else {
-                          storage.backgroundService?.stopPriceUpdates();
+                          storage.stopSync();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: StyledToast(
+                                title: 'Cloud Sync Disabled',
+                                subtitle: 'Auto-sync turned off',
+                                icon: Icons.cloud_off,
+                                backgroundColor: Colors.orange,
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: Colors.transparent,
+                              elevation: 0,
+                              duration: const Duration(seconds: 2), // Reduced from default 4 seconds
+                            ),
+                          );
                         }
-                        setState(() {}); // Refresh UI
+                        setState(() {});
                       },
                     ),
                   ),
+                  if (storageService.isSyncEnabled) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.sync_rounded),
+                      title: const Text('Sync Now'),
+                      onTap: () async {
+                        final storage = context.read<StorageService>();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: StyledToast(
+                              title: 'Syncing...',
+                              subtitle: 'Updating your collection',
+                              icon: Icons.sync,
+                              backgroundColor: Colors.blue,
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: Colors.transparent,
+                            elevation: 0,
+                            duration: const Duration(milliseconds: 1500), // Shorter duration for "Syncing..."
+                          ),
+                        );
+                        
+                        final success = await storage.syncNow();
+                        
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: StyledToast(
+                                title: success ? 'Sync Complete' : 'Sync Failed',
+                                subtitle: success ? 'Your collection is up to date' : 'Please try again later',
+                                icon: success ? Icons.check_circle_outline : Icons.error_outline,
+                                backgroundColor: success ? Colors.green : Colors.red,
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: Colors.transparent,
+                              elevation: 0,
+                              duration: const Duration(seconds: 2), // Reduced completion notification
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                  const Divider(height: 1),
+                  // 3. Notifications (disabled for now)
+                  ListTile(
+                    leading: const Icon(Icons.notifications_outlined),
+                    title: Text(localizations.translate('notifications')),
+                    subtitle: const Text('Price alerts and updates'),
+                    trailing: Switch(
+                      value: _notificationsEnabled,
+                      onChanged: null,  // Coming soon
+                    ),
+                  ),
+                  // 4. Information
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.info_outline),
                     title: const Text('Data Sources'),
-                    subtitle: const Text('Card data and prices powered by third-party APIs'),
+                    subtitle: const Text('Card data and market prices'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => _showDataAttributionDialog(context),
                   ),

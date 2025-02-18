@@ -15,6 +15,7 @@ class TcgCard {
   final DateTime? dateAdded;
   final DateTime? addedToCollection;
   final DateTime? lastPriceUpdate;
+  final DateTime lastModified; // Add this field
 
   TcgCard({
     required this.id,
@@ -30,7 +31,8 @@ class TcgCard {
     this.dateAdded,
     this.addedToCollection,
     this.lastPriceUpdate,
-  }) : priceHistory = priceHistory ?? [];
+    DateTime? lastModified, // Add this parameter
+  }) : priceHistory = priceHistory ?? [], lastModified = lastModified ?? DateTime.now(); // Initialize with current time if not provided
 
   String? get setName => set?.name;
 
@@ -100,6 +102,7 @@ class TcgCard {
         lastPriceUpdate: json['lastPriceUpdate'] != null
             ? DateTime.parse(json['lastPriceUpdate'] as String)
             : null,
+        lastModified: json['lastModified'] != null ? DateTime.parse(json['lastModified']) : DateTime.now(),
       );
     } catch (e) {
       print('Error creating TcgCard from JSON: $e');
@@ -127,6 +130,7 @@ class TcgCard {
     'dateAdded': dateAdded?.toIso8601String(),
     'addedToCollection': addedToCollection?.toIso8601String(),
     'lastPriceUpdate': lastPriceUpdate?.toIso8601String(),
+    'lastModified': lastModified.toIso8601String(),
   };
 
   TcgCard copyWith({
@@ -143,6 +147,7 @@ class TcgCard {
     DateTime? dateAdded,
     DateTime? addedToCollection,
     DateTime? lastPriceUpdate,
+    DateTime? lastModified,
   }) {
     return TcgCard(
       id: id ?? this.id,
@@ -158,6 +163,7 @@ class TcgCard {
       dateAdded: dateAdded ?? this.dateAdded,
       addedToCollection: addedToCollection ?? this.addedToCollection,
       lastPriceUpdate: lastPriceUpdate ?? this.lastPriceUpdate,
+      lastModified: lastModified ?? DateTime.now(), // Always update modification time
     );
   }
 }

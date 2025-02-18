@@ -45,6 +45,9 @@ dependencies:
   rxdart: ^0.27.7  # Add this line
   flutter_cache_manager: ^3.3.1  # Add this for better image caching
   palette_generator: ^0.3.3+3  # Add this for Pokemon type color extraction
+  cloud_kit: ^1.0.0  # Add this line
+  synchronized: ^3.1.0  # Add this line
+  connectivity_plus: ^5.0.1  # Add this line
 
 dev_dependencies:
   flutter_test:

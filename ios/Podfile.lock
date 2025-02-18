@@ -3,6 +3,11 @@ PODS:
     - Flutter
   - camera_avfoundation (0.0.1):
     - Flutter
+  - cloud_kit (0.0.1):
+    - Flutter
+  - connectivity_plus (0.0.1):
+    - Flutter
+    - ReachabilitySwift
   - Flutter (1.0.0)
   - flutter_contacts (0.0.1):
     - Flutter
@@ -87,6 +92,7 @@ PODS:
   - permission_handler_apple (9.3.0):
     - Flutter
   - PromisesObjC (2.4.0)
+  - ReachabilitySwift (5.2.4)
   - share_plus (0.0.1):
     - Flutter
   - shared_preferences_foundation (0.0.1):
@@ -107,6 +113,8 @@ PODS:
 DEPENDENCIES:
   - background_fetch (from `.symlinks/plugins/background_fetch/ios`)
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
+  - cloud_kit (from `.symlinks/plugins/cloud_kit/ios`)
+  - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - Flutter (from `Flutter`)
   - flutter_contacts (from `.symlinks/plugins/flutter_contacts/ios`)
   - flutter_native_splash (from `.symlinks/plugins/flutter_native_splash/ios`)
@@ -139,12 +147,17 @@ SPEC REPOS:
     - MLKitVision
     - nanopb
     - PromisesObjC
+    - ReachabilitySwift
 
 EXTERNAL SOURCES:
   background_fetch:
     :path: ".symlinks/plugins/background_fetch/ios"
   camera_avfoundation:
     :path: ".symlinks/plugins/camera_avfoundation/ios"
+  cloud_kit:
+    :path: ".symlinks/plugins/cloud_kit/ios"
+  connectivity_plus:
+    :path: ".symlinks/plugins/connectivity_plus/ios"
   Flutter:
     :path: Flutter
   flutter_contacts:
@@ -181,6 +194,8 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   background_fetch: 94b36ee293e82972852dba8ede1fbcd3bd3d9d57
   camera_avfoundation: 04b44aeb14070126c6529e5ab82cc7c9fca107cf
+  cloud_kit: 888e199a59204ab4e0ed10e07cc6a770c4d570f7
+  connectivity_plus: 481668c94744c30c53b8895afb39159d1e619bdf
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_contacts: 5383945387e7ca37cf963d4be57c21f2fc15ca9f
   flutter_native_splash: 6cad9122ea0fad137d23137dd14b937f3e90b145
@@ -203,6 +218,7 @@ SPEC CHECKSUMS:
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
+  ReachabilitySwift: 32793e867593cfc1177f5d16491e3a197d2fccda
   share_plus: de6030e33b4e106470e09322d87cf2a4258d2d1d
   shared_preferences_foundation: 9e1978ff2562383bd5676f64ec4e9aa8fa06a6f7
   sign_in_with_apple: c5dcc141574c8c54d5ac99dd2163c0c72ad22418

@@ -128,6 +128,10 @@ class AuthService {
         final collectionService = await CollectionService.getInstance();
         await collectionService.setCurrentUser(credential.userIdentifier);
 
+        // Initialize storage and start sync
+        final storage = await StorageService.init(null);
+        storage.startSync();
+
         return _currentUser;
       }
       return null;

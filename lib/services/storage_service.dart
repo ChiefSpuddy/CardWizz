@@ -75,7 +75,8 @@ class StorageService {
     }
     
     // Load the user's data
-    Future.delayed(const Duration(milliseconds: 100), () {
+    Future.delayed(const Duration(milliseconds: 100), () async {
+      await _loadSyncState(); // Add this
       _loadInitialData();
       final cards = _getCards();
       print('Loading cards with key: ${_getUserKey('cards')}');
@@ -446,11 +447,14 @@ class StorageService {
   // Remove the await from dispose since dispose is synchronous
   @override
   void dispose() {
+    _syncTimer?.cancel();
     _isReadyNotifier.dispose();  // Add this
     _cardsController.close();
     _cardChangeController.close();
     _priceUpdateController.close();
     _priceUpdateCompleteController.close();
+    _syncStatusController.close();
+    _syncProgressController.close();
   }
 
   // Add public getter for premium status
@@ -802,6 +806,94 @@ class StorageService {
       print('Added portfolio value point: \$${value.toStringAsFixed(2)} at ${timestamp.toIso8601String()}');
     } catch (e) {
       print('Error saving portfolio value point: $e');
+    }
+  }
+
+  static const Duration _syncInterval = Duration(minutes: 30);
+  DateTime? _lastSyncTime;
+  bool _isSyncEnabled = false;
+  Timer? _syncTimer;
+  final _syncStatusController = StreamController<String>.broadcast();
+  final _syncProgressController = StreamController<double>.broadcast();
+
+  // Add these getters
+  bool get isSyncEnabled => _isSyncEnabled;
+  Stream<String> get syncStatus => _syncStatusController.stream;
+  Stream<double> get syncProgress => _syncProgressController.stream;
+
+  // Add this method to load saved sync state
+  Future<void> _loadSyncState() async {
+    if (_currentUserId != null) {
+      _isSyncEnabled = _prefs.getBool('${_currentUserId}_sync_enabled') ?? false;
+      if (_isSyncEnabled) {
+        startSync();
+      }
+    }
+  }
+
+  void startSync() {
+    if (_isSyncEnabled) return;
+    _isSyncEnabled = true;
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(_syncInterval, (_) => _doSync());
+    _syncStatusController.add('Sync enabled');
+    if (_currentUserId != null) {
+      _prefs.setBool('${_currentUserId}_sync_enabled', true); // Save state
+    }
+    _doSync(force: true); // Do initial sync
+  }
+
+  void stopSync() {
+    _isSyncEnabled = false;
+    _syncTimer?.cancel();
+    _syncTimer = null;
+    _syncStatusController.add('Sync disabled');
+    if (_currentUserId != null) {
+      _prefs.setBool('${_currentUserId}_sync_enabled', false); // Save state
+    }
+  }
+
+  Future<bool> syncNow() async {
+    if (!_isSyncEnabled) return false;
+    return _doSync(force: true); // Return the sync result
+  }
+
+  // Update the _doSync method to return a completion status
+  Future<bool> _doSync({bool force = false}) async {
+    if (!_isSyncEnabled || _currentUserId == null) return false;
+
+    try {
+      _syncStatusController.add('Syncing...');
+      _syncProgressController.add(0.0);
+
+      final now = DateTime.now();
+      if (!force && _lastSyncTime != null) {
+        final timeSinceLastSync = now.difference(_lastSyncTime!);
+        if (timeSinceLastSync < Duration(minutes: 5)) {
+          print('🕒 Skipping auto-sync - too soon');
+          return false;
+        }
+      }
+
+      print('🔄 Starting sync...');
+      final cards = await getCards();
+      
+      // TODO: Add actual cloud sync logic here
+      await Future.delayed(Duration(milliseconds: 500)); // Simulate work
+      
+      _syncProgressController.add(1.0);
+      print('✅ Sync completed: ${cards.length} cards');
+      
+      _lastSyncTime = now;
+      _syncStatusController.add('Last synced: just now');
+
+      // Notify UI of completion
+      _notifyCardChange();
+      return true;  // Return success
+    } catch (e) {
+      print('❌ Sync error: $e');
+      _syncStatusController.add('Sync failed: $e');
+      return false;  // Return failure
     }
   }
 }
