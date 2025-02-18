@@ -466,43 +466,102 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       Theme.of(context).brightness == Brightness.dark 
                           ? Icons.dark_mode 
                           : Icons.light_mode,
+                      color: colorScheme.primary,
                     ),
                     title: const Text('Dark Mode'),
-                    trailing: Switch(
-                      value: Theme.of(context).brightness == Brightness.dark,
-                      onChanged: (_) => context.read<AppState>().toggleTheme(),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.language),
-                    title: Text(localizations.translate('language')),
-                    trailing: Text(
-                      context.select((AppState state) => 
-                        state.locale.languageCode == 'es' ? 'Español' :
-                        state.locale.languageCode == 'ja' ? '日本語' :
-                        'English'
+                    trailing: Transform.scale(
+                      scale: 0.9, // Slightly smaller switch
+                      child: Switch(
+                        value: Theme.of(context).brightness == Brightness.dark,
+                        onChanged: (_) => context.read<AppState>().toggleTheme(),
                       ),
                     ),
-                    onTap: () => _showLanguageDialog(context),
                   ),
                   const Divider(height: 1),
                   ListTile(
-                    leading: const Icon(Icons.currency_exchange),
+                    leading: Icon(Icons.language, color: colorScheme.primary),
+                    title: Text(localizations.translate('language')),
+                    trailing: Container(
+                      height: 48, // Match the height of the DropdownButton
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      child: Center(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => _showLanguageDialog(context),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  context.select((AppState state) => 
+                                    state.locale.languageCode == 'es' ? 'Español' :
+                                    state.locale.languageCode == 'ja' ? '日本語' :
+                                    'English'
+                                  ),
+                                  style: TextStyle(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  color: colorScheme.primary,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(Icons.currency_exchange, color: colorScheme.primary),
                     title: Text(localizations.translate('currency')),
-                    trailing: DropdownButton<String>(
-                      value: currencyProvider.currentCurrency,
-                      onChanged: (String? value) {
-                        if (value != null) {
-                          currencyProvider.setCurrency(value);
-                        }
-                      },
-                      items: currencyProvider.currencies.entries
-                          .map((entry) => DropdownMenuItem(
-                                value: entry.key,
-                                child: Text('${entry.key} (${entry.value.$1})'),
-                              ))
-                          .toList(),
+                    trailing: Container(
+                      height: 48, // Match the height
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          inputDecorationTheme: const InputDecorationTheme(
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        child: Center(
+                          child: DropdownButton<String>(
+                            value: currencyProvider.currentCurrency,
+                            underline: const SizedBox(),
+                            icon: Icon(
+                              Icons.arrow_drop_down,
+                              color: colorScheme.primary,
+                              size: 20,
+                            ),
+                            style: TextStyle(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                            isDense: true,
+                            onChanged: (String? value) {
+                              if (value != null) {
+                                currencyProvider.setCurrency(value);
+                              }
+                            },
+                            items: currencyProvider.currencies.entries
+                                .map((entry) => DropdownMenuItem(
+                                      value: entry.key,
+                                      child: Text('${entry.key} (${entry.value.$1})'),
+                                    ))
+                                .toList(),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                   const Divider(height: 1),

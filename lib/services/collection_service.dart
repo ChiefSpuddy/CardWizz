@@ -19,6 +19,8 @@ class CollectionService {
   final _collectionsController = StreamController<List<CustomCollection>>.broadcast();
   String? _currentUserId;
   List<CustomCollection> _collections = [];  // Add this field
+  bool _isInitialized = false;  // Add this field
+  bool _isRefreshing = false;  // Add this field
 
   // Update constructor to take both dependencies
   CollectionService._(this._db, this._storage);
@@ -68,6 +70,26 @@ class CollectionService {
     return _instance!;
   }
 
+  Future<void> initialize() async {
+    if (_isInitialized) {
+      print('Collection already initialized, skipping');
+      return;
+    }
+    
+    try {
+      print('Collection service initializing...');
+      await _refreshCollections();  // Load initial collections
+      _isInitialized = true;
+      
+      // Use current collections length instead of non-existent _cards
+      final collections = await getCustomCollections();
+      print('Collection service initialized with ${collections.length} collections');
+    } catch (e) {
+      print('Error initializing collection service: $e');
+      rethrow;
+    }
+  }
+
   // This method only clears in-memory state
   Future<void> clearSessionState() async {
     _collections = [];
@@ -76,11 +98,16 @@ class CollectionService {
   }
 
   Future<void> setCurrentUser(String? userId) async {
+    // Add check to prevent duplicate initialization
+    if (_currentUserId == userId) {
+      print('Collection service: Same user, skipping initialization');
+      return;
+    }
+    
     print('Setting collection service user: $userId');
     _currentUserId = userId;
     
     if (userId == null) {
-      // Just clear in-memory state
       await clearSessionState();
       return;
     }
@@ -128,16 +155,24 @@ class CollectionService {
   }
 
   Future<void> _refreshCollections() async {
-    if (_currentUserId == null) {
-      _collectionsController.add([]);
-      return;
-    }
-    
+    // Add guard to prevent multiple simultaneous refreshes
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+
     try {
+      if (_currentUserId == null) {
+        _collectionsController.add([]);
+        return;
+      }
+      
       final collections = await getCustomCollections();
-      _collectionsController.add(collections);
+      if (_currentUserId != null) { // Check again in case user changed during await
+        _collectionsController.add(collections);
+      }
     } catch (e) {
       _collectionsController.addError(e);
+    } finally {
+      _isRefreshing = false;
     }
   }
 

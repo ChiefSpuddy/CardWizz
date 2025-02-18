@@ -27,9 +27,15 @@ class AppState with ChangeNotifier {
     await _authService.initialize();
     _collectionService = await CollectionService.getInstance();
     
-    if (_authService.isAuthenticated) {
-      _storageService.setCurrentUser(_authService.currentUser!.id);
-      _collectionService?.setCurrentUser(_authService.currentUser!.id);
+    // Combine these operations into a single initialization if user is authenticated
+    if (_authService.isAuthenticated && _authService.currentUser != null) {
+      final userId = _authService.currentUser!.id;
+      
+      // Initialize services sequentially instead of using Future.wait
+      _storageService.setCurrentUser(userId);
+      if (_collectionService != null) {
+        await _collectionService!.setCurrentUser(userId);
+      }
     }
     
     // Load dark mode setting, default to true if not set

@@ -863,6 +863,13 @@ class StorageService {
     if (!_isSyncEnabled || _currentUserId == null) return false;
 
     try {
+      // Prevent multiple syncs running at once
+      if (_isSyncing && !force) {
+        print('🔄 Sync already in progress, skipping');
+        return false;
+      }
+      _isSyncing = true;
+
       _syncStatusController.add('Syncing...');
       _syncProgressController.add(0.0);
 
@@ -870,7 +877,8 @@ class StorageService {
       if (!force && _lastSyncTime != null) {
         final timeSinceLastSync = now.difference(_lastSyncTime!);
         if (timeSinceLastSync < Duration(minutes: 5)) {
-          print('🕒 Skipping auto-sync - too soon');
+          print('⏳ Skipping auto-sync - too soon (${timeSinceLastSync.inMinutes}m)');
+          _isSyncing = false;
           return false;
         }
       }
@@ -882,18 +890,25 @@ class StorageService {
       await Future.delayed(Duration(milliseconds: 500)); // Simulate work
       
       _syncProgressController.add(1.0);
-      print('✅ Sync completed: ${cards.length} cards');
-      
       _lastSyncTime = now;
+      
+      // Format the timestamp nicely
+      final timestamp = now.toLocal().toString().split('.')[0];
+      print('✅ Sync completed: ${cards.length} cards at $timestamp');
       _syncStatusController.add('Last synced: just now');
 
       // Notify UI of completion
       _notifyCardChange();
-      return true;  // Return success
+      _isSyncing = false;
+      return true;
     } catch (e) {
       print('❌ Sync error: $e');
       _syncStatusController.add('Sync failed: $e');
-      return false;  // Return failure
+      _isSyncing = false;
+      return false;
     }
   }
+
+  // Add this field at the top of the class
+  bool _isSyncing = false;
 }
