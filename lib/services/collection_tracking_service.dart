@@ -3,6 +3,7 @@ import 'storage_service.dart';
 import 'collection_index_service.dart';  // Make sure this import is used
 import 'poke_api_service.dart';
 import 'dart:async';
+import 'package:async/async.dart';  // Add this import
 
 class CollectionTrackingService {
   final StorageService _storage;
@@ -16,13 +17,17 @@ class CollectionTrackingService {
   Stream<void> get onUpdate => _updateController.stream;
 
   CollectionTrackingService(this._storage) :
-    _namesService = CollectionIndexService(),  // Update constructor
+    _namesService = CollectionIndexService(),
     _pokeApi = PokeApiService() {
-    // Make listener more robust
-    _storage.onCardsChanged.listen((_) {
-      if (!_isRefreshing) {  // Add guard here too
-        _refreshCollection();
-      }
+    // Combine both streams to handle all changes
+    StreamGroup.merge([
+      _storage.watchCards(),
+      _storage.onCardsChanged.asyncMap((_) => _storage.getCards()),
+    ]).listen((cards) {
+      print('Collection service processing ${cards.length} cards');
+      _allCards = cards;
+      _rebuildCaches();
+      _updateController.add(null);
     });
   }
 
@@ -86,9 +91,26 @@ class CollectionTrackingService {
     }
   }
 
-  // Public refresh method
+  // Make refresh method more robust
   Future<void> refresh() async {
-    await _refreshCollection();
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    
+    try {
+      // Clear caches first
+      _collectionCache.clear();
+      _cardCache.clear();
+      _allCards = null;
+      _isInitialized = false;
+      
+      // Reinitialize with fresh data
+      await initialize();
+      
+      // Notify listeners
+      _updateController.add(null);
+    } finally {
+      _isRefreshing = false;
+    }
   }
 
   Future<void> refreshCollection() async {
@@ -550,6 +572,29 @@ class CollectionTrackingService {
     }
     
     return collectedNumbers.length;
+  }
+
+  // Add this new method to rebuild caches
+  void _rebuildCaches() {
+    _collectionCache.clear();
+    _cardCache.clear();
+    
+    if (_allCards != null) {
+      for (final card in _allCards!) {
+        final baseName = _normalizeCardName(card.name);
+        _collectionCache[baseName] = true;
+        
+        if (!_cardCache.containsKey(baseName)) {
+          _cardCache[baseName] = [];
+        }
+        if (!_cardCache[baseName]!.any((c) => c.id == card.id)) {
+          _cardCache[baseName]!.add(card);
+        }
+      }
+    }
+    _isInitialized = true;
+    
+    print('Cache rebuild complete. Tracking ${_cardCache.length} unique Pokémon');
   }
 
   @override

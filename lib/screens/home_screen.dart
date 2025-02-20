@@ -75,6 +75,17 @@ class HomeScreenState extends State<HomeScreen> {  // Changed from _HomeScreenSt
     });
   }
 
+  void goToSearchWithQuery(String query) {
+    setState(() {
+      _selectedIndex = 2; // Switch to search tab
+    });
+    
+    // Small delay to ensure the search screen is initialized
+    Future.delayed(const Duration(milliseconds: 100), () {
+      SearchScreen.startSearch(context, query);
+    });
+  }
+
   Widget _buildBottomNavItem(BuildContext context, int index) {
     final appState = context.watch<AppState>();
     final user = appState.currentUser;

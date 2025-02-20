@@ -27,6 +27,16 @@ class SearchScreen extends StatefulWidget {
     }
   }
 
+  static void startSearch(BuildContext context, String query) {
+    // Find the search screen state
+    final state = context.findRootAncestorStateOfType<_SearchScreenState>();
+    if (state != null) {
+      // Update the search controller and perform search
+      state._searchController.text = query;
+      state._performSearch(query);
+    }
+  }
+
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }

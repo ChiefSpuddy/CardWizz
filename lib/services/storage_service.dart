@@ -258,18 +258,10 @@ class StorageService {
       );
       await savePortfolioValue(totalValue);
 
-      // Notify listeners
-      _cardsController.add(currentCards);
-      _notifyCardChange();
-
-      // Debounce sync operation
-      if (_isSyncEnabled) {
-        _syncDebounceTimer?.cancel();
-        _syncDebounceTimer = Timer(_syncDebounceTime, () {
-          print('💾 Changes detected, syncing...');
-          syncNow();
-        });
-      }
+      // Update the stream and notify listeners
+      _cardsController.add(currentCards);  // First notify card stream
+      _notifyCardChange();  // Then notify change listeners
+      print('Card saved and notifications sent');
 
     } catch (e) {
       print('Error saving card: $e');

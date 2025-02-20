@@ -570,7 +570,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                         ),
                         child: Container(
                           width: 140,
-                          margin: const EdgeInsets.only(right: 8),
+                          margin: const EdgeInsets.only(right: 8), // Changed from 4 to 8
                           child: Column(
                             children: [
                               Expanded(

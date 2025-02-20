@@ -44,6 +44,15 @@ class _CollectionIndexScreenState extends State<CollectionIndexScreen> {
       Provider.of<StorageService>(context, listen: false),
     );
     _initializeCollection();
+    
+    // Add subscription to collection updates
+    _collectionService.onUpdate.listen((_) {
+      if (mounted) {
+        setState(() {
+          // This will trigger a rebuild with updated data
+        });
+      }
+    });
   }
 
   Future<void> _initializeCollection() async {
@@ -216,76 +225,28 @@ class _CollectionIndexScreenState extends State<CollectionIndexScreen> {
   }
 
   void _showUncollectedInfo(String name) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
           children: [
-            Icon(
-              Icons.style_outlined,
-              color: Theme.of(context).colorScheme.primary,
-              size: 24,
-            ),
+            Icon(Icons.info_outline, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Expanded(child: Text('Add $name')),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'You haven\'t collected any $name cards yet.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(
-                  context, 
-                  '/search',
-                  arguments: {'searchTerm': name},
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ).copyWith(
-                backgroundColor: MaterialStateProperty.all(
-                  Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.search, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Search Cards',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+            Expanded(
+              child: Text('Tap to search for $name cards'),
             ),
           ],
         ),
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyle(color: Theme.of(context).colorScheme.secondary),
-            ),
-          ),
-        ],
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        action: SnackBarAction(
+          label: 'SEARCH',
+          onPressed: () {
+            final homeState = context.findAncestorStateOfType<HomeScreenState>();
+            if (homeState != null) {
+              homeState.goToSearchWithQuery(name);
+            }
+          },
+        ),
       ),
     );
   }
