@@ -380,7 +380,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                       ),
                       child: Container(
                         width: 140,
-                        margin: const EdgeInsets.only(right: 8),
+                        margin: const EdgeInsets.only(right: 4), // Changed from 8 to 4
                         child: Column(
                           children: [
                             Expanded(
@@ -643,11 +643,11 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
 
   void _navigateToCollection() {
     if (!mounted) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) {
-        Navigator.pushNamed(context, '/collection');
-      }
-    });
+    // Use pushNamed and routes instead of pushing MaterialPageRoute directly
+    final HomeScreenState? homeState = context.findAncestorStateOfType<HomeScreenState>();
+    if (homeState != null) {
+      homeState.setSelectedIndex(1); // Index 1 is the Collections tab
+    }
   }
 
   @override
@@ -820,7 +820,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                                 ),
                                 child: Container(
                                   width: 140,
-                                  margin: const EdgeInsets.only(right: 8),
+                                  margin: const EdgeInsets.only(right: 4), // Changed from 8 to 4
                                   child: Column(
                                     children: [
                                       Expanded(
