@@ -936,4 +936,36 @@ class StorageService {
       return _maxSyncInterval;
     }
   }
+
+  Future<void> debugSyncStatus() async {
+    if (_currentUserId == null) {
+      print('❌ No user logged in');
+      return;
+    }
+
+    print('📊 Sync Status Debug:');
+    print('--------------------');
+    print('Sync Enabled: $_isSyncEnabled');
+    print('Currently Syncing: $_isSyncing');
+    print('Last Sync: ${_lastSyncTime?.toLocal() ?? 'Never'}');
+    print('User ID: $_currentUserId');
+    
+    final cards = await getCards();
+    final cardsKey = _getUserKey('cards');
+    final cloudData = _prefs.getString(cardsKey);
+    
+    print('\n📱 Local Data:');
+    print('Cards in memory: ${cards.length}');
+    print('Cards in cloud storage: ${cloudData != null ? jsonDecode(cloudData).length : 0}');
+    
+    if (_lastSyncTime != null) {
+      final timeSinceSync = DateTime.now().difference(_lastSyncTime!);
+      print('\n⏱️ Time since last sync:');
+      print('${timeSinceSync.inMinutes} minutes ago');
+    }
+    
+    print('\n🔄 Recent Changes:');
+    print('Changes in queue: ${_lastModifiedDates.length}');
+    print('Next sync interval: ${_calculateNextSyncInterval().inMinutes} minutes');
+  }
 }

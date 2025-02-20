@@ -658,7 +658,6 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     final localizations = AppLocalizations.of(context);
 
     return Scaffold(
-      // Only show AppBar if signed in
       appBar: isSignedIn ? AppBar(
         toolbarHeight: 44,
         automaticallyImplyLeading: false,
@@ -686,177 +685,177 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
       ) : null,
-      body: !isSignedIn 
+      body: !isSignedIn && ModalRoute.of(context)?.settings.name == '/' 
         ? const SignInView()
         : Stack(
-          children: [
-            // Background animation
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.3,
-                child: Lottie.asset( 
-                  'assets/animations/background.json',
-                  fit: BoxFit.cover,
-                  repeat: true,
-                  frameRate: FrameRate(30),
-                  controller: _animationController,
+            children: [
+              // Background animation
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.3,
+                  child: Lottie.asset( 
+                    'assets/animations/background.json',
+                    fit: BoxFit.cover,
+                    repeat: true,
+                    frameRate: FrameRate(30),
+                    controller: _animationController,
+                  ),
                 ),
               ),
-            ),
-            // Content
-            StreamBuilder<List<TcgCard>>(
-              stream: Provider.of<StorageService>(context).watchCards(),
-              initialData: const [],
-              builder: (context, snapshot) {
-                final currencyProvider = context.watch<CurrencyProvider>();
-                final cards = snapshot.data ?? [];
-                // Get total value in EUR
-                final totalValueEur = cards.fold<double>(
-                  0, 
-                  (sum, card) => sum + (card.price ?? 0)
-                );
-                
-                // Let the currency provider handle the conversion
-                final displayValue = currencyProvider.formatValue(totalValueEur);
+              // Content
+              StreamBuilder<List<TcgCard>>(
+                stream: Provider.of<StorageService>(context).watchCards(),
+                initialData: const [],
+                builder: (context, snapshot) {
+                  final currencyProvider = context.watch<CurrencyProvider>();
+                  final cards = snapshot.data ?? [];
+                  // Get total value in EUR
+                  final totalValueEur = cards.fold<double>(
+                    0, 
+                    (sum, card) => sum + (card.price ?? 0)
+                  );
+                  
+                  // Let the currency provider handle the conversion
+                  final displayValue = currencyProvider.formatValue(totalValueEur);
 
-                final reversedCards = cards.reversed.toList();  // Add this line
-                if (cards.isEmpty) {
-                  return _buildEmptyState();
-                }
+                  final reversedCards = cards.reversed.toList();  // Add this line
+                  if (cards.isEmpty) {
+                    return _buildEmptyState();
+                  }
 
-                // Add logging here
-                print('HomeOverview: cards.length = ${cards.length}');
+                  // Add logging here
+                  print('HomeOverview: cards.length = ${cards.length}');
 
-                return ListView(
-                  children: [
-                    // Summary Cards
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),  // Reduced padding
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildSummaryCard(
-                              context,
-                              'Total Cards',
-                              cards.length.toString(),
-                              Icons.style,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildSummaryCard(
-                              context,
-                              'Collection Value',
-                              displayValue,  // Use formatted value here
-                              Icons.currency_exchange,  // This will be overridden by the logic above
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Price Trend Chart
-                    if (cards.isNotEmpty) ...[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,  // Changed from start
-                          children: [
-                            const SizedBox(height: 24),  // Adjusted spacing
-                            Provider<List<TcgCard>>.value(
-                              value: cards,
-                              child: const PortfolioValueChart(),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    // Most Valuable Cards
-                    if (cards.isNotEmpty) ...[
-                      _buildTopCards(cards),  // Add this line before Recent Additions
-                      const SizedBox(height: 8),  // Reduced spacing
-                      _buildLatestSetCards(context),  // Add this line
-                      const SizedBox(height: 8),  // Reduced spacing
-                    ],
-
-                    // Recent Cards
-                    if (cards.isNotEmpty) ...[
+                  return ListView(
+                    children: [
+                      // Summary Cards
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),  // Reduced padding
                         child: Row(
                           children: [
-                            Text(
-                              localizations.translate('recentAdditions'),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: _buildSummaryCard(
+                                context,
+                                'Total Cards',
+                                cards.length.toString(),
+                                Icons.style,
                               ),
                             ),
-                            const Spacer(),
-                            TextButton(
-                              onPressed: _navigateToCollection,
-                              child: Text(localizations.translate('viewAll')),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildSummaryCard(
+                                context,
+                                'Collection Value',
+                                displayValue,  // Use formatted value here
+                                Icons.currency_exchange,  // This will be overridden by the logic above
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      SizedBox(
-                        height: 200,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
+
+                      // Price Trend Chart
+                      if (cards.isNotEmpty) ...[
+                        Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: reversedCards.length.clamp(0, 10),  // Use reversedCards
-                          itemBuilder: (context, index) {
-                            final card = reversedCards[index];  // Use reversedCards
-                            return GestureDetector(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CardDetailsScreen(
-                                    card: card,
-                                    heroContext: 'home_recent',
-                                  ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,  // Changed from start
+                            children: [
+                              const SizedBox(height: 24),  // Adjusted spacing
+                              Provider<List<TcgCard>>.value(
+                                value: cards,
+                                child: const PortfolioValueChart(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
+                      // Most Valuable Cards
+                      if (cards.isNotEmpty) ...[
+                        _buildTopCards(cards),  // Add this line before Recent Additions
+                        const SizedBox(height: 8),  // Reduced spacing
+                        _buildLatestSetCards(context),  // Add this line
+                        const SizedBox(height: 8),  // Reduced spacing
+                      ],
+
+                      // Recent Cards
+                      if (cards.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),  // Reduced padding
+                          child: Row(
+                            children: [
+                              Text(
+                                localizations.translate('recentAdditions'),
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              child: Container(
-                                width: 140,
-                                margin: const EdgeInsets.only(right: 8),
-                                child: Column(
-                                  children: [
-                                    Expanded(
-                                      child: Hero(
-                                        tag: HeroTags.cardImage(card.id, context: 'home_recent'),
-                                        child: Image.network(
-                                          card.imageUrl,
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ),
+                              const Spacer(),
+                              TextButton(
+                                onPressed: _navigateToCollection,
+                                child: Text(localizations.translate('viewAll')),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          height: 200,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: reversedCards.length.clamp(0, 10),  // Use reversedCards
+                            itemBuilder: (context, index) {
+                              final card = reversedCards[index];  // Use reversedCards
+                              return GestureDetector(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => CardDetailsScreen(
+                                      card: card,
+                                      heroContext: 'home_recent',
                                     ),
-                                    if (card.price != null)
-                                      Padding(
-                                        padding: const EdgeInsets.all(4),
-                                        child: Text(
-                                          currencyProvider.formatValue(card.price!),  // Update this line
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                child: Container(
+                                  width: 140,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  child: Column(
+                                    children: [
+                                      Expanded(
+                                        child: Hero(
+                                          tag: HeroTags.cardImage(card.id, context: 'home_recent'),
+                                          child: Image.network(
+                                            card.imageUrl,
+                                            fit: BoxFit.contain,
                                           ),
                                         ),
                                       ),
-                                  ],
+                                      if (card.price != null)
+                                        Padding(
+                                          padding: const EdgeInsets.all(4),
+                                          child: Text(
+                                            currencyProvider.formatValue(card.price!),  // Update this line
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
+                  );
+                },
+              ),
+            ],
+          ),
     );
   }
 
