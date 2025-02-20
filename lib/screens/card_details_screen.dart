@@ -35,7 +35,7 @@ class CardDetailsScreen extends StatefulWidget {
     required this.card,
     this.heroContext = 'details',  // Default value
     this.isFromBinder = false,  // Add default value
-    this.isFromCollection = false,  // Add default value
+    this.isFromCollection = false,  // Add default value,
   });
 
   @override
@@ -1357,7 +1357,7 @@ Widget _buildPricingSection() {
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(16),
                                         child: CachedNetworkImage(
-                                          imageUrl: widget.card.imageUrl,
+                                          imageUrl: widget.card.largeImageUrl,  // Changed from imageUrl
                                           fit: BoxFit.contain,
                                           // ...existing CachedNetworkImage properties...
                                         ),

@@ -183,7 +183,7 @@ class _CardGridItemState extends State<CardGridItem> {
 
     // Add null safety check for URL before creating NetworkImage
     return Image.network(
-      widget.card.imageUrl,
+      widget.card.largeImageUrl,  // Changed from imageUrl
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {
         _hasError = true;
