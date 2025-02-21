@@ -149,6 +149,47 @@ class PokemonSets {
     'XY Base Set': {'code': 'xy1', 'year': '2013', 'icon': '⚔️'},
   };
 
+  static const scarletViolet = {
+    'Prismatic Evolution': {'code': 'sv8pt5', 'year': '2024', 'icon': '💎'},
+    'Temporal Forces': {'code': 'sv5', 'year': '2024', 'icon': '⌛'},
+    'Paldean Fates': {'code': 'sv4pt5', 'year': '2024', 'icon': '🌟'},
+    // ...rest of existing SV sets...
+  };
+
+  static const swordShield = {
+    // ...existing sets...
+    'Darkness Ablaze': {'code': 'swsh3', 'year': '2020', 'icon': '🌑'},
+    'Rebel Clash': {'code': 'swsh2', 'year': '2020', 'icon': '⚔️'},
+    'Sword & Shield Base': {'code': 'swsh1', 'year': '2020', 'icon': '🛡️'},
+    // ...rest of existing SwSh sets...
+  };
+
+  static const sunMoon = {
+    // ...existing sets...
+    'Dragon Majesty': {'code': 'sm75', 'year': '2018', 'icon': '🐉'},
+    'Celestial Storm': {'code': 'sm7', 'year': '2018', 'icon': '✨'},
+    'Forbidden Light': {'code': 'sm6', 'year': '2018', 'icon': '💫'},
+    'Crimson Invasion': {'code': 'sm4', 'year': '2017', 'icon': '🌋'},
+    'Shining Legends': {'code': 'sm35', 'year': '2017', 'icon': '✨'},
+    // ...rest of existing SM sets...
+  };
+
+  static const blackWhite = {
+    // ...existing sets...
+    'Legendary Treasures': {'code': 'bw11', 'year': '2013', 'icon': '👑'},
+    'Boundaries Crossed': {'code': 'bw7', 'year': '2012', 'icon': '🌈'},
+    'Emerging Powers': {'code': 'bw2', 'year': '2011', 'icon': '💪'},
+    // ...rest of existing BW sets...
+  };
+
+  // Add new promotional sets category
+  static const promoSets = {
+    'SWSH Black Star Promos': {'code': 'swshp', 'year': '2019', 'icon': '⭐'},
+    'SM Black Star Promos': {'code': 'smp', 'year': '2016', 'icon': '⭐'},
+    'XY Black Star Promos': {'code': 'xyp', 'year': '2013', 'icon': '⭐'},
+    'BW Black Star Promos': {'code': 'bwp', 'year': '2010', 'icon': '⭐'},
+  };
+
   static const rarityFilters = [
     {'name': 'Holo Rare', 'icon': '✨', 'code': 'rarity:holo'},
     {'name': 'Ultra Rare', 'icon': '⭐', 'code': 'rarity:ultra'},
@@ -189,4 +230,47 @@ class PokemonSets {
   }
 
   static Map<String, String> get allSetIds => setIdMap;
+
+  static const rarities = [
+    // Special Arts & Full Arts
+    {
+      'name': 'Special Illustration',
+      'icon': '🎨',
+      'query': 'rarity:"Special Illustration Rare"',
+      'description': 'Special art cards'
+    },
+    {
+      'name': 'Full Art',
+      'icon': '🖼️',
+      'query': 'subtypes:"Trainer Gallery" OR rarity:"Rare Ultra" -subtypes:VMAX',
+      'description': 'Full art cards'
+    },
+    {
+      'name': 'Ancient',
+      'icon': '🗿',
+      'query': 'subtypes:ancient',
+      'description': 'Ancient variant cards'
+    },
+
+    // Ultra Rares - existing rarities...
+    {'name': 'Secret Rare', 'icon': '🌟', 'query': 'rarity:"Rare Secret"'},
+    {'name': 'Rainbow Rare', 'icon': '🌈', 'query': 'rarity:"Rare Rainbow"'},
+    // ...rest of existing rarities...
+  ];
+
+  // Update getSearchCategories to include promos
+  static Map<String, List<Map<String, dynamic>>> getSearchCategories() {
+    return {
+      'modern': _convertSetToSearchFormat(scarletViolet),
+      'swsh': _convertSetToSearchFormat(swordShield),
+      'sm': _convertSetToSearchFormat(sunMoon),
+      'xy': _convertSetToSearchFormat(xy),
+      'bw': _convertSetToSearchFormat(blackWhite),
+      'vintage': _convertSetToSearchFormat(classic),
+      'ex': _convertSetToSearchFormat(ex),
+      'promos': _convertSetToSearchFormat(promoSets),
+      'popular': popular,
+      'rarities': rarities,
+    };
+  }
 }

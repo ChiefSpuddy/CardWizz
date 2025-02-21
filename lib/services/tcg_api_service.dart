@@ -325,13 +325,14 @@ class TcgApiService {
     'sv9pt5': 'https://images.pokemontcg.io/sv9pt5/logo.png', // Twilight Masquerade
     'sv9': 'https://images.pokemontcg.io/sv9/logo.png',       // Stellar Crown
     'sv5': 'https://images.pokemontcg.io/sv5/logo.png',       // Temporal Forces
+    'sv4pt5': 'https://images.pokemontcg.io/sv4pt5/logo.png', // Paldean Fates
     'sv4': 'https://images.pokemontcg.io/sv4/logo.png',       // Paradox Rift
     'sv3pt5': 'https://images.pokemontcg.io/sv3pt5/logo.png', // 151
     'sv3': 'https://images.pokemontcg.io/sv3/logo.png',       // Obsidian Flames
     'sv2': 'https://images.pokemontcg.io/sv2/logo.png',       // Paldea Evolved
     'sv1': 'https://images.pokemontcg.io/sv1/logo.png',       // Scarlet & Violet Base
 
-    // Sword & Shield Era
+    // Sword & Shield Era through Classic Sets
     'swsh12pt5': 'https://images.pokemontcg.io/swsh12pt5/logo.png',
     'swsh12': 'https://images.pokemontcg.io/swsh12/logo.png',
     'swsh11': 'https://images.pokemontcg.io/swsh11/logo.png',
@@ -363,6 +364,7 @@ class TcgApiService {
     'sm1': 'https://images.pokemontcg.io/sm1/logo.png',      // Sun & Moon Base
     'sm115': 'https://images.pokemontcg.io/sm115/logo.png',  // Hidden Fates
     'sm35': 'https://images.pokemontcg.io/sm35/logo.png',    // Shining Legends
+    'sm75': 'https://images.pokemontcg.io/sm75/logo.png',    // Dragon Majesty
 
     // XY Era
     'xy12': 'https://images.pokemontcg.io/xy12/logo.png',    // Evolutions
@@ -447,6 +449,12 @@ class TcgApiService {
     'ecard1': 'https://images.pokemontcg.io/ecard1/logo.png', // Expedition Base Set
     'ecard2': 'https://images.pokemontcg.io/ecard2/logo.png', // Aquapolis
     'ecard3': 'https://images.pokemontcg.io/ecard3/logo.png', // Skyridge
+
+    // Promo Sets
+    'swshp': 'https://images.pokemontcg.io/swshp/logo.png',    // SWSH Black Star Promos
+    'smp': 'https://images.pokemontcg.io/smp/logo.png',        // SM Black Star Promos
+    'xyp': 'https://images.pokemontcg.io/xyp/logo.png',        // XY Black Star Promos
+    'bwp': 'https://images.pokemontcg.io/bwp/logo.png',        // BW Black Star Promos
   };
 
   // Add this method near the getCardPrice and searchCards methods
@@ -582,5 +590,10 @@ class TcgApiService {
       default:
         return 'set.id:$setId';
     }
+  }
+
+  Future<Map<String, dynamic>> getSets() async {
+    final response = await _dio.get('/sets');
+    return response.data;
   }
 }
