@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import '../providers/currency_provider.dart';
 import '../l10n/app_localizations.dart';  // Add this import
 import '../constants/layout.dart';  // Add this import
+import '../constants/sets.dart';  // Add this import at the top
 
 // Move enum outside the class
 enum SearchMode { cards, sets }
@@ -52,282 +53,6 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   bool _isHistoryLoading = true;
   bool _isInitialSearch = true;
   bool _showCategories = true; // Add this
-
-  // Replace all the old search constants with new organized ones
-  static const searchCategories = {
-    'vintage': [
-      {'name': 'Base Set', 'icon': '📦', 'year': '1999', 'query': 'set.id:base1', 'description': 'Original Pokemon TCG set'},
-      {'name': 'Jungle', 'icon': '🌿', 'year': '1999', 'query': 'set.id:base2', 'description': 'Second Base Set expansion'},
-      {'name': 'Fossil', 'icon': '🦴', 'year': '1999', 'query': 'set.id:base3', 'description': 'Ancient Pokemon cards'},
-      {'name': 'Base Set 2', 'icon': '2️⃣', 'year': '2000', 'query': 'set.id:base4', 'description': 'Base Set revision'},
-      {'name': 'Team Rocket', 'icon': '🚀', 'year': '2000', 'query': 'set.id:base5', 'description': 'Evil team themed set'},
-      {'name': 'Legendary Collection', 'icon': '👑', 'year': '2002', 'query': 'set.id:base6', 'description': 'Best of Base-Fossil'},
-      {'name': 'Gym Heroes', 'icon': '🏃', 'year': '2000', 'query': 'set.id:gym1', 'description': 'Gym Leader cards'},
-      {'name': 'Gym Challenge', 'icon': '🏆', 'year': '2000', 'query': 'set.id:gym2', 'description': 'Gym Leader cards'},
-      {'name': 'Neo Genesis', 'icon': '✨', 'year': '2000', 'query': 'set.id:neo1', 'description': 'First Neo series set'},
-      {'name': 'Neo Discovery', 'icon': '🔍', 'year': '2001', 'query': 'set.id:neo2', 'description': 'Neo Discovery set'},
-      {'name': 'Neo Revelation', 'icon': '📜', 'year': '2001', 'query': 'set.id:neo3', 'description': 'Neo Revelation set'},
-      {'name': 'Neo Destiny', 'icon': '⭐', 'year': '2002', 'query': 'set.id:neo4', 'description': 'Neo Destiny set'},
-      {'name': 'Southern Islands', 'icon': '🏝️', 'year': '2001', 'query': 'set.id:si1', 'description': 'Tropical promo set'},
-      {'name': 'Expedition', 'icon': '🗺️', 'year': '2002', 'query': 'set.id:ecard1', 'description': 'First e-Card set'},
-      {'name': 'Aquapolis', 'icon': '🌊', 'year': '2003', 'query': 'set.id:ecard2', 'description': 'Second e-Card set'},
-      {'name': 'Skyridge', 'icon': '🌅', 'year': '2003', 'query': 'set.id:ecard3', 'description': 'Final e-Card set'},
-    ],
-    'modern': [
-      {'name': 'Prismatic Evolution', 'icon': '💎', 'release': '2024', 'query': 'set.id:sv8pt5', 'description': 'Special set'},
-      {'name': 'Surging Sparks', 'icon': '⚡', 'release': '2024', 'query': 'set.id:sv8', 'description': 'Electric themed set'},
-      {'name': '151', 'icon': '🌟', 'release': '2023', 'query': 'set.id:sv3pt5', 'description': 'Original 151 Pokemon'},
-      {'name': 'Temporal Forces', 'icon': '⌛', 'release': '2024', 'query': 'set.id:sv5', 'description': 'Time themed set'},
-      {'name': 'Paradox Rift', 'icon': '🌀', 'release': '2023', 'query': 'set.id:sv4', 'description': 'Paradox Pokemon'},
-      {'name': 'Obsidian Flames', 'icon': '🔥', 'release': '2023', 'query': 'set.id:sv3', 'description': 'Fire themed set'},
-      {'name': 'Paldea Evolved', 'icon': '🌟', 'release': '2023', 'query': 'set.id:sv2', 'description': 'Paldean Pokemon'},
-      {'name': 'Scarlet & Violet', 'icon': '⚔️', 'release': '2023', 'query': 'set.id:sv1', 'description': 'Base SV set'},
-    ],
-    'swsh': [  // Reorganized Sword & Shield sets
-      {'name': 'Crown Zenith', 'icon': '👑', 'release': '2023', 'query': 'set.id:swsh12pt5', 'description': 'Final SwSh set'},
-      {'name': 'Silver Tempest', 'icon': '⚡', 'release': '2022', 'query': 'set.id:swsh12', 'description': 'Silver themed'},
-      {'name': 'Lost Origin', 'icon': '🌌', 'release': '2022', 'query': 'set.id:swsh11', 'description': 'Lost Zone cards'},
-      {'name': 'Astral Radiance', 'icon': '✨', 'release': '2022', 'query': 'set.id:swsh10', 'description': 'Astral cards'},
-      {'name': 'Brilliant Stars', 'icon': '💫', 'release': '2022', 'query': 'set.id:swsh9', 'description': 'Brilliant cards'},
-      {'name': 'Evolving Skies', 'icon': '🌤️', 'release': '2021', 'query': 'set.id:swsh7', 'description': 'Dragon themed'},
-      {'name': 'Chilling Reign', 'icon': '❄️', 'release': '2021', 'query': 'set.id:swsh6', 'description': 'Ice themed'},
-      {'name': 'Battle Styles', 'icon': '⚔️', 'release': '2021', 'query': 'set.id:swsh5', 'description': 'Battle themed'},
-      {'name': 'Shining Fates', 'icon': '✨', 'release': '2021', 'query': 'set.id:swsh45', 'description': 'Shiny Pokemon'},
-      {'name': 'Vivid Voltage', 'icon': '⚡', 'release': '2020', 'query': 'set.id:swsh4', 'description': 'Electric themed'},
-      {'name': 'Darkness Ablaze', 'icon': '🔥', 'release': '2020', 'query': 'set.id:swsh3', 'description': 'Fire themed'},
-      {'name': 'Rebel Clash', 'icon': '🛡️', 'release': '2020', 'query': 'set.id:swsh2', 'description': 'Rebellion themed'},
-      {'name': "Champion's Path", 'icon': '🏆', 'release': '2020', 'query': 'set.id:swsh35', 'description': 'Champion themed'},
-    ],
-    'sm': [  // Add Sun & Moon era
-      {'name': 'Lost Thunder', 'icon': '⚡', 'release': '2018', 'query': 'set.id:sm8', 'description': 'Lost Thunder set'},
-      {'name': 'Ultra Prism', 'icon': '💠', 'release': '2018', 'query': 'set.id:sm5', 'description': 'Ultra Prism set'},
-      {'name': 'Burning Shadows', 'icon': '🔥', 'release': '2017', 'query': 'set.id:sm3', 'description': 'Burning Shadows set'},
-      {'name': 'Guardians Rising', 'icon': '🛡️', 'release': '2017', 'query': 'set.id:sm2', 'description': 'Guardians Rising set'},
-      {'name': 'Sun & Moon Base', 'icon': '☀️', 'release': '2017', 'query': 'set.id:sm1', 'description': 'Base Sun & Moon set'},
-      {'name': 'Team Up', 'icon': '🤝', 'release': '2019', 'query': 'set.id:sm9', 'description': 'Team Up set'},
-      {'name': 'Unbroken Bonds', 'icon': '🔗', 'release': '2019', 'query': 'set.id:sm10', 'description': 'Unbroken Bonds set'},
-      {'name': 'Unified Minds', 'icon': '🧠', 'release': '2019', 'query': 'set.id:sm11', 'description': 'Unified Minds set'},
-      {'name': 'Cosmic Eclipse', 'icon': '🌌', 'release': '2019', 'query': 'set.id:sm12', 'description': 'Cosmic Eclipse set'},
-      {'name': 'Hidden Fates', 'icon': '🎯', 'release': '2019', 'query': 'set.id:sm115', 'description': 'Hidden Fates set'},
-    ],
-    'ex': [  // Add EX Series
-      {'name': 'Ruby & Sapphire', 'icon': '💎', 'year': '2003', 'query': 'set.id:ex1', 'description': 'EX Ruby & Sapphire'},
-      {'name': 'Sandstorm', 'icon': '🏜️', 'year': '2003', 'query': 'set.id:ex2', 'description': 'EX Sandstorm'},
-      {'name': 'Dragon', 'icon': '🐉', 'year': '2003', 'query': 'set.id:ex3', 'description': 'EX Dragon'},
-      {'name': 'Hidden Legends', 'icon': '🗿', 'year': '2004', 'query': 'set.id:ex5', 'description': 'EX Hidden Legends'},
-      {'name': 'FireRed & LeafGreen', 'icon': '🔥', 'year': '2004', 'query': 'set.id:ex6', 'description': 'EX FireRed & LeafGreen'},
-      {'name': 'Team Rocket Returns', 'icon': '🚀', 'year': '2004', 'query': 'set.id:ex7', 'description': 'EX Team Rocket Returns'},
-      {'name': 'Deoxys', 'icon': '🧬', 'year': '2005', 'query': 'set.id:ex8', 'description': 'EX Deoxys'},
-      {'name': 'Emerald', 'icon': '💚', 'year': '2005', 'query': 'set.id:ex9', 'description': 'EX Emerald'},
-      {'name': 'Unseen Forces', 'icon': '👻', 'year': '2005', 'query': 'set.id:ex10', 'description': 'EX Unseen Forces'},
-      {'name': 'Delta Species', 'icon': '🔮', 'year': '2005', 'query': 'set.id:ex11', 'description': 'EX Delta Species'},
-      {'name': 'Legend Maker', 'icon': '📖', 'year': '2006', 'query': 'set.id:ex12', 'description': 'EX Legend Maker'},
-      {'name': 'Holon Phantoms', 'icon': '🌌', 'year': '2006', 'query': 'set.id:ex13', 'description': 'EX Holon Phantoms'},
-      {'name': 'Crystal Guardians', 'icon': '💎', 'year': '2006', 'query': 'set.id:ex14', 'description': 'EX Crystal Guardians'},
-      {'name': 'Dragon Frontiers', 'icon': '🐲', 'year': '2006', 'query': 'set.id:ex15', 'description': 'EX Dragon Frontiers'},
-      {'name': 'Power Keepers', 'icon': '⚡', 'year': '2007', 'query': 'set.id:ex16', 'description': 'EX Power Keepers'},
-    ],
-    'special': [
-      {'name': 'Special Illustration', 'icon': '🎨', 'query': 'rarity:"Special Illustration Rare"', 'description': 'Special art cards'},
-      {'name': 'Ancient', 'icon': '🗿', 'query': 'subtypes:ancient', 'description': 'Ancient variant cards'},
-      {'name': 'Full Art', 'icon': '👤', 'query': 'subtypes:"Trainer Gallery" OR rarity:"Rare Ultra" -subtypes:VMAX', 'description': 'Full art cards'},
-    ],
-    'popular': [
-      {
-        'name': 'Most Valuable', 
-        'icon': '💰',
-        'query': 'supertype:pokemon', // Keep query simple
-        'description': 'Most valuable cards',
-        'isValueSearch': true,
-      },
-      {'name': 'Charizard', 'icon': '🔥', 'query': 'name:charizard', 'description': 'All Charizard cards'},
-      {'name': 'Lugia', 'icon': '🌊', 'query': 'name:lugia', 'description': 'All Lugia cards'},
-      {'name': 'Giratina', 'icon': '👻', 'query': 'name:giratina', 'description': 'All Giratina cards'},
-      {'name': 'Pikachu', 'icon': '⚡', 'query': 'name:pikachu', 'description': 'All Pikachu cards'},
-      {'name': 'Mewtwo', 'icon': '🧬', 'query': 'name:mewtwo', 'description': 'All Mewtwo cards'},
-      {'name': 'Mew', 'icon': '💫', 'query': 'name:mew -name:mewtwo', 'description': 'All Mew cards'},
-      {'name': 'Umbreon', 'icon': '🌙', 'query': 'name:umbreon', 'description': 'All Umbreon cards'},
-    ],
-    'xy': [  // Add XY Series
-      {'name': 'XY Base Set', 'icon': '⚔️', 'release': '2014', 'query': 'set.id:xy1', 'description': 'XY Base Set'},
-      {'name': 'Flashfire', 'icon': '🔥', 'release': '2014', 'query': 'set.id:xy2', 'description': 'Fire themed set'},
-      {'name': 'Furious Fists', 'icon': '👊', 'release': '2014', 'query': 'set.id:xy3', 'description': 'Fighting themed'},
-      {'name': 'Phantom Forces', 'icon': '👻', 'release': '2014', 'query': 'set.id:xy4', 'description': 'Ghost/Psychic themed'},
-      {'name': 'Primal Clash', 'icon': '🌊', 'release': '2015', 'query': 'set.id:xy5', 'description': 'Primal Reversion'},
-      {'name': 'Roaring Skies', 'icon': '🌪️', 'release': '2015', 'query': 'set.id:xy6', 'description': 'Flying themed'},
-      {'name': 'Ancient Origins', 'icon': '🏺', 'release': '2015', 'query': 'set.id:xy7', 'description': 'Ancient traits'},
-      {'name': 'BREAKthrough', 'icon': '💥', 'release': '2015', 'query': 'set.id:xy8', 'description': 'BREAK Evolution'},
-      {'name': 'BREAKpoint', 'icon': '⚡', 'release': '2016', 'query': 'set.id:xy9', 'description': 'BREAK Evolution'},
-      {'name': 'Fates Collide', 'icon': '🎲', 'release': '2016', 'query': 'set.id:xy10', 'description': 'Zygarde themed'},
-      {'name': 'Steam Siege', 'icon': '🚂', 'release': '2016', 'query': 'set.id:xy11', 'description': 'Volcanion themed'},
-      {'name': 'Evolutions', 'icon': '🧬', 'release': '2016', 'query': 'set.id:xy12', 'description': 'Base Set remake'},
-      {'name': 'Generations', 'icon': '🌟', 'release': '2016', 'query': 'set.id:g1', 'description': '20th Anniversary'},
-    ],
-
-    'bw': [  // Add Black & White Series
-      {'name': 'Black & White', 'icon': '⚫', 'release': '2011', 'query': 'set.id:bw1', 'description': 'BW Base Set'},
-      {'name': 'Emerging Powers', 'icon': '💪', 'release': '2011', 'query': 'set.id:bw2', 'description': 'New Pokemon'},
-      {'name': 'Noble Victories', 'icon': '🏆', 'release': '2011', 'query': 'set.id:bw3', 'description': 'Victory themed'},
-      {'name': 'Next Destinies', 'icon': '🔮', 'release': '2012', 'query': 'set.id:bw4', 'description': 'Future themed'},
-      {'name': 'Dark Explorers', 'icon': '🌑', 'release': '2012', 'query': 'set.id:bw5', 'description': 'Dark Pokemon'},
-      {'name': 'Dragons Exalted', 'icon': '🐉', 'release': '2012', 'query': 'set.id:bw6', 'description': 'Dragon themed'},
-      {'name': 'Boundaries Crossed', 'icon': '🌈', 'release': '2012', 'query': 'set.id:bw7', 'description': 'Black/White Kyurem'},
-      {'name': 'Plasma Storm', 'icon': '⚡', 'release': '2013', 'query': 'set.id:bw8', 'description': 'Team Plasma'},
-      {'name': 'Plasma Freeze', 'icon': '❄️', 'release': '2013', 'query': 'set.id:bw9', 'description': 'Team Plasma'},
-      {'name': 'Plasma Blast', 'icon': '💥', 'release': '2013', 'query': 'set.id:bw10', 'description': 'Team Plasma'},
-      {'name': 'Legendary Treasures', 'icon': '💎', 'release': '2013', 'query': 'set.id:bw11', 'description': 'Radiant Collection'},
-    ],
-
-    'hgss': [  // Add HeartGold & SoulSilver Series
-      {'name': 'HeartGold SoulSilver', 'icon': '💗', 'release': '2010', 'query': 'set.id:hgss1', 'description': 'HGSS Base Set'},
-      {'name': 'Unleashed', 'icon': '🔓', 'release': '2010', 'query': 'set.id:hgss2', 'description': 'Unleashed set'},
-      {'name': 'Undaunted', 'icon': '🦁', 'release': '2010', 'query': 'set.id:hgss3', 'description': 'Undaunted set'},
-      {'name': 'Triumphant', 'icon': '🏅', 'release': '2010', 'query': 'set.id:hgss4', 'description': 'Triumphant set'},
-      {'name': 'Call of Legends', 'icon': '📞', 'release': '2011', 'query': 'set.id:col1', 'description': 'Shiny Pokemon'},
-    ],
-
-    'dp': [  // Add Diamond & Pearl Series
-      {'name': 'Diamond & Pearl', 'icon': '💎', 'release': '2007', 'query': 'set.id:dp1', 'description': 'DP Base Set'},
-      {'name': 'Mysterious Treasures', 'icon': '🗝️', 'release': '2007', 'query': 'set.id:dp2', 'description': 'Treasures set'},
-      {'name': 'Secret Wonders', 'icon': '✨', 'release': '2007', 'query': 'set.id:dp3', 'description': 'Wonders set'},
-      {'name': 'Great Encounters', 'icon': '🤝', 'release': '2008', 'query': 'set.id:dp4', 'description': 'Encounters set'},
-      {'name': 'Majestic Dawn', 'icon': '🌅', 'release': '2008', 'query': 'set.id:dp5', 'description': 'Dawn set'},
-      {'name': 'Legends Awakened', 'icon': '🐉', 'release': '2008', 'query': 'set.id:dp6', 'description': 'Legends set'},
-      {'name': 'Stormfront', 'icon': '⛈️', 'release': '2008', 'query': 'set.id:dp7', 'description': 'Storm set'},
-      {'name': 'Platinum', 'icon': '⚪', 'release': '2009', 'query': 'set.id:pl1', 'description': 'Platinum Base'},
-      {'name': 'Rising Rivals', 'icon': '⚔️', 'release': '2009', 'query': 'set.id:pl2', 'description': 'Rivals set'},
-      {'name': 'Supreme Victors', 'icon': '👑', 'release': '2009', 'query': 'set.id:pl3', 'description': 'Victors set'},
-      {'name': 'Arceus', 'icon': '🔱', 'release': '2009', 'query': 'set.id:pl4', 'description': 'Arceus set'},
-    ],
-    'rarities': [
-      // Ultra Rares
-      {
-        'name': 'Secret Rare',
-        'icon': '🌟',
-        'query': 'rarity:"Rare Secret"',
-        'description': 'Secret Rare cards'
-      },
-      {
-        'name': 'Rainbow Rare',
-        'icon': '🌈',
-        'query': 'rarity:"Rare Rainbow"',
-        'description': 'Rainbow Rare cards'
-      },
-      {
-        'name': 'Amazing Rare',
-        'icon': '✨',
-        'query': 'rarity:"Amazing Rare"',
-        'description': 'Amazing Rare cards'
-      },
-      {
-        'name': 'Shining',
-        'icon': '💫',
-        'query': 'rarity:"Rare Shining"',
-        'description': 'Shining cards'
-      },
-
-      // Modern Era
-      {
-        'name': 'VMAX',
-        'icon': '⚡',
-        'query': 'rarity:"Rare Holo VMAX"',
-        'description': 'VMAX cards'
-      },
-      {
-        'name': 'V Cards',
-        'icon': '⚔️',
-        'query': 'rarity:"Rare Holo V"',
-        'description': 'V cards'
-      },
-      {
-        'name': 'GX Cards',
-        'icon': '🔥',
-        'query': 'rarity:"Rare Holo GX"',
-        'description': 'GX cards'
-      },
-      {
-        'name': 'Shiny GX',
-        'icon': '✨',
-        'query': 'rarity:"Rare Shiny GX"',
-        'description': 'Shiny GX cards'
-      },
-
-      // Classic Era
-      {
-        'name': 'EX Cards',
-        'icon': '💪',
-        'query': 'rarity:"Rare Holo EX"',
-        'description': 'EX cards'
-      },
-      {
-        'name': 'LEGEND',
-        'icon': '👑',
-        'query': 'rarity:"LEGEND"',
-        'description': 'LEGEND cards'
-      },
-      {
-        'name': 'LV.X',
-        'icon': '⭐',
-        'query': 'rarity:"Rare Holo LV.X"',
-        'description': 'Level X cards'
-      },
-      {
-        'name': 'Prime',
-        'icon': '🏆',
-        'query': 'rarity:"Rare Prime"',
-        'description': 'Prime cards'
-      },
-      {
-        'name': 'Star Cards',
-        'icon': '⭐',
-        'query': 'rarity:"Rare Holo Star"',
-        'description': 'Star cards'
-      },
-      {
-        'name': 'BREAK',
-        'icon': '💥',
-        'query': 'rarity:"Rare BREAK"',
-        'description': 'BREAK cards'
-      },
-      {
-        'name': 'ACE SPEC',
-        'icon': '🎯',
-        'query': 'rarity:"Rare ACE"',
-        'description': 'ACE SPEC cards'
-      },
-      // Basic Rarities
-      {
-        'name': 'Holo Rare',
-        'icon': '✨',
-        'query': 'rarity:"Rare Holo"',
-        'description': 'Holo Rare cards'
-      },
-      {
-        'name': 'Rare',
-        'icon': '⚪',
-        'query': 'rarity:"Rare"',
-        'description': 'Rare cards'
-      },
-      {
-        'name': 'Uncommon',
-        'icon': '⚫',
-        'query': 'rarity:"Uncommon"',
-        'description': 'Uncommon cards'
-      },
-      {
-        'name': 'Common',
-        'icon': '⚫',
-        'query': 'rarity:"Common"',
-        'description': 'Common cards'
-      },
-      {
-        'name': 'Promo',
-        'icon': '🎁',
-        'query': 'rarity:"Promo"',
-        'description': 'Promotional cards'
-      },
-    ],
-  };
 
   // Add these fields after other declarations
   final _scrollController = ScrollController();
@@ -487,8 +212,8 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
 // Add helper method to detect set searches
 List<Map<String, dynamic>> _getAllSets() {
   return [
-    ...searchCategories['vintage']!,
-    ...searchCategories['modern']!,
+    ...PokemonSets.getSetsForCategory('vintage'),
+    ...PokemonSets.getSetsForCategory('modern'),
   ];
 }
 
@@ -644,7 +369,7 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
       
       // If set search failed, try by name
       if (data.isEmpty && query.startsWith('set.id:')) {
-        final setMap = searchCategories['modern']!
+        final setMap = PokemonSets.getSetsForCategory('modern')
             .firstWhere((s) => s['query'] == query, orElse: () => {'name': ''});
         final String? setName = setMap['name'] as String?;
         
@@ -850,216 +575,95 @@ Future<void> _performQuickSearch(Map<String, dynamic> searchItem) async {
 
 // Update _buildQuickSearches method to use the new scroll indicator
 Widget _buildSearchCategories() {
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      _buildSearchSection('Vintage Sets', searchCategories['vintage']!, Icons.auto_awesome),
-      _buildSearchSection('Latest Sets', searchCategories['modern']!, Icons.new_releases),
-      _buildSearchSection('Sword & Shield', searchCategories['swsh']!, Icons.shield),
-      _buildSearchSection('Sun & Moon', searchCategories['sm']!, Icons.wb_sunny),
-      _buildSearchSection('XY Series', searchCategories['xy']!, Icons.flash_on),
-      _buildSearchSection('Black & White', searchCategories['bw']!, Icons.brightness_2),
-      _buildSearchSection('HeartGold SoulSilver', searchCategories['hgss']!, Icons.favorite),
-      _buildSearchSection('Diamond & Pearl', searchCategories['dp']!, Icons.diamond),
-      _buildSearchSection('EX Series', searchCategories['ex']!, Icons.extension),
-      _buildSpecialSearches('Special Cards', searchCategories['special']!, Icons.stars),
-      _buildSpecialSearches('Popular', searchCategories['popular']!, Icons.local_fire_department),
-      _buildSearchSection('Card Rarities', searchCategories['rarities']!, Icons.auto_awesome),
-    ],
-  );
-}
+  // Define the eras in order
+  final eras = [
+    {'title': 'Latest Sets', 'sets': PokemonSets.scarletViolet},
+    {'title': 'Sword & Shield', 'sets': PokemonSets.swordShield},
+    {'title': 'Sun & Moon', 'sets': PokemonSets.sunMoon},
+    {'title': 'XY Series', 'sets': PokemonSets.xy},
+    {'title': 'Black & White', 'sets': PokemonSets.blackWhite},
+    {'title': 'HeartGold SoulSilver', 'sets': PokemonSets.heartGoldSoulSilver},
+    {'title': 'Diamond & Pearl', 'sets': PokemonSets.diamondPearl},
+    {'title': 'EX Series', 'sets': PokemonSets.ex},
+    {'title': 'e-Card Series', 'sets': PokemonSets.eCard},
+    {'title': 'Classic WOTC', 'sets': PokemonSets.classic},
+  ];
 
-Widget _buildSearchSection(String title, List<Map<String, dynamic>> items, IconData icon) {
-  final colorScheme = Theme.of(context).colorScheme;
-  final showLabels = title == 'Special Cards' || 
-                     title == 'Popular' || 
-                     title == 'Card Rarities';
-  
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-        child: Row(
-          children: [
-            Text(
-              title,
+  return ListView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    itemCount: eras.length,
+    itemBuilder: (context, index) {
+      final era = eras[index];
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              era['title'] as String,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: colorScheme.onBackground,
+                color: Theme.of(context).colorScheme.onBackground,
               ),
             ),
-            const Spacer(),
-            Icon(
-              Icons.chevron_right,
-              size: 14,
-              color: colorScheme.primary.withOpacity(0.5),
-            ),
-          ],
-        ),
-      ),
-      SizedBox(
-        height: showLabels ? 108 : 80, // Adjust height based on whether labels are shown
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          itemCount: items.length,
-          itemBuilder: (context, index) => _buildSetCard(
-            items[index],
-            showLabel: showLabels, // Pass showLabel parameter
           ),
-        ),
-      ),
-    ],
-  );
-}
-
-// Add new method for special/popular searches with text
-Widget _buildSpecialSearches(String title, List<Map<String, dynamic>> items, IconData icon) {
-  final colorScheme = Theme.of(context).colorScheme;
-  
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-        child: Row(
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onBackground,
-              ),
+          SizedBox(
+            height: 80, // Reduced from 120 to 80
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: (era['sets'] as Map<String, Map<String, dynamic>>).length,
+              itemBuilder: (context, index) {
+                final set = (era['sets'] as Map<String, Map<String, dynamic>>)
+                    .entries.toList()[index];
+                return _buildSetLogoCard({
+                  'name': set.key,
+                  'query': 'set.id:${set.value['code']}',
+                  'icon': set.value['icon'],
+                  'year': set.value['year'],
+                });
+              },
             ),
-            const Spacer(),
-            Icon(
-              Icons.chevron_right,
-              size: 14,
-              color: colorScheme.primary.withOpacity(0.5),
-            ),
-          ],
-        ),
-      ),
-      SizedBox(
-        height: 48, // Smaller height for text-based items
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          itemCount: items.length,
-          itemBuilder: (context, index) => _buildSpecialSearchCard(items[index]),
-        ),
-      ),
-    ],
-  );
-}
-
-// Add method for special search card with text
-Widget _buildSpecialSearchCard(Map<String, dynamic> item) {
-  final colorScheme = Theme.of(context).colorScheme;
-  
-  return Card(
-    elevation: 0,
-    margin: const EdgeInsets.symmetric(horizontal: 4),
-    child: InkWell(
-      onTap: () => _performQuickSearch(item),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              item['icon'],
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              item['name'],
-              style: TextStyle(
-                fontSize: 13,
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-// Update the search card style
-Widget _buildSearchCard(Map<String, dynamic> item) {
-  final colorScheme = Theme.of(context).colorScheme;
-  
-  return Card(
-    elevation: 0,
-    margin: const EdgeInsets.symmetric(horizontal: 4),
-    clipBehavior: Clip.antiAlias,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: InkWell(
-      onTap: () => _performQuickSearch(item),
-      child: Container(
-        width: 110,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.surfaceVariant.withOpacity(0.5),
-              colorScheme.surface,
-            ],
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(8),
-              ),
+        ],
+      );
+    },
+  );
+}
+
+// Rename to avoid duplicate declaration
+Widget _buildSetLogoCard(Map<String, dynamic> item) {
+  final setCode = item['query'].toString().replaceAll('set.id:', '');
+  final logoUrl = 'https://images.pokemontcg.io/$setCode/logo.png';
+  
+  return InkWell(
+    onTap: () {
+      setState(() {
+        _currentSort = 'cardmarket.prices.averageSellPrice';
+        _sortAscending = false;
+      });
+      _performQuickSearch(item);
+    },
+    child: Container(
+      width: 120, // Increased from 82
+      height: 60, // Increased from 50
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Center(
+        child: Image.network(
+          logoUrl,
+          fit: BoxFit.contain,
+          height: 45, // Increased from 32
+          errorBuilder: (_, __, ___) => Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: FittedBox(
               child: Text(
                 item['icon'],
-                style: const TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 24), // Increased from 18
               ),
             ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    item['name'],
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 11,
-                      color: colorScheme.onSurface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (item['year'] != null || item['release'] != null)
-                    Text(
-                      item['year'] ?? item['release'] ?? '',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                    ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     ),
@@ -1195,7 +799,7 @@ String _formatSearchForDisplay(String query) {
   
   if (query.contains('subtypes:') || query.contains('rarity:')) {
     // Find matching special category
-    final specials = searchCategories['special']!;
+    final specials = PokemonSets.getSetsForCategory('special');
     final matchingSpecial = specials.firstWhere(
       (special) => special['query'] as String == query,
       orElse: () => {'name': query},
@@ -1370,17 +974,22 @@ String _formatSearchForDisplay(String query) {
   }
 
   String _getSetIcon(String setName) {
-    // Look in all categories for the set icon
-    for (final category in searchCategories.values) {
-      final matchingSet = category.firstWhere(
-        (set) => (set['name'] as String) == setName,
-        orElse: () => <String, String>{'icon': '📦', 'name': ''}, // Fixed typo in parameter name
-      );
-      if ((matchingSet['name'] as String) == setName) {
-        return matchingSet['icon'] as String;
-      }
-    }
-    return '📦';
+    // Look in all set lists for the set icon
+    final allSets = [
+      ...PokemonSets.scarletViolet.entries,
+      ...PokemonSets.swordShield.entries,
+      ...PokemonSets.sunMoon.entries,
+      ...PokemonSets.xy.entries,
+      ...PokemonSets.classic.entries,
+      ...PokemonSets.ex.entries,
+    ];
+    
+    final matchingSet = allSets.firstWhere(
+      (entry) => entry.key == setName,
+      orElse: () => MapEntry('', {'icon': '📦'}),
+    );
+
+    return matchingSet.value['icon'] as String? ?? '📦';
   }
 
   // Add method to manage image loading
@@ -2021,10 +1630,12 @@ String _formatSearchForDisplay(String query) {
     });
   }
 
-  Widget _buildSetCard(Map<String, dynamic> item, {bool showLabel = false}) { // Add showLabel parameter
+  Widget _buildSetCard(Map<String, dynamic> item, {bool showLabel = false}) {
   final colorScheme = Theme.of(context).colorScheme;
   final query = item['query'] as String;
   final isSetQuery = query.startsWith('set.id:');
+  final setCode = isSetQuery ? query.replaceAll('set.id:', '') : '';
+  final logoUrl = isSetQuery ? 'https://images.pokemontcg.io/$setCode/logo.png' : null;
   
   return Card(
     elevation: 0,
@@ -2037,28 +1648,26 @@ String _formatSearchForDisplay(String query) {
       onTap: () {
         if (isSetQuery) {
           setState(() {
-            _currentSort = 'cardmarket.prices.averageSellPrice';
-            _sortAscending = false;
+            _currentSort = 'number';
+            _sortAscending = true;
           });
         }
         _performQuickSearch(item);
       },
-      child: SizedBox(
+      child: Container(
         width: 100,
+        padding: const EdgeInsets.all(8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isSetQuery)
+            if (logoUrl != null)
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Image.network(
-                    _apiService.getSetLogo(query),
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Text(
-                      item['icon'],
-                      style: const TextStyle(fontSize: 24),
-                    ),
+                child: Image.network(
+                  logoUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Text(
+                    item['icon'],
+                    style: const TextStyle(fontSize: 24),
                   ),
                 ),
               )
@@ -2070,10 +1679,9 @@ String _formatSearchForDisplay(String query) {
                   style: const TextStyle(fontSize: 24),
                 ),
               ),
-            // Only show label if showLabel is true
             if (showLabel)
               Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   item['name'],
                   style: TextStyle(
