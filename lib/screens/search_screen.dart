@@ -13,9 +13,10 @@ import '../providers/currency_provider.dart';
 import '../l10n/app_localizations.dart';  // Add this import
 import '../constants/layout.dart';  // Add this import
 import '../constants/sets.dart';  // Add this import at the top
+import '../constants/japanese_sets.dart';  // Add this import
 
 // Move enum outside the class
-enum SearchMode { cards, sets }
+enum SearchMode { eng, jpn }
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -73,7 +74,7 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
   String? _lastQuery;
 
   // Add search mode state
-  SearchMode _searchMode = SearchMode.cards;
+  SearchMode _searchMode = SearchMode.eng;
   List<dynamic>? _setResults;
 
   @override
@@ -473,7 +474,7 @@ void _onSearchChanged(String query) {
         _currentPage = 1;
         _isInitialSearch = true;
       });
-      if (_searchMode == SearchMode.cards) {
+      if (_searchMode == SearchMode.eng) {
         _performSearch(query);
       } else {
         _performSetSearch(query);
@@ -576,25 +577,31 @@ Future<void> _performQuickSearch(Map<String, dynamic> searchItem) async {
 // Update _buildQuickSearches method to use the new scroll indicator
 Widget _buildSearchCategories() {
   // Define the eras in order
-  final eras = [
-    {'title': 'Latest Sets', 'sets': PokemonSets.scarletViolet},
-    {'title': 'Sword & Shield', 'sets': PokemonSets.swordShield},
-    {'title': 'Sun & Moon', 'sets': PokemonSets.sunMoon},
-    {'title': 'XY Series', 'sets': PokemonSets.xy},
-    {'title': 'Black & White', 'sets': PokemonSets.blackWhite},
-    {'title': 'HeartGold SoulSilver', 'sets': PokemonSets.heartGoldSoulSilver},
-    {'title': 'Diamond & Pearl', 'sets': PokemonSets.diamondPearl},
-    {'title': 'EX Series', 'sets': PokemonSets.ex},
-    {'title': 'e-Card Series', 'sets': PokemonSets.eCard},
-    {'title': 'Classic WOTC', 'sets': PokemonSets.classic},
-  ];
+  final sets = _searchMode == SearchMode.eng
+      ? [
+          {'title': 'Latest Sets', 'sets': PokemonSets.scarletViolet},
+          {'title': 'Sword & Shield', 'sets': PokemonSets.swordShield},
+          {'title': 'Sun & Moon', 'sets': PokemonSets.sunMoon},
+          {'title': 'XY Series', 'sets': PokemonSets.xy},
+          {'title': 'Black & White', 'sets': PokemonSets.blackWhite},
+          {'title': 'HeartGold SoulSilver', 'sets': PokemonSets.heartGoldSoulSilver},
+          {'title': 'Diamond & Pearl', 'sets': PokemonSets.diamondPearl},
+          {'title': 'EX Series', 'sets': PokemonSets.ex},
+          {'title': 'e-Card Series', 'sets': PokemonSets.eCard},
+          {'title': 'Classic WOTC', 'sets': PokemonSets.classic},
+        ]
+      : [
+          {'title': 'Latest Sets', 'sets': JapaneseSets.scarletViolet},
+          {'title': 'Sword & Shield', 'sets': JapaneseSets.swordShield},
+          // Add more Japanese set categories...
+        ];
 
   return ListView.builder(
     shrinkWrap: true,
     physics: const NeverScrollableScrollPhysics(),
-    itemCount: eras.length,
+    itemCount: sets.length,
     itemBuilder: (context, index) {
-      final era = eras[index];
+      final era = sets[index];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1153,7 +1160,7 @@ String _formatSearchForDisplay(String query) {
               child: TextField( // Remove GestureDetector wrapper
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: _searchMode == SearchMode.cards 
+                  hintText: _searchMode == SearchMode.eng 
                     ? 'Search cards...' 
                     : 'Search sets...',
                   border: InputBorder.none,
@@ -1228,12 +1235,12 @@ String _formatSearchForDisplay(String query) {
               },
               segments: [
                 ButtonSegment(
-                  value: SearchMode.cards,
+                  value: SearchMode.eng,
                   label: Container(
                     height: double.infinity,
                     width: MediaQuery.of(context).size.width * 0.44, // Make buttons wider
                     decoration: BoxDecoration(
-                      gradient: _searchMode == SearchMode.cards ? LinearGradient(
+                      gradient: _searchMode == SearchMode.eng ? LinearGradient(
                         // ...existing gradient...
                         colors: isDark ? [
                           Colors.blue[900]!,
@@ -1249,19 +1256,18 @@ String _formatSearchForDisplay(String query) {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.style,
-                          size: 16,
-                          color: _searchMode == SearchMode.cards
-                            ? Colors.white
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                        Text(
+                          '🇺🇸',
+                          style: TextStyle(
+                            fontSize: 13,
+                          ),
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Cards',
+                          'ENG',
                           style: TextStyle(
                             fontSize: 13,
-                            color: _searchMode == SearchMode.cards
+                            color: _searchMode == SearchMode.eng
                               ? Colors.white
                               : Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
@@ -1271,12 +1277,12 @@ String _formatSearchForDisplay(String query) {
                   ),
                 ),
                 ButtonSegment(
-                  value: SearchMode.sets,
+                  value: SearchMode.jpn,
                   label: Container(
                     height: double.infinity,
                     width: MediaQuery.of(context).size.width * 0.44, // Make buttons wider
                     decoration: BoxDecoration(
-                      gradient: _searchMode == SearchMode.sets ? LinearGradient(
+                      gradient: _searchMode == SearchMode.jpn ? LinearGradient(
                         // ...existing gradient...
                         colors: isDark ? [
                           Colors.blue[900]!,
@@ -1292,19 +1298,18 @@ String _formatSearchForDisplay(String query) {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.collections_bookmark,
-                          size: 16,
-                          color: _searchMode == SearchMode.sets
-                            ? Colors.white
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                        Text(
+                          '🇯🇵',
+                          style: TextStyle(
+                            fontSize: 13,
+                          ),
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Sets',
+                          'JPN',
                           style: TextStyle(
                             fontSize: 13,
-                            color: _searchMode == SearchMode.sets
+                            color: _searchMode == SearchMode.jpn
                               ? Colors.white
                               : Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
@@ -1382,7 +1387,7 @@ String _formatSearchForDisplay(String query) {
             padding: const EdgeInsets.all(16),
             sliver: SliverToBoxAdapter(
               child: Text(
-                _searchMode == SearchMode.cards
+                _searchMode == SearchMode.eng
                     ? 'Found $_totalCards cards'
                     : 'Found ${_setResults?.length ?? 0} sets',
                 style: Theme.of(context).textTheme.titleMedium,
@@ -1391,7 +1396,7 @@ String _formatSearchForDisplay(String query) {
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            sliver: _searchMode == SearchMode.cards
+            sliver: _searchMode == SearchMode.eng
                 ? _buildCardResultsGrid()
                 : _buildSetResultsGrid(),
           ),
@@ -1494,7 +1499,7 @@ String _formatSearchForDisplay(String query) {
           child: InkWell(
             onTap: () {
               _searchController.text = set['name'];
-              _searchMode = SearchMode.cards;
+              _searchMode = SearchMode.eng;
               _performSearch('set.id:${set['id']}'); // Changed to use _performSearch directly
             },
             child: Column(
@@ -1557,7 +1562,7 @@ String _formatSearchForDisplay(String query) {
         onTap: () {
           setState(() {
             _searchController.text = set['name'];
-            _searchMode = SearchMode.cards;
+            _searchMode = SearchMode.eng;
             _currentSort = 'cardmarket.prices.averageSellPrice';
             _sortAscending = false;
             _performSearch('set.id:${set['id']}');
@@ -1700,5 +1705,6 @@ String _formatSearchForDisplay(String query) {
     ),
   );
 }
-}
+
+} // Add this closing brace for the _SearchScreenState class
 
