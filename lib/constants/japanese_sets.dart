@@ -1,7 +1,17 @@
 class JapaneseSets {
   static const scarletViolet = <String, Map<String, dynamic>>{
-    'Raging Surf': {'code': 'sv5c', 'year': '2024', 'icon': '🌊'},
-    'Wild Force': {'code': 'sv5b', 'year': '2024', 'icon': '💪'},
+    'Raging Surf': {
+      'code': 'sv5c',
+      'tcgdex_id': 'sv5c', // Add TCGdex ID
+      'year': '2024',
+      'icon': '🌊'
+    },
+    'Wild Force': {
+      'code': 'sv5b',
+      'tcgdex_id': 'sv5b',
+      'year': '2024',
+      'icon': '💪'
+    },
     'Cyber Judge': {'code': 'sv5a', 'year': '2024', 'icon': '🤖'},
     'Ancient Roar': {'code': 'sv4c', 'year': '2023', 'icon': '🦕'},
     'Future Flash': {'code': 'sv4b', 'year': '2023', 'icon': '⚡'},

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../services/tcg_api_service.dart';
+import '../services/tcgdex_api_service.dart'; // Add this import
 import '../services/search_history_service.dart';
 import '../screens/card_details_screen.dart';
 import '../models/tcg_card.dart';
@@ -45,6 +46,7 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderStateMixin {
   final _apiService = TcgApiService();
+  final _tcgdexApi = TcgdexApiService(); // Add this line
   final _searchController = TextEditingController();
   List<TcgCard>? _searchResults;
   bool _isLoading = false;
@@ -1362,6 +1364,10 @@ String _formatSearchForDisplay(String query) {
   }
 
   Widget _buildContent() {
+    if (_searchMode == SearchMode.jpn && _setResults == null) {
+      _loadJapaneseSets();
+    }
+
     if (_isLoading) {
       return _buildLoadingState();
     }
@@ -1460,20 +1466,30 @@ String _formatSearchForDisplay(String query) {
     setState(() => _isLoading = true);
 
     try {
-      final results = await _apiService.searchSets(query: query);
-      
-      if (mounted) {
-        setState(() {
-          _setResults = results['data'] as List?;
-          _isLoading = false;
-        });
+      if (_searchMode == SearchMode.eng) {
+        final results = await _apiService.searchSets(query: query);
+        if (mounted) {
+          setState(() {
+            _setResults = results['data'] as List?;
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Use TCGdex API for Japanese sets
+        final results = await _tcgdexApi.searchJapaneseSet(query);
+        if (mounted) {
+          setState(() {
+            _setResults = results['data'] as List?;
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       print('Set search error: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _setResults = null; // Fixed syntax error here
+          _setResults = null;
         });
       }
     }
@@ -1560,24 +1576,23 @@ String _formatSearchForDisplay(String query) {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          setState(() {
-            _searchController.text = set['name'];
-            _searchMode = SearchMode.eng;
-            _currentSort = 'cardmarket.prices.averageSellPrice';
-            _sortAscending = false;
-            _performSearch('set.id:${set['id']}');
-          });
+          _searchController.text = set['name'];
+          _performSetSearch(set['id']); // Use set ID directly
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (set['images']?['logo'] != null)
+            if (set['logo'] != null)
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   child: Image.network(
-                    set['images']['logo'],
+                    set['logo'],
                     fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.broken_image,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ),
               ),
@@ -1704,6 +1719,26 @@ String _formatSearchForDisplay(String query) {
       ),
     ),
   );
+}
+
+void _loadJapaneseSets() async {
+  if (_searchMode == SearchMode.jpn && _setResults == null) {
+    setState(() => _isLoading = true);
+    try {
+      final results = await _tcgdexApi.getJapaneseSets();
+      if (mounted) {
+        setState(() {
+          _setResults = results;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading Japanese sets: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 }
 
 } // Add this closing brace for the _SearchScreenState class

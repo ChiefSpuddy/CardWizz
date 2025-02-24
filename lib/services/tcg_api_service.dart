@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/tcg_card.dart';
+import './tcgdex_api_service.dart'; // Add this import
 
 // Move cache entry class outside
 class _CacheEntry {
@@ -43,6 +44,8 @@ class TcgApiService {
     baseUrl: _baseUrl,
     headers: {'X-Api-Key': apiKey},  // Now this will work
   ));
+
+  final _tcgdexApi = TcgdexApiService();
 
   // Add rate limiting method
   Future<void> _waitForRateLimit() async {
@@ -102,6 +105,12 @@ class TcgApiService {
     final cacheEntry = _cache[cacheKey];
     if (cacheEntry != null && !cacheEntry.isExpired) {
       return cacheEntry.data as Map<String, dynamic>;
+    }
+
+    // Check if this is a Japanese set query
+    if (query.startsWith('set.id:') && query.contains('-jp')) {
+      final setId = query.replaceAll('set.id:', '').trim();
+      return _tcgdexApi.searchJapaneseSet(setId);
     }
 
     try {
@@ -174,8 +183,8 @@ class TcgApiService {
       }
     }
 
-    // Process remaining requests
-    if (batch.isNotEmpty) {
+    // Process remaining requests - Fix the syntax
+    if (batch.isNotEmpty) { // Fixed syntax here
       results.addAll(await Future.wait(batch));
     }
 
