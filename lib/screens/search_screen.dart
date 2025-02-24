@@ -15,9 +15,11 @@ import '../l10n/app_localizations.dart';  // Add this import
 import '../constants/layout.dart';  // Add this import
 import '../constants/sets.dart';  // Add this import at the top
 import '../constants/japanese_sets.dart';  // Add this import
+import '../services/mtg_api_service.dart'; // Add this import
+import '../constants/mtg_sets.dart'; // Add this import
 
 // Move enum outside the class
-enum SearchMode { eng, jpn }
+enum SearchMode { eng, jpn, mtg }
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -47,6 +49,7 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderStateMixin {
   final _apiService = TcgApiService();
   final _tcgdexApi = TcgdexApiService(); // Add this line
+  final _mtgApi = MtgApiService(); // Fixed variable name to match convention
   final _searchController = TextEditingController();
   List<TcgCard>? _searchResults;
   bool _isLoading = false;
@@ -301,6 +304,12 @@ String _buildSearchQuery(String query) {
 
 // Update _performSearch method to handle sort order correctly
 Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useOriginalQuery = false}) async {
+  // Don't do anything if we've switched to MTG mode
+  if (_searchMode == SearchMode.mtg) {
+    _performMtgSearch(query);
+    return;
+  }
+
   if (query.isEmpty) {
     setState(() {
       _searchResults = null;
@@ -320,6 +329,12 @@ Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useO
       _searchResults = null;
       _showCategories = false;  // Hide categories when searching
       _isLoading = true;  // Move this here to not affect _searchController.text state
+      
+      // Always set price sorting for set searches
+      if (query.startsWith('set.id:')) {
+        _currentSort = 'cardmarket.prices.averageSellPrice';
+        _sortAscending = false;
+      }
     });
   }
 
@@ -478,11 +493,54 @@ void _onSearchChanged(String query) {
       });
       if (_searchMode == SearchMode.eng) {
         _performSearch(query);
+      } else if (_searchMode == SearchMode.mtg) {
+        _performMtgSearch(query);
       } else {
         _performSetSearch(query);
       }
     }
   });
+}
+
+// Add MTG search method
+Future<void> _performMtgSearch(String query) async {
+  if (query.isEmpty) {
+    setState(() => _searchResults = null);
+    return;
+  }
+
+  setState(() => _isLoading = true);
+
+  try {
+    final results = await _mtgApi.searchCards( // Changed from _mtgApiService to _mtgApi
+      query: query,
+      page: _currentPage,
+      pageSize: 30,
+      orderBy: _currentSort,
+      orderByDesc: !_sortAscending,
+    );
+
+    if (mounted) {
+      final List<dynamic> data = results['data'] as List? ?? [];
+      final totalCount = results['totalCount'] as int;
+
+      setState(() {
+        _searchResults = data.map((card) => TcgCard.fromJson(card as Map<String, dynamic>)).toList();
+        _totalCards = totalCount;
+        _isLoading = false;
+        _hasMorePages = (_currentPage * 30) < totalCount;
+      });
+    }
+  } catch (e) {
+    print('MTG search error: $e');
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _searchResults = [];
+        _totalCards = 0;
+      });
+    }
+  }
 }
 
 Future<void> _performQuickSearch(Map<String, dynamic> searchItem) async {
@@ -493,6 +551,12 @@ Future<void> _performQuickSearch(Map<String, dynamic> searchItem) async {
     _currentPage = 1;
     _hasMorePages = true;
     _showCategories = false;
+
+    // Always sort by price high-to-low for set searches
+    if (searchItem['query'].toString().startsWith('set.id:')) {
+      _currentSort = 'cardmarket.prices.averageSellPrice';
+      _sortAscending = false;
+    }
   });
 
   try {
@@ -578,8 +642,8 @@ Future<void> _performQuickSearch(Map<String, dynamic> searchItem) async {
 
 // Update _buildQuickSearches method to use the new scroll indicator
 Widget _buildSearchCategories() {
-  // Define the eras in order
-  final sets = _searchMode == SearchMode.eng
+    // Define the eras based on search mode
+    final sets = _searchMode == SearchMode.eng
       ? [
           {'title': 'Latest Sets', 'sets': PokemonSets.scarletViolet},
           {'title': 'Sword & Shield', 'sets': PokemonSets.swordShield},
@@ -592,92 +656,60 @@ Widget _buildSearchCategories() {
           {'title': 'e-Card Series', 'sets': PokemonSets.eCard},
           {'title': 'Classic WOTC', 'sets': PokemonSets.classic},
         ]
-      : [
+      : _searchMode == SearchMode.jpn
+      ? [
           {'title': 'Latest Sets', 'sets': JapaneseSets.scarletViolet},
           {'title': 'Sword & Shield', 'sets': JapaneseSets.swordShield},
-          // Add more Japanese set categories...
+        ]
+      : [
+          {'title': 'Standard Sets', 'sets': MtgSets.standard},
+          {'title': 'Modern Sets', 'sets': MtgSets.modern},
+          {'title': 'Legacy Sets', 'sets': MtgSets.legacy},
         ];
 
-  return ListView.builder(
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    itemCount: sets.length,
-    itemBuilder: (context, index) {
-      final era = sets[index];
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              era['title'] as String,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onBackground,
-              ),
-            ),
-          ),
-          SizedBox(
-            height: 80, // Reduced from 120 to 80
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              itemCount: (era['sets'] as Map<String, Map<String, dynamic>>).length,
-              itemBuilder: (context, index) {
-                final set = (era['sets'] as Map<String, Map<String, dynamic>>)
-                    .entries.toList()[index];
-                return _buildSetLogoCard({
-                  'name': set.key,
-                  'query': 'set.id:${set.value['code']}',
-                  'icon': set.value['icon'],
-                  'year': set.value['year'],
-                });
-              },
-            ),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-// Rename to avoid duplicate declaration
-Widget _buildSetLogoCard(Map<String, dynamic> item) {
-  final setCode = item['query'].toString().replaceAll('set.id:', '');
-  final logoUrl = 'https://images.pokemontcg.io/$setCode/logo.png';
-  
-  return InkWell(
-    onTap: () {
-      setState(() {
-        _currentSort = 'cardmarket.prices.averageSellPrice';
-        _sortAscending = false;
-      });
-      _performQuickSearch(item);
-    },
-    child: Container(
-      width: 120, // Increased from 82
-      height: 60, // Increased from 50
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      child: Center(
-        child: Image.network(
-          logoUrl,
-          fit: BoxFit.contain,
-          height: 45, // Increased from 32
-          errorBuilder: (_, __, ___) => Container(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: FittedBox(
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: sets.length,
+      itemBuilder: (context, index) {
+        final era = sets[index];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Text(
-                item['icon'],
-                style: const TextStyle(fontSize: 24), // Increased from 18
+                era['title'] as String,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onBackground,
+                ),
               ),
             ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
+            SizedBox(
+              height: 80,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: (era['sets'] as Map<String, Map<String, dynamic>>).length,
+                itemBuilder: (context, index) {
+                  final set = (era['sets'] as Map<String, Map<String, dynamic>>)
+                      .entries.toList()[index];
+                  return _buildSetCard({ // Changed from _buildSetLogoCard to _buildSetCard
+                    'name': set.key,
+                    'query': 'set.id:${set.value['code']}',
+                    'icon': set.value['icon'],
+                    'year': set.value['year'],
+                  });
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
 // Update _buildRecentSearches to improve styling
 Widget _buildRecentSearches() {
@@ -898,6 +930,24 @@ String _formatSearchForDisplay(String query) {
   }
 
   void _updateSort(String sortBy, bool ascending) {
+    // Don't apply Pokemon sorting to MTG cards
+    if (_searchMode == SearchMode.mtg) {
+      // MTG specific sorting
+      setState(() {
+        _currentSort = sortBy;
+        _sortAscending = ascending;
+        _currentPage = 1;
+        _searchResults = null;
+        _hasMorePages = true;
+      });
+      
+      if (_lastQuery != null || _searchController.text.isNotEmpty) {
+        _performMtgSearch(_lastQuery ?? _searchController.text);
+      }
+      return;
+    }
+
+    // Original Pokemon sorting logic
     print('Updating sort:');
     print('- From: $_currentSort (ascending: $_sortAscending)');
     print('- To: $sortBy (ascending: $ascending)');
@@ -1236,94 +1286,64 @@ String _formatSearchForDisplay(String query) {
                 });
               },
               segments: [
+                // Existing ENG segment
                 ButtonSegment(
                   value: SearchMode.eng,
-                  label: Container(
-                    height: double.infinity,
-                    width: MediaQuery.of(context).size.width * 0.44, // Make buttons wider
-                    decoration: BoxDecoration(
-                      gradient: _searchMode == SearchMode.eng ? LinearGradient(
-                        // ...existing gradient...
-                        colors: isDark ? [
-                          Colors.blue[900]!,
-                          Colors.blue[800]!,
-                        ] : [
-                          Theme.of(context).colorScheme.primary,
-                          Theme.of(context).colorScheme.secondary,
-                        ],
-                      ) : null,
-                      borderRadius: BorderRadius.circular(18), // Increased from 8
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '🇺🇸',
-                          style: TextStyle(
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'ENG',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _searchMode == SearchMode.eng
-                              ? Colors.white
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  label: _buildSegmentLabel('🇺🇸', 'ENG'),
                 ),
+                // Existing JPN segment
                 ButtonSegment(
                   value: SearchMode.jpn,
-                  label: Container(
-                    height: double.infinity,
-                    width: MediaQuery.of(context).size.width * 0.44, // Make buttons wider
-                    decoration: BoxDecoration(
-                      gradient: _searchMode == SearchMode.jpn ? LinearGradient(
-                        // ...existing gradient...
-                        colors: isDark ? [
-                          Colors.blue[900]!,
-                          Colors.blue[800]!,
-                        ] : [
-                          Theme.of(context).colorScheme.primary,
-                          Theme.of(context).colorScheme.secondary,
-                        ],
-                      ) : null,
-                      borderRadius: BorderRadius.circular(18), // Increased from 8
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '🇯🇵',
-                          style: TextStyle(
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'JPN',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _searchMode == SearchMode.jpn
-                              ? Colors.white
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  label: _buildSegmentLabel('🇯🇵', 'JPN'),
+                ),
+                // New MTG segment
+                ButtonSegment(
+                  value: SearchMode.mtg,
+                  label: _buildSegmentLabel('✨', 'MTG'),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // Helper for segment labels
+  Widget _buildSegmentLabel(String emoji, String text) {
+    return Container(
+      height: double.infinity,
+      width: MediaQuery.of(context).size.width * 0.28, // Adjusted width for 3 segments
+      decoration: BoxDecoration(
+        gradient: _searchMode.toString() == 'SearchMode.${text.toLowerCase()}' 
+          ? LinearGradient(
+              colors: isDark ? [
+                Colors.blue[900]!,
+                Colors.blue[800]!,
+              ] : [
+                Theme.of(context).colorScheme.primary,
+                Theme.of(context).colorScheme.secondary,
+              ],
+            ) 
+          : null,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 13)),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              color: _searchMode.toString() == 'SearchMode.${text.toLowerCase()}'
+                ? Colors.white
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }
