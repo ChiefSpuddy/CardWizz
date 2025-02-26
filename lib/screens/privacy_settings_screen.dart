@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
-import '../constants/colors.dart';
+import '../constants/app_colors.dart';  // Updated import path
 import '../l10n/app_localizations.dart';
 import '../utils/privacy_test_helper.dart';
 

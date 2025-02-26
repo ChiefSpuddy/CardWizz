@@ -1,50 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shimmer/shimmer.dart';
-import '../../constants/card_styles.dart';
-import '../../l10n/app_localizations.dart';
-
-class SearchLoadingIndicator extends StatelessWidget {
-  const SearchLoadingIndicator({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 80.0),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 32.0),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                localizations.translate('searching'),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+import '../../constants/app_colors.dart';
 
 class LoadingMoreIndicator extends StatelessWidget {
   const LoadingMoreIndicator({Key? key}) : super(key: key);
@@ -53,100 +8,73 @@ class LoadingMoreIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Text(
-            'Loading more...',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.secondary,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
+      alignment: Alignment.center,
+      child: const CircularProgressIndicator(),
     );
   }
 }
 
-class ShimmerCardItem extends StatelessWidget {
-  const ShimmerCardItem({Key? key}) : super(key: key);
+class ShimmerLoadingCard extends StatefulWidget {
+  const ShimmerLoadingCard({Key? key}) : super(key: key);
+
+  @override
+  State<ShimmerLoadingCard> createState() => _ShimmerLoadingCardState();
+}
+
+class _ShimmerLoadingCardState extends State<ShimmerLoadingCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+
+    _animation = Tween<double>(begin: -1.0, end: 2.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: CardStyles.cardDecoration(context),
-      child: Shimmer.fromColors(
-        baseColor: Theme.of(context).colorScheme.surfaceVariant,
-        highlightColor: Theme.of(context).colorScheme.surface,
-        child: Container(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseColor = isDark 
+        ? const Color(0xFF2C2C2C) 
+        : const Color(0xFFE8E8E8);
+    final highlightColor = isDark
+        ? const Color(0xFF3D3D3D)
+        : const Color(0xFFF5F5F5);
+
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                baseColor,
+                highlightColor,
+                baseColor,
+              ],
+              stops: const [0.0, 0.5, 1.0],
+              transform: GradientRotation(_animation.value * 3.14),
+            ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class NoResultsMessage extends StatelessWidget {
-  final String currentSort;
-
-  const NoResultsMessage({Key? key, required this.currentSort}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final localizations = AppLocalizations.of(context);
-    
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).size.height * 0.1,
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_off_rounded,
-              size: 48,
-              color: Theme.of(context).colorScheme.secondary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              localizations.translate('noCardsFound'),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            if (currentSort.contains('cardmarket.prices'))
-              Text(
-                'Try removing price sorting as not all cards have prices',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                ),
-              )
-            else
-              Text(
-                localizations.translate('tryAdjustingSearch'),
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 }

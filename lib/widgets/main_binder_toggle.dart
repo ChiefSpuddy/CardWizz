@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../constants/colors.dart';
+import '../constants/app_colors.dart';  // Updated import path
 
 class MainBinderToggle extends StatelessWidget {
   final bool showMain;

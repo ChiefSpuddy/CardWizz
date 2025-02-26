@@ -4,18 +4,20 @@ import '../constants/card_styles.dart';
 
 class CardGridItem extends StatelessWidget {
   final TcgCard card;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Image? cached;
   final String? heroContext;
   final bool showPrice;
+  final bool showName;  // Add this parameter
 
   const CardGridItem({
     Key? key,
     required this.card,
-    required this.onTap,
+    this.onTap,
     this.cached,
     this.heroContext,
     this.showPrice = true,
+    this.showName = false,  // Add default value
   }) : super(key: key);
 
   @override
@@ -72,24 +74,60 @@ class CardGridItem extends StatelessWidget {
                   highlightColor: Colors.transparent,
                 ),
               ),
-              // Optional price tag at bottom
-              if (showPrice && card.price != null && card.price! > 0)
+              // Optional name and price tag at bottom
+              if (showName || showPrice)
                 Positioned(
                   bottom: 0,
                   right: 0,
+                  left: 0,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
-                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(4)),
-                    ),
-                    child: Text(
-                      '\$${card.price!.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.8),
+                          Colors.black.withOpacity(0.0),
+                        ],
+                        stops: const [0.0, 1.0],
                       ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (showName && card.name.isNotEmpty)
+                          Text(
+                            card.name,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.5),
+                                  blurRadius: 2,
+                                ),
+                              ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        if (showPrice && card.price != null && card.price! > 0)
+                          Text(
+                            '\$${card.price!.toStringAsFixed(2)}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.5),
+                                  blurRadius: 2,
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

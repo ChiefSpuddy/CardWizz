@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';  // Fix the import
+import 'package:provider/provider.dart';  // Add this import
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/storage_service.dart';
 import '../services/auth_service.dart';
-import '../services/collection_service.dart';  // Add this import
+import '../services/collection_service.dart';
+import '../services/navigation_service.dart';  // Add this import
+import 'theme_provider.dart';  // Import our theme provider
 
 class AppState with ChangeNotifier {
   final StorageService _storageService;
   final AuthService _authService;
   CollectionService? _collectionService;
   SharedPreferences? _prefs;  // Add this
-  bool _isDarkMode = true;  // Change default to true
   bool _isLoading = true;
   Locale _locale = const Locale('en');
   bool _analyticsEnabled = true;
@@ -37,9 +39,6 @@ class AppState with ChangeNotifier {
         await _collectionService!.setCurrentUser(userId);
       }
     }
-    
-    // Load dark mode setting, default to true if not set
-    _isDarkMode = _prefs?.getBool('darkMode') ?? true;
 
     await _initializePrivacySettings();
 
@@ -47,7 +46,6 @@ class AppState with ChangeNotifier {
     notifyListeners();
   }
 
-  bool get isDarkMode => _isDarkMode;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _authService.isAuthenticated;
   AuthUser? get currentUser => _authService.currentUser;
@@ -57,10 +55,17 @@ class AppState with ChangeNotifier {
   bool get profileVisible => _profileVisible;
   bool get showPrices => _showPrices;
 
+  // Delegate theme toggle to ThemeProvider
   void toggleTheme() {
-    _isDarkMode = !_isDarkMode;
-    _prefs?.setBool('darkMode', _isDarkMode);
-    notifyListeners();
+    // This is just a pass-through method to maintain compatibility
+    // with existing code that calls appState.toggleTheme()
+    
+    // We'll find the ThemeProvider and call its toggleTheme method
+    final context = NavigationService.navigatorKey.currentContext;
+    if (context != null) {
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      themeProvider.toggleTheme();
+    }
   }
 
   Future<void> setLocale(String languageCode) async {

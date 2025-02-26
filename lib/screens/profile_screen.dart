@@ -18,6 +18,7 @@ import 'package:flutter/foundation.dart';  // Add this import for kDebugMode
 import '../widgets/sign_in_view.dart';
 import '../services/collection_service.dart';
 import '../widgets/styled_toast.dart';  // Add this import
+import '../providers/theme_provider.dart'; // Add this import
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -429,6 +430,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final currencyProvider = context.watch<CurrencyProvider>();
     final purchaseService = context.watch<PurchaseService>();
     final storageService = Provider.of<StorageService>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context); // Add this
+    final isDark = themeProvider.isDarkMode; // Use this instead
     
     return StreamBuilder<List<TcgCard>>(
       stream: storageService.watchCards(),
@@ -463,18 +466,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   // 1. Core App Settings
                   ListTile(
                     leading: Icon(
-                      Theme.of(context).brightness == Brightness.dark 
-                          ? Icons.dark_mode 
-                          : Icons.light_mode,
-                      color: colorScheme.primary,
+                      isDark ? Icons.light_mode : Icons.dark_mode,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                    title: const Text('Dark Mode'),
-                    trailing: Transform.scale(
-                      scale: 0.9, // Slightly smaller switch
-                      child: Switch(
-                        value: Theme.of(context).brightness == Brightness.dark,
-                        onChanged: (_) => context.read<AppState>().toggleTheme(),
-                      ),
+                    title: Text(isDark ? 'Light Mode' : 'Dark Mode'),
+                    subtitle: Text(isDark ? 'Switch to light theme' : 'Switch to dark theme'),
+                    onTap: () => themeProvider.toggleTheme(), // Use themeProvider
+                    trailing: Switch(
+                      value: isDark,
+                      onChanged: (value) {
+                        themeProvider.setThemeMode(value ? ThemeMode.dark : ThemeMode.light);
+                      },
                     ),
                   ),
                   const Divider(height: 1),

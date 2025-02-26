@@ -510,8 +510,9 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
                             key: ValueKey(card.id),
                             card: card,
                             heroContext: 'collection',
-                            showPrice: false,
-                            onTap: () {}, // Use empty function instead of null
+                            showPrice: true, // Changed to true
+                            showName: true,  // Added showName
+                            onTap: () => _showCardDetails(context, card), // Add direct handler here
                           ),
                         ),
                         if (_isMultiSelectMode)

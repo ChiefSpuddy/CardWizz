@@ -7,7 +7,7 @@ import '../models/tcg_card.dart';
 import '../services/collection_index_service.dart';  // Make sure this import is used
 import '../services/storage_service.dart';
 import '../providers/currency_provider.dart';
-import '../constants/colors.dart';
+import '../constants/app_colors.dart';  // Update this import
 import '../services/collection_tracking_service.dart';  // Updated import
 import '../services/tcg_api_service.dart';
 import 'card_details_screen.dart';

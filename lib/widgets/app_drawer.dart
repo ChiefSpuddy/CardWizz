@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui';
 import '../providers/app_state.dart';
-import '../providers/currency_provider.dart';  // Add this import
+import '../providers/currency_provider.dart';
+import '../providers/theme_provider.dart'; // Add this import
 import '../routes.dart';
-import '../screens/collections_screen.dart';  // Add this import
-import '../screens/analytics_screen.dart';  // Add this import
-import '../l10n/app_localizations.dart';  // Add this import
-import '../screens/home_screen.dart';  // Add this import for HomeScreenState
+import '../screens/collections_screen.dart';
+import '../screens/analytics_screen.dart';
+import '../l10n/app_localizations.dart';
+import '../screens/home_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   final GlobalKey<ScaffoldState>? scaffoldKey;
@@ -55,7 +56,8 @@ class AppDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final currencyProvider = context.watch<CurrencyProvider>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final themeProvider = context.watch<ThemeProvider>(); // Add this
+    final isDark = themeProvider.isDarkMode; // Use themeProvider instead of Theme.of
     final localizations = AppLocalizations.of(context);
 
     return ClipRRect(
@@ -219,7 +221,7 @@ class AppDrawer extends StatelessWidget {
                           icon: isDark ? Icons.light_mode : Icons.dark_mode,
                           title: isDark ? 'Light Mode' : 'Dark Mode',
                           onTap: () {
-                            appState.toggleTheme();
+                            themeProvider.toggleTheme(); // Use themeProvider instead
                             Navigator.pop(context);
                           },
                         ),
