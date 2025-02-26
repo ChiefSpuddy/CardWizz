@@ -374,6 +374,8 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
                 final card = _cards![index];
                 return CardGridItem(
                   card: card,
+                  heroContext: widget.collection.id,
+                  showPrice: false,
                   onTap: () => _showCardDetails(context, card),
                 );
               },

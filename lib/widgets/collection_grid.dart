@@ -507,8 +507,11 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
                         Opacity(
                           opacity: isSelected ? 0.8 : 1.0,
                           child: CardGridItem(
+                            key: ValueKey(card.id),
                             card: card,
-                            onTap: null, // Important: disable CardGridItem's tap handler
+                            heroContext: 'collection',
+                            showPrice: false,
+                            onTap: () {}, // Use empty function instead of null
                           ),
                         ),
                         if (_isMultiSelectMode)

@@ -550,11 +550,13 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                         largeImageUrl: card['images']['large'],
                         rarity: card['rarity'],
                         set: card['set'] != null ? TcgSet(
-                          id: card['set']['id'],
-                          name: card['set']['name'],
-                          series: card['set']['series'],
-                          total: card['set']['total'],
-                        ) : null,
+                          id: card['set']['id'] ?? '',
+                          name: card['set']['name'] ?? 'Unknown Set',
+                          // Remove required parameters that might be null
+                        ) : TcgSet(
+                          id: '',
+                          name: 'Unknown Set',
+                        ),
                         price: card['cardmarket']?['prices']?['averageSellPrice'],
                       );
                       

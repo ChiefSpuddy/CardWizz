@@ -536,11 +536,13 @@ class TcgApiService {
       largeImageUrl: data['images']?['large'] as String? ?? '',
       price: data['cardmarket']?['prices']?['averageSellPrice'] as double?,
       set: data['set'] != null ? TcgSet(
-        id: data['set']['id'] as String,
-        name: data['set']['name'] as String,
-        series: data['set']['series'] as String,
-        total: data['set']['total'] as int,
-      ) : null,
+        id: data['set']['id'] ?? '',
+        name: data['set']['name'] ?? 'Unknown Set',
+        // Remove required parameters that might be null
+      ) : TcgSet(
+        id: '',
+        name: 'Unknown Set',
+      ),
     );
   }
 

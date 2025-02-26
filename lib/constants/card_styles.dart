@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 class CardStyles {
   static BoxDecoration cardDecoration(BuildContext context) {
     return BoxDecoration(
-      color: Theme.of(context).cardColor,
-      borderRadius: BorderRadius.circular(12),
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(2), // Minimized border radius to prevent content clipping
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.05),
+          color: Colors.black.withOpacity(0.1),
           blurRadius: 4,
           offset: const Offset(0, 2),
         ),

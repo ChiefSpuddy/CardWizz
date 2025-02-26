@@ -16,6 +16,7 @@ import '../widgets/create_collection_sheet.dart';  // Add this import
 import '../widgets/create_binder_dialog.dart';  // Add this import
 import '../widgets/styled_toast.dart';  // Add this import
 import '../screens/custom_collection_detail_screen.dart';  // Add this import
+import '../utils/image_utils.dart';
 
 extension StringExtension on String {
   String capitalize() {
@@ -1357,7 +1358,7 @@ Widget _buildPricingSection() {
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(16),
                                         child: CachedNetworkImage(
-                                          imageUrl: widget.card.largeImageUrl,  // Changed from imageUrl
+                                          imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
                                           fit: BoxFit.contain,
                                           // ...existing CachedNetworkImage properties...
                                         ),

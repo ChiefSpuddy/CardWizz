@@ -445,11 +445,12 @@ class _SignInViewState extends State<SignInView> with SingleTickerProviderStateM
                       largeImageUrl: card['images']['large'],
                       rarity: card['rarity'],
                       set: card['set'] != null ? TcgSet(
-                        id: card['set']['id'],
-                        name: card['set']['name'],
-                        series: card['set']['series'],
-                        total: card['set']['total'],
-                      ) : null,
+                        id: card['set']['id'] ?? '',
+                        name: card['set']['name'] ?? 'Unknown Set',
+                      ) : TcgSet(
+                        id: '',
+                        name: 'Unknown Set',
+                      ),
                       price: card['cardmarket']?['prices']?['averageSellPrice'],
                     );
 

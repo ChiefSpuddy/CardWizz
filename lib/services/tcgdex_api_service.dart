@@ -1,114 +1,86 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../models/tcg_card.dart';
+import '../utils/image_utils.dart';
 
 class TcgdexApiService {
-  static const String _baseUrl = 'https://play.limitlesstcg.com/api';
-  static const String _apiKey = 'YOUR_API_KEY_HERE'; // You'll need to get this from Limitless TCG
+  static const String baseUrl = 'https://www.tcgdex.net/v2';
   
+  // Get all Japanese sets
   Future<List<Map<String, dynamic>>> getJapaneseSets() async {
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/decks/sets/jp'),
-        headers: {
-          'Authorization': 'Bearer $_apiKey',
-          'Accept': 'application/json',
-        },
-      );
+      final response = await http.get(Uri.parse('$baseUrl/jp/sets'));
       
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-      
-      if (response.statusCode != 200) {
-        print('❌ Failed to fetch Japanese sets: ${response.statusCode}');
-        return _getFallbackSets();
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        
+        // Process the sets
+        final List<Map<String, dynamic>> processedSets = [];
+        for (final set in data) {
+          if (set is Map<String, dynamic>) {
+            final setId = set['id'] as String?;
+            if (setId != null) {
+              // Add logo URL using our utility
+              set['logo'] = CardImageUtils.getJapaneseSetLogo(setId);
+              processedSets.add(Map<String, dynamic>.from(set));
+            }
+          }
+        }
+        
+        return processedSets;
+      } else {
+        throw Exception('Failed to load Japanese sets: ${response.statusCode}');
       }
-
-      final List<dynamic> sets = jsonDecode(response.body);
-      final japaneseSets = <Map<String, dynamic>>[];
-
-      for (final set in sets) {
-        japaneseSets.add({
-          'id': set['setId'],
-          'name': set['name']?['en'] ?? set['name']?['jp'] ?? set['setId'],
-          'releaseDate': set['releaseDate'],
-          'logo': 'https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/jp/${set['setId']}/${set['setId']}_Logo_EN.png',
-          'symbol': 'https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/jp/${set['setId']}/${set['setId']}_Symbol.png',
-          'total': set['totalCards'] ?? 0,
-          'series': 'Japanese',
-        });
-      }
-
-      print('📦 Found ${japaneseSets.length} Japanese sets');
-      return japaneseSets;
     } catch (e) {
-      print('❌ Limitless API error: $e');
-      return _getFallbackSets();
+      print('Error fetching Japanese sets: $e');
+      return [];
     }
   }
-
-  List<Map<String, dynamic>> _getFallbackSets() {
-    // Fallback data if API fails
-    return [
-      {
-        'id': 'wild-force',
-        'name': 'Wild Force (Japan)',
-        'releaseDate': '2024/02/23',
-        'logo': 'https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/jp/SV5B/SV5B_Logo_EN.png',
-        'symbol': 'https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/jp/SV5B/SV5B_Symbol.png',
-        'total': 67,
-        'series': 'Scarlet & Violet'
-      },
-      {
-        'id': 'raging-surf',
-        'name': 'Raging Surf (Japan)', 
-        'releaseDate': '2024/03/22',
-        'total': 63,
-        'series': 'Scarlet & Violet'
-      },
-      // Add more fallback sets here
-    ];
-  }
-
-  Future<Map<String, dynamic>> searchJapaneseSet(String setId) async {
+  
+  // Search for Japanese set
+  Future<Map<String, dynamic>> searchJapaneseSet(String query) async {
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/cards?setId=$setId&language=jp'),
-      );
-
-      if (response.statusCode != 200) {
-        return {'data': [], 'totalCount': 0};
-      }
-
-      final List<dynamic> cards = jsonDecode(response.body);
-      final formattedCards = cards.map((card) => {
-        'id': card['id'],
-        'number': card['number'],
-        'name': card['name']?['en'] ?? card['name']?['jp'] ?? 'Unknown',
-        'images': {
-          'small': 'https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/jp/$setId/cards/${card['number']}.jpg',
-          'large': 'https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/jp/$setId/cards/${card['number']}_hires.jpg',
-        },
-        'set': {
-          'id': setId,
-          'name': card['setName']?['en'] ?? 'Japanese Set',
-          'series': 'Japanese',
-          'total': cards.length,
-        }
+      // First get all sets
+      final sets = await getJapaneseSets();
+      
+      // Filter by name or ID
+      final normalizedQuery = query.toLowerCase().trim();
+      final filteredSets = sets.where((set) {
+        final name = (set['name'] as String? ?? '').toLowerCase();
+        final id = (set['id'] as String? ?? '').toLowerCase();
+        
+        return name.contains(normalizedQuery) || id.contains(normalizedQuery);
       }).toList();
-
-      return {
-        'data': formattedCards,
-        'totalCount': formattedCards.length,
-        'setInfo': {
-          'id': setId,
-          'name': formattedCards.first['set']['name'],
-          'total': formattedCards.length,
+      
+      // Use correct method
+      for (var set in filteredSets) {
+        final setId = set['id']?.toString() ?? '';
+        if (setId.isNotEmpty) {
+          set['logo'] = CardImageUtils.getJapaneseSetLogo(setId);
         }
+      }
+      
+      // Format result similar to Pokemon API
+      return {
+        'data': filteredSets.map((setData) {
+          return {
+            'id': setData['id'],
+            'name': setData['name'],
+            'series': setData['serie'],
+            'printedTotal': setData['cardCount'] ?? 0,
+            'total': setData['cardCount'] ?? 0,
+            'releaseDate': setData['releaseDate'],
+            'images': {
+              'symbol': setData['logo'] ?? CardImageUtils.getJapaneseSetLogo(setData['id']),
+              'logo': setData['logo'] ?? CardImageUtils.getJapaneseSetLogo(setData['id']),
+            },
+            'logo': setData['logo'] ?? CardImageUtils.getJapaneseSetLogo(setData['id']),
+          };
+        }).toList(),
       };
-
     } catch (e) {
-      print('❌ Limitless API error: $e');
-      return {'data': [], 'totalCount': 0};
+      print('Error searching Japanese sets: $e');
+      return {'data': []};
     }
   }
 }

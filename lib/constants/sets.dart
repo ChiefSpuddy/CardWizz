@@ -360,7 +360,7 @@ class PokemonSets {
     // ...rest of existing rarities...
   ];
 
-  // Update _convertSetToSearchFormat to handle logo URLs
+  // Update _convertSetToSearchFormat to correctly handle logo URLs
   static List<Map<String, dynamic>> _convertSetToSearchFormat(Map<String, Map<String, dynamic>> sets) {
     return sets.entries.map((entry) {
       final code = entry.value['code'] as String;
@@ -370,7 +370,7 @@ class PokemonSets {
         'icon': entry.value['icon'],
         'year': entry.value['year'] ?? entry.value['release'],
         'description': entry.value['description'] ?? '${entry.key} set',
-        'logo': 'https://images.pokemontcg.io/$code/logo.png',
+        'logo': 'https://images.pokemontcg.io/$code/logo.png', // Ensure correct logo URL
       };
     }).toList();
   }

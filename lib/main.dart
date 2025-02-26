@@ -1,29 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'l10n/app_localizations.dart';  // Add this import
+import 'l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'routes.dart';
 import 'providers/app_state.dart';
 import 'services/storage_service.dart';
-import 'services/navigation_service.dart';  // Add this import
+import 'services/navigation_service.dart';
 import 'constants/colors.dart';
 import 'constants/text_styles.dart';
 import 'services/tcg_api_service.dart';
-import 'services/auth_service.dart'; // Add this import
+import 'services/auth_service.dart';
 import 'providers/currency_provider.dart';
 import 'services/purchase_service.dart';
 import 'screens/splash_screen.dart';
 import 'services/scanner_service.dart';
 import 'screens/add_to_collection_screen.dart';
 import 'screens/card_details_screen.dart';
-import 'models/tcg_card.dart';  // Add this import
-import 'services/collection_service.dart';  // Add this import
-import 'screens/home_screen.dart'; // Add this import
-import 'providers/sort_provider.dart';  // Add this import
+import 'models/tcg_card.dart';
+import 'services/collection_service.dart';
+import 'screens/home_screen.dart';
+import 'providers/sort_provider.dart';
+import 'utils/string_extensions.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize the TcgApiService at app start
+  TcgApiService();
   
   final collectionService = await CollectionService.getInstance();
   await collectionService.initializeLastUser(); // Add this line
