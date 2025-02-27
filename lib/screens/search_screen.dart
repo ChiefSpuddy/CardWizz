@@ -878,6 +878,17 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  // Add this method to handle back to search categories
+  void _handleBackToCategories() {
+    setState(() {
+      _searchResults = null;
+      _setResults = null;
+      _showCategories = true;
+      _searchController.clear();
+      _lastQuery = null;
+    });
+  }
+
   // Add this method where the other class methods are
   void _addToSearchHistory(String query, {String? imageUrl}) {
     if (_searchHistory != null) {
@@ -974,6 +985,23 @@ class _SearchScreenState extends State<SearchScreen> {
     return CustomScrollView(
       controller: _scrollController,
       slivers: [
+        // Add a simple back button when showing search results
+        if (_searchResults != null || _setResults != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8.0, top: 8.0),
+              child: TextButton.icon(
+                onPressed: _handleBackToCategories,
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Back to Search'),
+                style: TextButton.styleFrom(
+                  alignment: Alignment.centerLeft,
+                ),
+              ),
+            ),
+          ),
+          
+        // ...existing code for search results and categories...
         if (_searchResults == null && _setResults == null) ...[
           SliverToBoxAdapter(
             child: SearchCategoriesHeader(
