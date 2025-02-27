@@ -204,8 +204,12 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Map<String, dynamic>> _getAllMtgSets() {
     return [
       ...MtgSets.getSetsForCategory('standard'),
+      ...MtgSets.getSetsForCategory('commander'),
+      ...MtgSets.getSetsForCategory('special'),
       ...MtgSets.getSetsForCategory('modern'),
+      ...MtgSets.getSetsForCategory('pioneer'),
       ...MtgSets.getSetsForCategory('legacy'),
+      ...MtgSets.getSetsForCategory('classic'),
     ];
   }
 
@@ -473,7 +477,7 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      // Always enforce price sorting for MTG searches
+      // Always enforce price high-to-low for ALL MTG searches
       _currentSort = 'cardmarket.prices.averageSellPrice';
       _sortAscending = false;
       
@@ -484,13 +488,6 @@ class _SearchScreenState extends State<SearchScreen> {
       if (query.startsWith('set.id:')) {
         originalSetCode = query.substring(7).trim();
         searchQuery = 'e:$originalSetCode';
-        
-        // Default to price high-to-low for set searches
-        if (_currentSort != 'cardmarket.prices.averageSellPrice' || _sortAscending) {
-          _currentSort = 'cardmarket.prices.averageSellPrice';
-          _sortAscending = false; 
-        }
-        
         print('MTG search for set: "$originalSetCode" using query: "$searchQuery" (sorted by price high-to-low)');
       } else {
         print('MTG general search: "$searchQuery" (sorted by price high-to-low)');
@@ -500,8 +497,8 @@ class _SearchScreenState extends State<SearchScreen> {
         query: searchQuery,
         page: _currentPage,
         pageSize: 30,
-        orderBy: _currentSort,
-        orderByDesc: !_sortAscending,
+        orderBy: _currentSort,        // Already set to price
+        orderByDesc: !_sortAscending, // Already set to descending (high to low)
       );
 
       if (mounted) {
@@ -605,12 +602,8 @@ class _SearchScreenState extends State<SearchScreen> {
     // Clean the code
     final cleanCode = code.trim().toLowerCase();
     
-    // Try to find the set in the MTG sets
-    final mtgSets = [
-      ...MtgSets.getSetsForCategory('standard'),
-      ...MtgSets.getSetsForCategory('modern'),
-      ...MtgSets.getSetsForCategory('legacy'),
-    ];
+    // Try to find the set in all MTG sets
+    final mtgSets = _getAllMtgSets();
     
     final matchingSet = mtgSets.firstWhere(
       (set) => set['code'].toString().toLowerCase() == cleanCode,
@@ -830,65 +823,94 @@ class _SearchScreenState extends State<SearchScreen> {
   void _showSortOptions() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text(
-                'Sort By',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+      builder: (context) {
+        // For MTG searches, show that high-to-low is the default and always applied
+        bool isMtgMode = _searchMode == SearchMode.mtg;
+        
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text(
+                  'Sort By',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                trailing: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Done'),
+                ),
               ),
-              trailing: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('Done'),
+              if (isMtgMode)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Text(
+                    'MTG cards are always sorted by price (high to low)',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.secondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              const Divider(height: 16),
+              
+              ListTile(
+                title: const Text('Price (High to Low)'),
+                leading: const Icon(Icons.attach_money),
+                selected: _currentSort == 'cardmarket.prices.averageSellPrice' && !_sortAscending,
+                // For MTG mode, disable other sorting options
+                enabled: !isMtgMode || (_currentSort == 'cardmarket.prices.averageSellPrice' && !_sortAscending),
+                onTap: () => _updateSort('cardmarket.prices.averageSellPrice', false),
               ),
-            ),
-            const Divider(height: 0),
-            ListTile(
-              title: const Text('Price (High to Low)'),
-              leading: const Icon(Icons.attach_money),
-              selected: _currentSort == 'cardmarket.prices.averageSellPrice' && !_sortAscending,
-              onTap: () => _updateSort('cardmarket.prices.averageSellPrice', false),
-            ),
-            ListTile(
-              title: const Text('Price (Low to High)'),
-              leading: const Icon(Icons.money_off),
-              selected: _currentSort == 'cardmarket.prices.averageSellPrice' && _sortAscending,
-              onTap: () => _updateSort('cardmarket.prices.averageSellPrice', true),
-            ),
-            ListTile(
-              title: const Text('Name (A to Z)'),
-              leading: const Icon(Icons.sort_by_alpha),
-              selected: _currentSort == 'name' && _sortAscending,
-              onTap: () => _updateSort('name', true),
-            ),
-            ListTile(
-              title: const Text('Name (Z to A)'),
-              leading: const Icon(Icons.sort_by_alpha),
-              selected: _currentSort == 'name' && !_sortAscending,
-              onTap: () => _updateSort('name', false),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              title: const Text('Set Number (Low to High)'),
-              leading: const Icon(Icons.format_list_numbered),
-              selected: _currentSort == 'number' && _sortAscending,
-              onTap: () => _updateSort('number', true),
-            ),
-            ListTile(
-              title: const Text('Set Number (High to Low)'),
-              leading: const Icon(Icons.format_list_numbered),
-              selected: _currentSort == 'number' && !_sortAscending,
-              onTap: () => _updateSort('number', false),
-            ),
-          ],
-        ),
-      ),
+              
+              // Only show other options if not in MTG mode
+              if (!isMtgMode) ...[
+                ListTile(
+                  title: const Text('Price (Low to High)'),
+                  leading: const Icon(Icons.money_off),
+                  selected: _currentSort == 'cardmarket.prices.averageSellPrice' && _sortAscending,
+                  onTap: () => _updateSort('cardmarket.prices.averageSellPrice', true),
+                ),
+                ListTile(
+                  title: const Text('Name (A to Z)'),
+                  leading: const Icon(Icons.sort_by_alpha),
+                  selected: _currentSort == 'name' && _sortAscending,
+                  onTap: () => _updateSort('name', true),
+                ),
+                ListTile(
+                  title: const Text('Name (Z to A)'),
+                  leading: const Icon(Icons.sort_by_alpha),
+                  selected: _currentSort == 'name' && !_sortAscending,
+                  onTap: () => _updateSort('name', false),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Set Number (Low to High)'),
+                  leading: const Icon(Icons.format_list_numbered),
+                  selected: _currentSort == 'number' && _sortAscending,
+                  onTap: () => _updateSort('number', true),
+                ),
+                ListTile(
+                  title: const Text('Set Number (High to Low)'),
+                  leading: const Icon(Icons.format_list_numbered),
+                  selected: _currentSort == 'number' && !_sortAscending,
+                  onTap: () => _updateSort('number', false),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
   void _updateSort(String sortBy, bool ascending) {
+    // For MTG mode, always override to price high-to-low
+    if (_searchMode == SearchMode.mtg) {
+      sortBy = 'cardmarket.prices.averageSellPrice';
+      ascending = false;
+    }
+    
     setState(() {
       _currentSort = sortBy;
       _sortAscending = ascending;

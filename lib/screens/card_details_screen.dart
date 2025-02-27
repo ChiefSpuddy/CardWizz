@@ -54,6 +54,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with TickerProvid
   bool _showingFront = true;
   Map<String, dynamic>? _additionalData;
   Map<String, List<Map<String, dynamic>>>? _salesByCategory;  // Add this field
+  bool get isMtgCard => widget.card.set.id.length <= 3 || widget.card.isMtg == true;
 
   @override
   void initState() {
@@ -100,14 +101,42 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with TickerProvid
 
   Future<void> _loadAdditionalData() async {
     try {
-      final data = await _apiService.getCardDetails(widget.card.id);
+      Map<String, dynamic> data;
+      
+      if (isMtgCard) {
+        // For MTG cards, try to get Scryfall data directly
+        if (widget.card.id.startsWith("mtg_")) {
+          data = await _apiService.getCardDetails(widget.card.id);
+        } else {
+          // Try to load by set code and collector number
+          data = await _apiService.getScryfallCardBySetAndNumber(
+            widget.card.set.id, 
+            widget.card.number ?? ""
+          );
+        }
+      } else {
+        // Pokemon cards - use normal API
+        data = await _apiService.getCardDetails(widget.card.id);
+      }
+      
       if (mounted) {
         setState(() {
           _additionalData = data;
           _isLoading = false;
+          print("Loaded additional data: ${data.keys}");
+          
+          if (isMtgCard) {
+            // Debug MTG data
+            print("MTG data keys: ${data.keys.toList()}");
+            
+            if (data.containsKey('oracle_text')) {
+              print("Oracle text: ${data['oracle_text']}");
+            }
+          }
         });
       }
     } catch (e) {
+      print("Error loading additional data: $e");
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -116,11 +145,20 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> with TickerProvid
 
   Future<void> _loadRecentSales() async {
     try {
-      final sales = await _ebayService.getRecentSalesWithGraded(
-        widget.card.name,
-        setName: widget.card.setName,
-        number: widget.card.number,
+      final cardName = widget.card.name;
+      final setName = widget.card.setName;
+      final number = widget.card.number;
+      
+      // Use different queries for MTG vs Pokemon
+      Map<String, List<Map<String, dynamic>>>? sales;
+      
+      sales = await _ebayService.getRecentSalesWithGraded(
+        cardName,
+        setName: setName,
+        number: number,
+        isMtg: isMtgCard, // Use the boolean property from the class
       );
+        
       if (mounted) {
         setState(() => _salesByCategory = sales);
       }
@@ -584,9 +622,43 @@ Widget _buildPricingSection() {
   }
 
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final prices = _additionalData!['tcgplayer']?['prices']?['normal'] ?? 
-                _additionalData!['cardmarket']?['prices'] ??
-                {};
+  
+  // Handle different data structures for MTG vs Pokemon cards
+  Map<String, dynamic> prices = {};
+  
+  if (isMtgCard) {
+    print("MTG pricing data: ${_additionalData!.containsKey('prices') ? _additionalData!['prices'] : 'No prices found'}");
+    // MTG price data structure
+    if (_additionalData!.containsKey('prices')) {
+      final mtgPrices = _additionalData!['prices'];
+      
+      // Convert string values to doubles as needed
+      double? usdPrice;
+      if (mtgPrices['usd'] != null) {
+        usdPrice = double.tryParse(mtgPrices['usd'].toString());
+      }
+      
+      double? usdFoil;
+      if (mtgPrices['usd_foil'] != null) {
+        usdFoil = double.tryParse(mtgPrices['usd_foil'].toString());
+      }
+      
+      prices = {
+        'market': usdPrice,
+        'averageSellPrice': usdPrice,
+        'foil': usdFoil,
+      };
+      
+      if (mtgPrices['eur'] != null) {
+        prices['eur'] = double.tryParse(mtgPrices['eur'].toString());
+      }
+    }
+  } else {
+    // Pokemon price data structure
+    prices = _additionalData!['tcgplayer']?['prices']?['normal'] ?? 
+             _additionalData!['cardmarket']?['prices'] ??
+             {};
+  }
 
   // Early validation of price data
   if (prices.isEmpty || (prices['market'] == null && prices['averageSellPrice'] == null)) {
@@ -604,10 +676,15 @@ Widget _buildPricingSection() {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _launchUrl(_additionalData!['cardmarket']?['url'] ?? 
-                    'https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${Uri.encodeComponent(widget.card.name)}'),
+                  onPressed: () {
+                    final url = isMtgCard 
+                      ? 'https://scryfall.com/card/${widget.card.set.id}/${widget.card.number}'
+                      : (_additionalData!['cardmarket']?['url'] ?? 
+                         'https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${Uri.encodeComponent(widget.card.name)}');
+                    _launchUrl(url);
+                  },
                   icon: const Icon(Icons.shopping_cart),
-                  label: const Text('Cardmarket'),
+                  label: Text(isMtgCard ? 'Scryfall' : 'Cardmarket'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isDark ? Colors.green[700] : Colors.green,
                     foregroundColor: Colors.white,
@@ -646,19 +723,22 @@ Widget _buildPricingSection() {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (prices.isNotEmpty) ...[
-          _buildPriceChart(prices),
-          const Divider(height: 32),
-          _buildPriceInfo(prices),  // Remove spread operator
+          _buildCurrentPrice(prices),  // New method to just show current price
           const SizedBox(height: 24),
         ],
         Row(
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => _launchUrl(_additionalData!['cardmarket']?['url'] ?? 
-                  'https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${Uri.encodeComponent(widget.card.name)}'),
+                onPressed: () {
+                  final url = isMtgCard 
+                    ? 'https://scryfall.com/card/${widget.card.set.id}/${widget.card.number}'
+                    : (_additionalData!['cardmarket']?['url'] ?? 
+                       'https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${Uri.encodeComponent(widget.card.name)}');
+                  _launchUrl(url);
+                },
                 icon: const Icon(Icons.shopping_cart),
-                label: const Text('Cardmarket'),
+                label: Text(isMtgCard ? 'View on Scryfall' : 'Cardmarket'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isDark ? Colors.green[700] : Colors.green,
                   foregroundColor: Colors.white,
@@ -668,10 +748,17 @@ Widget _buildPricingSection() {
             const SizedBox(width: 8),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => _launchUrl(_apiService.getEbaySearchUrl(
-                  widget.card.name,
-                  setName: widget.card.setName,
-                )),
+                onPressed: () => _launchUrl(isMtgCard
+                  ? _apiService.getEbayMtgSearchUrl(
+                      widget.card.name,
+                      setName: widget.card.setName,
+                      number: widget.card.number,
+                    )
+                  : _apiService.getEbaySearchUrl(
+                      widget.card.name,
+                      setName: widget.card.setName,
+                    )
+                ),
                 icon: const Icon(Icons.search),
                 label: const Text('eBay'),
                 style: ElevatedButton.styleFrom(
@@ -684,6 +771,65 @@ Widget _buildPricingSection() {
         ),
       ],
     ),
+  );
+}
+
+// New helper method to show current price without charts (simpler)
+Widget _buildCurrentPrice(Map<String, dynamic> prices) {
+  final currencyProvider = context.watch<CurrencyProvider>();
+  
+  // Extract and format price data
+  final currentPrice = prices['market'] ?? prices['averageSellPrice'];
+  final foilPrice = prices['foil'] ?? prices['usd_foil'];
+  
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'Current Prices',
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      const SizedBox(height: 16),
+      // Regular price
+      if (currentPrice != null) ...[
+        _buildPriceRow(
+          'Regular',
+          currentPrice,
+          isHighlight: true,
+        ),
+      ],
+      // Foil price if available
+      if (foilPrice != null) ...[
+        const SizedBox(height: 8),
+        _buildPriceRow(
+          'Foil',
+          foilPrice,
+          isHighlight: false,
+        ),
+      ],
+      // EUR price if available
+      if (prices['eur'] != null) ...[
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'EUR Price',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            Text(
+              '€${prices['eur']}',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+            ),
+          ],
+        ),
+      ],
+    ],
   );
 }
 
@@ -1289,208 +1435,441 @@ Widget _buildPricingSection() {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.card.name)),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 80),
-          child: Column(
+// Add this method to display detailed MTG card information
+Widget _buildMtgCardInfo() {
+  if (_additionalData == null || !isMtgCard) {
+    return const SizedBox.shrink();
+  }
+
+  print("Building MTG info from: ${_additionalData!.keys.toList()}");
+  
+  // Extract additional MTG data
+  final oracleText = _additionalData!['oracle_text'] as String? ?? '';
+  final typeLine = _additionalData!['type_line'] as String? ?? widget.card.types ?? '';
+  final manaCost = _additionalData!['mana_cost'] as String? ?? '';
+  final cmc = _additionalData!['cmc'] as num? ?? 0;
+  final colors = _additionalData!['colors'] as List<dynamic>? ?? [];
+  final rarity = _additionalData!['rarity'] as String? ?? widget.card.rarity ?? '';
+  final artist = _additionalData!['artist'] as String? ?? '';
+  final setName = _additionalData!['set_name'] as String? ?? widget.card.setName ?? '';
+  final collectorNumber = _additionalData!['collector_number'] as String? ?? widget.card.number ?? '';
+  final releasedAt = _additionalData!['released_at'] as String? ?? '';
+  final legalities = _additionalData!['legalities'] as Map<String, dynamic>? ?? {};
+  final keywords = _additionalData!['keywords'] as List<dynamic>? ?? [];
+  
+  return Container(
+    decoration: BoxDecoration(
+      color: Theme.of(context).brightness == Brightness.dark 
+          ? Colors.grey[900] 
+          : Colors.grey[100],
+      borderRadius: BorderRadius.circular(12),
+    ),
+    margin: const EdgeInsets.only(top: 24),
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Magic: The Gathering Details',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Mana Cost
+        if (manaCost.isNotEmpty) ...[
+          _buildDetailRow('Mana Cost', manaCost),
+          const Divider(),
+        ],
+        
+        // CMC
+        if (cmc != null && cmc != 0) ...[
+          _buildDetailRow('Mana Value', '$cmc'),
+          const Divider(),
+        ],
+        
+        // Colors
+        if (colors.isNotEmpty) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                color: isDark ? Colors.black : Colors.white, // Changed from grey
-                height: MediaQuery.of(context).size.width * 1.0, // Reduced from 1.2
-                child: Stack(
-                  children: [
-                    // Background gradient overlay
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              isDark ? Colors.black : Colors.white,
-                              isDark ? Colors.black.withOpacity(0.7) : Colors.grey[100]!,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Card image
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16), // Reduced padding
-                        child: Container(
-                          width: MediaQuery.of(context).size.width * 0.75, // Slightly larger
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: GestureDetector(
-                            onTap: _flipCard,
-                            child: AnimatedBuilder(
-                              animation: _flipController,
-                              builder: (context, child) {
-                                return Transform(
-                                  transform: Matrix4.identity()
-                                    ..setEntry(3, 2, 0.001)
-                                    ..rotateY(_flipController.value * pi),
-                                  alignment: Alignment.center,
-                                  child: _flipController.value < 0.5 ?
-                                    // Front of card
-                                    Hero(
-                                      tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: CachedNetworkImage(
-                                          imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
-                                          fit: BoxFit.contain,
-                                          // ...existing CachedNetworkImage properties...
-                                        ),
-                                      ),
-                                    )
-                                    :
-                                    // Back of card
-                                    Transform(
-                                      transform: Matrix4.identity()..rotateY(pi),
-                                      alignment: Alignment.center,
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: Image.asset(
-                                          'assets/images/cardback.png',
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ),
-                                    ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+              Text(
+                'Colors',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.card.name,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildPricingSection(),
-                    const SizedBox(height: 24),
-                    _buildCardInfo(),
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.grey[900] : Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: _buildRecentSales(),
-                    ),
-                  ],
+              Wrap(
+                spacing: 4,
+                children: colors.map((color) => _buildManaSymbol(color)).toList(),
+              ),
+            ],
+          ),
+          const Divider(),
+        ],
+        
+        // Keywords
+        if (keywords.isNotEmpty) ...[
+          _buildDetailRow('Keywords', keywords.join(', ')),
+          const Divider(),
+        ],
+        
+        // Type Line
+        _buildDetailRow('Type', typeLine),
+        const Divider(),
+        
+        // Oracle Text
+        if (oracleText.isNotEmpty) ...[
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Oracle Text',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark 
+                      ? Colors.black.withOpacity(0.3) 
+                      : Colors.white.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  oracleText,
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
             ],
           ),
-        ),
-      ),
-      floatingActionButton: FutureBuilder<CollectionService>(
-        future: CollectionService.getInstance(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const SizedBox.shrink();
-          
-          return StreamBuilder<List<TcgCard>>(
-            stream: _storage.watchCards(),
-            builder: (context, cardsSnapshot) {
-              // If we're viewing from collection or binder, show "Add to Binder"
-              if (widget.isFromCollection || widget.isFromBinder) {
-                return _buildFAB(
-                  icon: Icons.collections_bookmark,
-                  label: 'Add to Binder',
-                  onPressed: () => _showAddToBinderDialog(context),
-                );
-              }
-
-              // Otherwise check if card is in collection
-              final isInCollection = cardsSnapshot.data?.any(
-                (c) => c.id == widget.card.id
-              ) ?? false;
-
-              return _buildFAB(
-                icon: isInCollection ? Icons.collections_bookmark : Icons.add,
-                label: isInCollection ? 'Add to Binder' : 'Add to Collection',
-                onPressed: isInCollection 
-                  ? () => _showAddToBinderDialog(context)
-                  : () => _addToCollection(context),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildFAB({
-    required IconData icon,
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return Container(
-      height: 46,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(23),
-        gradient: LinearGradient(
-          colors: [
-            Theme.of(context).primaryColor,
-            Theme.of(context).colorScheme.secondary,
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).primaryColor.withOpacity(0.4),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
+          const Divider(),
         ],
-      ),
-      child: FloatingActionButton.extended(
-        onPressed: onPressed,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        icon: Icon(icon, size: 20),
-        label: Text(
-          label,
-          style: const TextStyle(fontSize: 14),
+        
+        // Legal Formats
+        if (legalities.isNotEmpty) ...[
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Legal Formats',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 8,
+                children: legalities.entries
+                    .where((entry) => entry.value == 'legal')
+                    .map((entry) => _buildLegalityTag(entry.key))
+                    .toList(),
+              ),
+            ],
+          ),
+          const Divider(),
+        ],
+        
+        // Card Number and Set
+        _buildDetailRow('Set', '$setName ($collectorNumber)'),
+        const Divider(),
+        
+        // Release Date
+        if (releasedAt.isNotEmpty) ...[
+          _buildDetailRow('Released', _formatDate(releasedAt)),
+          const Divider(),
+        ],
+        
+        // Artist
+        if (artist.isNotEmpty) ...[
+          _buildDetailRow('Artist', artist),
+        ],
+      ],
+    ),
+  );
+}
+
+// Add helper method to build color symbols
+Widget _buildManaSymbol(String color) {
+  Color symbolColor;
+  
+  switch (color) {
+    case 'W':
+      symbolColor = Colors.amber.shade200;
+      break;
+    case 'U':
+      symbolColor = Colors.blue;
+      break;
+    case 'B':
+      symbolColor = Colors.grey.shade800;
+      break;
+    case 'R':
+      symbolColor = Colors.red;
+      break;
+    case 'G':
+      symbolColor = Colors.green;
+      break;
+    default:
+      symbolColor = Colors.grey;
+  }
+  
+  return Container(
+    width: 24,
+    height: 24,
+    decoration: BoxDecoration(
+      color: symbolColor,
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.grey.shade300, width: 1),
+    ),
+    child: Center(
+      child: Text(
+        color,
+        style: TextStyle(
+          color: color == 'W' || color == 'G' ? Colors.black : Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+// Add helper method to build legality tags
+Widget _buildLegalityTag(String format) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: Colors.green.shade600.withOpacity(0.2),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.green.shade600.withOpacity(0.3)),
+    ),
+    child: Text(
+      format.replaceAll('_', ' ').toUpperCase(),
+      style: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        color: Colors.green.shade600,
+      ),
+    ),
+  );
+}
+
+// Update the build method to use the MTG specific info section
+@override
+Widget build(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  
+  return Scaffold(
+    appBar: AppBar(title: Text(widget.card.name)),
+    body: SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 80),
+        child: Column(
+          children: [
+            Container(
+              color: isDark ? Colors.black : Colors.white, // Changed from grey
+              height: MediaQuery.of(context).size.width * 1.0, // Reduced from 1.2
+              child: Stack(
+                children: [
+                  // Background gradient overlay
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            isDark ? Colors.black : Colors.white,
+                            isDark ? Colors.black.withOpacity(0.7) : Colors.grey[100]!,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Card image
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16), // Reduced padding
+                      child: Container(
+                        width: MediaQuery.of(context).size.width * 0.75, // Slightly larger
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                            ),
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: GestureDetector(
+                          onTap: _flipCard,
+                          child: AnimatedBuilder(
+                            animation: _flipController,
+                            builder: (context, child) {
+                              return Transform(
+                                transform: Matrix4.identity()
+                                  ..setEntry(3, 2, 0.001)
+                                  ..rotateY(_flipController.value * pi),
+                                alignment: Alignment.center,
+                                child: _flipController.value < 0.5 ?
+                                  // Front of card
+                                  Hero(
+                                    tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(isMtgCard ? 10 : 16),
+                                      child: CachedNetworkImage(
+                                        imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
+                                        fit: BoxFit.contain,
+                                        errorWidget: (context, url, error) => Container(
+                                          color: Colors.grey[900],
+                                          child: const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 50)),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  :
+                                  // Back of card
+                                  Transform(
+                                    transform: Matrix4.identity()..rotateY(pi),
+                                    alignment: Alignment.center,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(isMtgCard ? 10 : 16),
+                                      child: Image.asset(
+                                        isMtgCard
+                                            ? 'assets/images/mtgback.png'
+                                            : 'assets/images/cardback.png',
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.card.name,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildPricingSection(),
+                  
+                  // Use MTG-specific info for MTG cards, regular info for Pokemon cards
+                  isMtgCard ? _buildMtgCardInfo() : _buildCardInfo(),
+                  
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[900] : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _buildRecentSales(),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+    // ... existing FAB code ...
+    floatingActionButton: FutureBuilder<CollectionService>(
+      future: CollectionService.getInstance(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+        
+        return StreamBuilder<List<TcgCard>>(
+          stream: _storage.watchCards(),
+          builder: (context, cardsSnapshot) {
+            // If we're viewing from collection or binder, show "Add to Binder"
+            if (widget.isFromCollection || widget.isFromBinder) {
+              return _buildFAB(
+                icon: Icons.collections_bookmark,
+                label: 'Add to Binder',
+                onPressed: () => _showAddToBinderDialog(context),
+              );
+            }
+
+            // Otherwise check if card is in collection
+            final isInCollection = cardsSnapshot.data?.any(
+              (c) => c.id == widget.card.id
+            ) ?? false;
+
+            return _buildFAB(
+              icon: isInCollection ? Icons.collections_bookmark : Icons.add,
+              label: isInCollection ? 'Add to Binder' : 'Add to Collection',
+              onPressed: isInCollection 
+                ? () => _showAddToBinderDialog(context)
+                : () => _addToCollection(context),
+            );
+          },
+        );
+      },
+    ),
+  );
+}
+
+Widget _buildFAB({
+  required IconData icon,
+  required String label,
+  required VoidCallback onPressed,
+}) {
+  return Container(
+    height: 46,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(23),
+      gradient: LinearGradient(
+        colors: [
+          Theme.of(context).primaryColor,
+          Theme.of(context).colorScheme.secondary,
+        ],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Theme.of(context).primaryColor.withOpacity(0.4),
+          blurRadius: 8,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: FloatingActionButton.extended(
+      onPressed: onPressed,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      icon: Icon(icon, size: 20),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 14),
+      ),
+    ),
+  );
+}
 
   String _formatDate(String? dateStr) {
     if (dateStr == null) return 'Unknown';

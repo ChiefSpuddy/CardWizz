@@ -202,8 +202,12 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
       case SearchMode.mtg:
         return [
           {'title': 'Standard Sets', 'sets': _createSetMap(MtgSets.standard)},
+          {'title': 'Commander Sets', 'sets': _createSetMap(MtgSets.commander)},
+          {'title': 'Special & Masters', 'sets': _createSetMap(MtgSets.special)},
           {'title': 'Modern Sets', 'sets': _createSetMap(MtgSets.modern)},
+          {'title': 'Pioneer Sets', 'sets': _createSetMap(MtgSets.pioneer)},
           {'title': 'Legacy Sets', 'sets': _createSetMap(MtgSets.legacy)},
+          {'title': 'Classic Sets', 'sets': _createSetMap(MtgSets.classic)},
         ];
     }
   }

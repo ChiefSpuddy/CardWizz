@@ -83,6 +83,7 @@ flutter:
     - assets/animations/Loading.json
     - assets/images/cardback.png
     - assets/images/             # Add this line to include all images in the directory
+    - assets/images/mtgback.png  # Add this line to include the mtgback.png file
 
 flutter_launcher_icons:
   android: "launcher_icon"

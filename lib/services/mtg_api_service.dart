@@ -5,12 +5,13 @@ import 'dart:async';
 class MtgApiService {
   final String _baseUrl = 'https://api.scryfall.com';
 
+  // Modify the searchCards method to enforce price sorting for MTG
   Future<Map<String, dynamic>> searchCards({
     required String query,
     int page = 1,
     int pageSize = 20,
-    String orderBy = 'name',
-    bool orderByDesc = false,
+    String orderBy = 'usd', // Change default to USD price
+    bool orderByDesc = true, // Default to descending (high to low)
   }) async {
     try {
       print('🃏 MTG SEARCH START: "$query"');
@@ -24,9 +25,7 @@ class MtgApiService {
       // Format the query correctly for Scryfall
       String scryfallQuery;
       if (query.startsWith('set.id:')) {
-        // Extract set code and format for Scryfall
         final setCode = query.substring(7).trim();
-        // Try e: first as it's the more modern syntax
         scryfallQuery = 'e:$setCode';
         print('🃏 MTG set search converted: "$scryfallQuery"');
       } else {
@@ -34,9 +33,9 @@ class MtgApiService {
         print('🃏 MTG general search: "$scryfallQuery"');
       }
       
-      // Add sorting parameters to the query
-      String sortParam = _getScryfallSortField(orderBy);
-      String sortDir = orderByDesc ? 'desc' : 'asc';
+      // Always use price sorting for MTG
+      String sortParam = 'usd';  // Always sort by price
+      String sortDir = 'desc';   // Always high to low
       
       // Create direct URL for debugging
       final directUrl = '$_baseUrl/cards/search?q=${Uri.encodeComponent(scryfallQuery)}&order=$sortParam&dir=$sortDir&page=$page';
@@ -88,6 +87,7 @@ class MtgApiService {
     }
   }
   
+  // Update the _processResponse method to sort by price locally too
   Map<String, dynamic> _processResponse(Map<String, dynamic> data, String originalQuery) {
     final List<dynamic> cards = data['data'] ?? [];
     final int totalCards = data['total_cards'] ?? 0;
@@ -136,13 +136,12 @@ class MtgApiService {
         // Process price
         double price = 0.0;
         if (card['prices'] != null) {
-          // Try USD price first, then EUR, then TIX
-          if (card['prices']['usd'] != null) {
+          if (card['prices']['usd'] != null && card['prices']['usd'] != "null") {
             price = double.tryParse(card['prices']['usd'].toString()) ?? 0.0;
-          } else if (card['prices']['eur'] != null) {
+          } else if (card['prices']['usd_foil'] != null && card['prices']['usd_foil'] != "null") {
+            price = double.tryParse(card['prices']['usd_foil'].toString()) ?? 0.0;
+          } else if (card['prices']['eur'] != null && card['prices']['eur'] != "null") {
             price = double.tryParse(card['prices']['eur'].toString()) ?? 0.0;
-          } else if (card['prices']['tix'] != null) {
-            price = double.tryParse(card['prices']['tix'].toString()) ?? 0.0;
           }
         }
         
@@ -168,6 +167,11 @@ class MtgApiService {
         print('🃏 Error processing card: $e');
       }
     }
+    
+    // Always sort by price high to low locally for extra guarantee
+    processedCards.sort((a, b) => 
+      (b['price'] as double).compareTo(a['price'] as double)
+    );
     
     print('🃏 Successfully processed ${processedCards.length} cards');
     if (processedCards.isNotEmpty) {

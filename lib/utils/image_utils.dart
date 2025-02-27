@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/tcg_card.dart';
+import '../widgets/mtg_set_icon.dart';
 
 class CardImageUtils {
   /// Get the appropriate placeholder for a card based on type
@@ -180,5 +181,37 @@ class CardImageUtils {
         );
       },
     );
+  }
+
+  // Add these methods to your existing ImageUtils class
+  static Widget buildMtgSetIcon(String setCode, {double? size, Color? color}) {
+    try {
+      return MtgSetIcon(
+        setCode: setCode,
+        size: size ?? 30,
+        color: color,
+      );
+    } catch (e) {
+      print('Error building MTG set icon for $setCode: $e');
+      // Return a clean fallback
+      return Container(
+        width: size ?? 30,
+        height: size ?? 30,
+        decoration: BoxDecoration(
+          color: color?.withOpacity(0.1) ?? Colors.grey.withOpacity(0.2),
+          borderRadius: BorderRadius.circular((size ?? 30) / 4),
+        ),
+        child: Center(
+          child: Text(
+            setCode.toUpperCase(),
+            style: TextStyle(
+              fontSize: (size ?? 30) * 0.4,
+              fontWeight: FontWeight.bold,
+              color: color ?? Colors.grey,
+            ),
+          ),
+        ),
+      );
+    }
   }
 }

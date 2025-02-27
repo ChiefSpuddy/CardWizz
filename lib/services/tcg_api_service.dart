@@ -285,14 +285,70 @@ class TcgApiService {
   }
 
   // Get single card details
-  Future<Map<String, dynamic>?> getCardDetails(String cardId) async {
+  Future<Map<String, dynamic>> getCardDetails(String cardId) async {
     try {
-      final response = await _dio.get('/cards/$cardId');
-      return response.data['data'];
+      if (cardId.startsWith("mtg_")) {
+        // This is an MTG card - use Scryfall API directly with the UUID
+        String scryId = cardId.replaceAll("mtg_", "");
+        final url = 'https://api.scryfall.com/cards/$scryId';
+        print('Fetching MTG card details: $url');
+        
+        final response = await _dio.get(url);
+        if (response.statusCode == 200) {
+          return response.data;
+        } else {
+          print('Error fetching MTG card details: ${response.statusCode}');
+          return {};
+        }
+      } else {
+        // Use original implementation for Pokemon cards
+        final url = '${_baseUrl}/cards/$cardId';
+        final response = await _dio.get(url);
+        if (response.statusCode == 200) {
+          return response.data;
+        } else {
+          throw Exception('Failed to load card details');
+        }
+      }
     } catch (e) {
       print('Error getting card details: $e');
-      return null;
+      return {};
     }
+  }
+
+  // Add a method to get Scryfall data directly by set and collector number
+  Future<Map<String, dynamic>> getScryfallCardBySetAndNumber(String setCode, String collectorNumber) async {
+    try {
+      final url = 'https://api.scryfall.com/cards/$setCode/$collectorNumber';
+      print('Fetching MTG card details: $url');
+      
+      final response = await _dio.get(url);
+      if (response.statusCode == 200) {
+        return response.data;
+      } else {
+        print('Error fetching MTG card details: ${response.statusCode}');
+        return {};
+      }
+    } catch (e) {
+      print('Error getting MTG card details: $e');
+      return {};
+    }
+  }
+
+  // Add a helper method to get eBay search URL for MTG cards
+  String getEbayMtgSearchUrl(String cardName, {String? setName, String? number}) {
+    final baseSearchTerm = Uri.encodeComponent('$cardName MTG card');
+    String searchTerm = baseSearchTerm;
+    
+    if (setName != null && setName.isNotEmpty) {
+      searchTerm += Uri.encodeComponent(' "$setName"');
+    }
+    
+    if (number != null && number.isNotEmpty) {
+      searchTerm += Uri.encodeComponent(' $number');
+    }
+    
+    return 'https://www.ebay.com/sch/i.html?_nkw=$searchTerm&_sacat=0&LH_TitleDesc=0&_fsrp=1&_sop=16&LH_Sold=1&LH_Complete=1';
   }
 
   // Update searchSet to handle pagination - removing duplicate implementation

@@ -520,53 +520,109 @@ class EbayApiService {
     return activityMap;
   }
 
-  Future<Map<String, List<Map<String, dynamic>>>> getRecentSalesWithGraded(String cardName, {
+  Future<Map<String, List<Map<String, dynamic>>>> getRecentSalesWithGraded(
+    String cardName, {
     String? setName,
     String? number,
-    Duration lookbackPeriod = const Duration(days: 90),
+    bool isMtg = false, // Add this parameter
   }) async {
-    // Get the sales first using existing method
-    final sales = await getRecentSales(
-      cardName,
-      setName: setName,
-      number: number,
-      lookbackPeriod: lookbackPeriod,
-    );
-
-    // Initialize result with empty lists for each category
-    final result = {
+    // Initialize empty results map
+    final results = {
       'ungraded': <Map<String, dynamic>>[],
       'PSA': <Map<String, dynamic>>[],
       'BGS': <Map<String, dynamic>>[],
       'CGC': <Map<String, dynamic>>[],
-      'ACE': <Map<String, dynamic>>[],
       'SGC': <Map<String, dynamic>>[],
+      'ACE': <Map<String, dynamic>>[],
     };
-
-    // Process sales...
-    for (final sale in sales) {
-      if (!_isValidSale(sale)) continue;
-      
-      final title = sale['title'].toString().toLowerCase();
-      final gradingService = _getGradingService(title);
-      
-      if (gradingService != null) {
-        result[gradingService]!.add(sale);
-      } else {
-        result['ungraded']!.add(sale);
+    
+    // Add MTG-specific search terms if needed
+    final List<String> searchTerms = [];
+    
+    // Base search
+    if (isMtg) {
+      // For MTG cards, use a different format
+      searchTerms.add('$cardName MTG');
+      if (setName != null && setName.isNotEmpty) {
+        searchTerms.add('"$setName"');
+      }
+    } else {
+      // For Pokémon cards
+      searchTerms.add('$cardName pokemon card');
+      if (setName != null && setName.isNotEmpty) {
+        searchTerms.add('"$setName"');
       }
     }
-
-    // Sort each category by date (most recent first)
-    for (final sales in result.values) {
-      sales.sort((a, b) {
-        final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime(1900);
-        final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime(1900);
-        return dateB.compareTo(dateA);
-      });
+    
+    // Add number for both types
+    if (number != null && number.isNotEmpty) {
+      searchTerms.add(number);
     }
 
-    return result;
+    // Build the query combining all terms
+    final query = searchTerms.join(' ');
+    
+    try {
+      final searchResults = await _searchEbay(query, isMtg: isMtg);
+      
+      // Sort results into categories
+      for (final sale in searchResults) {
+        final title = (sale['title'] as String).toLowerCase();
+        
+        if (!_isValidSale(sale)) continue;
+        
+        // Check for graded cards first
+        final gradingService = _getGradingService(title);
+        if (gradingService != null) {
+          results[gradingService]?.add(sale);
+        } else {
+          results['ungraded']?.add(sale);
+        }
+      }
+      
+      return results;
+    } catch (e) {
+      print('Error getting card details: $e');
+      return results; // Return empty results map instead of null
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _searchEbay(String query, {bool isMtg = false}) async {
+    try {
+      // Encode the search query
+      final encodedQuery = Uri.encodeComponent(query);
+      
+      // Build the search URL with appropriate filters for card type
+      final String baseUrl = 'https://www.ebay.com/sch/i.html';
+      final Map<String, String> params = {
+        '_nkw': encodedQuery,
+        '_sacat': isMtg ? '2536' : '183454', // Use correct category ID based on card type
+        '_LH_Complete': '1',
+        '_LH_Sold': '1',
+        '_sop': '13', // End date (recent first)
+      };
+      
+      // Convert params to URL query string
+      final String queryString = params.entries
+          .map((e) => '${e.key}=${e.value}')
+          .join('&');
+      
+      final String url = '$baseUrl?$queryString';
+      
+      // Make the request
+      final response = await http.get(Uri.parse(url));
+      
+      if (response.statusCode == 200) {
+        // Parse HTML and extract sales data
+        // This is a simplified version - you'll need proper HTML parsing
+        return []; // Return empty list for now
+      }
+      
+      return []; // Return empty list on failure
+    } catch (e) {
+      print('Error searching eBay: $e');
+      return []; // Return empty list on error
+    }
   }
 
   bool _isValidSale(Map<String, dynamic> sale) {

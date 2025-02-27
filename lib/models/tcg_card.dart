@@ -19,6 +19,7 @@ class TcgCard {
   final DateTime? addedToCollection; // Added field
   final List<PriceHistoryEntry> priceHistory; // Added field
   final DateTime? lastPriceUpdate; // Added field
+  final bool? isMtg; // Added field
 
   // Added getters for backwards compatibility
   String? get setName => set.name;
@@ -42,6 +43,7 @@ class TcgCard {
     this.addedToCollection, // Added parameter
     List<PriceHistoryEntry>? priceHistory, // Added parameter
     this.lastPriceUpdate, // Added parameter
+    this.isMtg, // Added parameter
   }) : this.priceHistory = priceHistory ?? []; // Initialize priceHistory
 
   // Add method to add price history point
@@ -162,6 +164,7 @@ class TcgCard {
       addedToCollection: addedToCollection,
       priceHistory: priceHistory,
       lastPriceUpdate: lastPriceUpdate,
+      isMtg: json['isMtg'] ?? false, // Added field
     );
   }
 
@@ -183,6 +186,7 @@ class TcgCard {
       'addedToCollection': addedToCollection?.toIso8601String(),
       'priceHistory': priceHistory.map((entry) => entry.toJson()).toList(),
       'lastPriceUpdate': lastPriceUpdate?.toIso8601String(),
+      'isMtg': isMtg, // Added field
     };
   }
 
@@ -204,6 +208,7 @@ class TcgCard {
     DateTime? addedToCollection,
     List<PriceHistoryEntry>? priceHistory,
     DateTime? lastPriceUpdate,
+    bool? isMtg, // Added parameter
   }) {
     return TcgCard(
       id: id ?? this.id,
@@ -223,6 +228,7 @@ class TcgCard {
       addedToCollection: addedToCollection ?? this.addedToCollection,
       priceHistory: priceHistory ?? List.from(this.priceHistory),
       lastPriceUpdate: lastPriceUpdate ?? this.lastPriceUpdate,
+      isMtg: isMtg ?? this.isMtg, // Added parameter
     );
   }
 
@@ -280,6 +286,9 @@ class TcgCard {
       'startPrice': startPrice
     };
   }
+
+  // Helper method to detect if this is an MTG card
+  bool get isMagicCard => isMtg == true || set.id.length <= 3;
 
   @override
   String toString() {
