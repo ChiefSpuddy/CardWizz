@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:flutter_svg/flutter_svg.dart';
 
 class MtgSetIcon extends StatelessWidget {
   final String setCode;
@@ -16,52 +17,58 @@ class MtgSetIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final String svgUrl = 'https://svgs.scryfall.io/sets/$setCode.svg';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    // Get a consistent color based on setCode
-    final int colorValue = setCode.hashCode;
-    final Color setColor = color ?? Color(colorValue).withOpacity(1.0);
-
-    return Container(
+    return SizedBox(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        // Use gradient for better visual appearance
-        gradient: LinearGradient(
-          colors: [
-            setColor.withOpacity(0.8),
-            setColor.withOpacity(0.6),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(size / 5),
-        border: Border.all(
-          color: setColor.withOpacity(0.9),
-          width: 1.5,
-        ),
-        // Add shadow for better visuals
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
+        child: Container(
+          decoration: BoxDecoration(
+            // Use a neutral background with subtle gradient
+            gradient: LinearGradient(
+              colors: isDark 
+                ? [
+                    colorScheme.surfaceVariant.withOpacity(0.7),
+                    colorScheme.surfaceVariant.withOpacity(0.3),
+                  ]
+                : [
+                    Colors.grey.shade100,
+                    Colors.grey.shade200,
+                  ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            // Add subtle border
+            border: Border.all(
+              color: isDark
+                ? colorScheme.outlineVariant.withOpacity(0.3)
+                : colorScheme.outline.withOpacity(0.2),
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(size / 5),
           ),
-        ],
-      ),
-      child: Center(
-        child: Text(
-          // Make sure to handle empty codes gracefully
-          setCode.isEmpty ? '?' : setCode.toUpperCase().substring(0, math.min(3, setCode.length)),
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: size * 0.4,
-            shadows: [
-              Shadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 1,
+          child: Center(
+            child: SvgPicture.network(
+              svgUrl,
+              height: size * 0.6,
+              width: size * 0.6,
+              // Use a color for the SVG that matches the theme
+              colorFilter: ColorFilter.mode(
+                colorScheme.primary,
+                BlendMode.srcIn,
               ),
-            ],
+              placeholderBuilder: (BuildContext context) => Text(
+                setCode.isEmpty ? '?' : setCode.toUpperCase().substring(0, math.min(3, setCode.length)),
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                  fontSize: size * 0.4,
+                ),
+              ),
+            ),
           ),
         ),
       ),

@@ -171,9 +171,15 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _loadNextPage() {
-    if (_searchController.text.isNotEmpty || _lastQuery != null) {
-      setState(() => _isLoadingMore = true);
-      _currentPage++;
+    if (_isLoading || _isLoadingMore || !_hasMorePages) return;
+
+    setState(() => _isLoadingMore = true);
+    _currentPage++;
+    
+    // Use the correct search method based on the mode
+    if (_searchMode == SearchMode.mtg) {
+      _performMtgSearch(_lastQuery ?? _searchController.text);
+    } else {
       _performSearch(
         _lastQuery ?? _searchController.text,
         isLoadingMore: true,
@@ -467,6 +473,10 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
+      // Always enforce price sorting for MTG searches
+      _currentSort = 'cardmarket.prices.averageSellPrice';
+      _sortAscending = false;
+      
       // Format query for Scryfall API
       String searchQuery = query;
       String originalSetCode = "";
@@ -474,9 +484,16 @@ class _SearchScreenState extends State<SearchScreen> {
       if (query.startsWith('set.id:')) {
         originalSetCode = query.substring(7).trim();
         searchQuery = 'e:$originalSetCode';
-        print('MTG search for set: "$originalSetCode" using query: "$searchQuery"');
+        
+        // Default to price high-to-low for set searches
+        if (_currentSort != 'cardmarket.prices.averageSellPrice' || _sortAscending) {
+          _currentSort = 'cardmarket.prices.averageSellPrice';
+          _sortAscending = false; 
+        }
+        
+        print('MTG search for set: "$originalSetCode" using query: "$searchQuery" (sorted by price high-to-low)');
       } else {
-        print('MTG general search: "$searchQuery"');
+        print('MTG general search: "$searchQuery" (sorted by price high-to-low)');
       }
 
       final results = await _mtgApi.searchCards(
@@ -490,14 +507,17 @@ class _SearchScreenState extends State<SearchScreen> {
       if (mounted) {
         final List<dynamic> cardsData = results['data'] as List? ?? [];
         final int totalCount = results['totalCount'] as int;
+        final bool hasMore = results['hasMore'] ?? false;
         
-        print('MTG API returned ${cardsData.length} cards, total: $totalCount');
+        print('MTG API returned ${cardsData.length} cards, total: $totalCount, hasMore: $hasMore');
         
         if (cardsData.isEmpty) {
           setState(() {
             _isLoading = false;
+            _isLoadingMore = false;
             _searchResults = [];
             _totalCards = 0;
+            _hasMorePages = false;
           });
           return;
         }
@@ -520,10 +540,15 @@ class _SearchScreenState extends State<SearchScreen> {
         }).toList();
         
         setState(() {
-          _searchResults = cards;
+          if (_isLoadingMore && _searchResults != null) {
+            _searchResults = [..._searchResults!, ...cards];
+          } else {
+            _searchResults = cards;
+          }
           _totalCards = totalCount;
           _isLoading = false;
-          _hasMorePages = results['hasMore'] ?? false;
+          _isLoadingMore = false;
+          _hasMorePages = hasMore;
         });
         
         // Debug log the first few cards
@@ -559,8 +584,10 @@ class _SearchScreenState extends State<SearchScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _isLoadingMore = false;
           _searchResults = [];
           _totalCards = 0;
+          _hasMorePages = false;
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -698,11 +725,21 @@ class _SearchScreenState extends State<SearchScreen> {
       _currentPage = 1;
       _hasMorePages = true;
       _showCategories = false;
+
+      // Sort by price high-to-low for set searches (both Pokemon and MTG)
+      if (searchItem['query'].toString().startsWith('set.id:')) {
+        _currentSort = 'cardmarket.prices.averageSellPrice';
+        _sortAscending = false;
+      }
     });
 
     try {
       // Check if this is an MTG search
       if (_searchMode == SearchMode.mtg) {
+        // Set price sorting for MTG searches
+        _currentSort = 'cardmarket.prices.averageSellPrice';
+        _sortAscending = false;
+        
         // Use MTG search directly
         final query = searchItem['query'] as String;
         await _performMtgSearch(query);
@@ -1043,6 +1080,12 @@ class _SearchScreenState extends State<SearchScreen> {
               _setResults = null;
               _searchController.clear();
               _showCategories = true;
+              
+              // Always set price high-to-low for MTG mode
+              if (_searchMode == SearchMode.mtg) {
+                _currentSort = 'cardmarket.prices.averageSellPrice';
+                _sortAscending = false;
+              }
             });
           },
           onClearSearch: _clearSearch,
@@ -1061,27 +1104,6 @@ class _SearchScreenState extends State<SearchScreen> {
     return CustomScrollView(
       controller: _scrollController,
       slivers: [
-        // Debug section - add this at the top
-        if (_searchMode == SearchMode.mtg)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  ElevatedButton(
-                    onPressed: () => _performMtgSearch('set.id:neo'),
-                    child: const Text('Test NEO'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () => _performMtgSearch('set.id:one'),
-                    child: const Text('Test ONE'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          
         // Add a simple back button when showing search results
         if (_searchResults != null || _setResults != null)
           SliverToBoxAdapter(
@@ -1131,7 +1153,7 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Text(
                 // Fix the text to be accurate about what we're searching
                 _searchMode == SearchMode.mtg 
-                    ? (_searchResults == null ? 'Found 0 cards' : 'Found $_totalCards cards')
+                    ? (_searchResults == null || _searchResults!.isEmpty ? 'Found 0 cards' : 'Found $_totalCards cards')
                     : (_searchMode == SearchMode.eng || _searchMode == SearchMode.jpn) && _setResults != null 
                         ? 'Found ${_setResults?.length ?? 0} sets'
                         : 'Found $_totalCards cards',
@@ -1139,7 +1161,43 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
           ),
-          if (_searchMode == SearchMode.eng && _searchResults != null)
+          
+          // Replace the MTG card grid with this updated version
+          if (_searchResults != null && _searchMode == SearchMode.mtg)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,                // Changed from 2 to 3
+                  childAspectRatio: 0.7,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final card = _searchResults![index];
+                    return CardGridItem(
+                      card: card,
+                      showName: false,              // Changed to false for better display with 3 columns
+                      showPrice: true,              // Keep price display
+                      onTap: () {
+                        // Save search state before navigating
+                        _wasSearchActive = true;
+                        _lastActiveSearch = _searchController.text;
+                        
+                        Navigator.pushNamed(
+                          context,
+                          '/card',
+                          arguments: {'card': card},
+                        );
+                      },
+                    );
+                  },
+                  childCount: _searchResults!.length,
+                ),
+              ),
+            )
+          else if (_searchMode == SearchMode.eng && _searchResults != null)
             CardSearchGrid(
               cards: _searchResults!,
               imageCache: _imageCache,
@@ -1167,34 +1225,28 @@ class _SearchScreenState extends State<SearchScreen> {
                 _performSearch(query);
               },
             ),
-          if (_hasMorePages && !_isLoading)
-            const SliverToBoxAdapter(
-              child: LoadingMoreIndicator(),
-            ),
-          if (_searchResults != null && _searchMode == SearchMode.mtg)
-            SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.7,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
+          
+          // Handle pagination for all modes
+          if (_hasMorePages && !_isLoadingMore)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Center(
+                  child: ElevatedButton(
+                    onPressed: _loadNextPage,
+                    child: Text('Load more cards'),
+                  ),
+                ),
               ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final card = _searchResults![index];
-                  return CardGridItem(
-                    card: card,
-                    showName: true,
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        '/card',
-                        arguments: {'card': card},
-                      );
-                    },
-                  );
-                },
-                childCount: _searchResults!.length,
+            ),
+          
+          if (_isLoadingMore)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
               ),
             ),
         ],

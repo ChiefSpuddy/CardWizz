@@ -34,8 +34,12 @@ class MtgApiService {
         print('🃏 MTG general search: "$scryfallQuery"');
       }
       
+      // Add sorting parameters to the query
+      String sortParam = _getScryfallSortField(orderBy);
+      String sortDir = orderByDesc ? 'desc' : 'asc';
+      
       // Create direct URL for debugging
-      final directUrl = '$_baseUrl/cards/search?q=${Uri.encodeComponent(scryfallQuery)}';
+      final directUrl = '$_baseUrl/cards/search?q=${Uri.encodeComponent(scryfallQuery)}&order=$sortParam&dir=$sortDir&page=$page';
       print('🃏 MTG API URL: $directUrl');
       
       // Make direct API call with timeout
@@ -131,8 +135,15 @@ class MtgApiService {
         
         // Process price
         double price = 0.0;
-        if (card['prices'] != null && card['prices']['usd'] != null) {
-          price = double.tryParse(card['prices']['usd'].toString()) ?? 0.0;
+        if (card['prices'] != null) {
+          // Try USD price first, then EUR, then TIX
+          if (card['prices']['usd'] != null) {
+            price = double.tryParse(card['prices']['usd'].toString()) ?? 0.0;
+          } else if (card['prices']['eur'] != null) {
+            price = double.tryParse(card['prices']['eur'].toString()) ?? 0.0;
+          } else if (card['prices']['tix'] != null) {
+            price = double.tryParse(card['prices']['tix'].toString()) ?? 0.0;
+          }
         }
         
         // Add processed card
@@ -151,6 +162,7 @@ class MtgApiService {
           'types': card['type_line'] ?? '',
           'artist': card['artist'] ?? 'Unknown',
           'isMtg': true,  // Flag this as an MTG card
+          'hasPrice': price > 0, // Add flag for cards with price
         });
       } catch (e) {
         print('🃏 Error processing card: $e');
@@ -199,10 +211,13 @@ class MtgApiService {
   String _getScryfallSortField(String orderBy) {
     switch (orderBy) {
       case 'cardmarket.prices.averageSellPrice':
-        return 'usd';
+        return 'usd'; // Sort by USD price
       case 'number':
         return 'collector';
       case 'name':
+        return 'name';
+      case 'releaseDate':
+        return 'released';
       default:
         return 'name';
     }

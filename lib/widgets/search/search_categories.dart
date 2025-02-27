@@ -271,6 +271,38 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
+          
+          // Add loading state indicator with better overflow handling
+          final scaffoldMessenger = ScaffoldMessenger.of(context);
+          scaffoldMessenger.showSnackBar(
+            SnackBar(
+              content: Row(
+                mainAxisSize: MainAxisSize.min, // Prevent overflow by setting minimum size
+                children: [
+                  SizedBox(
+                    width: 20, 
+                    height: 20, 
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible( // Use Flexible to allow text to wrap/shrink
+                    child: Text(
+                      'Searching for ${item['name']} cards...',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
+              ),
+              duration: Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              margin: EdgeInsets.fromLTRB(16, 0, 16, 16),
+            ),
+          );
+          
           // Add debug log
           print('Set card tapped: ${item['name']} with query: ${item['query']}');
           widget.onQuickSearch(item);
