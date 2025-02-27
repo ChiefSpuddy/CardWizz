@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/app_drawer.dart';
 import 'home_overview.dart';
 import 'search_screen.dart';
-import 'root_navigator.dart';  // Add this import
+import 'root_navigator.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,7 +26,6 @@ class HomeScreen extends StatefulWidget {
 class HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
-  // Add these methods back that other screens are using
   void setSelectedIndex(int index) {
     // Find RootNavigator and set its index
     final rootNavigator = context.findRootAncestorStateOfType<State<RootNavigator>>();
@@ -59,14 +58,8 @@ class HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       key: _scaffoldKey,
       drawer: const AppDrawer(),
-      body: CustomScrollView(
-        controller: HomeScreen._scrollController,
-        slivers: [
-          SliverFillRemaining(
-            child: HomeOverview(),
-          ),
-        ],
-      ),
+      // Don't use SingleChildScrollView here, the HomeOverview widget will handle its own scrolling
+      body: const HomeOverview(),
     );
   }
 }

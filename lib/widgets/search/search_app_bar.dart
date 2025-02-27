@@ -78,6 +78,16 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
                     Expanded(child: _buildSearchField(context)),
                     const SizedBox(width: 8),
                     _buildSortButton(context),
+                    if (searchMode == SearchMode.mtg)
+                      IconButton(
+                        icon: const Icon(Icons.bug_report),
+                        onPressed: () {
+                          // Log something useful for debugging
+                          print('MTG mode active - Debug info:');
+                          print('Current search text: ${searchController.text}');
+                        },
+                        tooltip: 'Debug Info',
+                      ),
                   ],
                 ),
               ),

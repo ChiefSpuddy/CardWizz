@@ -201,13 +201,38 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
         ];
       case SearchMode.mtg:
         return [
-          {'title': 'Standard Sets', 'sets': MtgSets.standard},
-          {'title': 'Modern Sets', 'sets': MtgSets.modern},
-          {'title': 'Legacy Sets', 'sets': MtgSets.legacy},
-          {'title': 'Pioneer Sets', 'sets': <String, Map<String, dynamic>>{}},
-          {'title': 'Specialty Sets', 'sets': <String, Map<String, dynamic>>{}},
+          {'title': 'Standard Sets', 'sets': _createSetMap(MtgSets.standard)},
+          {'title': 'Modern Sets', 'sets': _createSetMap(MtgSets.modern)},
+          {'title': 'Legacy Sets', 'sets': _createSetMap(MtgSets.legacy)},
         ];
     }
+  }
+
+  // Helper method to convert list format to map format for MTG sets
+  Map<String, Map<String, dynamic>> _createSetMap(Map<String, Map<String, dynamic>> sets) {
+    return sets;
+  }
+
+  // Add the previously missing methods
+  Map<String, dynamic> _buildCategoryHeader(BuildContext context, String title) {
+    return {'title': title, 'type': 'header'};
+  }
+
+  Map<String, dynamic> _buildCategoryRow(BuildContext context, List<Map<String, dynamic>> sets) {
+    // Convert sets list to the format expected by the UI
+    final Map<String, Map<String, dynamic>> setsMap = {};
+    
+    for (final set in sets) {
+      setsMap[set['code']] = {
+        'name': set['name'],
+        'code': set['code'],
+        'year': set['year'] ?? '',
+        'logo': set['logo'],
+        'query': set['query'],
+      };
+    }
+    
+    return {'title': '', 'sets': setsMap, 'type': 'sets'};
   }
 
   Color _getCategoryHeaderColor(SearchMode mode, bool isExpanded) {
@@ -246,6 +271,8 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
+          // Add debug log
+          print('Set card tapped: ${item['name']} with query: ${item['query']}');
           widget.onQuickSearch(item);
         },
         child: SizedBox(

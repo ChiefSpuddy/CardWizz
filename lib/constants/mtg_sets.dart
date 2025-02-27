@@ -37,16 +37,14 @@ class MtgSets {
   static Map<String, dynamic> _buildSetData(String code, String name, String releaseDate) {
     // Build URLs for both potential sources
     final String setIconUrl = 'https://svgs.scryfall.io/sets/$code.svg';
-    final String setSymbolUrl = 'https://gatherer.wizards.com/Handlers/Image.ashx?type=symbol&set=$code&size=large';
     
     return {
       'code': code,
       'name': name,
       'releaseDate': releaseDate,
       'year': releaseDate.substring(0, 4), // Extract year from the date
-      'logo': setIconUrl,               // Primary source: Scryfall SVG
-      'symbolFallback': setSymbolUrl,   // Fallback: Gatherer symbol
-      'query': 'set.id:$code',
+      'logo': setIconUrl,
+      'query': 'set.id:$code',  // Make sure this is correctly formatted
     };
   }
 
@@ -73,8 +71,8 @@ class MtgSets {
               ...entry.value,
               'id': entry.key,
               'code': entry.key,
-              'name': entry.value['name'], // Use the full name
-              'query': 'set.id:${entry.key}',
+              'name': entry.value['name'],
+              'query': 'set.id:${entry.key}', // Ensure this format is preserved
             })
         .toList();
   }

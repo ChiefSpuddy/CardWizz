@@ -11,21 +11,21 @@ import 'constants/text_styles.dart';
 import 'services/tcg_api_service.dart';
 import 'services/auth_service.dart';
 import 'providers/currency_provider.dart';
-import 'providers/theme_provider.dart'; // Add this
+import 'providers/theme_provider.dart'; 
 import 'services/purchase_service.dart';
 import 'screens/splash_screen.dart';
 import 'services/scanner_service.dart';
 import 'screens/add_to_collection_screen.dart';
 import 'screens/card_details_screen.dart';
-import 'screens/search_screen.dart';  // Add this import
-import 'screens/root_navigator.dart';  // Add this import
+import 'screens/search_screen.dart';
+import 'screens/root_navigator.dart';
 import 'models/tcg_card.dart';
 import 'services/collection_service.dart';
 import 'screens/home_screen.dart';
 import 'providers/sort_provider.dart';
 import 'utils/string_extensions.dart';
 import 'constants/app_colors.dart';
-import 'screens/scanner_screen.dart';  // Add this import
+import 'screens/scanner_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

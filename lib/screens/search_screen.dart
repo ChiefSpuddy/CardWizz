@@ -21,6 +21,8 @@ import '../widgets/search/loading_indicators.dart';
 import '../widgets/search/card_grid.dart';
 import '../widgets/search/set_grid.dart';
 import '../widgets/styled_toast.dart';  // Add this import
+import 'dart:math' as math;
+import '../widgets/search/card_grid_item.dart';  // Add this import
 
 // Move enum outside the class
 enum SearchMode { eng, jpn, mtg }
@@ -457,22 +459,24 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
-    if (_isLoading) return;
-
     setState(() {
       _isLoading = true;
       _searchResults = null;
+      _setResults = null;
       _showCategories = false;
     });
 
     try {
+      // Format query for Scryfall API
       String searchQuery = query;
+      String originalSetCode = "";
+      
       if (query.startsWith('set.id:')) {
-        // API will handle set.id: format
-        searchQuery = query;
-      } else if (!query.contains(':')) {
-        // Default to name search for simple queries
-        searchQuery = 'name:$query';
+        originalSetCode = query.substring(7).trim();
+        searchQuery = 'e:$originalSetCode';
+        print('MTG search for set: "$originalSetCode" using query: "$searchQuery"');
+      } else {
+        print('MTG general search: "$searchQuery"');
       }
 
       final results = await _mtgApi.searchCards(
@@ -484,25 +488,74 @@ class _SearchScreenState extends State<SearchScreen> {
       );
 
       if (mounted) {
-        final List<dynamic> data = results['data'] as List? ?? [];
-        final totalCount = results['totalCount'] as int;
-
+        final List<dynamic> cardsData = results['data'] as List? ?? [];
+        final int totalCount = results['totalCount'] as int;
+        
+        print('MTG API returned ${cardsData.length} cards, total: $totalCount');
+        
+        if (cardsData.isEmpty) {
+          setState(() {
+            _isLoading = false;
+            _searchResults = [];
+            _totalCards = 0;
+          });
+          return;
+        }
+        
+        // Convert to TcgCard objects
+        final cards = cardsData.map((data) {
+          return TcgCard(
+            id: data['id'] as String? ?? '',
+            name: data['name'] as String? ?? 'Unknown Card',
+            imageUrl: data['imageUrl'] as String? ?? '',
+            largeImageUrl: data['largeImageUrl'] as String? ?? '',
+            number: data['number'] as String? ?? '',
+            rarity: data['rarity'] as String? ?? '',
+            price: data['price'] as double? ?? 0.0,
+            set: TcgSet(
+              id: data['set']['id'] as String? ?? '',
+              name: data['set']['name'] as String? ?? '',
+            ),
+          );
+        }).toList();
+        
         setState(() {
-          _searchResults = data.map((card) => TcgCard.fromJson(card as Map<String, dynamic>)).toList();
+          _searchResults = cards;
           _totalCards = totalCount;
           _isLoading = false;
-          _hasMorePages = (results['hasMore'] as bool?) ?? false;
-          
-          if (_searchHistory != null && _searchResults != null && _searchResults!.isNotEmpty) {
-            _searchHistory!.addSearch(
-              query,
-              imageUrl: _searchResults![0].imageUrl,
-            );
-          }
+          _hasMorePages = results['hasMore'] ?? false;
         });
+        
+        // Debug log the first few cards
+        if (cards.isNotEmpty) {
+          for (int i = 0; i < math.min(3, cards.length); i++) {
+            print('Card $i: ${cards[i].name} - ${cards[i].imageUrl}');
+          }
+        }
+        
+        // Save to search history with the correct display name
+        if (_searchHistory != null && cards.isNotEmpty) {
+          String displayName;
+          
+          if (query.startsWith('set.id:')) {
+            // Try to get a nice set name from our constants
+            displayName = _getSetNameFromCode(originalSetCode) ?? 
+                         'MTG: ${originalSetCode.toUpperCase()}';
+          } else {
+            displayName = query;
+          }
+          
+          _searchHistory!.addSearch(
+            displayName,
+            imageUrl: cards.isNotEmpty ? cards[0].imageUrl : null,
+            isSetSearch: query.startsWith('set.id:'),
+          );
+        }
       }
-    } catch (e) {
+    } catch (e, stack) {
       print('MTG search error: $e');
+      print('Stack trace: $stack');
+      
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -512,12 +565,32 @@ class _SearchScreenState extends State<SearchScreen> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Search failed: ${e.toString()}'),
+            content: Text('MTG search failed: ${e.toString()}'),
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
     }
+  }
+
+  // Add this helper method to get a set name from code
+  String? _getSetNameFromCode(String code) {
+    // Clean the code
+    final cleanCode = code.trim().toLowerCase();
+    
+    // Try to find the set in the MTG sets
+    final mtgSets = [
+      ...MtgSets.getSetsForCategory('standard'),
+      ...MtgSets.getSetsForCategory('modern'),
+      ...MtgSets.getSetsForCategory('legacy'),
+    ];
+    
+    final matchingSet = mtgSets.firstWhere(
+      (set) => set['code'].toString().toLowerCase() == cleanCode,
+      orElse: () => {'name': null},
+    );
+    
+    return matchingSet['name'] as String?;
   }
 
   Future<void> _performSetSearch(String query) async {
@@ -625,15 +698,18 @@ class _SearchScreenState extends State<SearchScreen> {
       _currentPage = 1;
       _hasMorePages = true;
       _showCategories = false;
-
-      // Sort by price high-to-low for set searches
-      if (searchItem['query'].toString().startsWith('set.id:')) {
-        _currentSort = 'cardmarket.prices.averageSellPrice';
-        _sortAscending = false;
-      }
     });
 
     try {
+      // Check if this is an MTG search
+      if (_searchMode == SearchMode.mtg) {
+        // Use MTG search directly
+        final query = searchItem['query'] as String;
+        await _performMtgSearch(query);
+        return;
+      }
+
+      // Rest of the existing code for Pokemon searches
       // Special handling for Most Valuable search
       if (searchItem['isValueSearch'] == true) {
         setState(() {
@@ -985,6 +1061,27 @@ class _SearchScreenState extends State<SearchScreen> {
     return CustomScrollView(
       controller: _scrollController,
       slivers: [
+        // Debug section - add this at the top
+        if (_searchMode == SearchMode.mtg)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  ElevatedButton(
+                    onPressed: () => _performMtgSearch('set.id:neo'),
+                    child: const Text('Test NEO'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => _performMtgSearch('set.id:one'),
+                    child: const Text('Test ONE'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
         // Add a simple back button when showing search results
         if (_searchResults != null || _setResults != null)
           SliverToBoxAdapter(
@@ -1032,9 +1129,12 @@ class _SearchScreenState extends State<SearchScreen> {
             padding: const EdgeInsets.all(16),
             sliver: SliverToBoxAdapter(
               child: Text(
-                _searchMode == SearchMode.eng
-                    ? 'Found $_totalCards cards'
-                    : 'Found ${_setResults?.length ?? 0} sets',
+                // Fix the text to be accurate about what we're searching
+                _searchMode == SearchMode.mtg 
+                    ? (_searchResults == null ? 'Found 0 cards' : 'Found $_totalCards cards')
+                    : (_searchMode == SearchMode.eng || _searchMode == SearchMode.jpn) && _setResults != null 
+                        ? 'Found ${_setResults?.length ?? 0} sets'
+                        : 'Found $_totalCards cards',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
@@ -1070,6 +1170,32 @@ class _SearchScreenState extends State<SearchScreen> {
           if (_hasMorePages && !_isLoading)
             const SliverToBoxAdapter(
               child: LoadingMoreIndicator(),
+            ),
+          if (_searchResults != null && _searchMode == SearchMode.mtg)
+            SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.7,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final card = _searchResults![index];
+                  return CardGridItem(
+                    card: card,
+                    showName: true,
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        '/card',
+                        arguments: {'card': card},
+                      );
+                    },
+                  );
+                },
+                childCount: _searchResults!.length,
+              ),
             ),
         ],
       ],
