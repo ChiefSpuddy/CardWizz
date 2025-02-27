@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:math' as math; // Add this import
 import '../../constants/sets.dart';
 import '../../constants/japanese_sets.dart';
 import '../../constants/mtg_sets.dart';
 import '../../screens/search_screen.dart';
 import '../../utils/image_utils.dart';
 import '../../constants/app_colors.dart';
+import '../../widgets/mtg_set_icon.dart';
 
 class SearchCategories extends StatefulWidget {
   final SearchMode searchMode;
@@ -149,10 +151,12 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
                     itemBuilder: (context, index) {
                       final set = (era['sets'] as Map<String, Map<String, dynamic>>)
                           .entries.toList()[index];
+                      
+                      // Fix: Use the 'name' field from the set value rather than the key
                       return _buildSetCard(
                         context,
                         {
-                          'name': set.key,
+                          'name': set.value['name'] ?? set.key, // Use full name stored in 'name' field
                           'query': 'set.id:${set.value['code']}',
                           'icon': set.value['icon'],
                           'year': set.value['year'],
@@ -225,79 +229,52 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
     final query = item['query'] as String? ?? '';
     final isSetQuery = query.startsWith('set.id:');
     
-    // Get logo URL based on query type
-    String? logoUrl;
-    if (item.containsKey('logo') && item['logo'] != null) {
-      logoUrl = item['logo'] as String;
-    } else if (isSetQuery) {
-      final setCode = query.replaceAll('set.id:', '').trim();
-      // Use Pokemon TCG API CDN for Pokemon sets
-      if (widget.searchMode != SearchMode.mtg) {
-        logoUrl = 'https://images.pokemontcg.io/$setCode/logo.png';
-      } else {
-        // Keep Scryfall for MTG sets
-        logoUrl = 'https://c2.scryfall.com/file/scryfall-symbols/sets/$setCode.svg';
-      }
+    // Extract set code
+    String? setCode;
+    if (isSetQuery) {
+      setCode = query.replaceAll('set.id:', '').trim();
     }
+
+    // Get the full set name - THIS IS THE KEY CHANGE
+    final String displayName = item['name'] as String;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       color: isDark ? AppColors.searchBarDark : AppColors.searchBarLight,
       elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.2),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: isDark 
-              ? Colors.white.withOpacity(0.1)
-              : Colors.black.withOpacity(0.05),
-        ),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
           widget.onQuickSearch(item);
         },
-        child: SizedBox( // Changed from Container to SizedBox
+        child: SizedBox(
           width: 100,
-          height: 100, // Added fixed height
+          height: 100,
           child: Padding(
-            padding: const EdgeInsets.all(8), // Reduced padding
+            padding: const EdgeInsets.all(8),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                if (logoUrl != null)
-                  Expanded(
-                    child: Image.network(
-                      logoUrl,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stack) {
-                        print('Error loading set symbol for ${item['name']}: $error');
-                        return Text(
-                          item['icon'] ?? '📦',
-                          style: TextStyle(
-                            fontSize: 20, // Reduced font size
-                            color: colorScheme.primary.withOpacity(0.8)
-                          ),
-                        );
-                      },
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8), // Reduced padding
+                // Icon area
+                Expanded(
+                  flex: 1,
+                  child: widget.searchMode == SearchMode.mtg && setCode != null
+                    ? MtgSetIcon(
+                        setCode: setCode,
+                        size: 40,
+                      )
+                    : _buildStandardSetLogo(context, item, setCode, colorScheme),
+                ),
+                
+                // Name area - DISPLAYING THE FULL NAME HERE
+                Expanded(
+                  flex: 1,
+                  child: Center(
                     child: Text(
-                      item['icon'] ?? '📦',
-                      style: const TextStyle(fontSize: 20), // Reduced font size
-                    ),
-                  ),
-                if (item['name'] != null)
-                  Flexible( // Added Flexible
-                    child: Text(
-                      item['name'] ?? '',
+                      displayName,  // Using the full set name
                       style: TextStyle(
-                        fontSize: 10, // Reduced font size
-                        fontWeight: FontWeight.w500,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
                       ),
                       textAlign: TextAlign.center,
@@ -305,11 +282,14 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                ),
+                
+                // Year if available
                 if (item['year'] != null)
                   Text(
                     item['year'].toString(),
                     style: TextStyle(
-                      fontSize: 9, // Reduced font size
+                      fontSize: 9,
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
@@ -317,6 +297,39 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildStandardSetLogo(BuildContext context, Map<String, dynamic> item, String? setCode, ColorScheme colorScheme) {
+    // For Pokemon sets, use the Pokemon TCG API
+    if (setCode != null) {
+      final logoUrl = widget.searchMode == SearchMode.jpn
+          ? CardImageUtils.getJapaneseSetLogo(setCode)
+          : CardImageUtils.getPokemonSetLogo(setCode);
+
+      return Image.network(
+        logoUrl,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stack) {
+          print('Error loading set logo for ${item['name']}: $error');
+          return Text(
+            item['icon'] ?? '📦',
+            style: TextStyle(
+              fontSize: 20,
+              color: colorScheme.primary.withOpacity(0.8)
+            ),
+          );
+        },
+      );
+    }
+    
+    // Fallback
+    return Text(
+      item['icon'] ?? '📦',
+      style: TextStyle(
+        fontSize: 20,
+        color: colorScheme.primary.withOpacity(0.8)
       ),
     );
   }

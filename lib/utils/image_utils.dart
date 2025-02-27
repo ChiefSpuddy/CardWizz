@@ -39,14 +39,25 @@ class CardImageUtils {
   static String getMtgSetLogo(String setCode) {
     // Make lowercase for consistency
     final code = setCode.toLowerCase();
-    return 'https://c2.scryfall.com/file/scryfall-symbols/sets/$code.svg';
+    return 'https://svgs.scryfall.io/sets/$code.svg';
   }
   
   /// Get the MTG set logo as PNG (fallback)
   static String getMtgSetPngLogo(String setCode) {
     // Make lowercase for consistency
     final code = setCode.toLowerCase();
-    return 'https://c2.scryfall.com/file/scryfall-symbols/sets/$code.png';
+    return 'https://svgs.scryfall.io/sets/$code.png';
+  }
+
+  /// Get the MTG set logo/icon URL from Scryfall
+  static String getMtgSetIconUrl(String setCode) {
+    final code = setCode.toLowerCase();
+    return 'https://svgs.scryfall.io/sets/$code.svg';
+  }
+
+  /// Get the MTG set symbol from Gatherer as fallback
+  static String getMtgSetSymbolUrl(String setCode) {
+    return 'https://gatherer.wizards.com/Handlers/Image.ashx?type=symbol&set=$setCode&size=large';
   }
 
   /// Get the Pokemon set logo URL

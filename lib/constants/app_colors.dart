@@ -16,14 +16,14 @@ class AppColors {
   static const textPrimary = Color(0xFF1E293B);     // Slate 800
   static const textSecondary = Color(0xFF64748B);   // Slate 500
   static const textLight = Color(0xFF94A3B8);       // Slate 400
-  static const textDark = Color(0xFF0F172A);        // Slate 900
+  static const textDark = Color(0xFF303030);        // Slate 900
   
   // Game Specific Colors - Enhanced
-  static const primaryPokemon = Color(0xFF3B5BA9);  // Richer Pokémon blue
+  static const primaryPokemon = Color(0xFF3F51B5);  // Richer Pokémon blue
   static const secondaryPokemon = Color(0xFFFFD700); // Vibrant Pokémon yellow
-  static const primaryJapanese = Color(0xFFD22B2B);  // Rich Japanese red
+  static const primaryJapanese = Color(0xFFD32F2F);  // Rich Japanese red
   static const secondaryJapanese = Color(0xFFFFFFFF); // White
-  static const primaryMtg = Color(0xFF6D4C41);      // Modern MTG brown
+  static const primaryMtg = Color(0xFF795548);      // Modern MTG brown
   static const secondaryMtg = Color(0xFFFFB300);    // Modern MTG gold
 
   // Returns gradient colors based on game type
@@ -168,14 +168,14 @@ class AppColors {
   }
 
   // Search-specific colors
-  static const searchBarLight = Color(0xFFF1F5F9);  // Slate 100
-  static const searchBarDark = Color(0xFF1E293B);   // Slate 800
+  static const searchBarLight = Color(0xFFFFFFFF);  // Slate 100
+  static const searchBarDark = Color(0xFF303030);   // Slate 800
   
-  static const searchIconLight = Color(0xFF64748B);  // Slate 500
-  static const searchIconDark = Color(0xFF94A3B8);   // Slate 400
+  static const searchIconLight = Color(0xFF757575);  // Slate 500
+  static const searchIconDark = Color(0xFFBDBDBD);   // Slate 400
   
-  static const searchHintLight = Color(0xFF94A3B8);  // Slate 400
-  static const searchHintDark = Color(0xFF64748B);   // Slate 500
+  static const searchHintLight = Color(0xFF9E9E9E);  // Slate 400
+  static const searchHintDark = Color(0xFF707070);   // Slate 500
 
   // Search bar gradient based on mode
   static List<Color> getSearchBarGradient(bool isDark) {
@@ -201,5 +201,20 @@ class AppColors {
     return isDark
         ? [searchHeaderDark, searchHeaderDarkGradient]
         : [searchHeaderLight, searchHeaderLightGradient];
+  }
+
+  // Helper method to get the appropriate color for a value/price
+  static Color getValueColor(double value) {
+    if (value >= 100) {
+      return const Color(0xFFC62828);  // Expensive - Red
+    } else if (value >= 50) {
+      return const Color(0xFFEF6C00);  // High value - Orange
+    } else if (value >= 10) {
+      return const Color(0xFF2E7D32);  // Medium value - Green
+    } else if (value >= 5) {
+      return const Color(0xFF1976D2);  // Low value - Blue
+    } else {
+      return const Color(0xFF757575);  // Very low value - Grey
+    }
   }
 }

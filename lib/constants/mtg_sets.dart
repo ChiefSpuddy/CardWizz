@@ -35,30 +35,47 @@ class MtgSets {
 
   // Helper method to build a set data entry with consistent structure
   static Map<String, dynamic> _buildSetData(String code, String name, String releaseDate) {
-    final svgLogoUrl = CardImageUtils.getMtgSetLogo(code);
-    final pngLogoUrl = CardImageUtils.getMtgSetPngLogo(code);
+    // Build URLs for both potential sources
+    final String setIconUrl = 'https://svgs.scryfall.io/sets/$code.svg';
+    final String setSymbolUrl = 'https://gatherer.wizards.com/Handlers/Image.ashx?type=symbol&set=$code&size=large';
     
     return {
-      'id': code,
+      'code': code,
       'name': name,
       'releaseDate': releaseDate,
-      'logo': svgLogoUrl,
-      'logoFallback': pngLogoUrl,
+      'year': releaseDate.substring(0, 4), // Extract year from the date
+      'logo': setIconUrl,               // Primary source: Scryfall SVG
+      'symbolFallback': setSymbolUrl,   // Fallback: Gatherer symbol
       'query': 'set.id:$code',
     };
   }
 
   // Get sets for a specific category
   static List<Map<String, dynamic>> getSetsForCategory(String category) {
+    Map<String, Map<String, dynamic>> sets;
+    
     switch (category.toLowerCase()) {
       case 'standard':
-        return standard.entries.map((e) => e.value).toList();
+        sets = standard;
+        break;
       case 'modern':
-        return modern.entries.map((e) => e.value).toList();
+        sets = modern;
+        break;
       case 'legacy':
-        return legacy.entries.map((e) => e.value).toList();
+        sets = legacy;
+        break;
       default:
         return [];
     }
+    
+    return sets.entries
+        .map((entry) => {
+              ...entry.value,
+              'id': entry.key,
+              'code': entry.key,
+              'name': entry.value['name'], // Use the full name
+              'query': 'set.id:${entry.key}',
+            })
+        .toList();
   }
 }
