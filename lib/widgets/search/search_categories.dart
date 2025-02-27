@@ -140,7 +140,7 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
               AnimatedCrossFade(
                 firstChild: const SizedBox(height: 0),
                 secondChild: Container(
-                  height: 120,
+                  height: 110, // Reduced height
                   margin: const EdgeInsets.only(top: 8, bottom: 8),
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
@@ -220,8 +220,8 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
   }
 
   Widget _buildSetCard(BuildContext context, Map<String, dynamic> item) {
-    final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     final query = item['query'] as String? ?? '';
     final isSetQuery = query.startsWith('set.id:');
     
@@ -231,115 +231,90 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
       logoUrl = item['logo'] as String;
     } else if (isSetQuery) {
       final setCode = query.replaceAll('set.id:', '').trim();
-      if (widget.searchMode == SearchMode.mtg) {
-        // Use Scryfall's CDN for MTG sets
-        logoUrl = 'https://c2.scryfall.com/file/scryfall-symbols/sets/$setCode.svg';
+      // Use Pokemon TCG API CDN for Pokemon sets
+      if (widget.searchMode != SearchMode.mtg) {
+        logoUrl = 'https://images.pokemontcg.io/$setCode/logo.png';
       } else {
-        // We'll need a suitable URL scheme for Pokémon sets
-        logoUrl = 'https://tcgdex.net/en/set/$setCode/symbol';
+        // Keep Scryfall for MTG sets
+        logoUrl = 'https://c2.scryfall.com/file/scryfall-symbols/sets/$setCode.svg';
       }
     }
-    
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      clipBehavior: Clip.antiAlias,
-      elevation: 3,
+      color: isDark ? AppColors.searchBarDark : AppColors.searchBarLight,
+      elevation: 2,
       shadowColor: Colors.black.withOpacity(0.2),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: isDark 
+              ? Colors.white.withOpacity(0.1)
+              : Colors.black.withOpacity(0.05),
+        ),
       ),
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
           widget.onQuickSearch(item);
         },
-        splashColor: colorScheme.primary.withOpacity(0.1),
-        child: Container(
+        child: SizedBox( // Changed from Container to SizedBox
           width: 100,
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark ? 
-                [
-                  colorScheme.surfaceVariant.withOpacity(0.8),
-                  colorScheme.surfaceVariant.withOpacity(0.5),
-                ] : 
-                [
-                  colorScheme.surface,
-                  colorScheme.surfaceVariant.withOpacity(0.3),
-                ],
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (logoUrl != null)
-                Expanded(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Show icon as background/fallback
-                      Text(
-                        item['icon'] ?? '📦',
-                        style: TextStyle(
-                          fontSize: 24, 
-                          color: colorScheme.primary.withOpacity(0.2)
-                        ),
-                      ),
-                      // Try to load the logo on top with proper error handling
-                      Image.network(
-                        logoUrl,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stack) {
-                          return Text(
-                            item['icon'] ?? '📦',
-                            style: TextStyle(
-                              fontSize: 24, 
-                              color: colorScheme.primary.withOpacity(0.8)
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text(
-                    item['icon'] ?? '📦',
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                ),
-              if (item['name'] != null)
-                Container(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    item['name'] ?? '',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: colorScheme.onSurface,
+          height: 100, // Added fixed height
+          child: Padding(
+            padding: const EdgeInsets.all(8), // Reduced padding
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (logoUrl != null)
+                  Expanded(
+                    child: Image.network(
+                      logoUrl,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stack) {
+                        print('Error loading set symbol for ${item['name']}: $error');
+                        return Text(
+                          item['icon'] ?? '📦',
+                          style: TextStyle(
+                            fontSize: 20, // Reduced font size
+                            color: colorScheme.primary.withOpacity(0.8)
+                          ),
+                        );
+                      },
                     ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8), // Reduced padding
+                    child: Text(
+                      item['icon'] ?? '📦',
+                      style: const TextStyle(fontSize: 20), // Reduced font size
+                    ),
                   ),
-                ),
-              if (item['year'] != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
+                if (item['name'] != null)
+                  Flexible( // Added Flexible
+                    child: Text(
+                      item['name'] ?? '',
+                      style: TextStyle(
+                        fontSize: 10, // Reduced font size
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurface,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                if (item['year'] != null)
+                  Text(
                     item['year'].toString(),
                     style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 9, // Reduced font size
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

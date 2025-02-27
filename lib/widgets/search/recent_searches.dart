@@ -3,7 +3,7 @@ import '../../services/search_history_service.dart';
 
 class RecentSearches extends StatefulWidget {
   final SearchHistoryService? searchHistory;
-  final Function(String) onSearchSelected;
+  final Function(String, Map<String, String>) onSearchSelected;
   final Function() onClearHistory;
   final bool isLoading;
 
@@ -213,7 +213,10 @@ class _RecentSearchesState extends State<RecentSearches> with SingleTickerProvid
                           ),
                         ],
                       ),
-                      onTap: () => widget.onSearchSelected(search['query']!),
+                      onTap: () => widget.onSearchSelected(
+                        search['query']!,
+                        search,
+                      ),
                     ),
                   );
                 },

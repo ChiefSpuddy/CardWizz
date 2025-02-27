@@ -15,6 +15,7 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool hasResults;
   final SearchMode searchMode;
   final Function(Set<SearchMode>) onSearchModeChanged;
+  final Function() onCameraPressed;  // Add this line
 
   const SearchAppBar({
     Key? key,
@@ -24,6 +25,7 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.currentSort,
     required this.sortAscending,
     required this.onSortOptionsPressed,
+    required this.onCameraPressed,  // Add this line
     this.hasResults = false,
     required this.searchMode,
     required this.onSearchModeChanged,
@@ -56,7 +58,7 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: AppColors.getGradientForGameType(searchMode.toString().split('.').last),
+          colors: AppColors.getSearchHeaderGradient(isDark),
         ),
         boxShadow: AppColors.getCardShadow(elevation: 0.7),
       ),
@@ -133,14 +135,16 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   Widget _buildLeadingButton(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       width: 44,
       height: 44,
       margin: const EdgeInsets.only(right: 8),
       decoration: BoxDecoration(
         color: hasResults 
-            ? Colors.white.withOpacity(0.15)
-            : Colors.white.withOpacity(0.1),
+            ? (isDark ? Colors.white.withOpacity(0.15) : Colors.black.withOpacity(0.1))
+            : (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.08)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Material(
@@ -152,49 +156,38 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
             if (hasResults) {
               onClearSearch();
             } else {
-              _showCameraScanToast(context);
+              onCameraPressed();  // Use the callback instead of direct navigation
             }
           },
           child: Icon(
             hasResults ? Icons.arrow_back_ios_rounded : Icons.camera_alt_rounded,
             size: 22,
-            color: Colors.white,
+            color: isDark ? Colors.white : Colors.black87,
           ),
         ),
-      ),
-    );
-  }
-  
-  void _showCameraScanToast(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.info_outline, color: Colors.white, size: 16),
-            const SizedBox(width: 12),
-            const Text('Card scanning coming soon!'),
-          ],
-        ),
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).size.height - 120,
-          left: 16,
-          right: 16,
-        ),
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
 
   Widget _buildSearchField(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     
     return Container(
       height: 46,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(isDark ? 0.12 : 0.2),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: AppColors.getSearchBarGradient(isDark),
+        ),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark 
+              ? Colors.white.withOpacity(0.1)
+              : Colors.black.withOpacity(0.05),
+        ),
+        boxShadow: AppColors.getCardShadow(elevation: 0.5),
       ),
       child: Row(
         children: [
@@ -202,7 +195,9 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
           Icon(
             Icons.search_rounded,
             size: 20,
-            color: Colors.white.withOpacity(0.9),
+            color: isDark 
+                ? AppColors.searchIconDark 
+                : AppColors.searchIconLight,
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -212,16 +207,20 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
                 hintText: _getPlaceholderText(),
                 border: InputBorder.none,
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 hintStyle: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: isDark 
+                      ? AppColors.searchHintDark 
+                      : AppColors.searchHintLight,
                   fontSize: 16,
                   fontWeight: FontWeight.w400,
                 ),
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
-                color: Colors.white,
+                color: isDark 
+                    ? Colors.white 
+                    : AppColors.textDark,
               ),
               onChanged: onSearchChanged,
               textInputAction: TextInputAction.search,
@@ -259,12 +258,17 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   Widget _buildSortButton(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Container(
       width: 44,
       height: 44,
       margin: const EdgeInsets.only(left: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: isDark 
+            ? Colors.white.withOpacity(0.1)
+            : Colors.black.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Material(
@@ -276,7 +280,7 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
           child: Icon(
             _getSortIcon(currentSort),
             size: 22,
-            color: Colors.white,
+            color: isDark ? Colors.white : Colors.black87,
           ),
         ),
       ),
@@ -284,9 +288,33 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   Widget _buildGameSelector(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark 
+              ? [
+                  const Color(0xFF1E293B),  // Slate 800
+                  const Color(0xFF0F172A),  // Slate 900
+                ]
+              : [
+                  Colors.white,
+                  const Color(0xFFF8FAFC),  // Slate 50
+                ],
+        ),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark 
+                ? Colors.white.withOpacity(0.1)
+                : Colors.black.withOpacity(0.05),
+          ),
+        ),
+      ),
       child: Row(
         children: [
           _buildGameOption(context, SearchMode.eng, 'Pokemon', 'assets/icons/pokemon_logo.png'),
@@ -299,6 +327,8 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   Widget _buildGameOption(BuildContext context, SearchMode mode, String label, String iconPath) {
     final isSelected = searchMode == mode;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
     
     return Expanded(
       child: GestureDetector(
@@ -308,23 +338,26 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
+            color: isSelected 
+                ? (isDark ? Colors.white.withOpacity(0.15) : colorScheme.primary.withOpacity(0.1))
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.3),
+              color: isSelected
+                  ? (isDark ? Colors.white : colorScheme.primary)
+                  : (isDark ? Colors.white.withOpacity(0.3) : colorScheme.outline),
               width: 1.5,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Use appropriate icon for each game
-              _getGameIcon(mode),
+              _getGameIcon(mode, isDark, colorScheme),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  color: Colors.white,
+                  color: isDark ? Colors.white : colorScheme.onSurface,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w400,
                   fontSize: 13,
                 ),
@@ -336,14 +369,16 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
   
-  Widget _getGameIcon(SearchMode mode) {
+  Widget _getGameIcon(SearchMode mode, bool isDark, ColorScheme colorScheme) {
+    final color = isDark ? Colors.white : colorScheme.onSurface;
+    
     switch (mode) {
       case SearchMode.eng:
-        return const Icon(Icons.catching_pokemon, size: 18, color: Colors.white);
+        return Icon(Icons.catching_pokemon, size: 18, color: color);
       case SearchMode.jpn:
         return const Text('🇯🇵', style: TextStyle(fontSize: 14));
       case SearchMode.mtg:
-        return const Icon(Icons.auto_awesome, size: 18, color: Colors.white);
+        return Icon(Icons.auto_awesome, size: 18, color: color);
     }
   }
 }

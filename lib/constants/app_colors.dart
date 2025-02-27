@@ -27,26 +27,11 @@ class AppColors {
   static const secondaryMtg = Color(0xFFFFB300);    // Modern MTG gold
 
   // Returns gradient colors based on game type
-  static List<Color> getGradientForGameType(String gameType) {
-    switch (gameType) {
-      case 'eng':
-        return [
-          const Color(0xFF4F46E5), // Indigo 600
-          const Color(0xFF3730A3), // Indigo 800
-        ];
-      case 'jpn':
-        return [
-          const Color(0xFFDC2626), // Red 600
-          const Color(0xFF991B1B), // Red 800
-        ];
-      case 'mtg':
-        return [
-          const Color(0xFF7C2D12), // Amber 900
-          const Color(0xFF451A03), // Amber 950
-        ];
-      default:
-        return [primary, primary.withOpacity(0.7)];
+  static List<Color> getGradientForGameType(String gameType, {bool isDark = false}) {
+    if (isDark) {
+      return [searchHeaderDark, searchHeaderDarkGradient];
     }
+    return [searchHeaderLight, searchHeaderLightGradient];
   }
 
   // Card type colors - more vibrant
@@ -180,5 +165,41 @@ class AppColors {
         ),
       ),
     );
+  }
+
+  // Search-specific colors
+  static const searchBarLight = Color(0xFFF1F5F9);  // Slate 100
+  static const searchBarDark = Color(0xFF1E293B);   // Slate 800
+  
+  static const searchIconLight = Color(0xFF64748B);  // Slate 500
+  static const searchIconDark = Color(0xFF94A3B8);   // Slate 400
+  
+  static const searchHintLight = Color(0xFF94A3B8);  // Slate 400
+  static const searchHintDark = Color(0xFF64748B);   // Slate 500
+
+  // Search bar gradient based on mode
+  static List<Color> getSearchBarGradient(bool isDark) {
+    return isDark
+        ? [
+            const Color(0xFF1E293B).withOpacity(0.95),  // Slate 800
+            const Color(0xFF0F172A).withOpacity(0.95),  // Slate 900
+          ]
+        : [
+            Colors.white.withOpacity(0.95),
+            const Color(0xFFF8FAFC).withOpacity(0.95),  // Slate 50
+          ];
+  }
+
+  // Search header colors
+  static const searchHeaderDark = Color(0xFF1E293B);  // Slate 800
+  static const searchHeaderDarkGradient = Color(0xFF0F172A);  // Slate 900
+  static const searchHeaderLight = Color(0xFFFFFFFF);  // White
+  static const searchHeaderLightGradient = Color(0xFFF8FAFC);  // Slate 50
+
+  // Search header gradient based on mode
+  static List<Color> getSearchHeaderGradient(bool isDark) {
+    return isDark
+        ? [searchHeaderDark, searchHeaderDarkGradient]
+        : [searchHeaderLight, searchHeaderLightGradient];
   }
 }

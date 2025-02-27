@@ -1,84 +1,42 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/services.dart';  // Add this import
-import '../providers/app_state.dart';
-import '../l10n/app_localizations.dart';  // Add this import
-import 'home_overview.dart';
-import 'collections_screen.dart';
-import 'search_screen.dart';
-import 'profile_screen.dart';
-import 'collection_index_screen.dart';  // Add this import, remove dex_screen.dart import
 import '../widgets/app_drawer.dart';
-import 'analytics_screen.dart';  // Add this import
-import '../services/purchase_service.dart';  // Add this import
-import '../providers/sort_provider.dart';  // Add this import
-
-// Add NavItem class at the top level
-class NavItem {
-  final IconData icon;
-  final String label;
-  const NavItem({required this.icon, required this.label});
-}
+import 'home_overview.dart';
+import 'search_screen.dart';
+import 'root_navigator.dart';  // Add this import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
-  @override
-  State<HomeScreen> createState() => HomeScreenState();  // Changed from _HomeScreenState
-}
-
-class HomeScreenState extends State<HomeScreen> {  // Changed from _HomeScreenState to HomeScreenState
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  int _selectedIndex = 0;
-
-  // Add 'final' keyword to the _navItems declaration
-  final List<NavItem> _navItems = const [
-    NavItem(icon: Icons.home_outlined, label: 'home'),
-    NavItem(icon: Icons.style_outlined, label: 'Collection'),
-    NavItem(icon: Icons.search_outlined, label: 'search'),
-    NavItem(icon: Icons.analytics_outlined, label: 'analytics'),
-    NavItem(icon: Icons.grid_view_outlined, label: 'Tracker'), // Updated icon and label
-    NavItem(icon: Icons.person_outline, label: 'profile'),
-  ];
-
-  // Add 'final' keyword to the _screens declaration
-  final List<Widget> _screens = [
-    const HomeOverview(),
-    const CollectionsScreen(),
-    const SearchScreen(),
-    const AnalyticsScreen(),
-    const CollectionIndexScreen(),  // Make sure this is using CollectionIndexScreen
-    const ProfileScreen(),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    // Restore selected index from storage
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadSelectedIndex();
-    });
-  }
-
-  Future<void> _loadSelectedIndex() async {
-    final prefs = await SharedPreferences.getInstance();
-    final index = prefs.getInt('selected_tab_index') ?? 0;
-    if (mounted) {
-      setState(() => _selectedIndex = index);
+  static final _scrollController = ScrollController();
+  
+  static void scrollToTop(BuildContext context) {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
+  @override
+  State<HomeScreen> createState() => HomeScreenState();
+}
+
+class HomeScreenState extends State<HomeScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  
+  // Add these methods back that other screens are using
   void setSelectedIndex(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    // Find RootNavigator and set its index
+    final rootNavigator = context.findRootAncestorStateOfType<State<RootNavigator>>();
+    if (rootNavigator != null) {
+      (rootNavigator as dynamic)._onNavigationItemTapped(index);
+    }
   }
 
   void goToSearchWithQuery(String query) {
-    setState(() {
-      _selectedIndex = 2; // Switch to search tab
-    });
+    setSelectedIndex(2); // Switch to search tab
     
     // Small delay to ensure the search screen is initialized
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -86,65 +44,28 @@ class HomeScreenState extends State<HomeScreen> {  // Changed from _HomeScreenSt
     });
   }
 
-  Widget _buildBottomNavItem(BuildContext context, int index) {
-    final appState = context.watch<AppState>();
-    final user = appState.currentUser;
-    
-    // Custom profile icon/avatar for the profile tab (index 5 is profile now)
-    if (index == 5) {  // Changed from 4 to 5
-      if (user != null && user.avatarPath != null) {
-        return CircleAvatar(
-          radius: 14,
-          backgroundColor: _selectedIndex == index 
-              ? Theme.of(context).colorScheme.primary
-              : Colors.transparent,
-          child: CircleAvatar(
-            radius: 12,
-            backgroundImage: AssetImage(user.avatarPath!),
-          ),
-        );
-      }
-      return Icon(
-        Icons.person_outline,
-        color: _selectedIndex == index
-            ? Theme.of(context).colorScheme.primary
-            : null,
-      );
-    }
+  @override
+  void initState() {
+    super.initState();
+    HomeScreen._scrollController.addListener(_onScroll);
+  }
 
-    // Return regular icons for other tabs
-    final iconData = _navItems[index].icon;
-    return Icon(
-      iconData,
-      color: _selectedIndex == index
-          ? Theme.of(context).colorScheme.primary
-          : null,
-    );
+  void _onScroll() {
+    // Add scroll handling logic here if needed
   }
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => SortProvider(),
-      child: Scaffold(
-        drawer: const AppDrawer(),  // Remove scaffoldKey parameter
-        body: IndexedStack(
-          index: _selectedIndex,
-          children: _screens,
-        ),
-        bottomNavigationBar: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          currentIndex: _selectedIndex,
-          selectedItemColor: Theme.of(context).colorScheme.primary,
-          unselectedItemColor: Colors.grey,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          onTap: setSelectedIndex,
-          items: _navItems.map((item) => BottomNavigationBarItem(
-            icon: _buildBottomNavItem(context, _navItems.indexOf(item)),
-            label: AppLocalizations.of(context).translate(item.label),
-          )).toList(),
-        ),
+    return Scaffold(
+      key: _scaffoldKey,
+      drawer: const AppDrawer(),
+      body: CustomScrollView(
+        controller: HomeScreen._scrollController,
+        slivers: [
+          SliverFillRemaining(
+            child: HomeOverview(),
+          ),
+        ],
       ),
     );
   }

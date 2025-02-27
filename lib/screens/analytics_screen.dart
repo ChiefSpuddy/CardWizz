@@ -35,6 +35,18 @@ import '../widgets/market_scan_button.dart';
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
 
+  static final _scrollController = ScrollController();
+  
+  static void scrollToTop(BuildContext context) {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
   @override
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
@@ -86,6 +98,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       DialogManager.instance.setContext(context);
     });
+    AnalyticsScreen._scrollController.addListener(_onScroll);
   }
 
   @override
@@ -285,7 +298,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   MaterialPageRoute(
                     builder: (context) => CardDetailsScreen(
                       card: card,
-                      heroContext: 'analytics_topcard_${card.id}', // Update this line
+                      heroContext: 'value_${card.id}', // Updated hero tag prefix
                     ),
                   ),
                 );
@@ -297,7 +310,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     SizedBox(
                       width: 28,
                       child: Hero(
-                        tag: 'analytics_topcard_${card.id}', // Update this line
+                        tag: 'value_${card.id}', // Updated hero tag prefix
                         child: _buildCardImage(card.imageUrl),
                       ),
                     ),
@@ -861,7 +874,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   MaterialPageRoute(
                     builder: (context) => CardDetailsScreen(
                       card: card,
-                      heroContext: 'analytics_mover_${card.id}',
+                      heroContext: 'mover_${card.id}', // Updated hero tag prefix
                     ),
                   ),
                 ),
@@ -872,7 +885,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       SizedBox(
                         width: 28,
                         child: Hero(
-                          tag: 'analytics_mover_${card.id}',
+                          tag: 'mover_${card.id}', // Updated hero tag prefix
                           child: _buildCardImage(card.imageUrl),
                         ),
                       ),
@@ -1641,7 +1654,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      // Only show AppBar if signed in
       appBar: isSignedIn ? AppBar(
         toolbarHeight: 44,
         automaticallyImplyLeading: false,
@@ -1697,6 +1709,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                     return CustomScrollView(
                       key: const ValueKey('analytics_scroll_view'), // Add this key
+                      controller: AnalyticsScreen._scrollController,  // Use the controller here
                       slivers: [
                         SliverToBoxAdapter(
                           child: Padding(
@@ -2070,6 +2083,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
     
     return powerOf10 * 10;
+  }
+
+  void _onScroll() {
+    // Add scroll handling logic here if needed in the future
   }
 }
 

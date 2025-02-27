@@ -20,6 +20,7 @@ import '../widgets/search/loading_state.dart';
 import '../widgets/search/loading_indicators.dart';
 import '../widgets/search/card_grid.dart';
 import '../widgets/search/set_grid.dart';
+import '../widgets/styled_toast.dart';  // Add this import
 
 // Move enum outside the class
 enum SearchMode { eng, jpn, mtg }
@@ -81,6 +82,10 @@ class _SearchScreenState extends State<SearchScreen> {
   SearchMode _searchMode = SearchMode.eng;
   List<dynamic>? _setResults;
 
+  // Add these new fields near the top of the class
+  bool _wasSearchActive = false;
+  String? _lastActiveSearch;
+
   @override
   void initState() {
     super.initState();
@@ -107,8 +112,17 @@ class _SearchScreenState extends State<SearchScreen> {
       final currentRoute = ModalRoute.of(context)?.settings.name;
       final fromBottomNav = route?.isFirst == true || currentRoute == '/search';
       
-      if (fromBottomNav) {
+      // Only clear if coming from bottom nav and no previous search
+      if (fromBottomNav && !_wasSearchActive) {
         _clearSearch();
+      } else if (_wasSearchActive && _lastActiveSearch != null) {
+        // Don't clear results when returning from card details
+        if (_searchResults == null || _searchResults!.isEmpty) {
+          _searchController.text = _lastActiveSearch!;
+          _performSearch(_lastActiveSearch!, useOriginalQuery: true);
+        }
+        _wasSearchActive = false;
+        _lastActiveSearch = null;
       }
     }
   }
@@ -122,11 +136,24 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _initSearchHistory() async {
-    _searchHistory = await SearchHistoryService.init();
-    if (mounted) {
-      setState(() {
-        _isHistoryLoading = false;
-      });
+    try {
+      _searchHistory = await SearchHistoryService.init();
+      if (mounted) {
+        setState(() {
+          _isHistoryLoading = false;
+        });
+      }
+      // Immediately load saved searches
+      if (mounted && _searchHistory != null) {
+        setState(() {}); // Trigger rebuild to show recent searches
+      }
+    } catch (e) {
+      print('Error initializing search history: $e');
+      if (mounted) {
+        setState(() {
+          _isHistoryLoading = false;
+        });
+      }
     }
   }
 
@@ -360,11 +387,14 @@ class _SearchScreenState extends State<SearchScreen> {
           _isLoading = false;
           _isLoadingMore = false;
 
-          // Save to search history for non-paginated searches with results
+          // Save to search history with more details
           if (!isLoadingMore && _searchHistory != null && newCards.isNotEmpty) {
+            final isSetSearch = query.startsWith('set.id:');
             _searchHistory!.addSearch(
-              _formatSearchForDisplay(query),
+              isSetSearch ? _formatSearchForDisplay(query) : query,
               imageUrl: newCards[0].imageUrl,
+              isSetSearch: isSetSearch,
+              cardId: isSetSearch ? null : newCards[0].id, // Save card ID for direct navigation
             );
           }
         });
@@ -389,12 +419,30 @@ class _SearchScreenState extends State<SearchScreen> {
         });
 
         if (!isLoadingMore) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Search failed: ${e.toString()}'),
-              behavior: SnackBarBehavior.floating,
+          // Show styled toast from bottom
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: Colors.transparent,
+            builder: (context) => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  StyledToast(
+                    title: 'Search Failed',
+                    subtitle: 'Please try a different search term',
+                    icon: Icons.error_outline,
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                ],
+              ),
             ),
           );
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) {
+              Navigator.pop(context);
+            }
+          });
         }
       }
     }
@@ -553,7 +601,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     
     _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-      if (mounted && query == _searchController.text && query.isNotEmpty) {
+      if (mounted && query == _searchController.text && query.isNotEmpty) {  // Fixed syntax here
         setState(() {
           _currentPage = 1;
           _isInitialSearch = true;
@@ -647,6 +695,12 @@ class _SearchScreenState extends State<SearchScreen> {
           _hasMorePages = (_currentPage * 30) < totalCount;
           _lastQuery = query;
         });
+
+        // Add to search history after successful search
+        _addToSearchHistory(
+          searchItem['name'],
+          imageUrl: newCards.isNotEmpty ? newCards[0].imageUrl : null,
+        );
       }
     } catch (e) {
       print('Quick search error: $e');
@@ -824,6 +878,64 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  // Add this method where the other class methods are
+  void _addToSearchHistory(String query, {String? imageUrl}) {
+    if (_searchHistory != null) {
+      _searchHistory!.addSearch(query, imageUrl: imageUrl);
+      // Force rebuild to show new search
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  // Update the recent searches handler
+  void _onRecentSearchSelected(String query, Map<String, String> search) {
+    final isSetSearch = search['isSetSearch'] == 'true';
+    _searchController.text = isSetSearch ? _formatSearchForDisplay(query) : query;
+
+    // If it's a set search, use set.id format
+    if (isSetSearch) {
+      _performSearch(query, useOriginalQuery: true);
+      return;
+    }
+
+    // Check if we have a card to show directly
+    if (search['cardId'] != null && search['imageUrl'] != null) {
+      // Create a minimal card for navigation
+      final card = TcgCard(
+        id: search['cardId']!,
+        name: query,
+        imageUrl: search['imageUrl']!,
+        largeImageUrl: search['imageUrl']!.replaceAll('small', 'large'),  // Fix: use replaceAll instead of replace
+        set: TcgSet(id: '', name: ''),
+      );
+
+      Navigator.pushNamed(
+        context,
+        '/card',
+        arguments: {'card': card},
+      );
+      return;
+    }
+
+    // Default to normal search
+    _performSearch(query);
+  }
+
+  void _onCameraPressed() async {
+    final result = await Navigator.pushNamed(context, '/scanner');
+    if (result != null && mounted) {
+      final cardData = result as Map<String, dynamic>;
+      if (cardData['card'] != null) {
+        setState(() {
+          _searchController.text = cardData['card'].name;
+          _performSearch(_searchController.text);
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -847,6 +959,7 @@ class _SearchScreenState extends State<SearchScreen> {
             });
           },
           onClearSearch: _clearSearch,
+          onCameraPressed: _onCameraPressed, // Add this line
         ),
         body: _buildContent(),
       ),
@@ -878,10 +991,7 @@ class _SearchScreenState extends State<SearchScreen> {
           SliverToBoxAdapter(
             child: RecentSearches(
               searchHistory: _searchHistory,
-              onSearchSelected: (query) {
-                _searchController.text = query;
-                _performSearch(query);
-              },
+              onSearchSelected: (query, search) => _onRecentSearchSelected(query, search),
               onClearHistory: () {
                 _searchHistory?.clearHistory();
                 setState(() {});
@@ -907,6 +1017,17 @@ class _SearchScreenState extends State<SearchScreen> {
               imageCache: _imageCache,
               loadImage: _loadImage,
               loadingRequestedUrls: _loadingRequestedUrls,
+              onCardTap: (card) {
+                // Save search state before navigating
+                _wasSearchActive = true;
+                _lastActiveSearch = _searchController.text;
+                
+                Navigator.pushNamed(
+                  context,
+                  '/card',
+                  arguments: {'card': card},
+                );
+              },
             )
           else if (_setResults != null)
             SetSearchGrid(

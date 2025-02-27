@@ -17,12 +17,15 @@ import 'screens/splash_screen.dart';
 import 'services/scanner_service.dart';
 import 'screens/add_to_collection_screen.dart';
 import 'screens/card_details_screen.dart';
+import 'screens/search_screen.dart';  // Add this import
+import 'screens/root_navigator.dart';  // Add this import
 import 'models/tcg_card.dart';
 import 'services/collection_service.dart';
 import 'screens/home_screen.dart';
 import 'providers/sort_provider.dart';
 import 'utils/string_extensions.dart';
 import 'constants/app_colors.dart';
+import 'screens/scanner_screen.dart';  // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,15 +108,24 @@ class MyApp extends StatelessWidget {
       ],
       initialRoute: '/',
       routes: {
-        '/': (context) => const SplashScreen(),
-        ...AppRoutes.routes,
-        '/card-details': (context) => CardDetailsScreen(
-          card: ModalRoute.of(context)!.settings.arguments as TcgCard,
-        ),
+        '/': (context) => const RootNavigator(),
+        '/search': (context) => const SearchScreen(),
+        '/card': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final card = args?['card'] as TcgCard?;
+          if (card == null) {
+            return const SearchScreen();
+          }
+          return CardDetailsScreen(
+            card: card,
+            heroContext: args?['heroContext'] ?? 'search',
+          );
+        },
         '/add-to-collection': (context) => AddToCollectionScreen(
           card: ModalRoute.of(context)!.settings.arguments as TcgCard,
         ),
         '/home': (context) => const HomeScreen(),
+        '/scanner': (context) => const ScannerScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/card-details') {

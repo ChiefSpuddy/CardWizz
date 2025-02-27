@@ -25,16 +25,16 @@ class AppDrawer extends StatelessWidget {
     final homeState = context.findRootAncestorStateOfType<HomeScreenState>();
     if (homeState != null) {
       switch (route) {
-        case '/':
+        case AppRoutes.home:
           homeState.setSelectedIndex(0);
           break;
-        case '/collection':
+        case AppRoutes.collection:
           homeState.setSelectedIndex(1);
           break;
-        case '/search':
+        case AppRoutes.search:
           homeState.setSelectedIndex(2);
           break;
-        case '/analytics':
+        case AppRoutes.analytics:
           homeState.setSelectedIndex(3);
           break;
         case '/dex':
@@ -161,7 +161,7 @@ class AppDrawer extends StatelessWidget {
                           context,
                           icon: Icons.home_rounded,
                           title: 'Home',
-                          onTap: () => _navigateAndClose(context, '/'),
+                          onTap: () => _navigateAndClose(context, AppRoutes.home),
                         ),
                         _buildMenuItem(
                           context,
@@ -185,7 +185,7 @@ class AppDrawer extends StatelessWidget {
                           context,
                           icon: Icons.search_outlined,
                           title: 'Search',
-                          onTap: () => _navigateAndClose(context, '/search'),
+                          onTap: () => _navigateAndClose(context, AppRoutes.search),
                         ),
                         _buildMenuItem(
                           context,

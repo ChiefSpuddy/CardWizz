@@ -36,14 +36,21 @@ class SearchHistoryService {
     return List.from(_searches);
   }
 
-  void addSearch(String query, {String? imageUrl}) {
+  void addSearch(
+    String query, {
+    String? imageUrl,
+    bool isSetSearch = false,
+    String? cardId,
+  }) {
     // Remove existing same query to avoid duplicates
     _searches.removeWhere((search) => search['query'] == query);
     
     // Add new search at the beginning
     _searches.insert(0, {
       'query': query,
+      'isSetSearch': isSetSearch.toString(),
       if (imageUrl != null) 'imageUrl': imageUrl,
+      if (cardId != null) 'cardId': cardId,
     });
     
     // Ensure we don't exceed the maximum allowed searches

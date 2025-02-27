@@ -10,6 +10,7 @@ class CardSearchGrid extends StatefulWidget {
   final Map<String, Image> imageCache;
   final Function(String) loadImage;
   final Set<String> loadingRequestedUrls;
+  final Function(TcgCard)? onCardTap;  // Add this parameter
 
   const CardSearchGrid({
     Key? key,
@@ -17,6 +18,7 @@ class CardSearchGrid extends StatefulWidget {
     required this.imageCache,
     required this.loadImage,
     required this.loadingRequestedUrls,
+    this.onCardTap,  // Add this parameter
   }) : super(key: key);
 
   @override
@@ -169,21 +171,25 @@ class _CardSearchGridState extends State<CardSearchGrid> with TickerProviderStat
             // Add haptic feedback for a premium feel
             HapticFeedback.lightImpact();
             
-            Navigator.push(
-              context,
-              PageRouteBuilder(
-                pageBuilder: (_, animation, __) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: CardDetailsScreen(
-                      card: card,
-                      heroContext: 'search',
-                    ),
-                  );
-                },
-                transitionDuration: const Duration(milliseconds: 300),
-              ),
-            );
+            if (widget.onCardTap != null) {
+              widget.onCardTap!(card);
+            } else {
+              Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (_, animation, __) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: CardDetailsScreen(
+                        card: card,
+                        heroContext: 'search',
+                      ),
+                    );
+                  },
+                  transitionDuration: const Duration(milliseconds: 300),
+                ),
+              );
+            }
           },
           child: Hero(
             tag: 'card_${card.id}_search',
