@@ -332,6 +332,11 @@ class TcgCard {
 extension MtgCardExtension on TcgCard {
   /// Check if this is an MTG card based on the image URL or raw data
   bool get isMtgCard {
+    // First check explicit flag
+    if (isMtg == true) {
+      return true;
+    }
+    
     // Check if image URL contains scryfall.io which is specific to MTG cards
     if (imageUrl.contains('scryfall.io') || imageUrl.contains('scryfall.com')) {
       return true;
@@ -342,6 +347,11 @@ extension MtgCardExtension on TcgCard {
       return rawData!.containsKey('set_type') || 
              rawData!.containsKey('oracle_text') ||
              rawData!.containsKey('mana_cost');
+    }
+    
+    // Check if ID has MTG prefix
+    if (id.startsWith('mtg_')) {
+      return true;
     }
     
     return false;

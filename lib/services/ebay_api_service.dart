@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:math';
 import '../models/tcg_card.dart';  // Add this import
 
+// Change the class to extend ChangeNotifier if needed for provider
 class EbayApiService {
   static const String _clientId = 'SamMay-CardScan-PRD-4227403db-8b726135';
   static const String _clientSecret = 'PRD-227403db4eda-4945-4811-aabd-f9fe';
@@ -63,6 +65,7 @@ class EbayApiService {
     String? setName,
     String? number,
     Duration lookbackPeriod = const Duration(days: 90),
+    bool isMtg = false, // Add this parameter to identify MTG cards
   }) async {
     final token = await _getAccessToken();
     
@@ -75,17 +78,23 @@ class EbayApiService {
       if (setName?.isNotEmpty ?? false) {
         queryParts.add(setName!);
       }
-      queryParts.add('pokemon card');
+      
+      // Add the correct TCG identifier
+      queryParts.add(isMtg ? 'mtg card' : 'pokemon card');
+      
       final searchQuery = queryParts.join(' ');
       
       print('Searching eBay with query: $searchQuery');
       
+      // Use correct category ID based on card type
+      final categoryId = isMtg ? '2536' : '183454'; // 2536 is for MTG cards
+      
       final response = await http.get(
         Uri.https(_baseUrl, '/buy/browse/v1/item_summary/search', {
           'q': searchQuery,
-          'category_ids': '183454',
-          'filter': 'buyingOptions:{FIXED_PRICE} AND soldItemsOnly:true',  // Add soldItemsOnly filter
-          'sort': '-soldDate',  // Sort by most recent sales
+          'category_ids': categoryId,
+          'filter': 'buyingOptions:{FIXED_PRICE} AND soldItemsOnly:true',
+          'sort': '-soldDate',
           'limit': '100',
         }),
         headers: {
@@ -524,7 +533,7 @@ class EbayApiService {
     String cardName, {
     String? setName,
     String? number,
-    bool isMtg = false, // Add this parameter
+    bool isMtg = false, // Make sure we're using this parameter 
   }) async {
     // Initialize empty results map
     final results = {
@@ -697,5 +706,21 @@ class EbayApiService {
     }
 
     return true;
+  }
+
+  // Add this method to help with MTG eBay searches
+  String getEbayMtgSearchUrl(String cardName, {String? setName, String? number}) {
+    final List<String> queryParts = [cardName, 'mtg', 'card'];
+    
+    if (setName != null && setName.isNotEmpty) {
+      queryParts.add(setName);
+    }
+    
+    if (number != null && number.isNotEmpty) {
+      queryParts.add(number);
+    }
+    
+    final queryString = queryParts.join(' ');
+    return 'https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(queryString)}&_sacat=2536';
   }
 }

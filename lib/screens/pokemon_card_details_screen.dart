@@ -1788,19 +1788,40 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-              _buildPricingSection(),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      widget.card.name,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    // Card title and set icon in a row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.card.name,
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (widget.card.set.id.isNotEmpty) 
+                          PokemonSetIcon(
+                            setId: widget.card.set.id,
+                            size: 32,
+                            color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : null,
+                          ),
+                      ],
                     ),
+                    if (widget.card.setName != null && widget.card.setName!.isNotEmpty)
+                      Text(
+                        widget.card.setName!,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     const SizedBox(height: 24),
                     _buildPricingSection(),
                     const SizedBox(height: 24),

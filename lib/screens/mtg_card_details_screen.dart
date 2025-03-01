@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../models/tcg_card.dart';
 import '../services/tcg_api_service.dart';
+import '../services/ebay_api_service.dart';
 import '../services/collection_service.dart';
 import '../providers/currency_provider.dart';
 import '../utils/hero_tags.dart';
@@ -177,8 +178,140 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
               ),
             ],
           ),
+          
+          // Add eBay recent sales section
+          const SizedBox(height: 24),
+          _buildEbayRecentSales(),
         ],
       ),
+    );
+  }
+
+  Widget _buildEbayRecentSales() {
+    // Get the EbayApiService instance
+    final ebayApiService = Provider.of<EbayApiService>(context, listen: false);
+    
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: ebayApiService.getRecentSales(
+        widget.card.name,
+        setName: widget.card.setName,
+        number: widget.card.number,
+        isMtg: true, // Set this flag to true for MTG cards
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Text(
+              'No recent sales found',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          );
+        }
+        
+        // Display recent sales
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Recent eBay Sales',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...snapshot.data!.take(3).map((sale) {
+              final price = (sale['price'] as num).toDouble();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        sale['title'] ?? 'Unknown listing',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      '\$${price.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+            
+            // View more link
+            if (snapshot.data!.length > 3)
+              TextButton(
+                onPressed: () {
+                  // Show modal with all sales
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (context) => DraggableScrollableSheet(
+                      initialChildSize: 0.7,
+                      maxChildSize: 0.9,
+                      expand: false,
+                      builder: (context, scrollController) {
+                        return Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Recent eBay Sales',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 16),
+                              Expanded(
+                                child: ListView.builder(
+                                  controller: scrollController,
+                                  itemCount: snapshot.data!.length,
+                                  itemBuilder: (context, index) {
+                                    final sale = snapshot.data![index];
+                                    final price = (sale['price'] as num).toDouble();
+                                    return ListTile(
+                                      title: Text(sale['title'] ?? 'Unknown listing'),
+                                      subtitle: Text(sale['condition'] ?? ''),
+                                      trailing: Text('\$${price.toStringAsFixed(2)}'),
+                                      onTap: () {
+                                        if (sale['link'] != null) {
+                                          launchUrl(Uri.parse(sale['link']));
+                                        }
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+                child: const Text('View more sales'),
+              ),
+          ],
+        );
+      },
     );
   }
 

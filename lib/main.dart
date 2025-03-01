@@ -26,6 +26,8 @@ import 'providers/sort_provider.dart';
 import 'utils/string_extensions.dart';
 import 'constants/app_colors.dart';
 import 'screens/scanner_screen.dart';
+import 'services/ebay_api_service.dart';  // Add this import
+import 'services/ebay_search_service.dart';  // Add this import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -76,6 +78,8 @@ void main() async {
         ChangeNotifierProvider(
           create: (_) => SortProvider(),
         ),
+        Provider(create: (_) => EbayApiService()),  // Changed from ChangeNotifierProvider to Provider
+        ChangeNotifierProvider(create: (_) => EbaySearchService()),
       ],
       child: const MyApp(),
     ),
