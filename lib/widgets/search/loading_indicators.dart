@@ -78,3 +78,48 @@ class _ShimmerLoadingCardState extends State<ShimmerLoadingCard>
     );
   }
 }
+
+class SearchLoadingIndicator extends StatelessWidget {
+  final double size;
+  
+  const SearchLoadingIndicator({
+    Key? key,
+    this.size = 24,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CircularProgressIndicator(
+        strokeWidth: size / 10,
+        valueColor: AlwaysStoppedAnimation<Color>(
+          isDark ? AppColors.accentLight : AppColors.accentDark,
+        ),
+      ),
+    );
+  }
+}
+
+class PaginationLoadingIndicator extends StatelessWidget {
+  const PaginationLoadingIndicator({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          SearchLoadingIndicator(size: 24),
+          SizedBox(width: 16),
+          Text('Loading more cards...'),
+        ],
+      ),
+    );
+  }
+}

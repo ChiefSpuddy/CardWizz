@@ -1735,49 +1735,43 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
                             child: AnimatedBuilder(
                               animation: flipController,
                               builder: (context, child) {
+                                final isFrontVisible = flipController.value < 0.5;
+                                
                                 return Transform(
                                   transform: Matrix4.identity()
                                     ..setEntry(3, 2, 0.001)
                                     ..rotateY(flipController.value * pi),
                                   alignment: Alignment.center,
-                                  child: flipController.value < 0.5 ?
-                                    // Front of card
-                                    Hero(
-                                      tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: CachedNetworkImage(
-                                          imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
-                                          fit: BoxFit.contain,
-                                          errorWidget: (context, url, error) => Container(
-                                            color: Colors.grey[900],
-                                            child: const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 50)),
+                                  child: isFrontVisible 
+                                    ? // Front of card - only build when visible
+                                      Hero(
+                                        tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(16),
+                                          child: CachedNetworkImage(
+                                            imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
+                                            fit: BoxFit.contain,
+                                            placeholder: (context, url) => Center(
+                                              child: CircularProgressIndicator(
+                                                valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
+                                              ),
+                                            ),
+                                            errorWidget: (context, url, error) => Container(
+                                              color: Colors.grey[900],
+                                              child: const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 50)),
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    )
-                                    :
-                                    // Back of card - use Pokemon cardback
-                                    Transform(
-                                      transform: Matrix4.identity()..rotateY(pi),
-                                      alignment: Alignment.center,
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: Image.asset(
-                                          'assets/images/cardback.png',
-                                          fit: BoxFit.contain,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            print("Error loading card back: $error");
-                                            return Container(
-                                              color: Colors.grey[900],
-                                              child: const Center(
-                                                child: Icon(Icons.image_not_supported, color: Colors.white, size: 50),
-                                              ),
-                                            );
-                                          },
+                                      )
+                                    : // Back of card - apply a second transform to maintain correct orientation
+                                      Transform(
+                                        transform: Matrix4.identity()..rotateY(pi),
+                                        alignment: Alignment.center,
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(16),
+                                          child: _buildCardBack(),
                                         ),
                                       ),
-                                    ),
                                 );
                               },
                             ),
@@ -1891,6 +1885,67 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
           );
         },
       ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Preload the card back image to prevent flicker during animation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _precacheCardBackImage();
+    });
+  }
+
+  // Add a dedicated method to preload card back with error handling
+  Future<void> _precacheCardBackImage() async {
+    try {
+      await precacheImage(const AssetImage('assets/images/cardback.png'), context);
+      print('Card back image precached successfully');
+    } catch (e) {
+      print('Error precaching card back image: $e');
+    }
+  }
+
+  // Add this helper method to build the card back with proper fallback
+  Widget _buildCardBack() {
+    return Image.asset(
+      'assets/images/cardback.png',
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        print('Error loading card back: $error');
+        // Provide a solid color fallback with Pokemon branding
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0C3A8D), // Pokemon card back blue color
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.style, color: Colors.white, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  'Pokémon',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 4,
+                        offset: const Offset(2, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

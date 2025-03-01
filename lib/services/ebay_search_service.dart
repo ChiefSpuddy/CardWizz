@@ -1,62 +1,75 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import '../services/ebay_api_service.dart';
 import '../models/tcg_card.dart';
 
 class EbaySearchService extends ChangeNotifier {
-  static const String _baseUrl = 'https://www.ebay.com';
+  final EbayApiService _ebayApi = EbayApiService();
   
-  // Get a properly formatted eBay search URL for MTG cards
-  String getMtgSearchUrl(String cardName, {String? setName, String? number}) {
-    final List<String> queryParts = [cardName, 'mtg', 'card'];
-    
-    if (setName != null && setName.isNotEmpty) {
-      queryParts.add(setName);
+  // Search state variables
+  bool _isSearching = false;
+  String _lastSearchQuery = '';
+  List<Map<String, dynamic>> _searchResults = [];
+  String? _errorMessage;
+  
+  // Getters
+  bool get isSearching => _isSearching;
+  String get lastSearchQuery => _lastSearchQuery;
+  List<Map<String, dynamic>> get searchResults => _searchResults;
+  String? get errorMessage => _errorMessage;
+  
+  // Search for completed listings
+  Future<void> searchCompletedListings(String cardName, {
+    String? setName,
+    String? number,
+    bool isMtg = false,
+  }) async {
+    try {
+      _isSearching = true;
+      _errorMessage = null;
+      _lastSearchQuery = cardName;
+      notifyListeners();
+      
+      _searchResults = await _ebayApi.getRecentSales(
+        cardName, 
+        setName: setName, 
+        number: number,
+        isMtg: isMtg,
+      );
+      
+      _isSearching = false;
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = 'Failed to search eBay: $e';
+      _isSearching = false;
+      notifyListeners();
     }
-    
-    if (number != null && number.isNotEmpty) {
-      queryParts.add(number);
-    }
-    
-    final queryString = queryParts.join(' ');
-    return 'https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(queryString)}&_sacat=2536';
   }
   
-  // Get a properly formatted eBay search URL for Pokemon cards
-  String getPokemonSearchUrl(String cardName, {String? setName, String? number}) {
-    final List<String> queryParts = [cardName, 'pokemon', 'card'];
-    
-    if (setName != null && setName.isNotEmpty) {
-      queryParts.add(setName);
-    }
-    
-    if (number != null && number.isNotEmpty) {
-      queryParts.add(number);
-    }
-    
-    final queryString = queryParts.join(' ');
-    return 'https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(queryString)}&_sacat=183454';
+  // Reset search
+  void resetSearch() {
+    _isSearching = false;
+    _searchResults = [];
+    _errorMessage = null;
+    notifyListeners();
   }
   
-  // Generic method to handle both MTG and Pokemon cards
-  String getCardSearchUrl(TcgCard card) {
-    if (card.isMtgCard) {
-      return getMtgSearchUrl(card.name, setName: card.setName, number: card.number);
+  // Generate eBay URL for the card
+  String getEbayUrl(TcgCard card, {bool isMtg = false}) {
+    if (isMtg) {
+      return _ebayApi.getEbayMtgSearchUrl(
+        card.name, 
+        setName: card.setName, 
+        number: card.number
+      );
     } else {
-      return getPokemonSearchUrl(card.name, setName: card.setName, number: card.number);
+      final queryParts = [card.name, 'pokemon card'];
+      if (card.setName != null) queryParts.add(card.setName!);
+      if (card.number != null) queryParts.add(card.number!);
+      
+      return 'https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(queryParts.join(' '))}&_sacat=183454';
     }
-  }
-  
-  // Method to get search URL for complete sets
-  String getSetSearchUrl(String setName, bool isMtg) {
-    final List<String> queryParts = [
-      '"$setName"',
-      'complete set',
-      isMtg ? 'mtg' : 'pokemon'
-    ];
-    
-    final queryString = queryParts.join(' ');
-    final categoryId = isMtg ? '2536' : '183454';
-    return 'https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(queryString)}&_sacat=$categoryId';
   }
 }

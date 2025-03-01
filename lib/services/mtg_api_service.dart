@@ -9,7 +9,7 @@ class MtgApiService {
     required String query,
     int page = 1,
     int pageSize = 20,
-    String orderBy = 'usd', // Change default to USD price
+    String orderBy = 'usd', // Default to USD price
     bool orderByDesc = true, // Default to descending (high to low)
   }) async {
     try {
@@ -73,13 +73,6 @@ class MtgApiService {
     final int totalCards = data['total_cards'] ?? 0;
     final bool hasMore = data['has_more'] ?? false;
     
-    if (cards.isNotEmpty) {
-      final firstCard = cards.first;
-      if (firstCard['image_uris'] != null) {
-      } else if (firstCard['card_faces'] != null) {
-      }
-    }
-    
     final List<Map<String, dynamic>> processedCards = [];
     
     for (final card in cards) {
@@ -127,12 +120,13 @@ class MtgApiService {
           'types': card['type_line'] ?? '',
           'artist': card['artist'] ?? 'Unknown',
           'isMtg': true,  // Flag this as an MTG card
-          'hasPrice': price > 0, // Add flag for cards with price
         });
       } catch (e) {
+        // Silent catch to continue processing other cards
       }
     }
     
+    // Sort by price high to low as default
     processedCards.sort((a, b) => 
       (b['price'] as double).compareTo(a['price'] as double)
     );
@@ -164,21 +158,6 @@ class MtgApiService {
       };
     } catch (e) {
       return null;
-    }
-  }
-
-  String _getScryfallSortField(String orderBy) {
-    switch (orderBy) {
-      case 'cardmarket.prices.averageSellPrice':
-        return 'usd'; // Sort by USD price
-      case 'number':
-        return 'collector';
-      case 'name':
-        return 'name';
-      case 'releaseDate':
-        return 'released';
-      default:
-        return 'name';
     }
   }
 }

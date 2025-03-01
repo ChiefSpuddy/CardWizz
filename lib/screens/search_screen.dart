@@ -1184,40 +1184,24 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ),
           
-          // Replace the MTG card grid with this updated version
+          // Replace the MTG card grid with a standard CardSearchGrid
           if (_searchResults != null && _searchMode == SearchMode.mtg)
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,                // Changed from 2 to 3
-                  childAspectRatio: 0.7,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final card = _searchResults![index];
-                    return CardGridItem(
-                      card: card,
-                      showName: false,              // Changed to false for better display with 3 columns
-                      showPrice: true,              // Keep price display
-                      onTap: () {
-                        // Save search state before navigating
-                        _wasSearchActive = true;
-                        _lastActiveSearch = _searchController.text;
-                        
-                        Navigator.pushNamed(
-                          context,
-                          '/card',
-                          arguments: {'card': card},
-                        );
-                      },
-                    );
-                  },
-                  childCount: _searchResults!.length,
-                ),
-              ),
+            CardSearchGrid(
+              cards: _searchResults!,
+              imageCache: _imageCache,
+              loadImage: _loadImage,
+              loadingRequestedUrls: _loadingRequestedUrls,
+              onCardTap: (card) {
+                // Save search state before navigating
+                _wasSearchActive = true;
+                _lastActiveSearch = _searchController.text;
+                
+                Navigator.pushNamed(
+                  context,
+                  '/card',
+                  arguments: {'card': card},
+                );
+              },
             )
           else if (_searchMode == SearchMode.eng && _searchResults != null)
             CardSearchGrid(

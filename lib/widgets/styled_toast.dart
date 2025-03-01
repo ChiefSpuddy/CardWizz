@@ -2,81 +2,117 @@ import 'package:flutter/material.dart';
 
 class StyledToast extends StatelessWidget {
   final String title;
-  final String? subtitle;
-  final IconData icon;
-  final Color backgroundColor;
-  final VoidCallback? onActionPressed;
-  final String? actionLabel;
+  final String subtitle;
+  final IconData? icon;  
+  final String? actionLabel;  
+  final Color? backgroundColor;
+  final Color? textColor;
+  final Color? iconColor;
+  final VoidCallback? onTap;
+  final VoidCallback? onAction;
+  final VoidCallback? onActionPressed; // Add this parameter for backward compatibility
 
   const StyledToast({
-    super.key,
+    Key? key,
     required this.title,
-    this.subtitle,
-    this.icon = Icons.check_circle_outline,
-    this.backgroundColor = Colors.green,
-    this.onActionPressed,
+    this.subtitle = '',  
+    this.icon,  
     this.actionLabel,
-  });
+    this.backgroundColor,
+    this.textColor,
+    this.iconColor,
+    this.onTap,
+    this.onAction,
+    this.onActionPressed, // Add this parameter
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: backgroundColor,
+    final bgColor = backgroundColor ?? Theme.of(context).colorScheme.primary;
+    final txtColor = textColor ?? Colors.white;
+    final icnColor = iconColor ?? txtColor;
+
+    // Use either onAction or onActionPressed callback (prefer onAction if both are provided)
+    final actionCallback = onAction ?? onActionPressed;
+
+    return Material(
+      elevation: 6,
+      borderRadius: BorderRadius.circular(12),
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(12),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                if (icon != null)  
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: icnColor.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: icnColor,
+                      size: 24,
+                    ),
+                  ),
+                if (icon != null)  
+                  const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: txtColor,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: txtColor.withOpacity(0.8),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                if (subtitle != null)
-                  Text(
-                    subtitle!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white70,
+                if (actionLabel != null && actionCallback != null) 
+                  TextButton(
+                    onPressed: actionCallback,
+                    child: Text(
+                      actionLabel!,
+                      style: TextStyle(
+                        color: txtColor,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
+                  )
+                else  
+                  Icon(
+                    Icons.chevron_right,
+                    color: txtColor.withOpacity(0.7),
                   ),
               ],
             ),
           ),
-          if (onActionPressed != null && actionLabel != null)
-            TextButton(
-              onPressed: onActionPressed,
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-              ),
-              child: Text(actionLabel!),
-            ),
-        ],
+        ),
       ),
     );
   }

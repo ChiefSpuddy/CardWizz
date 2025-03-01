@@ -36,6 +36,67 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
     _loadAdditionalData();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    // Preload the card back image to prevent flicker during animation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _precacheCardBackImage();
+    });
+  }
+
+  // Add a dedicated method to preload MTG card back with error handling
+  Future<void> _precacheCardBackImage() async {
+    try {
+      await precacheImage(const AssetImage('assets/images/mtgback.png'), context);
+      print('MTG card back image precached successfully');
+    } catch (e) {
+      print('Error precaching MTG card back image: $e');
+    }
+  }
+
+  // Add this helper method to build the MTG card back with proper fallback
+  Widget _buildCardBack() {
+    return Image.asset(
+      'assets/images/mtgback.png',
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        print('Error loading MTG card back: $error');
+        // Provide a solid color fallback with MTG branding
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF8B4513), // Brown color for MTG card back
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.auto_awesome, color: Colors.white, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  'Magic',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 4,
+                        offset: const Offset(2, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _loadAdditionalData() async {
     try {
       // For MTG cards, load data from Scryfall
@@ -188,42 +249,11 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
   }
 
   Widget _buildEbayRecentSales() {
-    // Get the EbayApiService instance
-    final ebayApiService = Provider.of<EbayApiService>(context, listen: false);
-    
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: ebayApiService.getRecentSales(
-        widget.card.name,
-        setName: widget.card.setName,
-        number: widget.card.number,
-        isMtg: true, // Set this flag to true for MTG cards
-      ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-        
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Text(
-              'No recent sales found',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          );
-        }
-        
-        // Display recent sales
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               'Recent eBay Sales',
@@ -231,88 +261,339 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 12),
-            ...snapshot.data!.take(3).map((sale) {
-              final price = (sale['price'] as num).toDouble();
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        sale['title'] ?? 'Unknown listing',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      '\$${price.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+            Image.asset(
+              'assets/images/ebay_logo.png', 
+              height: 24,
+              errorBuilder: (context, error, stackTrace) => 
+                  const SizedBox.shrink(), // Gracefully handle missing asset
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        
+        // Use FutureBuilder to fetch and display real eBay sales data
+        FutureBuilder<List<Map<String, dynamic>>>(
+          future: Provider.of<EbayApiService>(context, listen: false).getRecentSales(
+            widget.card.name,
+            setName: widget.card.setName,
+            number: widget.card.number,
+            isMtg: true, // This is an MTG card
+          ),
+          builder: (context, snapshot) {
+            // Loading state
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24.0),
+                  child: CircularProgressIndicator(),
                 ),
               );
-            }).toList(),
+            }
             
-            // View more link
-            if (snapshot.data!.length > 3)
-              TextButton(
-                onPressed: () {
-                  // Show modal with all sales
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (context) => DraggableScrollableSheet(
-                      initialChildSize: 0.7,
-                      maxChildSize: 0.9,
-                      expand: false,
-                      builder: (context, scrollController) {
-                        return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Recent eBay Sales',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 16),
-                              Expanded(
-                                child: ListView.builder(
-                                  controller: scrollController,
-                                  itemCount: snapshot.data!.length,
-                                  itemBuilder: (context, index) {
-                                    final sale = snapshot.data![index];
-                                    final price = (sale['price'] as num).toDouble();
-                                    return ListTile(
-                                      title: Text(sale['title'] ?? 'Unknown listing'),
-                                      subtitle: Text(sale['condition'] ?? ''),
-                                      trailing: Text('\$${price.toStringAsFixed(2)}'),
-                                      onTap: () {
-                                        if (sale['link'] != null) {
-                                          launchUrl(Uri.parse(sale['link']));
-                                        }
-                                      },
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
+            // Error state
+            if (snapshot.hasError) {
+              return _buildErrorState('Error loading sales data');
+            }
+            
+            // Empty state
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return _buildEmptyState();
+            }
+            
+            final sales = snapshot.data!;
+            final currencyProvider = context.watch<CurrencyProvider>();
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Display the first few sales
+                ...sales.take(3).map((sale) {
+                  final price = (sale['price'] as num).toDouble();
+                  final title = sale['title'] as String? ?? 'Unknown item';
+                  final condition = sale['condition'] as String? ?? '';
+                  final link = sale['link'] as String? ?? '';
+                  
+                  return InkWell(
+                    onTap: () {
+                      if (link.isNotEmpty) {
+                        _launchUrl(link);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Theme.of(context).dividerColor.withOpacity(0.5),
+                            width: 0.5,
                           ),
-                        );
-                      },
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10, 
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              currencyProvider.formatValue(price),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                if (condition.isNotEmpty)
+                                  Text(
+                                    condition,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right, size: 16),
+                        ],
+                      ),
                     ),
                   );
-                },
-                child: const Text('View more sales'),
-              ),
-          ],
-        );
-      },
+                }),
+                
+                // Show a "View More" button if there are more than 3 sales
+                if (sales.length > 3)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: TextButton.icon(
+                      onPressed: () => _showAllSales(sales),
+                      icon: const Icon(Icons.list, size: 16),
+                      label: Text('See ${sales.length - 3} more'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        iconColor: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
     );
+  }
+
+  Widget _buildErrorState(String message) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24.0),
+      width: double.infinity,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 48,
+            color: Theme.of(context).colorScheme.error.withOpacity(0.8),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => _launchUrl(_apiService.getEbayMtgSearchUrl(
+              widget.card.name,
+              setName: widget.card.setName,
+              number: widget.card.number,
+            )),
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('Check eBay Manually'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24.0),
+      width: double.infinity,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off,
+            size: 48,
+            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No recent sales found',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'We couldn\'t find any completed listings for this card',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => _launchUrl(_apiService.getEbayMtgSearchUrl(
+              widget.card.name,
+              setName: widget.card.setName,
+              number: widget.card.number,
+            )),
+            icon: const Icon(Icons.search),
+            label: const Text('Check eBay Manually'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAllSales(List<Map<String, dynamic>> sales) {
+    final currencyProvider = context.read<CurrencyProvider>();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                // Header
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.history),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Recent eBay Sales',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${sales.length} sales',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // Sales list
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: sales.length,
+                    itemBuilder: (context, index) {
+                      final sale = sales[index];
+                      final price = (sale['price'] as num).toDouble();
+                      final title = sale['title'] as String? ?? 'Unknown item';
+                      final condition = sale['condition'] as String? ?? '';
+                      final link = sale['link'] as String? ?? '';
+                      final date = sale['date'] != null ? 
+                          _formatDate(sale['date'].toString()) : '';
+                      
+                      return ListTile(
+                        title: Text(title),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (condition.isNotEmpty)
+                              Text(condition),
+                            if (date.isNotEmpty)
+                              Text(
+                                'Sold: $date',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                          ],
+                        ),
+                        trailing: Text(
+                          currencyProvider.formatValue(price),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        onTap: link.isNotEmpty ? () => _launchUrl(link) : null,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+  
+  // Format date for display
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      return '${date.month}/${date.day}/${date.year}';
+    } catch (e) {
+      return '';
+    }
   }
 
   Widget _buildPriceRow(String label, double price, CurrencyProvider currencyProvider, {String currency = '\$'}) {
@@ -863,15 +1144,6 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
     }
   }
 
-  String _formatDate(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-    } catch (e) {
-      return dateString;
-    }
-  }
-
   Future<void> _launchUrl(String url) async {
     try {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
@@ -937,19 +1209,27 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
                             child: AnimatedBuilder(
                               animation: flipController,
                               builder: (context, child) {
+                                final isFrontVisible = flipController.value < 0.5;
+                                
                                 return Transform(
                                   transform: Matrix4.identity()
                                     ..setEntry(3, 2, 0.001)
                                     ..rotateY(flipController.value * pi),
                                   alignment: Alignment.center,
-                                  child: flipController.value < 0.5 
-                                    ? Hero(
+                                  child: isFrontVisible 
+                                    ? // Front of card - only build when visible
+                                      Hero(
                                         tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.circular(16),
                                           child: CachedNetworkImage(
                                             imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
                                             fit: BoxFit.contain,
+                                            placeholder: (context, url) => Center(
+                                              child: CircularProgressIndicator(
+                                                valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
+                                              ),
+                                            ),
                                             errorWidget: (context, url, error) => Container(
                                               color: Colors.grey[900],
                                               child: const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 50)),
@@ -957,24 +1237,13 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
                                           ),
                                         ),
                                       )
-                                    : Transform(
+                                    : // Back of card - apply a second transform to maintain correct orientation
+                                      Transform(
                                         transform: Matrix4.identity()..rotateY(pi),
                                         alignment: Alignment.center,
                                         child: ClipRRect(
                                           borderRadius: BorderRadius.circular(16),
-                                          child: Image.asset(
-                                            'assets/images/mtgback.png',
-                                            fit: BoxFit.contain,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              print("Error loading card back: $error");
-                                              return Container(
-                                                color: Colors.grey[900],
-                                                child: const Center(
-                                                  child: Icon(Icons.image_not_supported, color: Colors.white, size: 50),
-                                                ),
-                                              );
-                                            },
-                                          ),
+                                          child: _buildCardBack(),
                                         ),
                                       ),
                                 );

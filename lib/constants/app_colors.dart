@@ -16,7 +16,7 @@ class AppColors {
   static const textPrimary = Color(0xFF1E293B);     // Slate 800
   static const textSecondary = Color(0xFF64748B);   // Slate 500
   static const textLight = Color(0xFF94A3B8);       // Slate 400
-  static const textDark = Color(0xFF303030);        // Slate 900
+  static const textDark = Color(0xFF212121);        // Slate 900
   
   // Game Specific Colors - Enhanced
   static const primaryPokemon = Color(0xFF3F51B5);  // Richer Pokémon blue
@@ -91,19 +91,15 @@ class AppColors {
   }
 
   // Beautiful shadows for cards and components
-  static List<BoxShadow> getCardShadow({double elevation = 1.0}) {
+  static List<BoxShadow>? getCardShadow({required double elevation}) {
+    if (elevation == 0) return null;
+    
     return [
       BoxShadow(
-        color: Colors.black.withOpacity(0.05 * elevation),
-        blurRadius: 10 * elevation,
-        offset: Offset(0, 4 * elevation),
-        spreadRadius: 0,
-      ),
-      BoxShadow(
-        color: Colors.black.withOpacity(0.03 * elevation),
-        blurRadius: 25 * elevation,
-        offset: Offset(0, 10 * elevation),
-        spreadRadius: -5,
+        color: Colors.black.withOpacity(0.1 * elevation),
+        blurRadius: 6.0 * elevation,
+        spreadRadius: 1.0 * elevation,
+        offset: Offset(0, 2.0 * elevation),
       ),
     ];
   }
@@ -168,25 +164,25 @@ class AppColors {
   }
 
   // Search-specific colors
-  static const searchBarLight = Color(0xFFFFFFFF);  // Slate 100
-  static const searchBarDark = Color(0xFF303030);   // Slate 800
+  static const searchBarLight = Color(0xFFF8F9FA);  // Slate 100
+  static const searchBarDark = Color(0xFF222222);   // Slate 800
   
   static const searchIconLight = Color(0xFF757575);  // Slate 500
-  static const searchIconDark = Color(0xFFBDBDBD);   // Slate 400
+  static const searchIconDark = Color(0xFFBBBBBB);   // Slate 400
   
   static const searchHintLight = Color(0xFF9E9E9E);  // Slate 400
-  static const searchHintDark = Color(0xFF707070);   // Slate 500
+  static const searchHintDark = Color(0xFF808080);   // Slate 500
 
   // Search bar gradient based on mode
   static List<Color> getSearchBarGradient(bool isDark) {
     return isDark
         ? [
-            const Color(0xFF1E293B).withOpacity(0.95),  // Slate 800
-            const Color(0xFF0F172A).withOpacity(0.95),  // Slate 900
+            searchBarDark,
+            searchBarDark.withOpacity(0.9),
           ]
         : [
-            Colors.white.withOpacity(0.95),
-            const Color(0xFFF8FAFC).withOpacity(0.95),  // Slate 50
+            searchBarLight,
+            searchBarLight.withOpacity(0.9),
           ];
   }
 
@@ -217,4 +213,11 @@ class AppColors {
       return const Color(0xFF757575);  // Very low value - Grey
     }
   }
+
+  // Price tag background
+  static const Color priceTagBackground = Color(0xFF388E3C);  // Green for prices
+  
+  // Accent colors
+  static const Color accentLight = Color(0xFF03A9F4);  // Light blue accent
+  static const Color accentDark = Color(0xFF29B6F6);  // Slightly lighter blue for dark mode
 }

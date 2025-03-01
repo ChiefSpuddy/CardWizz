@@ -16,6 +16,10 @@ class PokemonSetIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Ensure we have a valid set ID
+    if (setId.isEmpty) {
+      return _buildFallback(context);
+    }
+    
     final normalizedSetId = setId.toLowerCase().trim();
     
     // Base URL for logos
@@ -40,32 +44,40 @@ class PokemonSetIcon extends StatelessWidget {
           fit: BoxFit.contain,
           color: color,
           errorWidget: (context, url, error) {
-            // If both fail, show text fallback
-            return Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  normalizedSetId.length > 2 ? normalizedSetId.substring(0, 2).toUpperCase() : normalizedSetId.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: size * 0.4,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
-            );
+            return _buildFallback(context);
           },
         );
       },
+    );
+  }
+  
+  Widget _buildFallback(BuildContext context) {
+    // Fallback text representation
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          setId.isEmpty
+              ? '?'
+              : setId.length > 2 
+                  ? setId.substring(0, 2).toUpperCase() 
+                  : setId.toUpperCase(),
+          style: TextStyle(
+            fontSize: size * 0.4,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      ),
     );
   }
 }
