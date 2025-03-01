@@ -23,6 +23,7 @@ import '../widgets/search/set_grid.dart';
 import '../widgets/styled_toast.dart';  // Add this import
 import 'dart:math' as math;
 import '../widgets/search/card_grid_item.dart';  // Add this import
+import '../services/navigation_service.dart'; // Add the missing import
 
 // Move enum outside the class
 enum SearchMode { eng, jpn, mtg }
@@ -387,35 +388,49 @@ class _SearchScreenState extends State<SearchScreen> {
             .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
             .toList();
 
-        setState(() {
-          if (isLoadingMore && _searchResults != null) {
-            _searchResults = [..._searchResults!, ...newCards];
-          } else {
-            _searchResults = newCards;
-            _totalCards = totalCount;
+        // AGGRESSIVE IMAGE PRELOADING - Start loading ALL images IMMEDIATELY
+        // This ensures images show up without requiring scrolling or interaction
+        if (newCards.isNotEmpty) {
+          print("Starting aggressive image preloading for ${newCards.length} cards");
+          
+          // Directly load the first 12 images synchronously (first 4 rows)
+          for (int i = 0; i < math.min(12, newCards.length); i++) {
+            _loadImage(newCards[i].imageUrl);
           }
           
-          _hasMorePages = (_currentPage * 30) < totalCount;
-          _isLoading = false;
-          _isLoadingMore = false;
-
-          // Save to search history with more details
-          if (!isLoadingMore && _searchHistory != null && newCards.isNotEmpty) {
-            final isSetSearch = query.startsWith('set.id:');
-            _searchHistory!.addSearch(
-              isSetSearch ? _formatSearchForDisplay(query) : query,
-              imageUrl: newCards[0].imageUrl,
-              isSetSearch: isSetSearch,
-              cardId: isSetSearch ? null : newCards[0].id, // Save card ID for direct navigation
-            );
-          }
-        });
-
-        // Pre-load next page images
-        if (_hasMorePages) {
-          for (final card in newCards) {
-            _loadImage(card.imageUrl);
-          }
+          // Update the state quickly to show cards while images are loading
+          setState(() {
+            if (isLoadingMore && _searchResults != null) {
+              _searchResults = [..._searchResults!, ...newCards];
+            } else {
+              _searchResults = newCards;
+              _totalCards = totalCount;
+            }
+            
+            _hasMorePages = (_currentPage * 30) < totalCount;
+            _isLoading = false;
+            _isLoadingMore = false;
+          });
+          
+          // Then queue the rest for loading after a tiny delay to not block UI
+          Future.delayed(Duration.zero, () {
+            for (int i = 12; i < newCards.length; i++) {
+              if (!_loadingRequestedUrls.contains(newCards[i].imageUrl)) {
+                if (_loadingImages.length < _maxConcurrentLoads) {
+                  _loadImage(newCards[i].imageUrl);
+                } else {
+                  _loadQueue.add(newCards[i].imageUrl);
+                }
+              }
+            }
+          });
+          
+          // ...search history code...
+        } else {
+          setState(() {
+            _isLoading = false;
+            _isLoadingMore = false;
+          });
         }
       }
     } catch (e) {
@@ -432,29 +447,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
         if (!isLoadingMore) {
           // Show styled toast from bottom
-          showModalBottomSheet(
-            context: context,
-            backgroundColor: Colors.transparent,
-            builder: (context) => Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  StyledToast(
-                    title: 'Search Failed',
-                    subtitle: 'Please try a different search term',
-                    icon: Icons.error_outline,
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                  ),
-                ],
-              ),
-            ),
+          _showStyledToast(
+            title: 'Search Failed',
+            message: 'Please try a different search term',
+            icon: Icons.error_outline,
+            isError: true,
           );
-          Future.delayed(const Duration(seconds: 3), () {
-            if (mounted) {
-              Navigator.pop(context);
-            }
-          });
         }
       }
     }
@@ -587,11 +585,12 @@ class _SearchScreenState extends State<SearchScreen> {
           _hasMorePages = false;
         });
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('MTG search failed: ${e.toString()}'),
-            behavior: SnackBarBehavior.floating,
-          ),
+        // Replace SnackBar with styled toast
+        _showStyledToast(
+          title: 'MTG Search Failed',
+          message: 'Please try a different search term',
+          icon: Icons.error_outline,
+          isError: true,
         );
       }
     }
@@ -693,12 +692,16 @@ class _SearchScreenState extends State<SearchScreen> {
       _searchDebounce!.cancel();
     }
     
-    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-      if (mounted && query == _searchController.text && query.isNotEmpty) {  // Fixed syntax here
+    // Use a shorter debounce for better responsiveness
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted && query == _searchController.text && query.isNotEmpty) {
         setState(() {
           _currentPage = 1;
           _isInitialSearch = true;
+          _isLoading = true; // Set loading state before search for immediate UI feedback
         });
+        
+        // Perform search based on mode
         if (_searchMode == SearchMode.eng) {
           _performSearch(query);
         } else if (_searchMode == SearchMode.mtg) {
@@ -972,40 +975,116 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  // Image loading
+  // Improved image loading
   Future<void> _loadImage(String url) async {
+    // If already loading or cached, skip
     if (_loadingRequestedUrls.contains(url) || _imageCache.containsKey(url)) {
       return;
     }
 
+    // Mark as requested to avoid duplicate requests
     _loadingRequestedUrls.add(url);
-
-    if (_loadingImages.length >= _maxConcurrentLoads) {
-      _loadQueue.add(url);
-      return;
-    }
-
-    _loadingImages.add(url);
+    
+    // Use a simpler, more reliable Image.network approach
     try {
-      final image = Image.network(
+      // Create the image
+      final img = Image.network(
         url,
-        errorBuilder: (context, error, stackTrace) {
-          _loadingRequestedUrls.remove(url);
+        fit: BoxFit.contain,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            // Image fully loaded
+            return child;
+          }
+          // Show a loading indicator while loading
           return Container(
-            color: Theme.of(context).colorScheme.surfaceVariant,
-            child: Center(
-              child: Icon(
-                Icons.image_not_supported_outlined,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                size: 24,
+            color: Colors.grey[800],
+            child: const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                ),
               ),
             ),
           );
         },
+        errorBuilder: (context, error, stackTrace) {
+          _loadingRequestedUrls.remove(url);
+          return Container(
+            color: Colors.grey[800],
+            child: const Center(
+              child: Icon(Icons.error_outline, color: Colors.white),
+            ),
+          );
+        },
       );
-      _imageCache[url] = image;
-    } finally {
+      
+      // Cache the image immediately
+      _imageCache[url] = img;
+      
+      // Use a listener to know when the image is fully loaded
+      final completer = Completer<bool>();
+      
+      // Ensure the image is actually loaded with timeout
+      final imageProvider = NetworkImage(url);
+      final imageStream = imageProvider.resolve(const ImageConfiguration());
+      final listener = ImageStreamListener(
+        (info, synchronousCall) {
+          if (!completer.isCompleted) {
+            completer.complete(true);
+            _loadingImages.remove(url);
+            
+            // Process next image in queue
+            if (_loadQueue.isNotEmpty) {
+              final nextUrl = _loadQueue.removeAt(0);
+              _loadImage(nextUrl);
+            }
+          }
+        },
+        onError: (exception, stackTrace) {
+          if (!completer.isCompleted) {
+            completer.complete(false);
+            _loadingRequestedUrls.remove(url);
+            _loadingImages.remove(url);
+            
+            // Process next image in queue
+            if (_loadQueue.isNotEmpty) {
+              final nextUrl = _loadQueue.removeAt(0);
+              _loadImage(nextUrl);
+            }
+          }
+        },
+      );
+      
+      imageStream.addListener(listener);
+      
+      // Add a timeout
+      Timer(const Duration(seconds: 10), () {
+        if (!completer.isCompleted) {
+          completer.complete(false);
+          _loadingRequestedUrls.remove(url);
+          _loadingImages.remove(url);
+          imageStream.removeListener(listener);
+          
+          // Process next image in queue
+          if (_loadQueue.isNotEmpty) {
+            final nextUrl = _loadQueue.removeAt(0);
+            _loadImage(nextUrl);
+          }
+        }
+      });
+      
+      _loadingImages.add(url);
+
+    } catch (e) {
+      print('Error requesting image: $e');
+      _loadingRequestedUrls.remove(url);
       _loadingImages.remove(url);
+      
+      // Process next image in queue
       if (_loadQueue.isNotEmpty) {
         final nextUrl = _loadQueue.removeAt(0);
         _loadImage(nextUrl);
@@ -1082,6 +1161,18 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  void _onCardTap(TcgCard card) {
+    // Ensure we're setting the search state before navigating
+    _wasSearchActive = true;
+    _lastActiveSearch = _searchController.text;
+
+    // Immediate execution to prevent tap delays
+    Navigator.of(context).pushNamed(
+      '/card',
+      arguments: {'card': card},
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1124,6 +1215,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),  // Ensure scrolling is always active
       controller: _scrollController,
       slivers: [
         // Add a simple back button when showing search results
@@ -1191,17 +1283,7 @@ class _SearchScreenState extends State<SearchScreen> {
               imageCache: _imageCache,
               loadImage: _loadImage,
               loadingRequestedUrls: _loadingRequestedUrls,
-              onCardTap: (card) {
-                // Save search state before navigating
-                _wasSearchActive = true;
-                _lastActiveSearch = _searchController.text;
-                
-                Navigator.pushNamed(
-                  context,
-                  '/card',
-                  arguments: {'card': card},
-                );
-              },
+              onCardTap: _onCardTap,  // Use the new method
             )
           else if (_searchMode == SearchMode.eng && _searchResults != null)
             CardSearchGrid(
@@ -1209,17 +1291,7 @@ class _SearchScreenState extends State<SearchScreen> {
               imageCache: _imageCache,
               loadImage: _loadImage,
               loadingRequestedUrls: _loadingRequestedUrls,
-              onCardTap: (card) {
-                // Save search state before navigating
-                _wasSearchActive = true;
-                _lastActiveSearch = _searchController.text;
-                
-                Navigator.pushNamed(
-                  context,
-                  '/card',
-                  arguments: {'card': card},
-                );
-              },
+              onCardTap: _onCardTap,  // Use the new method
             )
           else if (_setResults != null)
             SetSearchGrid(
@@ -1257,6 +1329,25 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
         ],
       ],
+    );
+  }
+
+  // Add a helper method for showing styled toasts consistently
+  void _showStyledToast({
+    required String title,
+    required String message,
+    required IconData icon,
+    bool isError = false,
+    int durationSeconds = 3,
+  }) {
+    showToast(
+      context: context,
+      title: title,
+      subtitle: message,
+      icon: icon,
+      isError: isError,
+      compact: true,  // Use compact style for search notifications
+      durationSeconds: durationSeconds,
     );
   }
 }

@@ -6,7 +6,7 @@ class AppColors {
   static const secondary = Color(0xFF818CF8);  // Light indigo
   static const tertiary = Color(0xFF14B8A6);   // Teal accent
   static const background = Color(0xFFF8FAFC); // Cool gray
-  static const darkBackground = Color(0xFF0F172A); // Slate dark background
+  static const darkBackground = Color(0xFF121212); // Deeper, richer dark background
   static const surface = Colors.white;
   static const error = Color(0xFFF43F5E);      // Soft rose
   static const success = Color(0xFF10B981);    // Emerald green
@@ -25,6 +25,21 @@ class AppColors {
   static const secondaryJapanese = Color(0xFFFFFFFF); // White
   static const primaryMtg = Color(0xFF795548);      // Modern MTG brown
   static const secondaryMtg = Color(0xFFFFB300);    // Modern MTG gold
+
+  // Dark mode base colors - refined palette
+  static const darkSurface = Color(0xFF1E1E1E);        // Slightly lighter surface color
+  static const darkCardBackground = Color(0xFF262626); // Card background for dark mode
+  static const darkDivider = Color(0xFF323232);        // Subtle divider color
+  static const darkElevated = Color(0xFF2C2C2C);       // Elevated surface color
+  
+  // Premium accent colors for dark mode
+  static const darkAccentPrimary = Color(0xFF7B83EB);  // Lighter indigo for dark mode
+  static const darkAccentSecondary = Color(0xFFA5B4FC); // Even lighter for secondary elements
+  
+  // Text Colors - enhanced contrast for dark mode
+  static const textDarkPrimary = Color(0xFFF5F5F5);    // Very light gray for main text
+  static const textDarkSecondary = Color(0xFFBBBBBB);  // Light gray for secondary text
+  static const textDarkMuted = Color(0xFF8E8E8E);      // Muted text color
 
   // Returns gradient colors based on game type
   static List<Color> getGradientForGameType(String gameType, {bool isDark = false}) {
@@ -91,10 +106,17 @@ class AppColors {
   }
 
   // Beautiful shadows for cards and components
-  static List<BoxShadow>? getCardShadow({required double elevation}) {
+  static List<BoxShadow>? getCardShadow({required double elevation, bool isDark = false}) {
     if (elevation == 0) return null;
     
-    return [
+    return isDark ? [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.5),
+        blurRadius: 8.0 * elevation,
+        spreadRadius: 1.0 * elevation,
+        offset: Offset(0, 2.0 * elevation),
+      ),
+    ] : [
       BoxShadow(
         color: Colors.black.withOpacity(0.1 * elevation),
         blurRadius: 6.0 * elevation,
@@ -107,13 +129,16 @@ class AppColors {
   // Theme data helper
   static ThemeData getThemeData(bool isDark) {
     final ColorScheme colorScheme = isDark 
-        ? const ColorScheme.dark(
-            primary: primary,
-            secondary: secondary,
-            tertiary: tertiary,
-            background: darkBackground,
-            surface: Color(0xFF1E1E1E),
+        ? ColorScheme.dark(
+            primary: darkAccentPrimary,           // Lighter in dark mode
+            secondary: darkAccentSecondary,       // Even lighter
+            tertiary: tertiary.withOpacity(0.9),  // Slightly muted
+            background: darkBackground,           // Very dark background
+            surface: darkSurface,                 // Slightly lighter
             error: error,
+            onBackground: textDarkPrimary,        // Light text on dark background
+            onSurface: textDarkPrimary,           // Light text on surfaces
+            onPrimary: Colors.black,              // Dark text on light primary color
           )
         : const ColorScheme.light(
             primary: primary,
@@ -128,44 +153,95 @@ class AppColors {
       colorScheme: colorScheme,
       useMaterial3: true,
       brightness: isDark ? Brightness.dark : Brightness.light,
-      splashColor: primary.withOpacity(0.1),
-      highlightColor: primary.withOpacity(0.05),
+      splashColor: (isDark ? darkAccentPrimary : primary).withOpacity(0.1),
+      highlightColor: (isDark ? darkAccentPrimary : primary).withOpacity(0.05),
+      dividerColor: isDark ? darkDivider : Colors.grey.shade200,
+      scaffoldBackgroundColor: isDark ? darkBackground : background,
+      cardColor: isDark ? darkCardBackground : Colors.white,
+      dialogBackgroundColor: isDark ? darkSurface : Colors.white,
       cardTheme: CardTheme(
-        elevation: 2,
+        elevation: isDark ? 4 : 2,  // Higher elevation in dark mode
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
         clipBehavior: Clip.antiAlias,
+        color: isDark ? darkCardBackground : Colors.white,
       ),
-      scaffoldBackgroundColor: isDark ? darkBackground : background,
       appBarTheme: AppBarTheme(
         elevation: 0,
         backgroundColor: Colors.transparent, // Changed to transparent
-        foregroundColor: isDark ? Colors.white : textPrimary,
+        foregroundColor: isDark ? textDarkPrimary : textPrimary,
+        iconTheme: IconThemeData(
+          color: isDark ? textDarkPrimary : textPrimary,
+        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          elevation: 2,
+          elevation: isDark ? 4 : 2,  // More elevation in dark mode
+          backgroundColor: isDark ? darkAccentPrimary : primary,
+          foregroundColor: isDark ? Colors.black : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         ),
       ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: isDark ? darkAccentPrimary : primary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          side: BorderSide(
+            color: isDark ? darkAccentPrimary.withOpacity(0.8) : primary,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        ),
+      ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+          foregroundColor: isDark ? darkAccentPrimary : primary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         ),
       ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: isDark ? darkSurface : Colors.grey.shade50,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDark ? Colors.white24 : Colors.grey.shade300,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDark ? Colors.white24 : Colors.grey.shade300,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDark ? darkAccentPrimary : primary,
+            width: 2,
+          ),
+        ),
+      ),
+      // More refined dividers
+      dividerTheme: DividerThemeData(
+        color: isDark ? darkDivider : Colors.grey.shade200,
+        thickness: 1,
+        space: 24,
+      ),
     );
   }
 
-  // Search-specific colors
+  // Search-specific colors - simplified for better contrast
   static const searchBarLight = Color(0xFFF8F9FA);  // Slate 100
-  static const searchBarDark = Color(0xFF222222);   // Slate 800
+  static const searchBarDark = Color(0xFF262626);   // Darker background for contrast
   
   static const searchIconLight = Color(0xFF757575);  // Slate 500
   static const searchIconDark = Color(0xFFBBBBBB);   // Slate 400
@@ -173,26 +249,20 @@ class AppColors {
   static const searchHintLight = Color(0xFF9E9E9E);  // Slate 400
   static const searchHintDark = Color(0xFF808080);   // Slate 500
 
-  // Search bar gradient based on mode
+  // Search bar gradient based on mode - simplified to solid colors for clarity
   static List<Color> getSearchBarGradient(bool isDark) {
     return isDark
-        ? [
-            searchBarDark,
-            searchBarDark.withOpacity(0.9),
-          ]
-        : [
-            searchBarLight,
-            searchBarLight.withOpacity(0.9),
-          ];
+        ? [searchBarDark, searchBarDark]
+        : [searchBarLight, searchBarLight];
   }
 
-  // Search header colors
-  static const searchHeaderDark = Color(0xFF1E293B);  // Slate 800
-  static const searchHeaderDarkGradient = Color(0xFF0F172A);  // Slate 900
+  // Search header colors - simplified
+  static const searchHeaderDark = Color(0xFF121212);  // Match app background
+  static const searchHeaderDarkGradient = Color(0xFF151515);  // Slightly lighter
   static const searchHeaderLight = Color(0xFFFFFFFF);  // White
   static const searchHeaderLightGradient = Color(0xFFF8FAFC);  // Slate 50
 
-  // Search header gradient based on mode
+  // Search header gradient - simplified for better clarity
   static List<Color> getSearchHeaderGradient(bool isDark) {
     return isDark
         ? [searchHeaderDark, searchHeaderDarkGradient]
@@ -220,4 +290,45 @@ class AppColors {
   // Accent colors
   static const Color accentLight = Color(0xFF03A9F4);  // Light blue accent
   static const Color accentDark = Color(0xFF29B6F6);  // Slightly lighter blue for dark mode
+
+  // New styles for card containers in dark mode
+  static BoxDecoration darkModeCardDecoration = BoxDecoration(
+    color: darkCardBackground,
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(
+      color: Colors.white10,
+      width: 1,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.5),
+        blurRadius: 8,
+        offset: const Offset(0, 2),
+      ),
+    ],
+  );
+  
+  // Premium card container style for dark mode
+  static BoxDecoration darkModePremiumCardDecoration = BoxDecoration(
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        darkCardBackground,
+        const Color(0xFF2D2D2D),
+      ],
+    ),
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(
+      color: Colors.white12,
+      width: 1,
+    ),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.6),
+        blurRadius: 10,
+        offset: const Offset(0, 3),
+      ),
+    ],
+  );
 }

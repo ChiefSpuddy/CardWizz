@@ -9,6 +9,7 @@ import '../services/ebay_api_service.dart';
 import '../services/collection_service.dart';
 import '../providers/currency_provider.dart';
 import '../utils/hero_tags.dart';
+import '../constants/app_colors.dart'; // Add this import for AppColors
 import 'base_card_details_screen.dart';
 import '../widgets/mtg_set_icon.dart';
 
@@ -176,12 +177,16 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
 
     final currencyProvider = context.watch<CurrencyProvider>();
 
+    // Use the enhanced dark mode decoration
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.grey[900] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: isDark 
+          ? AppColors.darkModePremiumCardDecoration 
+          : BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: AppColors.getCardShadow(elevation: 1),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -435,6 +440,8 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 24.0),
       width: double.infinity,
@@ -444,19 +451,25 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
           Icon(
             Icons.search_off,
             size: 48,
-            color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
+            color: isDark 
+                ? Colors.white.withOpacity(0.5) 
+                : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.5),
           ),
           const SizedBox(height: 16),
           Text(
             'No recent sales found',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: isDark ? Colors.white.withOpacity(0.9) : null,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             'We couldn\'t find any completed listings for this card',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: isDark 
+                  ? Colors.white.withOpacity(0.7) 
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
@@ -468,6 +481,14 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
             )),
             icon: const Icon(Icons.search),
             label: const Text('Check eBay Manually'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: isDark ? AppColors.darkAccentPrimary : Theme.of(context).colorScheme.primary,
+              side: BorderSide(
+                color: isDark 
+                    ? AppColors.darkAccentPrimary.withOpacity(0.8) 
+                    : Theme.of(context).colorScheme.primary,
+              ),
+            ),
           ),
         ],
       ),
@@ -730,13 +751,17 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
     final rarity = rawData?['rarity'] ?? card.rarity?.toUpperCase() ?? '';
     final collectorNumber = rawData?['collector_number'] ?? card.number ?? '';
     
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Use the enhanced dark mode decoration
     return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark 
-            ? Colors.grey[900] 
-            : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
+      decoration: isDark
+          ? AppColors.darkModeCardDecoration
+          : BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: AppColors.getCardShadow(elevation: 1),
+            ),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -965,13 +990,26 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
         textColor = Colors.black;
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Enhanced container styling for dark mode
     return Container(
       width: 24,
       height: 24,
       decoration: BoxDecoration(
         color: backgroundColor,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey.shade300, width: 1),
+        border: Border.all(
+          color: isDark ? Colors.black : Colors.grey.shade300,
+          width: 1,
+        ),
+        boxShadow: isDark ? [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          )
+        ] : null,
       ),
       child: Center(
         child: Text(
@@ -987,25 +1025,33 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
   }
 
   Widget _buildOracleText(String text) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Card Text',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(isDark ? 0.9 : 0.7),
+            fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).cardColor.withOpacity(0.3),
+            color: isDark 
+                ? Theme.of(context).colorScheme.surface.withOpacity(0.5)
+                : Theme.of(context).cardColor.withOpacity(0.3),
             borderRadius: BorderRadius.circular(8),
+            border: isDark ? Border.all(color: Colors.white10) : null,
           ),
           padding: const EdgeInsets.all(12),
           child: Text(
             text.replaceAll("\n", "\n\n"), // Add extra spacing between paragraphs
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: isDark ? Theme.of(context).colorScheme.onSurface : null,
+            ),
           ),
         ),
       ],
@@ -1157,167 +1203,218 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.card.name)),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 80),
-          child: Column(
-            children: [
-              Container(
-                color: isDark ? Colors.black : Colors.white,
-                height: MediaQuery.of(context).size.width * 1.4, // MTG cards are taller
-                child: Stack(
-                  children: [
-                    // Background gradient overlay
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              isDark ? Colors.black : Colors.white,
-                              isDark ? Colors.black.withOpacity(0.7) : Colors.grey[100]!,
-                            ],
+      appBar: AppBar(
+        title: Text(
+          widget.card.name,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppColors.textDarkPrimary : null,
+          ),
+        ),
+        backgroundColor: isDark ? AppColors.darkBackground : Colors.transparent,
+      ),
+      body: Container(
+        color: isDark ? AppColors.darkBackground : null,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 80),
+            child: Column(
+              children: [
+                Container(
+                  color: isDark ? Colors.black : Colors.white,
+                  height: MediaQuery.of(context).size.width * 1.4, // MTG cards are taller
+                  child: Stack(
+                    children: [
+                      // Background gradient overlay
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                isDark ? Colors.black : Colors.white,
+                                isDark 
+                                  ? AppColors.darkBackground.withOpacity(0.98)  // Smoother transition
+                                  : Colors.grey[100]!,
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    // Card image
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Container(
-                          width: MediaQuery.of(context).size.width * 0.75,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: GestureDetector(
-                            onTap: flipCard,
-                            child: AnimatedBuilder(
-                              animation: flipController,
-                              builder: (context, child) {
-                                final isFrontVisible = flipController.value < 0.5;
-                                
-                                return Transform(
-                                  transform: Matrix4.identity()
-                                    ..setEntry(3, 2, 0.001)
-                                    ..rotateY(flipController.value * pi),
-                                  alignment: Alignment.center,
-                                  child: isFrontVisible 
-                                    ? // Front of card - only build when visible
-                                      Hero(
-                                        tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(16),
-                                          child: CachedNetworkImage(
-                                            imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
-                                            fit: BoxFit.contain,
-                                            placeholder: (context, url) => Center(
-                                              child: CircularProgressIndicator(
-                                                valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
+                      // Card image
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Container(
+                            width: MediaQuery.of(context).size.width * 0.75,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                ),
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: GestureDetector(
+                              onTap: flipCard,
+                              child: AnimatedBuilder(
+                                animation: flipController,
+                                builder: (context, child) {
+                                  final isFrontVisible = flipController.value < 0.5;
+                                  
+                                  return Transform(
+                                    transform: Matrix4.identity()
+                                      ..setEntry(3, 2, 0.001)
+                                      ..rotateY(flipController.value * pi),
+                                    alignment: Alignment.center,
+                                    child: isFrontVisible 
+                                      ? // Front of card - only build when visible
+                                        Hero(
+                                          tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(16),
+                                            child: CachedNetworkImage(
+                                              imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
+                                              fit: BoxFit.contain,
+                                              placeholder: (context, url) => Center(
+                                                child: CircularProgressIndicator(
+                                                  valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
+                                                ),
+                                              ),
+                                              errorWidget: (context, url, error) => Container(
+                                                color: Colors.grey[900],
+                                                child: const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 50)),
                                               ),
                                             ),
-                                            errorWidget: (context, url, error) => Container(
-                                              color: Colors.grey[900],
-                                              child: const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 50)),
-                                            ),
+                                          ),
+                                        )
+                                      : // Back of card - apply a second transform to maintain correct orientation
+                                        Transform(
+                                          transform: Matrix4.identity()..rotateY(pi),
+                                          alignment: Alignment.center,
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(16),
+                                            child: _buildCardBack(),
                                           ),
                                         ),
-                                      )
-                                    : // Back of card - apply a second transform to maintain correct orientation
-                                      Transform(
-                                        transform: Matrix4.identity()..rotateY(pi),
-                                        alignment: Alignment.center,
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(16),
-                                          child: _buildCardBack(),
-                                        ),
-                                      ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.card.name,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _buildPricingSection(),
-                    
-                    const SizedBox(height: 24),
-                    _buildCardInfo(),
-                    
-                    const SizedBox(height: 24),
-                    if (_additionalData != null && _additionalData!['related_uris'] != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.grey[900] : Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Related Links',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
+                                  );
+                                },
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            _buildRelatedLink(
-                              'Gatherer', 
-                              Icons.web, 
-                              _additionalData!['related_uris']?['gatherer'] ?? '',
-                            ),
-                            const Divider(),
-                            _buildRelatedLink(
-                              'Scryfall', 
-                              Icons.web, 
-                              _additionalData!['related_uris']?['scryfall'] ?? '',
-                            ),
-                            const Divider(),
-                            _buildRelatedLink(
-                              'EDHREC', 
-                              Icons.web, 
-                              _additionalData!['related_uris']?['edhrec'] ?? '',
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.card.name,
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _buildPricingSection(),
+                      
+                      const SizedBox(height: 24),
+                      _buildCardInfo(),
+                      
+                      const SizedBox(height: 24),
+                      if (_additionalData != null && _additionalData!['related_uris'] != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.grey[900] : Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Related Links',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              _buildRelatedLink(
+                                'Gatherer', 
+                                Icons.web, 
+                                _additionalData!['related_uris']?['gatherer'] ?? '',
+                              ),
+                              const Divider(),
+                              _buildRelatedLink(
+                                'Scryfall', 
+                                Icons.web, 
+                                _additionalData!['related_uris']?['scryfall'] ?? '',
+                              ),
+                              const Divider(),
+                              _buildRelatedLink(
+                                'EDHREC', 
+                                Icons.web, 
+                                _additionalData!['related_uris']?['edhrec'] ?? '',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+      floatingActionButton: FutureBuilder<CollectionService>(
+        future: CollectionService.getInstance(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const SizedBox.shrink();
+
+          return StreamBuilder<List<TcgCard>>(
+            stream: storage.watchCards(), // Use the storage property from the base class
+            builder: (context, cardsSnapshot) {
+              // If we're viewing from collection or binder, show "Add to Binder"
+              if (widget.isFromCollection || widget.isFromBinder) {
+                return buildFAB(
+                  icon: Icons.collections_bookmark,
+                  label: 'Add to Binder',
+                  onPressed: () => showAddToBinderDialog(context),
+                );
+              }
+
+              // Otherwise check if card is in collection
+              final isInCollection = cardsSnapshot.data?.any(
+                (c) => c.id == widget.card.id
+              ) ?? false;
+
+              return buildFAB(
+                icon: isInCollection ? Icons.collections_bookmark : Icons.add,
+                label: isInCollection ? 'Add to Binder' : 'Add to Collection',
+                onPressed: () {
+                  if (isInCollection) {
+                    showAddToBinderDialog(context);
+                  } else {
+                    addToCollection(context);
+                  }
+                },
+              );
+            },
+          );
+        },
       ),
     );
   }

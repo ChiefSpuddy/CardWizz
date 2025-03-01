@@ -15,7 +15,7 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool hasResults;
   final SearchMode searchMode;
   final Function(Set<SearchMode>) onSearchModeChanged;
-  final Function() onCameraPressed;  // Add this line
+  final Function() onCameraPressed;
 
   const SearchAppBar({
     Key? key,
@@ -25,7 +25,7 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.currentSort,
     required this.sortAscending,
     required this.onSortOptionsPressed,
-    required this.onCameraPressed,  // Add this line
+    required this.onCameraPressed,
     this.hasResults = false,
     required this.searchMode,
     required this.onSearchModeChanged,
@@ -55,12 +55,19 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
     
     return Container(
       decoration: BoxDecoration(
+        color: isDark ? AppColors.darkBackground : Colors.white,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: AppColors.getSearchHeaderGradient(isDark),
         ),
-        boxShadow: AppColors.getCardShadow(elevation: 0.7),
+        boxShadow: isDark ? [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          )
+        ] : AppColors.getCardShadow(elevation: 0.7),
       ),
       child: SafeArea(
         bottom: false,
@@ -93,45 +100,121 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  List<Color> _getAppBarGradient(BuildContext context, SearchMode mode, bool isDark) {
-    if (isDark) {
-      // Dark mode gradients
-      switch (mode) {
-        case SearchMode.eng:
-          return [
-            const Color(0xFF1A237E), // Deep Pokémon blue
-            const Color(0xFF303F9F),
-          ];
-        case SearchMode.jpn:
-          return [
-            const Color(0xFF7F0000), // Deep Japanese red
-            const Color(0xFFC62828),
-          ];
-        case SearchMode.mtg:
-          return [
-            const Color(0xFF3E2723), // Deep MTG brown
-            const Color(0xFF5D4037),
-          ];
-      }
-    } else {
-      // Light mode gradients
-      switch (mode) {
-        case SearchMode.eng:
-          return [
-            const Color(0xFF3F51B5), // Pokémon blue
-            const Color(0xFF5C6BC0),
-          ];
-        case SearchMode.jpn:
-          return [
-            const Color(0xFFD32F2F), // Japanese red
-            const Color(0xFFE57373),
-          ];
-        case SearchMode.mtg:
-          return [
-            const Color(0xFF795548), // MTG brown
-            const Color(0xFF8D6E63),
-          ];
-      }
+  Widget _buildGameSelector(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark 
+              ? [
+                  AppColors.darkCardBackground,
+                  AppColors.darkBackground,
+                ]
+              : [
+                  Colors.white,
+                  const Color(0xFFF8FAFC),
+                ],
+        ),
+        boxShadow: isDark ? null : [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+        border: Border(
+          bottom: BorderSide(
+            color: isDark 
+                ? Colors.white.withOpacity(0.05)
+                : Colors.black.withOpacity(0.05),
+            width: isDark ? 1 : 0.5,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          _buildGameOption(context, SearchMode.eng, 'Pokemon', 'assets/icons/pokemon_logo.png'),
+          _buildGameOption(context, SearchMode.jpn, 'Japanese', 'assets/icons/jp_flag.png'),
+          _buildGameOption(context, SearchMode.mtg, 'Magic', 'assets/icons/mtg_logo.png'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGameOption(BuildContext context, SearchMode mode, String label, String iconPath) {
+    final isSelected = searchMode == mode;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    // Enhanced styling for dark mode
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onSearchModeChanged({mode}),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? (isDark 
+                    ? AppColors.darkAccentPrimary.withOpacity(0.15)  // More subtle highlight for dark mode
+                    : colorScheme.primary.withOpacity(0.1))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected
+                  ? (isDark 
+                      ? AppColors.darkAccentPrimary.withOpacity(0.8)  // Softer accent color for dark mode
+                      : colorScheme.primary)
+                  : (isDark 
+                      ? Colors.white.withOpacity(0.1)  // Very subtle border for dark mode
+                      : Colors.black.withOpacity(0.1)),
+              width: isSelected ? 1.0 : 0.5,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _getGameIcon(mode, isDark, isSelected, colorScheme),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isDark 
+                      ? (isSelected 
+                          ? AppColors.darkAccentPrimary  // Accent color for selected
+                          : Colors.white.withOpacity(0.7))  // Dimmed white for unselected
+                      : (isSelected
+                          ? colorScheme.primary
+                          : colorScheme.onSurface.withOpacity(0.8)),
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w400,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _getGameIcon(SearchMode mode, bool isDark, bool isSelected, ColorScheme colorScheme) {
+    final color = isDark 
+        ? (isSelected ? AppColors.darkAccentPrimary : Colors.white.withOpacity(0.7))
+        : (isSelected ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.8));
+    
+    switch (mode) {
+      case SearchMode.eng:
+        return Icon(Icons.catching_pokemon, size: 18, color: color);
+      case SearchMode.jpn:
+        return const Text('🇯🇵', style: TextStyle(fontSize: 14));
+      case SearchMode.mtg:
+        return Icon(Icons.auto_awesome, size: 18, color: color);
     }
   }
 
@@ -172,23 +255,18 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   Widget _buildSearchField(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorScheme = Theme.of(context).colorScheme;
     
     return Container(
       height: 46,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: AppColors.getSearchBarGradient(isDark),
-        ),
+        color: isDark ? AppColors.searchBarDark : AppColors.searchBarLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark 
-              ? Colors.white.withOpacity(0.1)
+              ? Colors.white.withOpacity(0.05)
               : Colors.black.withOpacity(0.05),
+          width: 0.5,
         ),
-        boxShadow: AppColors.getCardShadow(elevation: 0.5),
       ),
       child: Row(
         children: [
@@ -197,7 +275,7 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
             Icons.search_rounded,
             size: 20,
             color: isDark 
-                ? AppColors.searchIconDark 
+                ? Colors.white.withOpacity(0.7)
                 : AppColors.searchIconLight,
           ),
           const SizedBox(width: 8),
@@ -207,15 +285,22 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
               decoration: InputDecoration(
                 hintText: _getPlaceholderText(),
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 hintStyle: TextStyle(
                   color: isDark 
-                      ? AppColors.searchHintDark 
+                      ? Colors.white.withOpacity(0.5)
                       : AppColors.searchHintLight,
                   fontSize: 16,
                   fontWeight: FontWeight.w400,
                 ),
+                // Remove filled property AND fillColor to prevent the overlay box
+                filled: false,
+                fillColor: Colors.transparent,
               ),
               style: TextStyle(
                 fontSize: 16,
@@ -223,6 +308,7 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ? Colors.white 
                     : AppColors.textDark,
               ),
+              cursorColor: isDark ? AppColors.darkAccentPrimary : Theme.of(context).primaryColor,
               onChanged: onSearchChanged,
               textInputAction: TextInputAction.search,
               onSubmitted: onSearchChanged,
@@ -230,10 +316,12 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           if (searchController.text.isNotEmpty || hasResults)
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.clear,
                 size: 20,
-                color: Colors.white,
+                color: isDark 
+                    ? Colors.white.withOpacity(0.7)
+                    : Colors.grey[600],
               ),
               onPressed: onClearSearch,
               padding: EdgeInsets.zero,
@@ -260,7 +348,6 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   Widget _buildSortButton(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorScheme = Theme.of(context).colorScheme;
     
     return Container(
       width: 44,
@@ -286,100 +373,5 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
       ),
     );
-  }
-
-  Widget _buildGameSelector(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark 
-              ? [
-                  const Color(0xFF1E293B),  // Slate 800
-                  const Color(0xFF0F172A),  // Slate 900
-                ]
-              : [
-                  Colors.white,
-                  const Color(0xFFF8FAFC),  // Slate 50
-                ],
-        ),
-        border: Border(
-          bottom: BorderSide(
-            color: isDark 
-                ? Colors.white.withOpacity(0.1)
-                : Colors.black.withOpacity(0.05),
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          _buildGameOption(context, SearchMode.eng, 'Pokemon', 'assets/icons/pokemon_logo.png'),
-          _buildGameOption(context, SearchMode.jpn, 'Japanese', 'assets/icons/jp_flag.png'),
-          _buildGameOption(context, SearchMode.mtg, 'Magic', 'assets/icons/mtg_logo.png'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGameOption(BuildContext context, SearchMode mode, String label, String iconPath) {
-    final isSelected = searchMode == mode;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onSearchModeChanged({mode}),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            color: isSelected 
-                ? (isDark ? Colors.white.withOpacity(0.15) : colorScheme.primary.withOpacity(0.1))
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected
-                  ? (isDark ? Colors.white : colorScheme.primary)
-                  : (isDark ? Colors.white.withOpacity(0.3) : colorScheme.outline),
-              width: 1.5,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _getGameIcon(mode, isDark, colorScheme),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isDark ? Colors.white : colorScheme.onSurface,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w400,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _getGameIcon(SearchMode mode, bool isDark, ColorScheme colorScheme) {
-    final color = isDark ? Colors.white : colorScheme.onSurface;
-    
-    switch (mode) {
-      case SearchMode.eng:
-        return Icon(Icons.catching_pokemon, size: 18, color: color);
-      case SearchMode.jpn:
-        return const Text('🇯🇵', style: TextStyle(fontSize: 14));
-      case SearchMode.mtg:
-        return Icon(Icons.auto_awesome, size: 18, color: color);
-    }
   }
 }
