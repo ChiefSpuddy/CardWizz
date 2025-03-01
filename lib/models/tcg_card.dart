@@ -67,6 +67,38 @@ class TcgCard {
   }
 
   factory TcgCard.fromJson(Map<String, dynamic> json) {
+    // Improved MTG detection logic
+    bool isMtg;
+    
+    // First check for explicit flag
+    if (json['isMtg'] != null) {
+      isMtg = json['isMtg'] == true;
+    } else {
+      // Check for MTG-specific data patterns
+      isMtg = (json['id'] as String).startsWith('mtg_') ||
+             json.containsKey('oracle_text') ||
+             json.containsKey('mana_cost');
+      
+      // Check set_id - Pokemon sets usually have longer codes with numbers
+      final setId = json['set']?['id'] ?? json['setCode'] ?? '';
+      
+      // If still undetermined, check if it looks like a Pokemon set ID
+      if (!isMtg && setId is String) {
+        if (setId.toLowerCase().startsWith('sv') || 
+            setId.toLowerCase().startsWith('swsh') ||
+            setId.toLowerCase().startsWith('sm') ||
+            setId.toLowerCase().startsWith('xy') ||
+            setId.toLowerCase().startsWith('bw') ||
+            RegExp(r'sv\d').hasMatch(setId.toLowerCase())) {
+          isMtg = false;  // Definitely Pokemon
+        } else if (setId.length <= 3 && 
+                  !setId.toLowerCase().startsWith('sv') &&
+                  !setId.toLowerCase().startsWith('sm')) {
+          isMtg = true;  // Likely MTG with short set code
+        }
+      }
+    }
+
     // Handle set data safely
     TcgSet cardSet;
     try {
@@ -164,7 +196,7 @@ class TcgCard {
       addedToCollection: addedToCollection,
       priceHistory: priceHistory,
       lastPriceUpdate: lastPriceUpdate,
-      isMtg: json['isMtg'] ?? false, // Added field
+      isMtg: isMtg, // Added field
     );
   }
 
@@ -337,6 +369,37 @@ extension MtgCardExtension on TcgCard {
     }
     
     return largeImageUrl ?? imageUrl;
+  }
+}
+
+/// Extension to add Pokemon-specific functionality to TcgCard
+extension PokemonCardExtension on TcgCard {
+  /// Check if this is a Pokemon card based on various signals
+  bool get isPokemonCard {
+    // Check explicit flag first
+    if (isMtg == false) return true;
+    
+    // Check for Pokemon set ID patterns
+    const pokemonPrefixes = ['sv', 'swsh', 'sm', 'xy', 'bw', 'dp', 'ex', 'cel'];
+    for (final prefix in pokemonPrefixes) {
+      if (set.id.toLowerCase().startsWith(prefix)) {
+        return true;
+      }
+    }
+    
+    // Check name patterns like "Pikachu V" or "Charizard ex"
+    final nameLower = name.toLowerCase();
+    if (nameLower.contains('pikachu') || 
+        nameLower.contains('charizard') ||
+        nameLower.endsWith(' ex') ||
+        nameLower.endsWith(' v') ||
+        nameLower.contains(' gx') ||
+        nameLower.contains(' vmax')) {
+      return true;
+    }
+    
+    // Default to false if no Pokemon signals detected
+    return false;
   }
 }
 

@@ -1,45 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-class MtgSetIcon extends StatelessWidget {
-  final String setCode;
+class PokemonSetIcon extends StatelessWidget {
+  final String setId;
   final double size;
   final Color? color;
-  final String? rarity;
 
-  const MtgSetIcon({
+  const PokemonSetIcon({
     super.key,
-    required this.setCode,
+    required this.setId,
     this.size = 24,
     this.color,
-    this.rarity,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Normalize the set code
-    final normalizedSetCode = setCode.toLowerCase().trim();
+    // Ensure we have a valid set ID
+    final normalizedSetId = setId.toLowerCase().trim();
     
-    // Use JPEG or PNG format instead of SVG from Scryfall
-    // This is more reliable than the SVG endpoint which is causing errors
-    final symbolUrl = 'https://cards.scryfall.io/art_crop/front/symbol/$normalizedSetCode.jpg';
+    // Base URL for logos
+    const baseUrl = 'https://images.pokemontcg.io';
     
+    // Try the preferred logo path
+    final logoUrl = '$baseUrl/$normalizedSetId/logo.png';
+    final symbolUrl = '$baseUrl/$normalizedSetId/symbol.png';
+
     return CachedNetworkImage(
-      imageUrl: symbolUrl,
-      width: size,
+      imageUrl: logoUrl,
+      width: size * 2, // Logos are wider
       height: size,
-      color: color,
       fit: BoxFit.contain,
+      color: color,
       errorWidget: (context, url, error) {
-        // Try fallback image URL
+        // Try the symbol path if logo fails
         return CachedNetworkImage(
-          imageUrl: 'https://gatherer.wizards.com/Handlers/Image.ashx?type=symbol&set=$normalizedSetCode&size=large&rarity=C',
+          imageUrl: symbolUrl,
           width: size,
           height: size,
-          color: color,
           fit: BoxFit.contain,
+          color: color,
           errorWidget: (context, url, error) {
-            // If both fail, show a text fallback
+            // If both fail, show text fallback
             return Container(
               width: size,
               height: size,
@@ -53,7 +54,7 @@ class MtgSetIcon extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  normalizedSetCode.length > 2 ? normalizedSetCode.substring(0, 2).toUpperCase() : normalizedSetCode.toUpperCase(),
+                  normalizedSetId.length > 2 ? normalizedSetId.substring(0, 2).toUpperCase() : normalizedSetId.toUpperCase(),
                   style: TextStyle(
                     fontSize: size * 0.4,
                     fontWeight: FontWeight.bold,

@@ -1,4 +1,6 @@
 import '../models/tcg_card.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart'; // Import for SHA-1 function if not already imported
 
 /// Utility class for managing hero tags in a consistent way throughout the app.
 /// 
@@ -40,9 +42,46 @@ class HeroTags {
   /// @param context The source context where the card is displayed
   /// @return A unique hero tag for the card image
   static String cardImage(String cardId, {String context = 'default'}) {
-    return '${context}_img_$cardId';
+    return 'card_image_$cardId:$context';
   }
-  
+
+  /// Create a tag for card search results
+  static String searchResult(String query, int index) {
+    return 'search_result_${_hashString(query)}_$index';
+  }
+
+  /// Create a tag for collection items
+  static String collectionItem(String collectionId, String cardId) {
+    return 'collection_$collectionId:$cardId';
+  }
+
+  /// Create a tag for binder items
+  static String binderItem(String binderId, String cardId) {
+    return 'binder_$binderId:$cardId';
+  }
+
+  /// Create a tag for set icons
+  static String setIcon(String setId) {
+    return 'set_icon_$setId';
+  }
+
+  /// Create a hash string for long values to keep tag length manageable
+  static String _hashString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha1.convert(bytes);
+    return digest.toString().substring(0, 8);
+  }
+
+  /// Create a tag for animating card prices
+  static String priceTag(String cardId) {
+    return 'price_$cardId';
+  }
+
+  /// Create a tag for rarity indicators
+  static String rarityIndicator(String cardId) {
+    return 'rarity_$cardId';
+  }
+
   /// Creates a hero tag specifically for an MTG card image.
   /// 
   /// @param cardId The unique identifier of the card

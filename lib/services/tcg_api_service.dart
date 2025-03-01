@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/tcg_card.dart';
-import './tcgdex_api_service.dart'; // Add this import
+import './tcgdex_api_service.dart';
 
-// Move cache entry class outside
+// Cache entry class
 class _CacheEntry {
   final dynamic data;
   final DateTime timestamp;
@@ -17,24 +17,24 @@ class _CacheEntry {
 }
 
 class TcgApiService {
-  static const String apiKey = 'eebb53a0-319a-4231-9244-fd7ea48b5d2c';  // Add this line
+  static const String apiKey = 'eebb53a0-319a-4231-9244-fd7ea48b5d2c';
   static final TcgApiService _instance = TcgApiService._internal();
   final Dio _dio;
   static const String _baseUrl = 'https://api.pokemontcg.io/v2';
   
-  // Update rate limiting constants
-  static const _requestDelay = Duration(milliseconds: 250); // Increased delay
+  // Rate limiting constants
+  static const _requestDelay = Duration(milliseconds: 250);
   static const _maxRetries = 3;
   static const _retryDelay = Duration(seconds: 2);
   static const _cacheExpiration = Duration(hours: 1);
-  static const _maxConcurrentRequests = 2; // Reduce concurrent requests
-  static const _rateLimitDelay = Duration(seconds: 5); // Add dedicated rate limit delay
-  static const _imageCacheExpiration = Duration(days: 7); // Add image cache expiration
+  static const _maxConcurrentRequests = 2;
+  static const _rateLimitDelay = Duration(seconds: 5);
+  static const _imageCacheExpiration = Duration(days: 7);
   
   final _requestQueue = <Future>[];
   final _cache = <String, _CacheEntry>{};
-  final _imageCache = <String, String>{}; // Add image URL cache
-  final _imageLoadErrors = <String>{}; // Track failed image URLs
+  final _imageCache = <String, String>{};
+  final _imageLoadErrors = <String>{};
   final _semaphore = Completer<void>()..complete();
   DateTime? _lastRequestTime;
   
@@ -42,12 +42,12 @@ class TcgApiService {
   
   TcgApiService._internal() : _dio = Dio(BaseOptions(
     baseUrl: _baseUrl,
-    headers: {'X-Api-Key': apiKey},  // Now this will work
+    headers: {'X-Api-Key': apiKey},
   ));
 
   final _tcgdexApi = TcgdexApiService();
 
-  // Add rate limiting method
+  // Rate limiting method
   Future<void> _waitForRateLimit() async {
     if (_lastRequestTime != null) {
       final timeSinceLastRequest = DateTime.now().difference(_lastRequestTime!);
@@ -65,7 +65,7 @@ class TcgApiService {
     'cardmarket.prices.averageSellPrice': 'Price',
   };
 
-  // Add dedicated set search method
+  // Set search method
   Future<Map<String, dynamic>> searchSets({
     required String query,
     int page = 1,
@@ -91,7 +91,7 @@ class TcgApiService {
     }
   }
 
-  // Core search method - combining both implementations
+  // Core search method
   Future<Map<String, dynamic>> searchCards({
     required String query,
     String orderBy = 'number',
@@ -132,19 +132,30 @@ class TcgApiService {
           'orderBy': orderByDesc ? '-$orderBy' : orderBy,
           'pageSize': pageSize,
           'page': page,
+          'select': 'id,name,number,rarity,images,cardmarket,set',
         },
       );
 
       if (response['data'] != null) {
-        // Convert the raw data to a format that matches our expected structure
-        final result = {
-          'data': response['data'],  // Keep as raw Map data
+        // Process the price data before returning
+        final processedData = response['data'].map((card) {
+          if (card['cardmarket'] != null) {
+            // Ensure the prices are converted to proper numbers
+            final prices = card['cardmarket']['prices'];
+            if (prices != null) {
+              prices['averageSellPrice'] = _toDouble(prices['averageSellPrice']);
+              prices['lowPrice'] = _toDouble(prices['lowPrice']);
+              prices['trendPrice'] = _toDouble(prices['trendPrice']);
+            }
+          }
+          return card;
+        }).toList();
+
+        return {
+          'data': processedData,
           'totalCount': response['totalCount'] ?? 0,
           'page': page,
         };
-
-        _cache[cacheKey] = _CacheEntry(result);
-        return result;
       }
 
       return {'data': [], 'totalCount': 0, 'page': page};
@@ -155,7 +166,7 @@ class TcgApiService {
     }
   }
 
-  // Add batch search method
+  // Batch search method
   Future<List<Map<String, dynamic>>> searchCardsBatch(
     List<String> queries,
   ) async {
@@ -183,8 +194,8 @@ class TcgApiService {
       }
     }
 
-    // Process remaining requests - Fix the syntax
-    if (batch.isNotEmpty) { // Fixed syntax here
+    // Process remaining requests
+    if (batch.isNotEmpty) {
       results.addAll(await Future.wait(batch));
     }
 
@@ -267,7 +278,7 @@ class TcgApiService {
     }
   }
 
-  // Add method to validate image URL
+  // Method to validate image URL
   String? getValidImageUrl(String? url) {
     if (url == null || _imageLoadErrors.contains(url)) {
       return null;
@@ -316,42 +327,59 @@ class TcgApiService {
     }
   }
 
-  // Add a method to get Scryfall data directly by set and collector number
-  Future<Map<String, dynamic>> getScryfallCardBySetAndNumber(String setCode, String collectorNumber) async {
+  // Method to get Scryfall data directly by set and collector number
+  Future<Map<String, dynamic>> getScryfallCardBySetAndNumber(
+      String setCode, String number) async {
     try {
-      final url = 'https://api.scryfall.com/cards/$setCode/$collectorNumber';
-      print('Fetching MTG card details: $url');
+      if (setCode.isEmpty) throw Exception('Empty set code');
+      if (number.isEmpty) throw Exception('Empty collector number');
       
-      final response = await _dio.get(url);
+      // Normalize the set code and number
+      final normalizedSetCode = setCode.trim().toLowerCase();
+      final normalizedNumber = number.trim();
+      
+      // Log the request
+      print('Fetching MTG card details: https://api.scryfall.com/cards/$normalizedSetCode/$normalizedNumber');
+      
+      // Make the API request
+      final response = await _dio.get(
+        'https://api.scryfall.com/cards/$normalizedSetCode/$normalizedNumber',
+      );
+      
+      // Check the response
       if (response.statusCode == 200) {
         return response.data;
       } else {
-        print('Error fetching MTG card details: ${response.statusCode}');
-        return {};
+        throw Exception('Failed to load card details. Status code: ${response.statusCode}');
       }
     } catch (e) {
       print('Error getting MTG card details: $e');
-      return {};
+      throw Exception('Failed to retrieve card details: $e');
     }
   }
 
-  // Add a helper method to get eBay search URL for MTG cards
+  // Helper method for MTG eBay URLs
   String getEbayMtgSearchUrl(String cardName, {String? setName, String? number}) {
-    final baseSearchTerm = Uri.encodeComponent('$cardName MTG card');
-    String searchTerm = baseSearchTerm;
+    // Normalize inputs
+    final normalizedCardName = cardName.trim();
+    final setNameQuery = setName != null && setName.trim().isNotEmpty 
+      ? ' "${setName.trim()}"' : '';
+    final numberQuery = number != null && number.trim().isNotEmpty
+      ? ' $number' : '';
     
-    if (setName != null && setName.isNotEmpty) {
-      searchTerm += Uri.encodeComponent(' "$setName"');
-    }
+    // Create the search query
+    final query = Uri.encodeComponent(
+      '$normalizedCardName MTG$setNameQuery$numberQuery'
+    );
     
-    if (number != null && number.isNotEmpty) {
-      searchTerm += Uri.encodeComponent(' $number');
-    }
+    // Log URL for debugging
+    final url = 'https://www.ebay.com/sch/i.html?_nkw=$query&_sacat=2536&LH_Sold=1&LH_Complete=1&_sop=13';
+    print('eBay search URL: $url');
     
-    return 'https://www.ebay.com/sch/i.html?_nkw=$searchTerm&_sacat=0&LH_TitleDesc=0&_fsrp=1&_sop=16&LH_Sold=1&LH_Complete=1';
+    return url;
   }
 
-  // Update searchSet to handle pagination - removing duplicate implementation
+  // Search set pagination handler
   Future<Map<String, dynamic>> searchSet(
     String setId, {
     int page = 1,
@@ -366,14 +394,28 @@ class TcgApiService {
     );
   }
 
-  // Helper for eBay links
-  String getEbaySearchUrl(String cardName, {String? setName}) {
-    final terms = [cardName, if (setName != null) setName, 'pokemon card']
-      .join(' ');
-    return 'https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(terms)}';
+  // Helper for Pokemon eBay links
+  String getEbaySearchUrl(String cardName, {String? setName, String? number}) {
+    // Normalize inputs 
+    final normalizedCardName = cardName.trim();
+    final setNameQuery = setName != null && setName.trim().isNotEmpty 
+      ? ' "${setName.trim()}"' : '';
+    final numberQuery = number != null && number.trim().isNotEmpty
+      ? ' $number' : '';
+    
+    // Create the search query
+    final query = Uri.encodeComponent(
+      '$normalizedCardName pokemon card$setNameQuery$numberQuery'
+    );
+    
+    // Log URL for debugging
+    final url = 'https://www.ebay.com/sch/i.html?_nkw=$query&_sacat=183454&LH_Sold=1&LH_Complete=1&_sop=13';
+    print('eBay search URL: $url');
+    
+    return url;
   }
 
-  // Add helper method to get set logo
+  // Helper method to get set logo
   String getSetLogo(String setQuery) {
     // Extract set ID from query
     final setId = setQuery.replaceAll('set.id:', '').trim();
@@ -382,7 +424,7 @@ class TcgApiService {
 
   static const _defaultSetLogo = 'https://images.pokemontcg.io/logos/default.png';
 
-  // Updated set logo map with actual URLs
+  // Set logos map with actual URLs
   static const _setLogos = {
     // Latest Scarlet & Violet
     'sv8pt5': 'https://images.pokemontcg.io/sv8pt5/logo.png', // Prismatic Evolution
@@ -522,7 +564,7 @@ class TcgApiService {
     'bwp': 'https://images.pokemontcg.io/bwp/logo.png',        // BW Black Star Promos
   };
 
-  // Add this method near the getCardPrice and searchCards methods
+  // Method to get card by ID
   Future<Map<String, dynamic>?> getCardById(String cardId) async {
     try {
       final cacheKey = 'card_$cardId';
@@ -662,5 +704,13 @@ class TcgApiService {
   Future<Map<String, dynamic>> getSets() async {
     final response = await _dio.get('/sets');
     return response.data;
+  }
+
+  // Add this helper method
+  double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
   }
 }
