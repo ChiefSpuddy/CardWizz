@@ -5,7 +5,12 @@ import 'search_screen.dart';
 import 'root_navigator.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialTabIndex;
+  
+  const HomeScreen({
+    Key? key,
+    this.initialTabIndex = 0,
+  }) : super(key: key);
 
   static final _scrollController = ScrollController();
   
@@ -25,6 +30,14 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  late int _selectedIndex;
+  
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialTabIndex;
+    HomeScreen._scrollController.addListener(_onScroll);
+  }
   
   void setSelectedIndex(int index) {
     // Find RootNavigator and set its index
@@ -41,12 +54,6 @@ class HomeScreenState extends State<HomeScreen> {
     Future.delayed(const Duration(milliseconds: 100), () {
       SearchScreen.startSearch(context, query);
     });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    HomeScreen._scrollController.addListener(_onScroll);
   }
 
   void _onScroll() {

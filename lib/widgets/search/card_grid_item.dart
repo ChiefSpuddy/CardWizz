@@ -9,6 +9,7 @@ class CardGridItem extends StatelessWidget {
   final Function(TcgCard) onCardTap;
   final Function(TcgCard) onAddToCollection;
   final bool isInCollection;
+  final String? currencySymbol;
 
   const CardGridItem({
     Key? key,
@@ -17,6 +18,7 @@ class CardGridItem extends StatelessWidget {
     required this.onCardTap,
     required this.onAddToCollection,
     this.isInCollection = false,
+    this.currencySymbol,
   }) : super(key: key);
 
   @override
@@ -101,7 +103,7 @@ class CardGridItem extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        '\$${card.price!.toStringAsFixed(2)}',
+                        '${currencySymbol ?? '\$'}${card.price!.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,

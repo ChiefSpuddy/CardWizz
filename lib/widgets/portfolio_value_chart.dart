@@ -101,186 +101,171 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
       return Card(
         elevation: 2,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(0, 16, 8, 16),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           child: SizedBox(
             height: 250,
-            child: LineChart(
-              LineChartData(
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,
-                    isCurved: true,
-                    curveSmoothness: 0.35,
-                    preventCurveOverShooting: true,
-                    color: Colors.green.shade600,
-                    barWidth: 2.5, // Slightly thinner for elegance
-                    isStrokeCapRound: true,
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.green.shade600.withOpacity(0.25),
-                          Colors.green.shade600.withOpacity(0.0),
-                        ],
-                        stops: const [0.2, 0.9],
-                      ),
-                    ),
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, percent, bar, index) {
-                        final isActualDataPoint = points.any((p) => 
-                          p.$1.millisecondsSinceEpoch == spot.x.toInt());
-                        return FlDotCirclePainter(
-                          radius: isActualDataPoint ? 3.5 : 0.0,
-                          color: Colors.white,
-                          strokeWidth: 2.0,
-                          strokeColor: Colors.green.shade600,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-                minY: (minY - yPadding).clamp(0, double.infinity),
-                maxY: maxY + yPadding,
-                borderData: FlBorderData(show: false),
-                clipData: FlClipData.all(),
-                lineTouchData: LineTouchData(
-                  enabled: true,
-                  touchTooltipData: LineTouchTooltipData(
-                    tooltipBgColor: Theme.of(context).colorScheme.surface,
-                    tooltipRoundedRadius: 12,
-                    tooltipPadding: const EdgeInsets.all(12),
-                    tooltipMargin: 8,
-                    fitInsideHorizontally: true, // Add this to prevent horizontal overflow
-                    fitInsideVertically: true, // Optional: Also prevent vertical overflow
-                    getTooltipItems: (spots) {
-                      return spots.map((spot) {
-                        // Convert normalized x value back to actual timestamp
-                        final index = (spot.x * (points.length - 1) / 100).round();
-                        if (index >= 0 && index < points.length) {
-                          final date = points[index].$1;  // Get actual date from points
-                          return LineTooltipItem(
-                            '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
-                            const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              height: 1.5,
-                            ),
-                          );
-                        }
-                        return null;
-                      }).whereType<LineTooltipItem>().toList();
-                    },
-                  ),
-                  touchSpotThreshold: 30, // Increased for better touch detection
-                  handleBuiltInTouches: true,
-                  getTouchedSpotIndicator: (_, indicators) {
-                    return indicators.map((index) {
-                      return TouchedSpotIndicatorData(
-                        FlLine(
-                          color: Colors.green.shade200,
-                          strokeWidth: 1,
-                          dashArray: [4, 4],
-                        ),
-                        FlDotData(
-                          show: true,
-                          getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
-                            radius: 4, // Smaller radius for touched spot
-                            color: Colors.white,
-                            strokeWidth: 2,
-                            strokeColor: Colors.green.shade600,
-                          ),
-                        ),
-                      );
-                    }).toList();
-                  },
-                ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: true,
-                  horizontalInterval: yRange / 5, // Adjusted for better spacing
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: Theme.of(context).dividerColor.withOpacity(0.15),
-                    strokeWidth: 1,
-                    dashArray: [5, 5],
-                  ),
-                  getDrawingVerticalLine: (value) => FlLine(
-                    color: Theme.of(context).dividerColor.withOpacity(0.1),
-                    strokeWidth: 1,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 20, // Show 5 evenly spaced dates
-                      getTitlesWidget: (value, _) {
-                        // Convert normalized value back to date
-                        final index = (value * (points.length - 1) / 100).round();
-                        if (index >= 0 && index < points.length) {
-                          final date = points[index].$1;
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              _formatDate(date),
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 46,
-                      interval: _calculateNiceInterval(maxY - minY), // Calculate nice interval
-                      getTitlesWidget: (value, _) {
-                        // Don't show labels too close to min/max to prevent overlap
-                        if (value == minY || value == maxY) {
-                          return const SizedBox.shrink();
-                        }
-                        
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: Text(
-                            currencyProvider.formatChartValue(value),
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                extraLinesData: ExtraLinesData(
-                  horizontalLines: [
-                    HorizontalLine(
-                      y: maxY,
-                      color: Colors.green.shade300.withOpacity(0.3),
-                      strokeWidth: 1,
-                      dashArray: [4, 4],
-                      label: HorizontalLineLabel(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24), // Increased from 16
+              child: LineChart(
+                LineChartData(
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: _adjustSpotsForPadding(spots), // New helper method
+                      isCurved: true,
+                      curveSmoothness: 0.5, // Increased from 0.35 for smoother curves
+                      preventCurveOverShooting: true,
+                      color: Colors.green.shade600,
+                      barWidth: 3, // Slightly thicker line
+                      isStrokeCapRound: true,
+                      dotData: FlDotData(
                         show: true,
-                        alignment: Alignment.topRight,
-                        padding: const EdgeInsets.only(right: 8, bottom: 4),
-                        style: TextStyle(
-                          color: Colors.green.shade600,
-                          fontWeight: FontWeight.bold,
+                        getDotPainter: (spot, percent, bar, index) {
+                          // Only show dots for significant changes, ignore first and last points
+                          final isSignificant = index > 0 && 
+                              index < spots.length - 1 && 
+                              _isSignificantChange(spots, index);
+                          
+                          return FlDotCirclePainter(
+                            radius: isSignificant ? 4.0 : 0.0,
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                            strokeColor: Colors.green.shade600,
+                          );
+                        },
+                      ),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.green.shade600.withOpacity(0.4), // More visible gradient
+                            Colors.green.shade600.withOpacity(0.0),
+                          ],
+                          stops: const [0.2, 1.0], // Adjusted gradient stops
                         ),
-                        labelResolver: (_) => currencyProvider.formatValue(maxY),
                       ),
                     ),
                   ],
+                  minY: (minY - yPadding).clamp(0, double.infinity),
+                  maxY: maxY + yPadding,
+                  borderData: FlBorderData(show: false),
+                  clipData: FlClipData.all(),
+                  lineTouchData: LineTouchData(
+                    enabled: true,
+                    touchTooltipData: LineTouchTooltipData(
+                      tooltipBgColor: Theme.of(context).colorScheme.surface,
+                      tooltipRoundedRadius: 12,
+                      tooltipPadding: const EdgeInsets.all(12),
+                      tooltipMargin: 8,
+                      fitInsideHorizontally: true, // Add this to prevent horizontal overflow
+                      fitInsideVertically: true, // Optional: Also prevent vertical overflow
+                      getTooltipItems: (spots) {
+                        return spots.map((spot) {
+                          // Convert normalized x value back to actual timestamp
+                          final index = (spot.x * (points.length - 1) / 100).round();
+                          if (index >= 0 && index < points.length) {
+                            final date = points[index].$1;  // Get actual date from points
+                            return LineTooltipItem(
+                              '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
+                              const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                height: 1.5,
+                              ),
+                            );
+                          }
+                          return null;
+                        }).whereType<LineTooltipItem>().toList();
+                      },
+                    ),
+                    touchSpotThreshold: 30, // Increased for better touch detection
+                    handleBuiltInTouches: true,
+                    getTouchedSpotIndicator: (_, indicators) {
+                      return indicators.map((index) {
+                        return TouchedSpotIndicatorData(
+                          FlLine(
+                            color: Colors.green.shade200,
+                            strokeWidth: 1,
+                            dashArray: [4, 4],
+                          ),
+                          FlDotData(
+                            show: true,
+                            getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                              radius: 4, // Smaller radius for touched spot
+                              color: Colors.white,
+                              strokeWidth: 2,
+                              strokeColor: Colors.green.shade600,
+                            ),
+                          ),
+                        );
+                      }).toList();
+                    },
+                  ),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false, // Remove vertical lines
+                    horizontalInterval: yRange / 4, // Adjusted for fewer lines
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Theme.of(context).dividerColor.withOpacity(0.1),
+                      strokeWidth: 1,
+                      dashArray: [5, 5],
+                    ),
+                    // Remove vertical grid lines near edges
+                    checkToShowVerticalLine: (value) =>
+                        value > 5 && value < 95, // Only show grid lines between 5% and 95%
+                  ),
+                  titlesData: FlTitlesData(
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)), // Removed left titles
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: 20, // Show 4 evenly spaced dates
+                        reservedSize: 24, // Increased from default
+                        getTitlesWidget: (value, _) {
+                          // Only show labels between 10 and 90 to prevent edge overlap
+                          if (value < 10 || value > 90) return const SizedBox.shrink();
+                          
+                          final index = (value * (points.length - 1) / 100).round();
+                          if (index >= 0 && index < points.length) {
+                            final date = points[index].$1;
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                _formatDate(date),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ),
+                  ),
+                  extraLinesData: ExtraLinesData(
+                    horizontalLines: [
+                      HorizontalLine(
+                        y: maxY,
+                        color: Colors.green.shade300.withOpacity(0.2),
+                        strokeWidth: 1,
+                        dashArray: [4, 4],
+                        label: HorizontalLineLabel(
+                          show: true,
+                          alignment: Alignment.topRight,
+                          padding: const EdgeInsets.only(right: 8, bottom: 4),
+                          style: TextStyle(
+                            color: Colors.green.shade600,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          labelResolver: (_) => currencyProvider.formatValue(maxY),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -440,5 +425,53 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
     }
     
     return niceInterval;
+  }
+
+  // Add this helper method to detect significant price changes
+  bool _isSignificantChange(List<FlSpot> spots, int index) {
+    if (index <= 0 || index >= spots.length - 1) return false;
+    
+    final previous = spots[index - 1].y;
+    final current = spots[index].y;
+    final next = spots[index + 1].y;
+    
+    // Calculate percentage changes
+    final changeFromPrev = (current - previous).abs() / previous;
+    final changeToNext = (next - current).abs() / current;
+    
+    // Increased threshold to only show more significant changes
+    return changeFromPrev > 0.08 || changeToNext > 0.08;
+  }
+
+  // Add this new helper method
+  List<FlSpot> _adjustSpotsForPadding(List<FlSpot> spots) {
+    const paddingPercentage = 8.0; // Increased padding percentage
+    return spots.map((spot) {
+      // Scale to ~85% of width with more padding on sides
+      final adjustedX = (spot.x * ((100 - (paddingPercentage * 2)) / 100)) + paddingPercentage;
+      return FlSpot(adjustedX, spot.y);
+    }).toList();
+  }
+
+  // Add this method to create box decoration
+  BoxDecoration _createChartDecoration(BuildContext context) {
+    return BoxDecoration(
+      borderRadius: BorderRadius.circular(12),
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Theme.of(context).cardColor,
+          Theme.of(context).cardColor.withOpacity(0.95),
+        ],
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    );
   }
 }

@@ -24,6 +24,8 @@ import '../widgets/styled_toast.dart';  // Add this import
 import 'dart:math' as math;
 import '../widgets/search/card_grid_item.dart';  // Add this import
 import '../services/navigation_service.dart'; // Add the missing import
+import 'package:provider/provider.dart';
+import '../providers/currency_provider.dart';
 
 // Move enum outside the class
 enum SearchMode { eng, jpn, mtg }
@@ -500,6 +502,7 @@ class _SearchScreenState extends State<SearchScreen> {
       );
 
       if (mounted) {
+        final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
         final List<dynamic> cardsData = results['data'] as List? ?? [];
         final int totalCount = results['totalCount'] as int;
         final bool hasMore = results['hasMore'] ?? false;
@@ -517,8 +520,9 @@ class _SearchScreenState extends State<SearchScreen> {
           return;
         }
         
-        // Convert to TcgCard objects
+        // Convert to TcgCard objects with currency conversion
         final cards = cardsData.map((data) {
+          final eurPrice = data['price'] as double? ?? 0.0;
           return TcgCard(
             id: data['id'] as String? ?? '',
             name: data['name'] as String? ?? 'Unknown Card',
@@ -526,7 +530,7 @@ class _SearchScreenState extends State<SearchScreen> {
             largeImageUrl: data['largeImageUrl'] as String? ?? '',
             number: data['number'] as String? ?? '',
             rarity: data['rarity'] as String? ?? '',
-            price: data['price'] as double? ?? 0.0,
+            price: currencyProvider.convertFromEur(eurPrice),
             set: TcgSet(
               id: data['set']['id'] as String? ?? '',
               name: data['set']['name'] as String? ?? '',
@@ -1162,14 +1166,17 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onCardTap(TcgCard card) {
-    // Ensure we're setting the search state before navigating
+    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+    
     _wasSearchActive = true;
     _lastActiveSearch = _searchController.text;
 
-    // Immediate execution to prevent tap delays
     Navigator.of(context).pushNamed(
       '/card',
-      arguments: {'card': card},
+      arguments: {
+        'card': card,
+        'currencySymbol': currencyProvider.symbol,
+      },
     );
   }
 

@@ -113,7 +113,8 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const RootNavigator(),
-        '/search': (context) => const SearchScreen(),
+        // For '/search', we should return RootNavigator with initialTab set to 2
+        '/search': (context) => const RootNavigator(initialTab: 2), // Update this to use named parameter
         '/card': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final card = args?['card'] as TcgCard?;

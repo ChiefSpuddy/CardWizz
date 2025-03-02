@@ -8,6 +8,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'card_grid_item.dart';
 import '../../widgets/styled_toast.dart'; // Add this import for StyledToast
+import '../../providers/currency_provider.dart';
 
 class CardSearchGrid extends StatefulWidget {
   final List<TcgCard> cards;
@@ -190,6 +191,8 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
       _preloadVisibleImages(immediate: true);
     }
     
+    final currencyProvider = Provider.of<CurrencyProvider>(context);
+
     return SliverPadding(
       padding: const EdgeInsets.all(8),
       sliver: SliverGrid(
@@ -218,6 +221,7 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
               onCardTap: widget.onCardTap,
               onAddToCollection: _addToCollection,
               isInCollection: _collectionCardIds.contains(card.id),
+              currencySymbol: currencyProvider.symbol,
             );
           },
           childCount: widget.cards.length,

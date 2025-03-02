@@ -9,14 +9,25 @@ import './profile_screen.dart';
 import '../constants/app_colors.dart';
 
 class RootNavigator extends StatefulWidget {
-  const RootNavigator({super.key});
+  final int initialTab;
+  
+  const RootNavigator({
+    super.key,
+    this.initialTab = 0,
+  });
 
   @override
   State<RootNavigator> createState() => _RootNavigatorState();
 }
 
 class _RootNavigatorState extends State<RootNavigator> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialTab;
+  }
 
   final List<Widget> _screens = const [
     HomeScreen(),
@@ -39,9 +50,26 @@ class _RootNavigatorState extends State<RootNavigator> {
     }
   }
 
+  // Add this public method
+  void switchToTab(int index) {
+    setState(() => _selectedIndex = index);
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Check for initialTab argument
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final initialTab = args?['initialTab'] as int?;
+    
+    // Update selected index if initialTab is provided via arguments
+    if (initialTab != null && initialTab != _selectedIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() => _selectedIndex = initialTab);
+      });
+    }
+
     return Scaffold(
+      // Remove the key - this is causing the conflict
       body: IndexedStack(
         index: _selectedIndex,
         children: _screens,
