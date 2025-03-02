@@ -26,6 +26,7 @@ class SearchCategories extends StatefulWidget {
 class _SearchCategoriesState extends State<SearchCategories> with TickerProviderStateMixin {
   late final AnimationController _animationController;
   int _expandedIndex = 0;
+  Brightness? _previousBrightness;
 
   @override
   void initState() {
@@ -51,6 +52,23 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
       _animationController.reset();
       _animationController.forward();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Reset animation when theme changes to ensure proper display
+    final brightness = Theme.of(context).brightness;
+    if (_previousBrightness != brightness) {
+      _previousBrightness = brightness;
+      _resetAnimation();
+    }
+  }
+  
+  void _resetAnimation() {
+    _animationController.reset();
+    _animationController.forward();
   }
 
   @override

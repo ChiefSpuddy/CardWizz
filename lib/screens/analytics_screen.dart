@@ -984,9 +984,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 }
 
   Widget _buildEmptyState() {
+    // Return the EmptyCollectionView with shorter, single-line message
     return const EmptyCollectionView(
       title: 'No Analytics Yet',
-      message: 'Add cards to your collection to see detailed analytics and insights',
+      message: 'Add cards to your collection to see insights', // Shortened message
+      buttonText: 'Browse Cards',
       icon: Icons.query_stats,
     );
   }
@@ -1701,6 +1703,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                     final cards = snapshot.data!;
                     if (cards.isEmpty) {
+                      // Return empty state directly at the same level as other screens
                       return _buildEmptyState();
                     }
 

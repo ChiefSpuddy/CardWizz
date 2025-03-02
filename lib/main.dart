@@ -59,6 +59,13 @@ void main() async {
     return !themeProvider.isInitialized;
   });
 
+  // Add this to ensure status bar content is visible in any mode
+  // Update to also handle theme changes
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    // Don't manually set values here, let the theme handle it
+    statusBarColor: Colors.transparent,
+  ));
+
   runApp(
     MultiProvider(
       providers: [
@@ -94,6 +101,15 @@ class MyApp extends StatelessWidget {
     // Get providers
     final appState = Provider.of<AppState>(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
+    
+    // Ensure proper status bar visibility based on current theme
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SystemChrome.setSystemUIOverlayStyle(
+        themeProvider.isDarkMode
+            ? SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent)
+            : SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
+      );
+    });
     
     return MaterialApp(
       title: 'CardWizz',

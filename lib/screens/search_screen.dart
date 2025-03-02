@@ -26,6 +26,7 @@ import '../widgets/search/card_grid_item.dart';  // Add this import
 import '../services/navigation_service.dart'; // Add the missing import
 import 'package:provider/provider.dart';
 import '../providers/currency_provider.dart';
+import '../providers/theme_provider.dart'; // Add this missing import
 
 // Move enum outside the class
 enum SearchMode { eng, jpn, mtg }
@@ -97,8 +98,13 @@ class _SearchScreenState extends State<SearchScreen> {
     _scrollController.addListener(_onScroll);
     _initSearchHistory();
     
-    // Handle initial search if provided
+    // Listen for theme changes to refresh the UI
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Add theme change listener
+      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      themeProvider.addListener(_onThemeChanged);
+      
+      // Handle initial search if provided
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       if (args != null && args['initialSearch'] != null) {
         _searchController.text = args['initialSearch'] as String;
@@ -134,10 +140,24 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    // Clean up theme change listener
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    themeProvider.removeListener(_onThemeChanged);
+    
     _scrollController.dispose();
     _searchController.dispose();
     _searchDebounce?.cancel();
     super.dispose();
+  }
+  
+  // Add this method to handle theme changes
+  void _onThemeChanged() {
+    // Force a rebuild of the UI on theme change
+    if (mounted) {
+      setState(() {
+        // No need to update any state values - just trigger a rebuild
+      });
+    }
   }
 
   Future<void> _initSearchHistory() async {
@@ -1217,6 +1237,9 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildContent() {
+    // Add this debug print to help identify when content is rebuilt
+    print('Building search content. IsLoading: $_isLoading, HasResults: ${_searchResults != null}');
+    
     if (_isLoading) {
       return const LoadingState();
     }

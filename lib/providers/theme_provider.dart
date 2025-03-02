@@ -41,7 +41,10 @@ class ThemeProvider extends ChangeNotifier {
     if (_themeMode == mode) return;
 
     _themeMode = mode;
-    notifyListeners();
+    
+    // Add this line to ensure any listeners have a chance to rebuild before
+    // other async operations happen
+    Future.microtask(() => notifyListeners());
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_themePreferenceKey, mode.index);

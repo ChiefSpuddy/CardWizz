@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';  // Add this import for SystemUiOverlayStyle
 
 class AppColors {
   // Base Colors - beautiful, modern palette
@@ -126,7 +127,7 @@ class AppColors {
     ];
   }
 
-  // Theme data helper
+  // Theme data helper with improved status bar visibility
   static ThemeData getThemeData(bool isDark) {
     final ColorScheme colorScheme = isDark 
         ? ColorScheme.dark(
@@ -174,6 +175,18 @@ class AppColors {
         iconTheme: IconThemeData(
           color: isDark ? textDarkPrimary : textPrimary,
         ),
+        // Add this to fix status bar visibility
+        systemOverlayStyle: isDark
+            ? SystemUiOverlayStyle.light.copyWith(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+              )
+            : SystemUiOverlayStyle.dark.copyWith(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.dark,
+                statusBarBrightness: Brightness.light,
+              ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(

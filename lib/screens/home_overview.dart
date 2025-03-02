@@ -635,6 +635,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   }
 
   Widget _buildEmptyState() {
+    // Return EmptyCollectionView directly for uniform alignment
     return const EmptyCollectionView(
       title: 'Welcome to CardWizz',
       message: 'Start building your collection by adding cards',

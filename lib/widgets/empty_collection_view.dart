@@ -510,13 +510,15 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
                       MaterialPageRoute(
                         builder: (context) => CardDetailsScreen(
                           card: previewCard,
-                          heroContext: 'empty_preview',
+                          // Change this to use a unique tag for each card
+                          heroContext: 'empty_preview_index_$index',
                         ),
                       ),
                     );
                   },
                   child: Hero(
-                    tag: 'empty_preview_${previewCard.id}',
+                    // Change this to use a unique tag for each card
+                    tag: 'empty_preview_index_$index',
                     child: Container(
                       width: smallScreen ? 75 : 85, // Reduce width on small screens
                       decoration: BoxDecoration(

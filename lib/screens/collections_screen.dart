@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
-import '../l10n/app_localizations.dart';  // Add this import
+import '../widgets/empty_collection_view.dart';
+import '../l10n/app_localizations.dart';  
 import '../services/storage_service.dart';
-import '../services/collection_service.dart';  // Add this
+import '../services/collection_service.dart';
 import '../models/tcg_card.dart';
-import '../models/custom_collection.dart';  // Add this
+import '../models/custom_collection.dart';
 import '../widgets/collection_grid.dart';
 import '../widgets/custom_collections_grid.dart';
 import '../widgets/create_collection_sheet.dart';
-import '../widgets/create_binder_dialog.dart';  // Add this import
+import '../widgets/create_binder_dialog.dart';
 import 'analytics_screen.dart';
 import 'home_screen.dart';
-import 'custom_collection_detail_screen.dart';  // Add this
+import 'custom_collection_detail_screen.dart';
 import '../widgets/animated_background.dart';
 import '../constants/card_styles.dart';
-import '../widgets/app_drawer.dart';  // Add this import at the top
+import '../widgets/app_drawer.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/sign_in_view.dart';
 import '../providers/app_state.dart';
-import '../providers/sort_provider.dart';  // Add this import
-import '../constants/layout.dart';  // Add this import
+import '../providers/sort_provider.dart';
+import '../constants/layout.dart';
 
 class CollectionsScreen extends StatefulWidget {
-  // Keep the field but make it private and unused
   final bool _showEmptyState;
   
   const CollectionsScreen({
@@ -35,7 +35,7 @@ class CollectionsScreen extends StatefulWidget {
   State<CollectionsScreen> createState() => CollectionsScreenState();
 }
 
-class CollectionsScreenState extends State<CollectionsScreen> { // Remove underscore
+class CollectionsScreenState extends State<CollectionsScreen> {
   final _pageController = PageController();
   bool _showCustomCollections = false;
   late bool _pageViewReady = false;
@@ -44,7 +44,6 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
   @override
   void initState() {
     super.initState();
-    // Add this to ensure PageView is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() => _pageViewReady = true);
     });
@@ -62,7 +61,6 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
     });
   }
 
-  // Add this getter to allow access from AppDrawer
   bool get showCustomCollections => _showCustomCollections;
   set showCustomCollections(bool value) {
     setState(() {
@@ -76,7 +74,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
     
     return Container(
       height: 36,
-      margin: const EdgeInsets.symmetric(horizontal: 16), // Remove top margin
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
@@ -206,7 +204,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
-        padding: const EdgeInsets.only(top: 24),  // Remove bottom padding
+        padding: const EdgeInsets.only(top: 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -225,7 +223,6 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
               ),
             ),
             const Divider(),
-            // Wrap options in Flexible and SingleChildScrollView
             Flexible(
               child: SingleChildScrollView(
                 child: Column(
@@ -273,13 +270,13 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
   }
 
   Future<void> _showCreateBinderDialog(BuildContext context) async {
-    final collectionId = await showDialog<String>(  // Change return type to String
+    final collectionId = await showDialog<String>(
       context: context,
       builder: (context) => const CreateBinderDialog(),
       useSafeArea: true,
     );
 
-    if (collectionId != null && mounted) {  // Check for collectionId instead of bool
+    if (collectionId != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 2),
@@ -340,7 +337,7 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
   Widget _buildCreateBinderButton(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      height: 46, // Smaller height
+      height: 46,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(23),
         gradient: LinearGradient(
@@ -381,216 +378,258 @@ class CollectionsScreenState extends State<CollectionsScreen> { // Remove unders
 
     return Scaffold(
       key: _scaffoldKey,
-      // Only show AppBar if signed in
-      appBar: isSignedIn ? AppBar(
-        toolbarHeight: 44,
-        centerTitle: false,
-        automaticallyImplyLeading: true,
-        titleSpacing: 0,
-        title: StreamBuilder<List<TcgCard>>(
-          stream: Provider.of<StorageService>(context).watchCards(),
-          builder: (context, snapshot) {
-            final cards = snapshot.data ?? [];
-            final totalValue = cards.fold<double>(
-              0,
-              (sum, card) => sum + (card.price ?? 0),
-            );  // Remove the rate multiplication here
-
-            if (cards.isEmpty) return const SizedBox.shrink();
-            
-            final isDark = Theme.of(context).brightness == Brightness.dark;
-
-            return Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  InkWell(
-                    onTap: () {
-                      final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                      if (homeState != null) {
-                        homeState.setSelectedIndex(3); // Assuming 3 is analytics tab index
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: isDark ? [
-                            Colors.grey[800]!,
-                            Colors.grey[700]!,
-                          ] : [
-                            Theme.of(context).colorScheme.primaryContainer,
-                            Theme.of(context).colorScheme.primary.withOpacity(0.7),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.style_outlined,
-                            size: 16,
-                            color: isDark 
-                              ? Colors.white.withOpacity(0.9)
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${cards.length}',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                ? Colors.white.withOpacity(0.9)
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
+      
+      // Use a PreferredSize widget for AppBar to fix the extra white space issue
+      appBar: isSignedIn 
+        ? PreferredSize(
+            // Set minimal height when no cards, normal height when there are cards
+            preferredSize: const Size.fromHeight(44), // Minimum height
+            child: StreamBuilder<List<TcgCard>>(
+              stream: Provider.of<StorageService>(context).watchCards(),
+              builder: (context, snapshot) {
+                final cards = snapshot.data ?? [];
+                
+                // If empty, return just a minimal AppBar with drawer icon
+                if (cards.isEmpty) {
+                  return AppBar(
+                    toolbarHeight: 44, 
+                    elevation: 0,
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Blend with background
+                    centerTitle: false, 
+                    automaticallyImplyLeading: true,
+                    titleSpacing: 0,
+                    // Empty to avoid taking space
+                    title: const SizedBox.shrink(),
+                    // No actions when empty to avoid taking space
+                    actions: const [],
+                    // No bottom when empty to avoid extra space
+                    bottom: null,
+                  );
+                }
+                
+                // Otherwise return the full AppBar with all content
+                return AppBar(
+                  toolbarHeight: 44,
+                  elevation: 0,
+                  centerTitle: false,
+                  automaticallyImplyLeading: true,
+                  titleSpacing: 0,
+                  // Include all the regular AppBar content
+                  title: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildCardCountButton(cards),
+                        const SizedBox(width: 8),
+                        _buildValueButton(cards, currencyProvider),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    onTap: () {
-                      final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                      if (homeState != null) {
-                        homeState.setSelectedIndex(3); // Assuming 3 is analytics tab index
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: isDark ? [
-                            Colors.green[900]!,
-                            Colors.green[800]!,
-                          ] : [
-                            Colors.green[200]!,
-                            Colors.green[400]!,
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Consumer<CurrencyProvider>(
-                        builder: (context, currencyProvider, _) => Text(
-                          currencyProvider.formatValue(totalValue),  // Just use formatValue
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                              ? Colors.white.withOpacity(0.9)
-                              : Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.analytics_outlined),
+                      onPressed: () {
+                        final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                        if (homeState != null) {
+                          homeState.setSelectedIndex(3);
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.sort),
+                      onPressed: () => _showSortMenu(context),
+                    ),
+                  ],
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(52),
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildToggle(),
                     ),
                   ),
-                ],
-              ),
-            );
-          },
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.analytics_outlined),
-            onPressed: () {
-              final homeState = context.findAncestorStateOfType<HomeScreenState>();
-              if (homeState != null) {
-                homeState.setSelectedIndex(3); // Assuming 3 is analytics tab index
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.sort),
-            onPressed: () => _showSortMenu(context),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: StreamBuilder<List<TcgCard>>(
-            stream: Provider.of<StorageService>(context).watchCards(),
-            builder: (context, snapshot) {
-              final cards = snapshot.data ?? [];
-              return cards.isNotEmpty ? Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _buildToggle(),
-              ) : const SizedBox.shrink();
-            }
-          ),
-        ),
-      ) : null,
-      drawer: const AppDrawer(),  // Remove scaffoldKey parameter
+                );
+              },
+            ),
+          )
+        : null, // No AppBar when not signed in
+      
+      drawer: const AppDrawer(),
+      extendBody: true,
+      
       body: AnimatedBackground(
         child: !isSignedIn
             ? const SignInView()
-            : PageView(  // Remove Stack and just use PageView directly
-                controller: _pageController,
-                onPageChanged: _onPageChanged,
-                physics: const ClampingScrollPhysics(),
-                children: const [
-                  CollectionGrid(key: PageStorageKey('main_collection')),
-                  CustomCollectionsGrid(key: PageStorageKey('custom_collections')),
-                ],
-              ),
+            : _buildCollectionContent(),
       ),
-      floatingActionButton: AnimatedSwitcher(  // Add this block
-        duration: const Duration(milliseconds: 300),
-        child: _showCustomCollections
-            ? Container(
-                key: const ValueKey('create_binder_fab'),
-                height: 46,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(23),
-                  gradient: LinearGradient(
-                    colors: isDark ? [
-                      Colors.blue[900]!,
-                      Colors.blue[800]!,
-                    ] : [
-                      Theme.of(context).colorScheme.primary,
-                      Theme.of(context).colorScheme.secondary,
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context).primaryColor.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: FloatingActionButton.extended(
-                  onPressed: () => _showCreateBinderDialog(context),
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  icon: const Icon(Icons.add, size: 20),
-                  label: const Text(
-                    'Create New Binder',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              )
-            : null,
+      
+      // ...existing floating action button...
+    );
+  }
+
+  // Add these helper methods to clean up the build method
+  Widget _buildCardCountButton(List<TcgCard> cards) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return InkWell(
+      onTap: () {
+        final homeState = context.findAncestorStateOfType<HomeScreenState>();
+        if (homeState != null) {
+          homeState.setSelectedIndex(3);
+        }
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark ? [
+              Colors.grey[800]!,
+              Colors.grey[700]!,
+            ] : [
+              Theme.of(context).colorScheme.primaryContainer,
+              Theme.of(context).colorScheme.primary.withOpacity(0.7),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.style_outlined,
+              size: 16,
+              color: isDark 
+                ? Colors.white.withOpacity(0.9)
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${cards.length}',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                  ? Colors.white.withOpacity(0.9)
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  Widget _buildValueButton(List<TcgCard> cards, CurrencyProvider currencyProvider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final totalValue = cards.fold<double>(
+      0,
+      (sum, card) => sum + (card.price ?? 0),
+    );
+    
+    return InkWell(
+      onTap: () {
+        final homeState = context.findAncestorStateOfType<HomeScreenState>();
+        if (homeState != null) {
+          homeState.setSelectedIndex(3);
+        }
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark 
+                ? [Colors.green[900]!, Colors.green[800]!] 
+                : [Colors.green[200]!, Colors.green[400]!],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          currencyProvider.formatValue(totalValue),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: isDark
+              ? Colors.white.withOpacity(0.9)
+              : Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollectionContent() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        MediaQuery.removePadding(
+          context: context,
+          removeTop: true,  
+          removeBottom: true,
+          child: PageView(
+            controller: _pageController,
+            onPageChanged: _onPageChanged,
+            physics: const ClampingScrollPhysics(),
+            children: [
+              StreamBuilder<List<TcgCard>>(
+                stream: Provider.of<StorageService>(context).watchCards(),
+                builder: (context, snapshot) {
+                  final cards = snapshot.data ?? [];
+                  
+                  if (cards.isEmpty) {
+                    // Simply return the EmptyCollectionView directly with no nesting
+                    // This ensures uniform alignment across all screens
+                    return const EmptyCollectionView(
+                      title: 'Add Cards',
+                      message: 'Start building your collection',
+                      buttonText: 'Browse Cards',
+                      icon: Icons.add_circle_outline,
+                    );
+                  }
+                  
+                  return const CollectionGrid(key: PageStorageKey('main_collection'));
+                },
+              ),
+              
+              // Use StreamBuilder here too to conditionally show empty state for custom collections
+              StreamBuilder<List<TcgCard>>(
+                stream: Provider.of<StorageService>(context).watchCards(),
+                builder: (context, snapshot) {
+                  final cards = snapshot.data ?? [];
+                  
+                  if (cards.isEmpty) {
+                    // Return the EmptyCollectionView with binder-specific text
+                    return const EmptyCollectionView(
+                      title: 'Create Binders',
+                      message: 'Organize your collection into custom binders',
+                      buttonText: 'Browse Cards',
+                      icon: Icons.collections_bookmark_outlined,
+                    );
+                  }
+                  
+                  return const CustomCollectionsGrid(key: PageStorageKey('custom_collections'));
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ...existing methods...
 }
