@@ -105,5 +105,12 @@
 			<string>processing</string>
 			<string>remote-notification</string>
 		</array>
+		<!-- Add these keys for network permissions -->
+		<key>NSLocalNetworkUsageDescription</key>
+		<string>This app needs access to your local network for debugging purposes</string>
+		<key>NSBonjourServices</key>
+		<array>
+			<string>_dartobservatory._tcp</string>
+		</array>
 	</dict>
 </plist>

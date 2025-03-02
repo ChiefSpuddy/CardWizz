@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -30,67 +31,143 @@ import 'services/ebay_api_service.dart';  // Add this import
 import 'services/ebay_search_service.dart';  // Add this import
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-    ),
-  );
-
-  // Initialize the TcgApiService at app start
-  TcgApiService();
-  
-  final collectionService = await CollectionService.getInstance();
-  await collectionService.initializeLastUser();
-
-  final purchaseService = PurchaseService();
-  await purchaseService.initialize();
-  
-  final storageService = await StorageService.init(purchaseService);
-  final authService = AuthService();
-  final appState = AppState(storageService, authService);
-  final scannerService = ScannerService();  // Create instance here
-  final themeProvider = ThemeProvider(); // Create theme provider
-  
-  await appState.initialize();
-  // Wait for theme provider to initialize
-  await Future.doWhile(() async {
-    await Future.delayed(const Duration(milliseconds: 50));
-    return !themeProvider.isInitialized;
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    debugPrint('Flutter app starting...');
+    
+    // Initialize services first with proper constructors
+    final storageService = await StorageService.init(null); // Changed from initialize() to init()
+    final authService = AuthService(); // Removed storageService parameter
+    await authService.initialize(); // Initialize after construction
+    
+    final tcgApiService = TcgApiService();
+    final collectionService = await CollectionService.getInstance();
+    final scannerService = ScannerService();
+    final purchaseService = PurchaseService();
+    await purchaseService.initialize();  // Make sure to initialize
+    final ebayApiService = EbayApiService();
+    final ebaySearchService = EbaySearchService();
+    
+    // Initialize providers with required parameters
+    final appState = AppState(storageService, authService);
+    final themeProvider = ThemeProvider();
+    final currencyProvider = CurrencyProvider();
+    final sortProvider = SortProvider();
+    
+    // Run app with providers properly set up
+    runApp(
+      MultiProvider(
+        providers: [
+          // ListenableProvider for services that extend ChangeNotifier
+          ListenableProvider<PurchaseService>.value(value: purchaseService),
+          ListenableProvider<EbaySearchService>.value(value: ebaySearchService),
+          
+          // Regular Provider for services that don't need updates
+          Provider<StorageService>.value(value: storageService),
+          Provider<AuthService>.value(value: authService),
+          Provider<TcgApiService>.value(value: tcgApiService),
+          Provider<CollectionService>.value(value: collectionService),
+          Provider<ScannerService>.value(value: scannerService),
+          Provider<EbayApiService>.value(value: ebayApiService),
+          
+          // ChangeNotifierProvider for state management
+          ChangeNotifierProvider<AppState>.value(value: appState),
+          ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
+          ChangeNotifierProvider<CurrencyProvider>.value(value: currencyProvider),
+          ChangeNotifierProvider<SortProvider>.value(value: sortProvider),
+        ],
+        child: const MyApp(),
+      ),
+    );
+    
+    debugPrint('App initialized with providers');
+  }, (error, stack) {
+    debugPrint('FATAL ERROR: $error');
+    debugPrint('Stack trace: $stack');
   });
+}
 
-  // Add this to ensure status bar content is visible in any mode
-  // Update to also handle theme changes
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    // Don't manually set values here, let the theme handle it
-    statusBarColor: Colors.transparent,
-  ));
+// Debug wrapper to catch early startup issues
+class AppStartupDebugWrapper extends StatefulWidget {
+  const AppStartupDebugWrapper({Key? key}) : super(key: key);
 
-  runApp(
-    MultiProvider(
-      providers: [
-        // Core providers
-        ChangeNotifierProvider<PurchaseService>.value(value: purchaseService),
-        ChangeNotifierProvider.value(value: appState),
-        ChangeNotifierProvider.value(value: themeProvider), // Add theme provider
-        Provider<StorageService>.value(value: storageService),
-        Provider<AuthService>.value(value: authService),
-        Provider<ScannerService>.value(value: scannerService),
-        
-        // Feature providers
-        Provider<TcgApiService>(create: (_) => TcgApiService()),
-        ChangeNotifierProvider<CurrencyProvider>(
-          create: (_) => CurrencyProvider(),
+  @override
+  State<AppStartupDebugWrapper> createState() => _AppStartupDebugWrapperState();
+}
+
+class _AppStartupDebugWrapperState extends State<AppStartupDebugWrapper> {
+  bool _isLoading = true;
+  String _status = 'Starting app...';
+  Object? _error;
+  
+  @override
+  void initState() {
+    super.initState();
+    _initializeApp();
+  }
+  
+  Future<void> _initializeApp() async {
+    try {
+      setState(() => _status = 'Initializing services...');
+      
+      // Initialize any required services here
+      // For example: await Firebase.initializeApp();
+      
+      setState(() => _status = 'Starting app...');
+      
+      // Wait a moment to ensure logs are visible
+      await Future.delayed(const Duration(seconds: 1));
+      
+      setState(() => _isLoading = false);
+    } catch (e) {
+      setState(() {
+        _error = e;
+        _status = 'Error during initialization';
+      });
+      debugPrint('Error during app initialization: $e');
+    }
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      // Show simple loading screen
+      return MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 24),
+                Text(_status),
+                if (_error != null) ...[
+                  const SizedBox(height: 16),
+                  Text('Error: $_error', 
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                ]
+              ],
+            ),
+          ),
         ),
-        ChangeNotifierProvider(
-          create: (_) => SortProvider(),
-        ),
-        Provider(create: (_) => EbayApiService()),  // Changed from ChangeNotifierProvider to Provider
-        ChangeNotifierProvider(create: (_) => EbaySearchService()),
-      ],
-      child: const MyApp(),
-    ),
-  );
+      );
+    }
+    
+    // Launch your actual app
+    return YourActualApp();
+  }
+}
+
+// Replace this with your actual app
+class YourActualApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    // Return your actual MyApp widget here
+    return MyApp();
+  }
 }
 
 class MyApp extends StatelessWidget {
