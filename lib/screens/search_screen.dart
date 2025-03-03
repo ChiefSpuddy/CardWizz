@@ -92,6 +92,9 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _wasSearchActive = false;
   String? _lastActiveSearch;
 
+  // Add this field to store theme provider
+  late final ThemeProvider _themeProvider;
+
   @override
   void initState() {
     super.initState();
@@ -100,9 +103,10 @@ class _SearchScreenState extends State<SearchScreen> {
     
     // Listen for theme changes to refresh the UI
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Add theme change listener
-      final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-      themeProvider.addListener(_onThemeChanged);
+      // Store provider reference for later use
+      _themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+      // Add the listener
+      _themeProvider.addListener(_onThemeChanged);
       
       // Handle initial search if provided
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
@@ -141,8 +145,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     // Clean up theme change listener
-    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    themeProvider.removeListener(_onThemeChanged);
+    _themeProvider.removeListener(_onThemeChanged);
     
     _scrollController.dispose();
     _searchController.dispose();

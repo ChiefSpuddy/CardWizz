@@ -27,25 +27,46 @@ import 'providers/sort_provider.dart';
 import 'utils/string_extensions.dart';
 import 'constants/app_colors.dart';
 import 'screens/scanner_screen.dart';
-import 'services/ebay_api_service.dart';  // Add this import
-import 'services/ebay_search_service.dart';  // Add this import
+import 'services/ebay_api_service.dart';
+import 'services/ebay_search_service.dart';
+
+// Remove these imports - they're causing the error
+// import 'package:flutter/widgets.dart' as widgets hide Hero;
+// import 'package:flutter/material.dart' hide Hero;
+// import 'widgets/no_hero.dart';
+
+// Remove this Hero class definition
+// class Hero extends NoHero { ... }
 
 void main() async {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     
+    // Add error handler for Provider errors during disposal
+    FlutterError.onError = (FlutterErrorDetails details) {
+      // Ignore Provider access during disposal errors
+      final exception = details.exception;
+      if (exception is FlutterError && 
+          exception.message.contains("Looking up a deactivated widget's ancestor is unsafe")) {
+        debugPrint('Ignoring Provider error during disposal: ${exception.message}');
+      } else {
+        // Handle other errors normally
+        FlutterError.presentError(details);
+      }
+    };
+    
     debugPrint('Flutter app starting...');
     
     // Initialize services first with proper constructors
-    final storageService = await StorageService.init(null); // Changed from initialize() to init()
-    final authService = AuthService(); // Removed storageService parameter
-    await authService.initialize(); // Initialize after construction
+    final storageService = await StorageService.init(null);
+    final authService = AuthService();
+    await authService.initialize();
     
     final tcgApiService = TcgApiService();
     final collectionService = await CollectionService.getInstance();
     final scannerService = ScannerService();
     final purchaseService = PurchaseService();
-    await purchaseService.initialize();  // Make sure to initialize
+    await purchaseService.initialize();
     final ebayApiService = EbayApiService();
     final ebaySearchService = EbaySearchService();
     
@@ -88,88 +109,6 @@ void main() async {
   });
 }
 
-// Debug wrapper to catch early startup issues
-class AppStartupDebugWrapper extends StatefulWidget {
-  const AppStartupDebugWrapper({Key? key}) : super(key: key);
-
-  @override
-  State<AppStartupDebugWrapper> createState() => _AppStartupDebugWrapperState();
-}
-
-class _AppStartupDebugWrapperState extends State<AppStartupDebugWrapper> {
-  bool _isLoading = true;
-  String _status = 'Starting app...';
-  Object? _error;
-  
-  @override
-  void initState() {
-    super.initState();
-    _initializeApp();
-  }
-  
-  Future<void> _initializeApp() async {
-    try {
-      setState(() => _status = 'Initializing services...');
-      
-      // Initialize any required services here
-      // For example: await Firebase.initializeApp();
-      
-      setState(() => _status = 'Starting app...');
-      
-      // Wait a moment to ensure logs are visible
-      await Future.delayed(const Duration(seconds: 1));
-      
-      setState(() => _isLoading = false);
-    } catch (e) {
-      setState(() {
-        _error = e;
-        _status = 'Error during initialization';
-      });
-      debugPrint('Error during app initialization: $e');
-    }
-  }
-  
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      // Show simple loading screen
-      return MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 24),
-                Text(_status),
-                if (_error != null) ...[
-                  const SizedBox(height: 16),
-                  Text('Error: $_error', 
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                ]
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-    
-    // Launch your actual app
-    return YourActualApp();
-  }
-}
-
-// Replace this with your actual app
-class YourActualApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    // Return your actual MyApp widget here
-    return MyApp();
-  }
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -195,6 +134,10 @@ class MyApp extends StatelessWidget {
       darkTheme: themeProvider.currentThemeData.copyWith(brightness: Brightness.dark),
       themeMode: themeProvider.themeMode,
       navigatorKey: NavigationService.navigatorKey,
+      
+      // Just add this one line to disable Hero animations completely
+      builder: (context, child) => HeroControllerScope.none(child: child ?? const SizedBox.shrink()),
+      
       locale: appState.locale,
       supportedLocales: AppState.supportedLocales,
       localizationsDelegates: const [
@@ -206,8 +149,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const RootNavigator(),
-        // For '/search', we should return RootNavigator with initialTab set to 2
-        '/search': (context) => const RootNavigator(initialTab: 2), // Update this to use named parameter
+        '/search': (context) => const RootNavigator(initialTab: 2),
         '/card': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final card = args?['card'] as TcgCard?;
