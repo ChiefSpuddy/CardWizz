@@ -97,10 +97,10 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     try {
       final apiService = Provider.of<TcgApiService>(context, listen: false);
       
-      // Load special illustration cards for the showcase
+      // Fix the search query format
       final response = await apiService.searchCards(
-        query: '(rarity:"Special Illustration Rare" OR rarity:"Illustration Rare" OR rarity:"Secret Rare" OR rarity:"Alt Art") -promo:true',
-        pageSize: 8,  // Reduced from 15 to 8 for better performance
+        query: 'rarity:"Secret Rare" OR rarity:"Alt Art"',  // Simplified query
+        pageSize: 8,
         orderBy: 'cardmarket.prices.averageSellPrice',
         orderByDesc: true,
       );

@@ -48,13 +48,19 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
   late final AnimationController _confettiController2;
   bool _useFirstController = true;
 
+  late final AnimationController _scaleController;
+  late final AnimationController _bounceController;
+  bool _isDisposed = false;
+
   @override
   void initState() {
     super.initState();
+    
+    // Initialize controllers
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 10),
-    )..repeat(reverse: true);
+    );
 
     _titleController = AnimationController(
       vsync: this,
@@ -78,79 +84,82 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
       )
     );
 
-    Future.delayed(Duration.zero, () => _titleController.forward());
-    Future.delayed(const Duration(milliseconds: 300), () => _descriptionController.forward());
-    Future.delayed(const Duration(milliseconds: 600), () => _buttonController.forward());
-
-    for (int i = 0; i < _featureControllers.length; i++) {
-      Future.delayed(Duration(milliseconds: 400 + (i * 200)), () {
-        if (mounted) _featureControllers[i].forward();
-      });
-    }
-
     _cardsController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 12),
-    )..repeat(reverse: false);
+    );
 
     _cardRotation = CurvedAnimation(
       parent: _cardsController,
       curve: Curves.linear,
     );
 
-    // Initialize the gradient animation controller
     _gradientController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
-    )..repeat();
+    );
 
-    // Initialize confetti controller
     _confettiController = AnimationController(
-      vsync: this, 
-      duration: const Duration(seconds: 8), // Longer duration for smoother animation
+      vsync: this,
+      duration: const Duration(seconds: 8),
     );
 
-    // Initialize secondary confetti controller for smooth looping
     _confettiController2 = AnimationController(
-      vsync: this, 
-      duration: const Duration(seconds: 8), // Match the first controller's duration
+      vsync: this,
+      duration: const Duration(seconds: 8),
     );
-    
-    // Start confetti after button appears, and make it repeat
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      if (mounted) {
-        _confettiController.forward();
-        
-        // Start second controller midway through first controller's animation
-        Future.delayed(const Duration(seconds: 4), () {
-          if (mounted) {
-            _confettiController2.forward();
-          }
-        });
-        
-        // Set up continuous looping with overlapping animations
-        _confettiController.addStatusListener((status) {
-          if (status == AnimationStatus.completed) {
-            Future.delayed(const Duration(milliseconds: 100), () {
-              if (mounted) {
-                _confettiController.reset();
-                _confettiController.forward();
-              }
-            });
-          }
-        });
-        
-        _confettiController2.addStatusListener((status) {
-          if (status == AnimationStatus.completed) {
-            Future.delayed(const Duration(milliseconds: 100), () {
-              if (mounted) {
-                _confettiController2.reset();
-                _confettiController2.forward();
-              }
-            });
-          }
-        });
+
+    _scaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _bounceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+
+    // Use a single post frame callback to start animations
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_isDisposed) return;
+      
+      // Start immediate animations
+      _animationController.repeat(reverse: true);
+      _cardsController.repeat(reverse: false);
+      _gradientController.repeat();
+      
+      // Delayed animations with safety checks
+      Future<void> startAnimation(AnimationController controller, {Duration delay = Duration.zero}) async {
+        await Future.delayed(delay);
+        if (!_isDisposed && mounted) {
+          controller.forward();
+        }
       }
+
+      // Schedule animations
+      startAnimation(_titleController);
+      startAnimation(_descriptionController, delay: const Duration(milliseconds: 300));
+      startAnimation(_buttonController, delay: const Duration(milliseconds: 600));
+      
+      // Feature animations
+      for (int i = 0; i < _featureControllers.length; i++) {
+        startAnimation(
+          _featureControllers[i],
+          delay: Duration(milliseconds: 400 + (i * 200)),
+        );
+      }
+
+      // Confetti animations
+      startAnimation(_confettiController, delay: const Duration(milliseconds: 1000));
+      startAnimation(_confettiController2, delay: const Duration(milliseconds: 4000));
+      
+      // Scale and bounce animations
+      startAnimation(_scaleController);
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (!_isDisposed && mounted) {
+          _bounceController.repeat(reverse: true);
+        }
+      });
     });
 
     _fetchPreviewCards();
@@ -158,6 +167,7 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
 
   @override
   void dispose() {
+    _isDisposed = true;
     _animationController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
@@ -169,6 +179,8 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
     _gradientController.dispose();
     _confettiController.dispose();
     _confettiController2.dispose();
+    _scaleController.dispose();
+    _bounceController.dispose();
     super.dispose();
   }
 
