@@ -713,11 +713,22 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 // Content
                 StreamBuilder<List<TcgCard>>(
                   stream: Provider.of<StorageService>(context).watchCards(),
-                  initialData: const [],
                   builder: (context, snapshot) {
-                    final currencyProvider = context.watch<CurrencyProvider>();
+                    print('HomeOverview StreamBuilder: state=${snapshot.connectionState}, hasData=${snapshot.hasData}, dataLength=${snapshot.data?.length ?? 0}');
+                    
+                    // Always use the latest data, don't rely on initialData
                     final cards = snapshot.data ?? [];
                     
+                    if (cards.isEmpty) {
+                      return const EmptyCollectionView(
+                        title: 'Welcome to CardWizz',
+                        message: 'Start building your collection by adding cards',
+                        buttonText: 'Add Your First Card',
+                        icon: Icons.add_circle_outline,
+                      );
+                    }
+                    
+                    final currencyProvider = context.watch<CurrencyProvider>();
                     final totalValueEur = cards.fold<double>(
                       0, 
                       (sum, card) => sum + (card.price ?? 0)

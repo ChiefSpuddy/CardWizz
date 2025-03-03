@@ -21,23 +21,41 @@ class AppState with ChangeNotifier {
 
   AppState(this._storageService, this._authService);
 
+  // Fix the initialize method to properly restore user state
   Future<void> initialize() async {
     _isLoading = true;
     notifyListeners();
 
-    _prefs = await SharedPreferences.getInstance();  // Initialize prefs
-    await _authService.initialize();
+    _prefs = await SharedPreferences.getInstance();
+    
+    // First restore auth state
+    await _authService.restoreAuthState();
+    
+    // Initialize storage and collection services AFTER auth is restored
     _collectionService = await CollectionService.getInstance();
     
-    // Combine these operations into a single initialization if user is authenticated
+    // Fix synchronization issue - make this explicit
     if (_authService.isAuthenticated && _authService.currentUser != null) {
       final userId = _authService.currentUser!.id;
+      print('AppState: Initializing with authenticated user: $userId');
       
-      // Initialize services sequentially instead of using Future.wait
+      // CRITICAL FIX: Wait for storage service to set user ID
       _storageService.setCurrentUser(userId);
+      
+      // Wait for collection service too
       if (_collectionService != null) {
         await _collectionService!.setCurrentUser(userId);
       }
+      
+      // Give a small delay to ensure data is loaded correctly
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Force refresh storage to ensure cards are loaded
+      await _storageService.refreshState();
+      
+      print('AppState: User data initialized successfully');
+    } else {
+      print('AppState: No authenticated user found');
     }
 
     await _initializePrivacySettings();
@@ -190,4 +208,9 @@ class AppState with ChangeNotifier {
     Locale('ja'), // Japanese
     // Add more supported locales
   ];
+
+  // Add this simple method at the bottom of the class
+  Future<void> notifyCardChange() async {
+    notifyListeners();
+  }
 }

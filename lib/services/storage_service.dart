@@ -64,8 +64,9 @@ class StorageService {
     _currentUserId = null;
   }
 
+  // Modify the setCurrentUser method
   void setCurrentUser(String? userId) {
-    print('Setting current user: $userId');
+    print('Setting current user ID: $userId (was: $_currentUserId)');
     _currentUserId = userId;
     
     if (userId == null) {
@@ -74,13 +75,18 @@ class StorageService {
       return;
     }
     
-    // Load the user's data
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _loadInitialData();
-      final cards = _getCards();
-      print('Loading cards with key: ${_getUserKey('cards')}');
-      _cardsController.add(cards);
-    });
+    // Save userId to SharedPreferences for persistence across app restarts
+    _prefs.setString('current_storage_user', userId);
+    
+    // Load data immediately to ensure it's available
+    _loadInitialData();
+    
+    // Explicitly print card count to verify it worked
+    final cardCount = _getCards().length;
+    print('Storage loaded $cardCount cards for user $userId');
+    
+    // Force emit to stream
+    _cardsController.add(_getCards());
   }
 
   // Only used during account deletion
@@ -117,6 +123,17 @@ class StorageService {
       _prefs = await SharedPreferences.getInstance();
       _isInitialized = true;
       _isReadyNotifier.value = true;  // Add this
+      
+      // Look for stored user ID and restore it
+      final savedUserId = _prefs.getString('current_user_id') ?? 
+                       _prefs.getString('user_id');
+      
+      if (savedUserId != null) {
+        print('StorageService found saved user ID: $savedUserId');
+        _currentUserId = savedUserId;
+        _loadInitialData();
+      }
+      
       _isSyncEnabled = _prefs.getBool('sync_enabled') ?? false;
       if (_isSyncEnabled) {
         // Start sync if it was enabled
@@ -155,12 +172,20 @@ class StorageService {
     return true;
   }
 
+  // Make sure watchCards() always emits current data
   Stream<List<TcgCard>> watchCards() {
-    if (!_isInitialized) {
+    // IMPORTANT: Print this to help with debugging
+    debugPrint('watchCards called, currentUserId: $_currentUserId, initialized: $_isInitialized');
+    
+    if (!_isInitialized || _currentUserId == null) {
       return Stream.value([]);
     }
     
+    // Always load fresh cards from storage
     final cards = _getCards();
+    debugPrint('watchCards: returning ${cards.length} cards for user $_currentUserId');
+    
+    // Create a new stream that emits current cards immediately then listens for updates
     return _cardsController.stream.startWith(cards);
   }
 
@@ -274,12 +299,23 @@ class StorageService {
     final currentCount = cards.length;
     
     print('DEBUG: Adding card when count=$currentCount, limit=$_freeUserCardLimit, isPremium=${_purchaseService.isPremium}');
+    print('DEBUG: Current user ID: $_currentUserId');
     
     if (!_purchaseService.isPremium && currentCount >= _freeUserCardLimit) {
       throw 'Free users can only add up to $_freeUserCardLimit cards. Upgrade to Premium for unlimited cards!';
     }
 
     await saveCard(card);
+    
+    // Verify the card was saved correctly
+    final updatedCards = await getCards();
+    if (updatedCards.any((c) => c.id == card.id)) {
+      print('DEBUG: Card ${card.name} successfully added to storage');
+    } else {
+      print('DEBUG: ERROR - Card ${card.name} NOT found in storage after save!');
+    }
+    
+    await refreshState();
   }
 
   bool canAddMoreCards() {
@@ -334,6 +370,7 @@ class StorageService {
       
       // Recalculate portfolio history
       await recalculatePortfolioHistory();
+      await refreshState(); // Add this line
 
     } catch (e) {
       print('Error removing card: $e');
@@ -959,5 +996,22 @@ class StorageService {
     print('\n🔄 Recent Changes:');
     print('Changes in queue: ${_lastModifiedDates.length}');
     print('Next sync interval: ${_calculateNextSyncInterval().inMinutes} minutes');
+  }
+
+  // Add this simple method near your other card management methods
+  Future<void> refreshState() async {
+    if (_currentUserId == null) {
+      debugPrint('Cannot refresh state: No current user ID');
+      return;
+    }
+    
+    try {
+      final cards = await getCards();
+      _cardsController.add(cards);
+      _notifyCardChange();
+      debugPrint('State refreshed with ${cards.length} cards');
+    } catch (e) {
+      debugPrint('Error refreshing state: $e');
+    }
   }
 }

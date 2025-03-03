@@ -12,6 +12,7 @@ class AuthService {
   bool _isInitialized = false;
   bool _isAuthenticated = false;
   AuthUser? _currentUser;
+  SharedPreferences? _prefs;
 
   bool get isAuthenticated => _isAuthenticated;
   AuthUser? get currentUser => _currentUser;
@@ -41,16 +42,25 @@ class AuthService {
 
   Future<void> _saveUserData(AuthUser user) async {
     final prefs = await SharedPreferences.getInstance();
+    
+    // Save all user data
     await prefs.setString('user_id', user.id);
     await prefs.setString('${user.id}_email', user.email ?? '');
     await prefs.setString('${user.id}_name', user.name ?? '');
-    await prefs.setString('${user.id}_locale', user.locale);  // Add this
+    await prefs.setString('${user.id}_locale', user.locale ?? 'en');
+    
+    // Save the full JSON data for easier restoration
+    await prefs.setString('${user.id}_data', jsonEncode(user.toJson()));
+    
     if (user.avatarPath != null) {
       await prefs.setString('${user.id}_avatar', user.avatarPath!);
     }
     if (user.username != null) {
       await prefs.setString('${user.id}_username', user.username!);
     }
+    
+    // Also store the userId in a central place
+    await prefs.setString('current_user_id', user.id);
   }
 
   Future<void> updateAvatar(String avatarPath) async {
@@ -132,6 +142,11 @@ class AuthService {
         final storage = await StorageService.init(null);
         storage.startSync();
 
+        // Save auth state
+        _prefs?.setString('user_id', _currentUser!.id);
+        _prefs?.setString('auth_token', _currentUser!.token ?? '');
+        _prefs?.setString('user_data', jsonEncode(_currentUser!.toJson()));
+
         return _currentUser;
       }
       return null;
@@ -183,6 +198,45 @@ class AuthService {
       _currentUser = null;
     }
   }
+
+  Future<void> restoreAuthState() async {
+    if (_prefs == null) {
+      _prefs = await SharedPreferences.getInstance();
+    }
+    
+    // Look for saved auth tokens/state
+    final savedUserId = _prefs!.getString('user_id');
+    
+    if (savedUserId != null) {
+      // Restore the user object from saved data
+      try {
+        final savedUserData = _prefs!.getString('${savedUserId}_data');
+        if (savedUserData != null) {
+          final userData = jsonDecode(savedUserData);
+          _currentUser = AuthUser(
+            id: savedUserId,
+            email: _prefs!.getString('${savedUserId}_email'),
+            name: _prefs!.getString('${savedUserId}_name') ?? 'Pokemon Trainer',
+            avatarPath: _prefs!.getString('${savedUserId}_avatar'),
+            locale: _prefs!.getString('${savedUserId}_locale') ?? 'en',
+            username: _prefs!.getString('${savedUserId}_username'),
+            token: _prefs!.getString('auth_token'),
+          );
+          _isAuthenticated = true;
+          
+          // The critical fix - make sure storage service gets the ID
+          final storage = await StorageService.init(null);
+          storage.setCurrentUser(savedUserId);
+          
+          print('Auth state restored for user: $savedUserId');
+        }
+      } catch (e) {
+        print('Error restoring user data: $e');
+      }
+    } else {
+      print('No saved user ID found during auth restore');
+    }
+  }
 }
 
 class AuthUser {
@@ -192,6 +246,7 @@ class AuthUser {
   final String? avatarPath;
   final String locale;  // Add this
   final String? username;  // Add this
+  final String? token; // Add this property
 
   AuthUser({
     required this.id,
@@ -200,6 +255,7 @@ class AuthUser {
     this.avatarPath,
     this.locale = 'en',  // Default to English
     this.username,  // Add this
+    this.token, // Add this parameter
   });
 
   AuthUser copyWith({
@@ -209,6 +265,7 @@ class AuthUser {
     String? avatarPath,
     String? locale,
     String? username,  // Add this
+    String? token, // Add this parameter
   }) {
     return AuthUser(
       id: id ?? this.id,
@@ -217,6 +274,31 @@ class AuthUser {
       avatarPath: avatarPath ?? this.avatarPath,
       locale: locale ?? this.locale,
       username: username ?? this.username,  // Add this
+      token: token ?? this.token, // Add this field
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'name': name,
+      'avatarPath': avatarPath,
+      'locale': locale,
+      'username': username,
+      'token': token, // Add this field
+    };
+  }
+
+  static AuthUser fromJson(Map<String, dynamic> json) {
+    return AuthUser(
+      id: json['id'],
+      email: json['email'],
+      name: json['name'],
+      avatarPath: json['avatarPath'],
+      locale: json['locale'] ?? 'en',
+      username: json['username'],
+      token: json['token'], // Add this field
     );
   }
 }

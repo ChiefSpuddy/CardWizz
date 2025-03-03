@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart'; 
+import '../../services/storage_service.dart';
 import '../../models/tcg_card.dart';
 import '../../constants/app_colors.dart';
+import '../../providers/app_state.dart';
 
 class CardGridItem extends StatelessWidget {
   final TcgCard card;
@@ -128,7 +131,18 @@ class CardGridItem extends StatelessWidget {
               elevation: 2,
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
-                onTap: () => onAddToCollection(card),
+                onTap: () async {
+                  try {
+                    await onAddToCollection(card);
+                    
+                    // Make sure to update any necessary global state - you'd need to implement this
+                    if (context.mounted) {
+                      Provider.of<AppState>(context, listen: false).notifyCardChange();
+                    }
+                  } catch (e) {
+                    print('Error adding card to collection: $e');
+                  }
+                },
                 child: Container(
                   width: 24,
                   height: 24,

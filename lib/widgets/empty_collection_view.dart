@@ -12,6 +12,8 @@ class EmptyCollectionView extends StatefulWidget {
   final String buttonText;
   final IconData icon;
   final VoidCallback? onActionPressed;
+  final bool showButton;
+  final String uniqueId;
 
   const EmptyCollectionView({
     super.key,
@@ -20,6 +22,8 @@ class EmptyCollectionView extends StatefulWidget {
     this.buttonText = 'Search Cards',
     this.icon = Icons.style_outlined,
     this.onActionPressed,
+    this.showButton = true,
+    this.uniqueId = '',
   });
 
   @override
@@ -227,6 +231,7 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isSmallScreen = MediaQuery.of(context).size.height < 700;
+    final heroTag = 'empty_view${widget.uniqueId.isNotEmpty ? "_${widget.uniqueId}" : "_${DateTime.now().millisecondsSinceEpoch}"}';
 
     return Stack(
       children: [
@@ -310,10 +315,13 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
                       ),
                     ],
                   ),
-                  child: Icon(
-                    widget.icon,
-                    size: isSmallScreen ? 36 : 40,
-                    color: Colors.white,
+                  child: Hero(
+                    tag: heroTag,
+                    child: Icon(
+                      widget.icon,
+                      size: isSmallScreen ? 36 : 40,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
                 

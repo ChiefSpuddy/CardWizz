@@ -16,6 +16,7 @@ class CardSearchGrid extends StatefulWidget {
   final Function(String) loadImage;
   final Set<String> loadingRequestedUrls;
   final Function(TcgCard) onCardTap;
+  final Function(TcgCard)? onAddToCollection; // Add this line to make it optional
 
   const CardSearchGrid({
     Key? key,
@@ -24,6 +25,7 @@ class CardSearchGrid extends StatefulWidget {
     required this.loadImage,
     required this.loadingRequestedUrls,
     required this.onCardTap,
+    this.onAddToCollection, // Add this optional parameter
   }) : super(key: key);
 
   @override
@@ -219,7 +221,7 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
               card: card,
               cachedImage: widget.imageCache[imageUrl],
               onCardTap: widget.onCardTap,
-              onAddToCollection: _addToCollection,
+              onAddToCollection: widget.onAddToCollection ?? (_) {}, // Pass it here with a default
               isInCollection: _collectionCardIds.contains(card.id),
               currencySymbol: currencyProvider.symbol,
             );

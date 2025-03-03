@@ -27,8 +27,10 @@ import '../services/navigation_service.dart'; // Add the missing import
 import 'package:provider/provider.dart';
 import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart'; // Add this missing import
+import '../services/storage_service.dart';
+// Add this import near the top of the file with other imports
+import '../providers/app_state.dart';
 
-// Move enum outside the class
 enum SearchMode { eng, jpn, mtg }
 
 class SearchScreen extends StatefulWidget {
@@ -1203,6 +1205,35 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  // Add this method to handle adding cards from search results
+  Future<void> _onCardAddToCollection(TcgCard card) async {
+    try {
+      final storageService = Provider.of<StorageService>(context, listen: false);
+      await storageService.addCard(card);
+      
+      // Notify app state about the change
+      Provider.of<AppState>(context, listen: false).notifyCardChange();
+      
+      // Show success toast
+      _showStyledToast(
+        title: 'Added to Collection',
+        message: card.name,
+        icon: Icons.check_circle,
+        durationSeconds: 2,
+      );
+    } catch (e) {
+      print('Error adding card to collection: $e');
+      
+      // Show error toast
+      _showStyledToast(
+        title: 'Failed to Add',
+        message: e.toString(),
+        icon: Icons.error_outline,
+        isError: true,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -1316,7 +1347,8 @@ class _SearchScreenState extends State<SearchScreen> {
               imageCache: _imageCache,
               loadImage: _loadImage,
               loadingRequestedUrls: _loadingRequestedUrls,
-              onCardTap: _onCardTap,  // Use the new method
+              onCardTap: _onCardTap,
+              onAddToCollection: _onCardAddToCollection, // Add this parameter
             )
           else if (_searchMode == SearchMode.eng && _searchResults != null)
             CardSearchGrid(
@@ -1324,7 +1356,8 @@ class _SearchScreenState extends State<SearchScreen> {
               imageCache: _imageCache,
               loadImage: _loadImage,
               loadingRequestedUrls: _loadingRequestedUrls,
-              onCardTap: _onCardTap,  // Use the new method
+              onCardTap: _onCardTap,
+              onAddToCollection: _onCardAddToCollection, // Add this parameter
             )
           else if (_setResults != null)
             SetSearchGrid(
