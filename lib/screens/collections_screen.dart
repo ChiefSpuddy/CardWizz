@@ -22,7 +22,6 @@ import '../widgets/sign_in_view.dart';
 import '../providers/app_state.dart';
 import '../providers/sort_provider.dart';
 import '../constants/layout.dart';
-import 'dart:math';
 
 class CollectionsScreen extends StatefulWidget {
   final bool _showEmptyState;
@@ -36,84 +35,22 @@ class CollectionsScreen extends StatefulWidget {
   State<CollectionsScreen> createState() => CollectionsScreenState();
 }
 
-class CollectionsScreenState extends State<CollectionsScreen> with TickerProviderStateMixin {
+class CollectionsScreenState extends State<CollectionsScreen> {
   final _pageController = PageController();
   bool _showCustomCollections = false;
   late bool _pageViewReady = false;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Animation controllers
-  late AnimationController _fadeInController;
-  late AnimationController _slideController;
-  late AnimationController _valueController;
-  late AnimationController _toggleController;
-  
-  // Particle system for background effects
-  final List<_CollectionParticle> _particles = [];
-  final Random _random = Random();
-
   @override
   void initState() {
     super.initState();
-    
-    // Initialize animation controllers
-    _fadeInController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    
-    _slideController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    
-    _valueController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    
-    _toggleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-
-    // Start animations
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() => _pageViewReady = true);
-      _fadeInController.forward();
-      _slideController.forward();
-      _valueController.forward();
-      _toggleController.forward();
-      
-      // Initialize background particles
-      _initializeParticles();
     });
-  }
-
-  void _initializeParticles() {
-    // Create particles for subtle background animation
-    for (int i = 0; i < 20; i++) {
-      _particles.add(
-        _CollectionParticle(
-          position: Offset(
-            _random.nextDouble() * MediaQuery.of(context).size.width,
-            _random.nextDouble() * MediaQuery.of(context).size.height,
-          ),
-          size: 2 + _random.nextDouble() * 4,
-          speed: 0.2 + _random.nextDouble() * 0.3,
-          angle: _random.nextDouble() * 2 * pi,
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-        ),
-      );
-    }
   }
 
   @override
   void dispose() {
-    _fadeInController.dispose();
-    _slideController.dispose();
-    _valueController.dispose();
-    _toggleController.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -131,319 +68,306 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     });
   }
 
-  // Improved toggle with animations
-  Widget _buildAnimatedToggle() {
+  Widget _buildToggle() {
     final localizations = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorScheme = Theme.of(context).colorScheme;
     
-    return AnimatedBuilder(
-      animation: _toggleController,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: 0.9 + (0.1 * _toggleController.value),
-          child: Opacity(
-            opacity: _toggleController.value,
-            child: Container(
-              height: 40, // Reduced from 48 to 40
-              margin: const EdgeInsets.symmetric(horizontal: 20), // Increased horizontal margin from 16 to 20
-              decoration: BoxDecoration(
-                color: isDark 
-                    ? colorScheme.surfaceVariant.withOpacity(0.3) 
-                    : colorScheme.surface,
-                borderRadius: BorderRadius.circular(20), // Changed from 24 to 20
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8, // Reduced from 10 to 8
-                    offset: const Offset(0, 3), // Reduced from 4 to 3
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        if (_pageController.hasClients) {
-                          _pageController.animateToPage(
-                            0,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeInOut,
-                          );
-                        }
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        decoration: BoxDecoration(
-                          gradient: !_showCustomCollections
-                              ? LinearGradient(
-                                  colors: isDark ? [
-                                    colorScheme.primary.withOpacity(0.8),
-                                    colorScheme.primary,
-                                  ] : [
-                                    colorScheme.primary.withOpacity(0.9),
-                                    colorScheme.primary,
-                                  ],
-                                )
-                              : null,
-                          borderRadius: BorderRadius.circular(20), // Changed from 24 to 20
-                          boxShadow: !_showCustomCollections
-                              ? [
-                                  BoxShadow(
-                                    color: colorScheme.primary.withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.style_outlined,
-                                size: 16, // Reduced from 18 to 16
-                                color: !_showCustomCollections
-                                    ? Colors.white
-                                    : colorScheme.onSurfaceVariant.withOpacity(0.8),
-                              ),
-                              const SizedBox(width: 6), // Reduced from 8 to 6
-                              Text(
-                                localizations.translate('main'),
-                                style: TextStyle(
-                                  fontSize: 13, // Reduced from 14 to 13
-                                  fontWeight: FontWeight.w600,
-                                  color: !_showCustomCollections
-                                      ? Colors.white
-                                      : colorScheme.onSurfaceVariant.withOpacity(0.8),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+    return Container(
+      height: 36,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (_pageController.hasClients) {
+                  _pageController.animateToPage(
+                    0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: !_showCustomCollections
+                    ? LinearGradient(
+                        colors: isDark ? [
+                          Colors.blue[900]!,
+                          Colors.blue[800]!,
+                        ] : [
+                          Theme.of(context).colorScheme.primary,
+                          Theme.of(context).colorScheme.secondary,
+                        ],
+                      )
+                    : null,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.style,
+                      size: 16,
+                      color: !_showCustomCollections
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      localizations.translate('main'),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: !_showCustomCollections
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        if (_pageController.hasClients) {
-                          _pageController.animateToPage(
-                            1,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeInOut,
-                          );
-                        }
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        decoration: BoxDecoration(
-                          gradient: _showCustomCollections
-                              ? LinearGradient(
-                                  colors: isDark ? [
-                                    colorScheme.primary.withOpacity(0.8),
-                                    colorScheme.primary,
-                                  ] : [
-                                    colorScheme.primary.withOpacity(0.9),
-                                    colorScheme.primary,
-                                  ],
-                                )
-                              : null,
-                          borderRadius: BorderRadius.circular(20), // Changed from 24 to 20
-                          boxShadow: _showCustomCollections
-                              ? [
-                                  BoxShadow(
-                                    color: colorScheme.primary.withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.collections_bookmark_outlined,
-                                size: 16, // Reduced from 18 to 16
-                                color: _showCustomCollections
-                                    ? Colors.white
-                                    : colorScheme.onSurfaceVariant.withOpacity(0.8),
-                              ),
-                              const SizedBox(width: 6), // Reduced from 8 to 6
-                              Text(
-                                localizations.translate('binders'),
-                                style: TextStyle(
-                                  fontSize: 13, // Reduced from 14 to 13
-                                  fontWeight: FontWeight.w600,
-                                  color: _showCustomCollections
-                                      ? Colors.white
-                                      : colorScheme.onSurfaceVariant.withOpacity(0.8),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        );
-      },
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (_pageController.hasClients) {
+                  _pageController.animateToPage(
+                    1,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: _showCustomCollections
+                    ? LinearGradient(
+                        colors: isDark ? [
+                          Colors.blue[900]!,
+                          Colors.blue[800]!,
+                        ] : [
+                          Theme.of(context).colorScheme.primary,
+                          Theme.of(context).colorScheme.secondary,
+                        ],
+                      )
+                    : null,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.collections_bookmark,
+                      size: 16,
+                      color: _showCustomCollections
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      localizations.translate('binders'),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _showCustomCollections
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // New animated value tracker card that shows collection value
-  Widget _buildValueTrackerCard(List<TcgCard> cards, CurrencyProvider currencyProvider) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+  Future<void> _createCollection(BuildContext context) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => const CreateCollectionSheet(),
+    );
+  }
+
+  void _showSortMenu(BuildContext context) {
+    final sortProvider = Provider.of<SortProvider>(context, listen: false);
     
-    return FadeTransition(
-      opacity: _fadeInController,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.2),
-          end: Offset.zero,
-        ).animate(_slideController),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0), // Changed from 16 to 20
-          child: InkWell(
-            onTap: () {
-              // Navigate to analytics page on tap
-              final homeState = context.findAncestorStateOfType<HomeScreenState>();
-              if (homeState != null) {
-                homeState.setSelectedIndex(3); // Index for analytics tab
-              }
-            },
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              height: 56, // Much shorter height
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    isDark 
-                      ? colorScheme.surfaceVariant.withOpacity(0.4)
-                      : colorScheme.surface,
-                    isDark 
-                      ? colorScheme.surface.withOpacity(0.3)
-                      : colorScheme.surface,
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: colorScheme.outline.withOpacity(0.1),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.only(top: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
               child: Row(
                 children: [
-                  Container(
-                    width: 4,
-                    margin: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade500,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
+                  const Icon(Icons.sort),
                   const SizedBox(width: 12),
-                  // Portfolio value with animation
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Collection Value',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurface.withOpacity(0.7),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        _valueController.value < 1.0
-                          ? Text(
-                              currencyProvider.formatValue(totalValue),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
-                              ),
-                            )
-                          : TweenAnimationBuilder<double>(
-                              duration: const Duration(milliseconds: 1500),
-                              curve: Curves.easeOutCubic,
-                              tween: Tween(begin: 0, end: totalValue),
-                              builder: (context, value, child) => Text(
-                                currencyProvider.formatValue(value),
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                            ),
-                      ],
-                    ),
+                  Text(
+                    'Sort by',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          '${cards.length}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.style_outlined,
-                          size: 14,
-                          color: colorScheme.primary,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                 ],
               ),
             ),
-          ),
+            const Divider(),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var option in CollectionSortOption.values)
+                      RadioListTile<CollectionSortOption>(
+                        value: option,
+                        groupValue: sortProvider.currentSort,
+                        onChanged: (value) {
+                          sortProvider.setSort(value!);
+                          Navigator.pop(context);
+                        },
+                        title: Text(_getSortOptionLabel(option)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // Helper method to count unique sets
-  int _countUniqueSets(List<TcgCard> cards) {
-    final sets = <String>{};
-    for (final card in cards) {
-      if (card.setName != null) {
-        sets.add(card.setName!);
-      }
+  String _getSortOptionLabel(CollectionSortOption option) {
+    switch (option) {
+      case CollectionSortOption.nameAZ:
+        return 'Name (A-Z)';
+      case CollectionSortOption.nameZA:
+        return 'Name (Z-A)';
+      case CollectionSortOption.valueHighLow:
+        return 'Value (High to Low)';
+      case CollectionSortOption.valueLowHigh:
+        return 'Value (Low to High)';
+      case CollectionSortOption.newest:
+        return 'Date Added (Newest First)';
+      case CollectionSortOption.oldest:
+        return 'Date Added (Oldest First)';
+      case CollectionSortOption.countHighLow:
+        return 'Card Count (High to Low)';
+      case CollectionSortOption.countLowHigh:
+        return 'Card Count (Low to High)';
     }
-    return sets.length;
+  }
+
+  Future<void> _showCreateBinderDialog(BuildContext context) async {
+    final collectionId = await showDialog<String>(
+      context: context,
+      builder: (context) => const CreateBinderDialog(),
+      useSafeArea: true,
+    );
+
+    if (collectionId != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 2),
+          backgroundColor: Theme.of(context).colorScheme.secondary,
+          behavior: SnackBarBehavior.floating,
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+            left: 16,
+            right: 16,
+          ),
+          content: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Binder Created',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      'Add cards to get started',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildCreateBinderButton(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      height: 46,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(23),
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).primaryColor,
+            Theme.of(context).colorScheme.secondary,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).primaryColor.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: FloatingActionButton.extended(
+        onPressed: () => _showCreateBinderDialog(context),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        icon: const Icon(Icons.add, size: 20),
+        label: const Text(
+          'Create New Binder',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -451,389 +375,261 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currencyProvider = context.watch<CurrencyProvider>();
     final isSignedIn = context.watch<AppState>().isAuthenticated;
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       key: _scaffoldKey,
       
-      // Clean design with minimal AppBar
+      // Use a PreferredSize widget for AppBar to fix the extra white space issue
       appBar: isSignedIn 
         ? PreferredSize(
-            preferredSize: const Size.fromHeight(44),
-            child: AppBar(
-              toolbarHeight: 44, 
-              elevation: 0,
-              backgroundColor: Colors.transparent,
-              centerTitle: false, 
-              leading: IconButton(
-                icon: Icon(
-                  Icons.menu, 
-                  color: colorScheme.onBackground,
-                ),
-                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-              ),
-              title: Text(
-                'Collection',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onBackground,
-                ),
-              ),
-              actions: [
-                IconButton(
-                  icon: Icon(
-                    Icons.sort,
-                    color: colorScheme.onBackground,
-                  ),
-                  onPressed: () => _showSortMenu(context),
-                ),
-              ],
-            ),
-          )
-        : null,
-      
-      drawer: const AppDrawer(),
-      extendBodyBehindAppBar: true,
-      extendBody: true,
-      
-      // Body with stack for beautiful backgrounds and animations
-      body: AnimatedBuilder(
-        animation: _fadeInController,
-        builder: (context, child) {
-          return Stack(
-            children: [
-              // Subtle animated background
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _CollectionBackgroundPainter(
-                    particles: _particles,
-                    isDark: isDark,
-                    primaryColor: colorScheme.primary,
-                  ),
-                ),
-              ),
-              
-              // Background gradient overlay
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Theme.of(context).scaffoldBackgroundColor,
-                        Theme.of(context).scaffoldBackgroundColor.withOpacity(0.9),
-                        Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
+            // Set minimal height when no cards, normal height when there are cards
+            preferredSize: const Size.fromHeight(44), // Minimum height
+            child: StreamBuilder<List<TcgCard>>(
+              stream: Provider.of<StorageService>(context).watchCards(),
+              builder: (context, snapshot) {
+                final cards = snapshot.data ?? [];
+                
+                // If empty, return just a minimal AppBar with drawer icon
+                if (cards.isEmpty) {
+                  return AppBar(
+                    toolbarHeight: 44, 
+                    elevation: 0,
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Blend with background
+                    centerTitle: false, 
+                    automaticallyImplyLeading: true,
+                    titleSpacing: 0,
+                    // Empty to avoid taking space
+                    title: const SizedBox.shrink(),
+                    // No actions when empty to avoid taking space
+                    actions: const [],
+                    // No bottom when empty to avoid extra space
+                    bottom: null,
+                  );
+                }
+                
+                // Otherwise return the full AppBar with all content
+                return AppBar(
+                  toolbarHeight: 44,
+                  elevation: 0,
+                  centerTitle: false,
+                  automaticallyImplyLeading: true,
+                  titleSpacing: 0,
+                  // Include all the regular AppBar content
+                  title: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildCardCountButton(cards),
+                        const SizedBox(width: 8),
+                        _buildValueButton(cards, currencyProvider),
                       ],
                     ),
                   ),
-                ),
-              ),
-              
-              // Main content
-              if (!isSignedIn)
-                const SignInView()
-              else
-                SafeArea(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 8),
-                      
-                      // Collection stats and value tracker
-                      StreamBuilder<List<TcgCard>>(
-                        stream: Provider.of<StorageService>(context).watchCards(),
-                        builder: (context, snapshot) {
-                          final cards = snapshot.data ?? [];
-                          if (cards.isEmpty) return const SizedBox.shrink();
-                          
-                          return _buildValueTrackerCard(cards, currencyProvider);
-                        },
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // New animated toggle
-                      _buildAnimatedToggle(),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Collection content
-                      Expanded(
-                        child: StreamBuilder<List<TcgCard>>(
-                          stream: Provider.of<StorageService>(context).watchCards(),
-                          builder: (context, snapshot) {
-                            final cards = snapshot.data ?? [];
-                            
-                            if (_pageViewReady) {
-                              if (cards.isEmpty) {
-                                return const EmptyCollectionView(
-                                  title: 'Start Your Collection',
-                                  message: 'Add cards to build your collection',
-                                  buttonText: 'Browse Cards',
-                                  icon: Icons.add_circle_outline,
-                                );
-                              }
-                              
-                              return AnimatedOpacity(
-                                duration: const Duration(milliseconds: 500),
-                                opacity: _fadeInController.value,
-                                child: PageView(
-                                  controller: _pageController,
-                                  onPageChanged: _onPageChanged,
-                                  physics: const ClampingScrollPhysics(),
-                                  children: [
-                                    const CollectionGrid(key: PageStorageKey('main_collection')),
-                                    const CustomCollectionsGrid(key: PageStorageKey('custom_collections')),
-                                  ],
-                                ),
-                              );
-                            } else {
-                              return const Center(child: CircularProgressIndicator());
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-      
-      // Floating action button for adding cards/collections
-      floatingActionButton: isSignedIn
-          ? AnimatedBuilder(
-              animation: _fadeInController,
-              builder: (context, child) {
-                return ScaleTransition(
-                  scale: Tween<double>(
-                    begin: 0.6,
-                    end: 1.0,
-                  ).animate(CurvedAnimation(
-                    parent: _fadeInController,
-                    curve: Curves.easeOutBack,
-                  )),
-                  child: FloatingActionButton(
-                    onPressed: () {
-                      if (_showCustomCollections) {
-                        _showCreateBinderDialog(context);
-                      } else {
-                        // Update this navigation logic to ensure it goes to the search screen
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.analytics_outlined),
+                      onPressed: () {
                         final homeState = context.findAncestorStateOfType<HomeScreenState>();
                         if (homeState != null) {
-                          homeState.setSelectedIndex(2); // Index 2 is the Search tab
-                        } else {
-                          // Alternative navigation if not inside HomeScreen
-                          Navigator.of(context).pushNamed('/search');
+                          homeState.setSelectedIndex(3);
                         }
-                      }
-                    },
-                    backgroundColor: colorScheme.primary,
-                    elevation: 4,
-                    child: Icon(
-                      _showCustomCollections ? Icons.create_new_folder : Icons.add,
-                      color: Colors.white,
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.sort),
+                      onPressed: () => _showSortMenu(context),
+                    ),
+                  ],
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(52),
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _buildToggle(),
                     ),
                   ),
                 );
               },
-            )
-          : null,
+            ),
+          )
+        : null, // No AppBar when not signed in
+      
+      drawer: const AppDrawer(),
+      extendBody: true,
+      
+      body: AnimatedBackground(
+        child: !isSignedIn
+            ? const SignInView()
+            : _buildCollectionContent(),
+      ),
+      
+      // ...existing floating action button...
     );
   }
 
-  // Other methods remain the same...
-  // ...existing methods...
-}
-
-// Helper class for background animation
-class _CollectionParticle {
-  Offset position;
-  final double size;
-  final double speed;
-  final double angle;
-  Color color;
-
-  _CollectionParticle({
-    required this.position,
-    required this.size,
-    required this.speed,
-    required this.angle,
-    required this.color,
-  });
-}
-
-// Background painter for animated particles
-class _CollectionBackgroundPainter extends CustomPainter {
-  final List<_CollectionParticle> particles;
-  final bool isDark;
-  final Color primaryColor;
-
-  _CollectionBackgroundPainter({
-    required this.particles,
-    required this.isDark,
-    required this.primaryColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Update particle positions
-    for (final particle in particles) {
-      particle.position = Offset(
-        (particle.position.dx + cos(particle.angle) * particle.speed) % size.width,
-        (particle.position.dy + sin(particle.angle) * particle.speed) % size.height,
-      );
-      
-      // Draw particles with glow effect
-      final paint = Paint()..color = particle.color;
-      canvas.drawCircle(particle.position, particle.size, paint);
-      
-      // Add subtle glow
-      final glowPaint = Paint()
-        ..color = particle.color.withOpacity(0.3)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
-      canvas.drawCircle(particle.position, particle.size * 1.5, glowPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_CollectionBackgroundPainter oldDelegate) => true;
-}
-
-// Custom tween for string animation
-class FixedTween extends Tween<String> {
-  final String end;
-  
-  FixedTween({required this.end}) : super(begin: '0', end: end);
-  
-  @override
-  String lerp(double t) {
-    // For numeric values, smoothly animate from 0 to final value
-    if (RegExp(r'^\d+(\.\d+)?$').hasMatch(end)) {
-      try {
-        final endValue = double.parse(end.replaceAll(RegExp(r'[^\d.]'), ''));
-        final currentValue = endValue * t;
-        
-        // For integers
-        if (end.indexOf('.') == -1) {
-          return currentValue.toInt().toString();
-        }
-        
-        // For currency
-        if (end.contains('\$') || end.contains('€') || end.contains('£')) {
-          final symbol = RegExp(r'[\$€£]').firstMatch(end)?.group(0) ?? '';
-          return '$symbol${currentValue.toStringAsFixed(2)}';
-        }
-        
-        // Default decimal formatting
-        return currentValue.toStringAsFixed(2);
-      } catch (_) {
-        return end;
-      }
-    }
+  // Add these helper methods to clean up the build method
+  Widget _buildCardCountButton(List<TcgCard> cards) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    // For non-numeric values, just use the end value
-    return end;
-  }
-}
-
-void _showSortMenu(BuildContext context) {
-  final sortProvider = Provider.of<SortProvider>(context, listen: false);
-  
-  showModalBottomSheet(
-    context: context,
-    builder: (context) => Container(
-      padding: const EdgeInsets.only(top: 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-            child: Row(
-              children: [
-                const Icon(Icons.sort),
-                const SizedBox(width: 12),
-                Text(
-                  'Sort by',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ],
-            ),
+    return InkWell(
+      onTap: () {
+        final homeState = context.findAncestorStateOfType<HomeScreenState>();
+        if (homeState != null) {
+          homeState.setSelectedIndex(3);
+        }
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark ? [
+              Colors.grey[800]!,
+              Colors.grey[700]!,
+            ] : [
+              Theme.of(context).colorScheme.primaryContainer,
+              Theme.of(context).colorScheme.primary.withOpacity(0.7),
+            ],
           ),
-          const Divider(),
-          Flexible(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var option in CollectionSortOption.values)
-                    RadioListTile<CollectionSortOption>(
-                      value: option,
-                      groupValue: sortProvider.currentSort,
-                      onChanged: (value) {
-                        sortProvider.setSort(value!);
-                        Navigator.pop(context);
-                      },
-                      title: Text(_getSortOptionLabel(option)),
-                    ),
-                ],
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.style_outlined,
+              size: 16,
+              color: isDark 
+                ? Colors.white.withOpacity(0.9)
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${cards.length}',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                  ? Colors.white.withOpacity(0.9)
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-String _getSortOptionLabel(CollectionSortOption option) {
-  switch (option) {
-    case CollectionSortOption.nameAZ:
-      return 'Name (A-Z)';
-    case CollectionSortOption.nameZA:
-      return 'Name (Z-A)';
-    case CollectionSortOption.valueHighLow:
-      return 'Value (High to Low)';
-    case CollectionSortOption.valueLowHigh:
-      return 'Value (Low to High)';
-    case CollectionSortOption.newest:
-      return 'Date Added (Newest First)';
-    case CollectionSortOption.oldest:
-      return 'Date Added (Oldest First)';
-    case CollectionSortOption.countHighLow:
-      return 'Card Count (High to Low)';
-    case CollectionSortOption.countLowHigh:
-      return 'Card Count (Low to High)';
-  }
-}
-
-Future<void> _showCreateBinderDialog(BuildContext context) async {
-  final collectionId = await showDialog<String>(
-    context: context,
-    builder: (context) => const CreateBinderDialog(),
-    useSafeArea: true,
-  );
-
-  if (collectionId != null) {  // Remove '&& mounted' check
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 2),
-        backgroundColor: Theme.of(context).colorScheme.secondary,
-        behavior: SnackBarBehavior.floating,
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 16,
-          left: 16,
-          right: 16,
-        ),
-        content: Row(
-          // ...existing code...
+          ],
         ),
       ),
     );
   }
+
+  Widget _buildValueButton(List<TcgCard> cards, CurrencyProvider currencyProvider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final totalValue = cards.fold<double>(
+      0,
+      (sum, card) => sum + (card.price ?? 0),
+    );
+    
+    return InkWell(
+      onTap: () {
+        final homeState = context.findAncestorStateOfType<HomeScreenState>();
+        if (homeState != null) {
+          homeState.setSelectedIndex(3);
+        }
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark 
+                ? [Colors.green[900]!, Colors.green[800]!] 
+                : [Colors.green[200]!, Colors.green[400]!],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          currencyProvider.formatValue(totalValue),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: isDark
+              ? Colors.white.withOpacity(0.9)
+              : Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollectionContent() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        MediaQuery.removePadding(
+          context: context,
+          removeTop: true,  
+          removeBottom: true,
+          child: PageView(
+            controller: _pageController,
+            onPageChanged: _onPageChanged,
+            physics: const ClampingScrollPhysics(),
+            children: [
+              StreamBuilder<List<TcgCard>>(
+                stream: Provider.of<StorageService>(context).watchCards(),
+                builder: (context, snapshot) {
+                  final cards = snapshot.data ?? [];
+                  
+                  if (cards.isEmpty) {
+                    // Simply return the EmptyCollectionView directly with no nesting
+                    // This ensures uniform alignment across all screens
+                    return const EmptyCollectionView(
+                      title: 'Add Cards',
+                      message: 'Start building your collection',
+                      buttonText: 'Browse Cards',
+                      icon: Icons.add_circle_outline,
+                    );
+                  }
+                  
+                  return const CollectionGrid(key: PageStorageKey('main_collection'));
+                },
+              ),
+              
+              // Use StreamBuilder here too to conditionally show empty state for custom collections
+              StreamBuilder<List<TcgCard>>(
+                stream: Provider.of<StorageService>(context).watchCards(),
+                builder: (context, snapshot) {
+                  final cards = snapshot.data ?? [];
+                  
+                  if (cards.isEmpty) {
+                    // Return the EmptyCollectionView with binder-specific text
+                    return const EmptyCollectionView(
+                      title: 'Create Binders',
+                      message: 'Organize your collection into custom binders',
+                      buttonText: 'Browse Cards',
+                      icon: Icons.collections_bookmark_outlined,
+                    );
+                  }
+                  
+                  return const CustomCollectionsGrid(key: PageStorageKey('custom_collections'));
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ...existing methods...
 }

@@ -19,6 +19,7 @@ import '../widgets/sign_in_view.dart';
 import '../services/collection_service.dart';
 import '../widgets/styled_toast.dart';  // Add this import
 import '../providers/theme_provider.dart'; // Add this import
+import '../widgets/app_drawer.dart'; // Add this import
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -1653,14 +1654,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         backgroundColor: Colors.transparent,
         elevation: 0,
         titleSpacing: 16,
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          padding: EdgeInsets.zero,
-          visualDensity: VisualDensity.compact,
-          constraints: const BoxConstraints(minWidth: 40),
-          onPressed: () => Scaffold.of(context).openDrawer(),
+        // Replace the existing leading with a Builder to get correct Scaffold context
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(minWidth: 40),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),  // Use ctx to get the correct Scaffold context
+          ),
         ),
       ) : null,
+      // Update the drawer instantiation with proper constructor
+      drawer: const AppDrawer(),  // AppDrawer doesn't require any parameters
       body: Stack(
         children: [
           Positioned.fill(
