@@ -352,10 +352,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildValueTrendCard(List<TcgCard> cards) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: PortfolioValueChart(),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        // Use a solid or semi-transparent background color based on the theme
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).colorScheme.surface.withOpacity(0.95)
+            : Theme.of(context).colorScheme.background.withOpacity(0.95),
+        // Add a subtle shadow
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Provider<List<TcgCard>>.value(
+            value: cards,
+            child: const FullWidthAnalyticsChart(),
+          ),
+        ),
       ),
     );
   }
@@ -2090,6 +2112,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   void _onScroll() {
     // Add scroll handling logic here if needed in the future
+  }
+}
+
+class FullWidthAnalyticsChart extends StatelessWidget {
+  const FullWidthAnalyticsChart({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: PortfolioValueChart(
+              useFullWidth: true,
+              chartPadding: 16,
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
