@@ -31,6 +31,8 @@ import '../widgets/portfolio_value_chart.dart';
 import '../widgets/styled_toast.dart';
 import 'package:rxdart/rxdart.dart';  // Add this import at the top
 import '../widgets/market_scan_button.dart';
+import '../widgets/acquisition_timeline_chart.dart';
+import '../widgets/rarity_distribution_chart.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -1759,6 +1761,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 _buildSetDistribution(cards),
                                 const SizedBox(height: 16),
                                 _buildPriceRangeDistribution(cards),
+                                const SizedBox(height: 16),
+                                AcquisitionTimelineChart(cards: cards),
+                                const SizedBox(height: 16),
+                                RarityDistributionChart(cards: cards),
                                 const SizedBox(height: 32),
                               ],
                             ),

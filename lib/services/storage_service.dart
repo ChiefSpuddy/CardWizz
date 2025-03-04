@@ -254,9 +254,10 @@ class StorageService {
     if (_currentUserId == null) return;
 
     try {
+      // IMPORTANT: Always ensure dateAdded is set for analytics
       final now = DateTime.now();
       final cardWithDate = card.copyWith(
-        dateAdded: card.dateAdded ?? now,
+        dateAdded: card.dateAdded ?? now,  // Use existing date if present, otherwise use now
         addedToCollection: card.addedToCollection ?? now,
         price: card.price,
         priceHistory: card.priceHistory.isEmpty && card.price != null ? 
