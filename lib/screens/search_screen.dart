@@ -30,6 +30,8 @@ import '../providers/theme_provider.dart'; // Add this missing import
 import '../services/storage_service.dart';
 // Add this import near the top of the file with other imports
 import '../providers/app_state.dart';
+// Add this import at the top with other imports
+import '../widgets/search/card_skeleton_grid.dart';
 
 enum SearchMode { eng, jpn, mtg }
 
@@ -96,6 +98,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   // Add this field to store theme provider
   late final ThemeProvider _themeProvider;
+
+  // Add this field at the top of the class with other fields
+  String? _currentSetName;
 
   @override
   void initState() {
@@ -334,6 +339,9 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
+    // Update to store set name for better loading states
+    String? setName;
+
     if (!isLoadingMore) {
       setState(() {
         _currentPage = 1;
@@ -345,6 +353,16 @@ class _SearchScreenState extends State<SearchScreen> {
         if (query.startsWith('set.id:')) {
           _currentSort = 'cardmarket.prices.averageSellPrice';
           _sortAscending = false;
+          
+          // Extract set name for display in loading state
+          final setId = query.substring(7).trim();
+          final allSets = _getAllSets();
+          final matchingSet = allSets.firstWhere(
+            (set) => (set['query'] as String?)?.contains(setId) ?? false,
+            orElse: () => {'name': null},
+          );
+          setName = matchingSet['name'] as String?;
+          _currentSetName = setName; // Store for skeleton loader
         }
       });
     }
@@ -1312,7 +1330,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               
             // ...existing code for search results and categories...
-            if (_searchResults == null && _setResults == null) ...[
+            if (_searchResults == null && _setResults == null && !_isLoading) ...[
               SliverToBoxAdapter(
                 child: SearchCategoriesHeader(
                   showCategories: _showCategories,
@@ -1336,6 +1354,24 @@ class _SearchScreenState extends State<SearchScreen> {
                   },
                   isLoading: _isHistoryLoading,
                 ),
+              ),
+            ] else if (_isLoading && _searchResults == null && _setResults == null) ...[
+              // Show loading skeleton when loading new results
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    _currentSetName != null
+                        ? 'Loading cards from $_currentSetName...'
+                        : 'Searching for "${_searchController.text}"...',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ),
+              // New skeleton loader
+              CardSkeletonGrid(
+                itemCount: 12,
+                setName: _currentSetName,
               ),
             ] else ...[
               SliverPadding(

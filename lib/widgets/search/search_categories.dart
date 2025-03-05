@@ -294,40 +294,12 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
         onTap: () {
           HapticFeedback.lightImpact();
           
-          // Add loading state indicator with better overflow handling
-          final scaffoldMessenger = ScaffoldMessenger.of(context);
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Row(
-                mainAxisSize: MainAxisSize.min, // Prevent overflow by setting minimum size
-                children: [
-                  SizedBox(
-                    width: 20, 
-                    height: 20, 
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Flexible( // Use Flexible to allow text to wrap/shrink
-                    child: Text(
-                      'Searching for ${item['name']} cards...',
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ),
-                ],
-              ),
-              duration: Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-              margin: EdgeInsets.fromLTRB(16, 0, 16, 16),
-            ),
-          );
+          // Don't show snackbar anymore, our skeleton UI is better feedback
+          // Instead, immediately call the search function
+          widget.onQuickSearch(item);
           
           // Add debug log
-          print('Set card tapped: ${item['name']} with query: ${item['query']}');
-          widget.onQuickSearch(item);
+          debugPrint('Set card tapped: ${item['name']} with query: ${item['query']}');
         },
         child: SizedBox(
           width: 100,
