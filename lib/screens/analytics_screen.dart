@@ -26,13 +26,14 @@ import '../services/chart_service.dart';
 import '../services/ebay_api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math' as math;
-import '../widgets/empty_collection_view.dart';  // Fix the quote and semicolon
+import '../widgets/empty_collection_view.dart';
 import '../widgets/portfolio_value_chart.dart';
 import '../widgets/styled_toast.dart';
-import 'package:rxdart/rxdart.dart';  // Add this import at the top
+import 'package:rxdart/rxdart.dart';
 import '../widgets/market_scan_button.dart';
 import '../widgets/acquisition_timeline_chart.dart';
 import '../widgets/rarity_distribution_chart.dart';
+import '../widgets/price_update_button.dart';  // Add this import
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -809,66 +810,109 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 }
 
   Widget _buildTopMovers(List<TcgCard> cards) {
-  final currencyProvider = context.watch<CurrencyProvider>();
-  final localizations = AppLocalizations.of(context);
+    final currencyProvider = context.watch<CurrencyProvider>();
+    final localizations = AppLocalizations.of(context);
 
-  // Debug log cards with recent price changes
-  print('Analyzing ${cards.length} cards for recent price changes');
-  
-  // Create a list for cards with direct price changes (from the update process)
-  final cardsWithDirectChanges = <(TcgCard, double)>[];
-  
-  // Find cards with direct price changes from the latest update
-  for (final card in cards) {
-    if (card.lastPriceChange != null && card.previousPrice != null && card.price != null) {
-      final change = ((card.price! - card.previousPrice!) / card.previousPrice!) * 100;
-      if (change.abs() > 0.01) {
-        cardsWithDirectChanges.add((card, change));
-        print('Direct change detected for ${card.name}: ${card.previousPrice} -> ${card.price} (${change.toStringAsFixed(2)}%)');
+    // Debug log cards with recent price changes
+    print('Analyzing ${cards.length} cards for recent price changes');
+    
+    // Create a list for cards with direct price changes (from the update process)
+    final cardsWithDirectChanges = <(TcgCard, double)>[];
+    
+    // Find cards with direct price changes from the latest update
+    for (final card in cards) {
+      if (card.lastPriceChange != null && card.previousPrice != null && card.price != null) {
+        final change = ((card.price! - card.previousPrice!) / card.previousPrice!) * 100;
+        if (change.abs() > 0.01) {
+          cardsWithDirectChanges.add((card, change));
+          print('Direct change detected for ${card.name}: ${card.previousPrice} -> ${card.price} (${change.toStringAsFixed(2)}%)');
+        }
       }
     }
-  }
-  
-  // Also look for changes in price history as before
-  final cardsWithHistoryChanges = cards
-      .where((card) => card.price != null && card.priceHistory.length >= 2)
-      .map((card) {
-        // Try to get the most recent change first
-        final change = card.getPriceChange(const Duration(days: 1)) ??
-                      card.getPriceChange(const Duration(days: 7)) ??
-                      card.getPriceChange(const Duration(days: 30));
-        
-        if (change == null || change.abs() < 0.01) return null;
-        print('History change detected for ${card.name}: ${change.toStringAsFixed(2)}%');
-        return (card, change);
-      })
-      .whereType<(TcgCard, double)>()
-      .toList();
-  
-  // Combine both lists and remove duplicates (prefer direct changes)
-  final seenCardIds = <String>{};
-  final allChanges = <(TcgCard, double)>[];
-  
-  // Add direct changes first (they're more recent)
-  for (final item in cardsWithDirectChanges) {
-    allChanges.add(item);
-    seenCardIds.add(item.$1.id);
-  }
-  
-  // Then add history changes if not already included
-  for (final item in cardsWithHistoryChanges) {
-    if (!seenCardIds.contains(item.$1.id)) {
+    
+    // Also look for changes in price history as before
+    final cardsWithHistoryChanges = cards
+        .where((card) => card.price != null && card.priceHistory.length >= 2)
+        .map((card) {
+          // Try to get the most recent change first
+          final change = card.getPriceChange(const Duration(days: 1)) ??
+                        card.getPriceChange(const Duration(days: 7)) ??
+                        card.getPriceChange(const Duration(days: 30));
+          
+          if (change == null || change.abs() < 0.01) return null;
+          print('History change detected for ${card.name}: ${change.toStringAsFixed(2)}%');
+          return (card, change);
+        })
+        .whereType<(TcgCard, double)>()
+        .toList();
+    
+    // Combine both lists and remove duplicates (prefer direct changes)
+    final seenCardIds = <String>{};
+    final allChanges = <(TcgCard, double)>[];
+    
+    // Add direct changes first (they're more recent)
+    for (final item in cardsWithDirectChanges) {
       allChanges.add(item);
       seenCardIds.add(item.$1.id);
     }
-  }
+    
+    // Then add history changes if not already included
+    for (final item in cardsWithHistoryChanges) {
+      if (!seenCardIds.contains(item.$1.id)) {
+        allChanges.add(item);
+        seenCardIds.add(item.$1.id);
+      }
+    }
 
-  // Sort by absolute change percentage (largest changes first)
-  allChanges.sort((a, b) => b.$2.abs().compareTo(a.$2.abs()));
-  
-  print('Found ${allChanges.length} cards with price changes');
+    // Sort by absolute change percentage (largest changes first)
+    allChanges.sort((a, b) => b.$2.abs().compareTo(a.$2.abs()));
+    
+    print('Found ${allChanges.length} cards with price changes');
 
-  if (allChanges.isEmpty) {
+    if (allChanges.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                localizations.translate('topMovers'),
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.show_chart,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No recent price changes',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Check back after the next price update',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final topMovers = allChanges.take(5).toList();
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -880,168 +924,135 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.show_chart,
-                    size: 48,
-                    color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No recent price changes',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Check back after the next price update',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ...topMovers.map((tuple) {
+              final card = tuple.$1;
+              final change = tuple.$2 ?? 0;
+              final period = card.getPriceChangePeriod();
+              
+              return InkWell(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CardDetailsScreen(
+                      card: card,
+                      heroContext: 'mover_${card.id}', // Updated hero tag prefix
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  final topMovers = allChanges.take(5).toList();
-
-  return Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            localizations.translate('topMovers'),
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          ...topMovers.map((tuple) {
-            final card = tuple.$1;
-            final change = tuple.$2 ?? 0;
-            final period = card.getPriceChangePeriod();
-            
-            return InkWell(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CardDetailsScreen(
-                    card: card,
-                    heroContext: 'mover_${card.id}', // Updated hero tag prefix
                   ),
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 28,
-                      child: Hero(
-                        tag: 'mover_${card.id}', // Updated hero tag prefix
-                        child: _buildCardImage(card.imageUrl),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        child: Hero(
+                          tag: 'mover_${card.id}', // Updated hero tag prefix
+                          child: _buildCardImage(card.imageUrl),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              card.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            Text(
+                              currencyProvider.formatValue(card.price ?? 0),
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
+                          _buildChangeIndicator(change),
+                          const SizedBox(height: 4),
                           Text(
-                            card.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                          Text(
-                            currencyProvider.formatValue(card.price ?? 0),
-                            style: TextStyle(
+                            period.toString(),  // Convert Map to String
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        _buildChangeIndicator(change),
-                        const SizedBox(height: 4),
-                        Text(
-                          period.toString(),  // Convert Map to String
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          }),
-        ],
+              );
+            }),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    ); // Remove the extra parenthesis that was here
+  }
 
   Future<void> _refreshPrices() async {
-  if (!mounted || _isRefreshing) return;
-  setState(() => _isRefreshing = true);
-  
-  try {
-    final storage = Provider.of<StorageService>(context, listen: false);
-    await storage.initializeBackgroundService();
-    final service = storage.backgroundService;
-    if (service == null) throw Exception('Failed to initialize background service');
+    if (!mounted || _isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      await storage.initializeBackgroundService();
+      final service = storage.backgroundService;
+      if (service == null) throw Exception('Failed to initialize background service');
 
-    // Cancel any existing subscriptions
-    _progressSubscription?.cancel();
-    _completeSubscription?.cancel();
+      // Cancel any existing subscriptions
+      _progressSubscription?.cancel();
+      _completeSubscription?.cancel();
 
-    // Setup progress subscription
-    _progressSubscription = storage.priceUpdateProgress
-        .distinct()
-        .listen((progress) {
-          final (current, total) = progress;
-          if (mounted) {
-            DialogService.instance.showPriceUpdateDialog(current, total);
-          }
-        });
+      // Setup progress subscription
+      _progressSubscription = storage.priceUpdateProgress
+          .distinct()
+          .listen((progress) {
+            final (current, total) = progress;
+            if (mounted) {
+              DialogService.instance.showPriceUpdateDialog(current, total);
+            }
+          });
 
-    // Setup completion subscription
-    _completeSubscription = storage.priceUpdateComplete
-        .listen((_) {
-          // Don't automatically hide dialog, let user dismiss it
-          if (mounted) {
-            setState(() {});
-            _updateLastRefreshTime();
-          }
-        });
+      // Setup completion subscription
+      _completeSubscription = storage.priceUpdateComplete
+          .listen((_) {
+            // Don't automatically hide dialog, let user dismiss it
+            if (mounted) {
+              setState(() {});
+              _updateLastRefreshTime();
+              
+              // After prices are updated, also refresh market data
+              final cards = storage.getCards().then((cards) {
+                if (cards.isNotEmpty && mounted) {
+                  // Only load market data if we're not already loading it
+                  if (!_isLoadingMarketData) {
+                    _loadMarketData(cards);
+                  }
+                }
+              });
+            }
+          });
 
-    // Start the refresh
-    await service.refreshPrices();
+      // Start the refresh
+      await service.refreshPrices();
 
-  } catch (e) {
-    print('Error refreshing prices: $e');
-    DialogService.instance.hideDialog();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating prices: $e')),
-      );
+    } catch (e) {
+      print('Error refreshing prices: $e');
+      DialogService.instance.hideDialog();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating prices: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
     }
-  } finally {
-    if (mounted) setState(() => _isRefreshing = false);
   }
-}
 
   Widget _buildEmptyState() {
     // Return the EmptyCollectionView with shorter, single-line message
@@ -1717,7 +1728,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: isSignedIn ? AppBar(
-        toolbarHeight: 44,
+        toolbarHeight: 52, // Increased height to fit the button
         automaticallyImplyLeading: false,
         leading: IconButton(
           icon: const Icon(Icons.menu),
@@ -1726,27 +1737,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         actions: [
-          Tooltip(
-            message: _lastUpdateTime != null 
-              ? 'Last updated: ${_formatDateTime(_lastUpdateTime!)}\nTap to check for new prices'
-              : 'Tap to check for new prices',
-            waitDuration: const Duration(milliseconds: 500),
-            showDuration: const Duration(seconds: 2),
-            preferBelow: false,
-            child: IconButton(
-              icon: _isRefreshing 
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh, size: 22),
+          Padding(
+            padding: const EdgeInsets.only(right: 16, top: 6, bottom: 6),
+            child: PriceUpdateButton(
+              isLoading: _isRefreshing,
+              lastUpdateTime: _lastUpdateTime,
               onPressed: _isRefreshing ? null : _refreshPrices,
-              padding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
             ),
           ),
-          const SizedBox(width: 8),
         ],
       ) : null,
       drawer: const AppDrawer(),

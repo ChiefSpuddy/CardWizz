@@ -96,6 +96,7 @@ class BackgroundPriceUpdateService {
       _storageService.notifyPriceUpdateProgress(0, cards.length);
       
       double totalValue = 0;
+      int updatedCount = 0;
       
       for (var i = 0; i < cards.length; i++) {
         if (_cancelled) break;
@@ -110,6 +111,7 @@ class BackgroundPriceUpdateService {
           if (price != null && price != card.price) {
             await _storageService.updateCardPrice(card, price);
             print('✅ Updated price for ${card.name}: ${card.price} -> $price');
+            updatedCount++;
           } else {
             print('ℹ️ No price change for ${card.name}');
           }
@@ -141,7 +143,7 @@ class BackgroundPriceUpdateService {
         
         // Notify completion after a delay
         await Future.delayed(const Duration(seconds: 1));
-        _storageService.notifyPriceUpdateComplete(0);
+        _storageService.notifyPriceUpdateComplete(updatedCount);
       }
       
     } catch (e) {

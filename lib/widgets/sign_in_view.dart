@@ -526,28 +526,17 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
           ),
           child: Opacity(
             opacity: progress,
-            child: AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                final scale = 1.0 + (_pulseController.value * 0.01);
-                
-                return Transform.scale(
-                  scale: scale,
-                  child: AnimatedGradientButton(
-                    text: 'Sign in with Apple',
-                    icon: Icons.apple,
-                    isLoading: _isSigningIn,
-                    gradientColors: [
-                      colorScheme.primary,
-                      colorScheme.secondary,
-                      colorScheme.tertiary,
-                    ],
-                    onPressed: () => _handleSignIn(context),
-                    height: 55,
-                    borderRadius: 16,
-                  ),
-                );
-              },
+            child: AnimatedGradientButton(
+              text: 'Sign in with Apple',
+              icon: Icons.apple,
+              isLoading: _isSigningIn,
+              gradientColors: [
+                colorScheme.primary,
+                colorScheme.secondary,
+              ],
+              onPressed: () => _handleSignIn(context),
+              height: 55,
+              borderRadius: 16,
             ),
           ),
         );
