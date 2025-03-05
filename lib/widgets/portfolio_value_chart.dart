@@ -481,12 +481,29 @@ class FullWidthPortfolioChart extends StatelessWidget {
       builder: (context, constraints) {
         return SizedBox(
           width: constraints.maxWidth,
-          child: Padding(
-            padding: EdgeInsets.zero, // Remove padding for maximum width
-            child: PortfolioValueChart(
-              useFullWidth: true, 
-              chartPadding: 16,
-            ),
+          child: PortfolioValueChart(
+            useFullWidth: true, 
+            chartPadding: 16,
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Similarly, in the FullWidthAnalyticsChart class:
+class FullWidthAnalyticsChart extends StatelessWidget {
+  const FullWidthAnalyticsChart({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth,
+          child: PortfolioValueChart(
+            useFullWidth: true,
+            chartPadding: 16,
           ),
         );
       },

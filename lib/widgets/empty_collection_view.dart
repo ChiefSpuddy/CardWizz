@@ -235,165 +235,137 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
 
     return Stack(
       children: [
+        // First, place the main content
         Positioned.fill(
-          child: Opacity(
-            opacity: 0.07,
-            child: Lottie.asset(
-              'assets/animations/background.json',
-              fit: BoxFit.cover,
-              controller: _animationController,
-              options: LottieOptions(enableMergePaths: false),
-            ),
-          ),
-        ),
-        
-        if (_previewCards.isNotEmpty)
-          ..._buildOptimizedFloatingCards(),
-        
-        // Improved confetti overlay with continuous animation
-        Positioned.fill(
-          child: IgnorePointer(
-            child: Stack(
-              children: [
-                // Continuously running first confetti layer
-                AnimatedBuilder(
-                  animation: _confettiController,
-                  builder: (context, child) {
-                    return _buildConfettiOverlay(
-                      _confettiController.value,
-                      random: math.Random(42),
-                      opacity: 0.65,
-                    );
-                  },
-                ),
-                
-                // Continuously running second confetti layer with different seed
-                AnimatedBuilder(
-                  animation: _confettiController2,
-                  builder: (context, child) {
-                    return _buildConfettiOverlay(
-                      _confettiController2.value,
-                      random: math.Random(24),
-                      opacity: 0.65,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        
-        SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Adjust vertical spacing based on screen size
-                SizedBox(height: isSmallScreen ? 12 : 16),
-                
-                // Main icon - slightly smaller on small screens
-                Container(
-                  width: isSmallScreen ? 70 : 80,
-                  height: isSmallScreen ? 70 : 80,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        colorScheme.primary.withOpacity(0.7),
-                        colorScheme.secondary.withOpacity(0.7),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Adjust vertical spacing based on screen size
+                  SizedBox(height: isSmallScreen ? 12 : 16),
+                  
+                  // Main icon - slightly smaller on small screens
+                  Container(
+                    width: isSmallScreen ? 70 : 80,
+                    height: isSmallScreen ? 70 : 80,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          colorScheme.primary.withOpacity(0.7),
+                          colorScheme.secondary.withOpacity(0.7),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.primary.withOpacity(0.3),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
                       ],
                     ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.3),
-                        blurRadius: 20,
-                        spreadRadius: 2,
+                    child: Hero(
+                      tag: heroTag,
+                      child: Icon(
+                        widget.icon,
+                        size: isSmallScreen ? 36 : 40,
+                        color: Colors.white,
                       ),
-                    ],
-                  ),
-                  child: Hero(
-                    tag: heroTag,
-                    child: Icon(
-                      widget.icon,
-                      size: isSmallScreen ? 36 : 40,
-                      color: Colors.white,
                     ),
                   ),
-                ),
-                
-                SizedBox(height: isSmallScreen ? 12 : 16),
-                
-                // Title animation - unchanged
-                AnimatedBuilder(
-                  animation: _titleController,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _titleController.value,
-                      child: Transform.translate(
-                        offset: Offset(0, 20 * (1 - _titleController.value)),
-                        child: child,
+                  
+                  SizedBox(height: isSmallScreen ? 12 : 16),
+                  
+                  // Title animation - unchanged
+                  AnimatedBuilder(
+                    animation: _titleController,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _titleController.value,
+                        child: Transform.translate(
+                          offset: Offset(0, 20 * (1 - _titleController.value)),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Text(
+                      widget.title,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith( // Changed from headlineMedium
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.5,
                       ),
-                    );
-                  },
-                  child: Text(
-                    widget.title,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith( // Changed from headlineMedium
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                ),
-                
-                SizedBox(height: isSmallScreen ? 2 : 4),
-                
-                // Description animation - unchanged
-                AnimatedBuilder(
-                  animation: _descriptionController,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _descriptionController.value,
-                      child: Transform.translate(
-                        offset: Offset(0, 20 * (1 - _descriptionController.value)),
-                        child: child,
+                  
+                  SizedBox(height: isSmallScreen ? 2 : 4),
+                  
+                  // Description animation - unchanged
+                  AnimatedBuilder(
+                    animation: _descriptionController,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _descriptionController.value,
+                        child: Transform.translate(
+                          offset: Offset(0, 20 * (1 - _descriptionController.value)),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Text(
+                      widget.message,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith( // Changed from bodyLarge
+                        color: colorScheme.onSurface.withOpacity(0.7),
+                        height: 1.3, // Reduced line height
                       ),
-                    );
-                  },
-                  child: Text(
-                    widget.message,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith( // Changed from bodyLarge
-                      color: colorScheme.onSurface.withOpacity(0.7),
-                      height: 1.3, // Reduced line height
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                ),
-                
-                SizedBox(height: isSmallScreen ? 12 : 16),
-                
-                // Card preview - optimize for small screens
-                _buildCompactCardPreview(smallScreen: isSmallScreen),
-                
-                SizedBox(height: isSmallScreen ? 10 : 16),
-                
-                // Features list - optimize for small screens
-                _buildEnhancedFeaturesList(context, smallScreen: isSmallScreen),
-                
-                SizedBox(height: isSmallScreen ? 10 : 16),
-                
-                // Button - unchanged
-                _buildAnimatedButton(),
-                
-                // Bottom padding - smaller on small screens
-                SizedBox(height: isSmallScreen ? 16 : 24),
-              ],
+                  
+                  SizedBox(height: isSmallScreen ? 12 : 16),
+                  
+                  // Card preview - optimize for small screens
+                  _buildCompactCardPreview(smallScreen: isSmallScreen),
+                  
+                  SizedBox(height: isSmallScreen ? 10 : 16),
+                  
+                  // Features list - optimize for small screens
+                  _buildEnhancedFeaturesList(context, smallScreen: isSmallScreen),
+                  
+                  SizedBox(height: isSmallScreen ? 10 : 16),
+                  
+                  // Button - unchanged
+                  _buildAnimatedButton(),
+                  
+                  // Bottom padding - smaller on small screens
+                  SizedBox(height: isSmallScreen ? 16 : 24),
+                ],
+              ),
             ),
           ),
         ),
+        
+        // Then add the confetti overlays as direct children of the Stack
+        if (_confettiController.value > 0)
+          _buildConfettiOverlay(
+            _confettiController.value,
+            random: math.Random(42),
+            opacity: _useFirstController ? 0.65 : 0.3,
+          ),
+          
+        if (_confettiController2.value > 0)
+          _buildConfettiOverlay(
+            _confettiController2.value,
+            random: math.Random(123),
+            opacity: _useFirstController ? 0.3 : 0.65,
+          ),
+        
+        // Add any other overlays as direct children of the Stack
       ],
     );
   }
@@ -806,23 +778,25 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
     
     return Opacity(
       opacity: opacity,
-      child: CustomPaint(
-        painter: ConfettiPainter(
-          animation: animation,
-          colors: [
-            Theme.of(context).colorScheme.primary,
-            Theme.of(context).colorScheme.secondary,
-            Theme.of(context).colorScheme.tertiary,
-            Colors.pink,
-            Colors.purple,
-            Colors.yellow,
-            Colors.orange,
-          ],
-          random: random,
-          count: 25, // Reduced from 30 for better performance
-          screenWidth: screenSize.width,
+      child: SizedBox(
+        width: screenSize.width,
+        height: screenSize.height,
+        child: CustomPaint(
+          painter: ConfettiPainter(
+            animation: animation,
+            colors: [
+              Colors.red,
+              Colors.blue,
+              Colors.green,
+              Colors.yellow,
+              Colors.purple,
+              Colors.orange,
+            ],
+            random: random,
+            count: 100,
+            screenWidth: screenSize.width,
+          ),
         ),
-        size: Size(screenSize.width, screenSize.height),
       ),
     );
   }
