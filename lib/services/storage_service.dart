@@ -651,16 +651,47 @@ class StorageService {
         final existingCard = cards[index];
         
         if (newPrice != existingCard.price) {
+          // Store previous price before updating
+          final previousPrice = existingCard.price;
+          
+          // Create updated card with new price
           final updatedCard = existingCard.copyWith(
             price: newPrice,
             lastPriceUpdate: now,
-            priceHistory: [
-              ...existingCard.priceHistory,
-              PriceHistoryEntry(price: newPrice, timestamp: now),
-            ],
           );
           
-          cards[index] = updatedCard;
+          // Set the previous price tracking fields
+          final cardWithHistory = TcgCard(
+            id: updatedCard.id,
+            name: updatedCard.name,
+            imageUrl: updatedCard.imageUrl,
+            largeImageUrl: updatedCard.largeImageUrl,
+            number: updatedCard.number,
+            rarity: updatedCard.rarity,
+            set: updatedCard.set,
+            price: newPrice,
+            types: updatedCard.types,
+            subtypes: updatedCard.subtypes,
+            artist: updatedCard.artist,
+            cardmarket: updatedCard.cardmarket,
+            rawData: updatedCard.rawData,
+            dateAdded: updatedCard.dateAdded,
+            addedToCollection: updatedCard.addedToCollection,
+            priceHistory: updatedCard.priceHistory,
+            lastPriceUpdate: now,
+            isMtg: updatedCard.isMtg,
+          );
+          
+          // Set fields that can't be set through constructor
+          cardWithHistory.previousPrice = previousPrice;
+          cardWithHistory.lastPriceChange = now;
+          
+          // Add new price point to history
+          cardWithHistory.priceHistory.add(
+            PriceHistoryEntry(price: newPrice, timestamp: now)
+          );
+          
+          cards[index] = cardWithHistory;
           
           // Save updated cards and portfolio value
           final cardsKey = _getUserKey('cards');

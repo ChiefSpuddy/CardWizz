@@ -20,6 +20,8 @@ class TcgCard {
   final List<PriceHistoryEntry> priceHistory; // Added field
   final DateTime? lastPriceUpdate; // Added field
   final bool? isMtg; // Added field
+  double? previousPrice;
+  DateTime? lastPriceChange;
 
   // Added getters for backwards compatibility
   String? get setName => set.name;
@@ -293,9 +295,24 @@ class TcgCard {
     return change;
   }
 
-  // Add method to get price change period
-  Map<String, dynamic> getPriceChangePeriod() {
-    if (priceHistory.isEmpty || price == null) return {};
+  // Replace the duplicate getPriceChangePeriod methods with this single implementation
+  MapEntry<String, double>? getPriceChangePeriod() {
+    if (lastPriceChange != null && previousPrice != null && price != null) {
+      final now = DateTime.now();
+      final diff = now.difference(lastPriceChange!);
+      final percentChange = ((price! - previousPrice!) / previousPrice!) * 100;
+      
+      if (diff.inDays < 1) {
+        return MapEntry('24h', percentChange);
+      } else if (diff.inDays < 7) {
+        return MapEntry('${diff.inDays}d', percentChange);
+      } else {
+        return MapEntry('30d', percentChange);
+      }
+    }
+    
+    // Fall back to historical data if no direct change
+    if (priceHistory.isEmpty || price == null) return null;
     
     // Find earliest price entry
     final earliestEntry = priceHistory.reduce((a, b) => 
@@ -308,15 +325,22 @@ class TcgCard {
     
     // Calculate price change since then
     final startPrice = earliestEntry.price;
-    final change = price! - startPrice;
-    final percentChange = startPrice > 0 ? (change / startPrice) * 100 : 0;
+    // Explicitly cast the percentage to double
+    final percentChange = startPrice > 0 
+        ? (((price! - startPrice) / startPrice) * 100).toDouble() 
+        : 0.0;
     
-    return {
-      'days': daysAgo,
-      'change': change,
-      'percentChange': percentChange,
-      'startPrice': startPrice
-    };
+    // Map duration to appropriate label
+    String timeLabel;
+    if (daysAgo < 1) {
+      timeLabel = '24h';
+    } else if (daysAgo < 7) {
+      timeLabel = '${daysAgo}d';
+    } else {
+      timeLabel = '30d';
+    }
+    
+    return MapEntry(timeLabel, percentChange);
   }
 
   // Helper method to detect if this is an MTG card
