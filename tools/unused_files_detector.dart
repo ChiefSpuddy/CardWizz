@@ -58,14 +58,25 @@ Future<List<File>> _getAllDartFiles(String directory) async {
 
 Future<Set<String>> _extractAllImports(List<File> dartFiles) async {
   final imports = <String>{};
-  // Fix the RegExp pattern by using single quotes for the raw string
-  final importRegex = RegExp(r'import\s+[\'"]([^\'"]*)[\'"]\s*;');
+  // Simplify the RegExp by using two separate patterns for single and double quotes
+  final singleQuoteRegex = RegExp(r"import\s+'([^']*)'");
+  final doubleQuoteRegex = RegExp(r'import\s+"([^"]*)"');
   
   for (final file in dartFiles) {
     final content = await file.readAsString();
-    final matches = importRegex.allMatches(content);
     
-    for (final match in matches) {
+    // Process imports with single quotes
+    final singleQuoteMatches = singleQuoteRegex.allMatches(content);
+    for (final match in singleQuoteMatches) {
+      final importPath = match.group(1);
+      if (importPath != null && !importPath.startsWith('dart:') && !importPath.startsWith('package:flutter/')) {
+        imports.add(importPath);
+      }
+    }
+    
+    // Process imports with double quotes
+    final doubleQuoteMatches = doubleQuoteRegex.allMatches(content);
+    for (final match in doubleQuoteMatches) {
       final importPath = match.group(1);
       if (importPath != null && !importPath.startsWith('dart:') && !importPath.startsWith('package:flutter/')) {
         imports.add(importPath);
