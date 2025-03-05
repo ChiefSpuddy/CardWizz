@@ -8,7 +8,8 @@ class CardGridItem extends StatelessWidget {
   final Image? cached;
   final String? heroContext;
   final bool showPrice;
-  final bool showName;  // Add this parameter
+  final bool showName;
+  final bool highQuality; // Add this property for performance control
 
   const CardGridItem({
     Key? key,
@@ -17,7 +18,8 @@ class CardGridItem extends StatelessWidget {
     this.cached,
     this.heroContext,
     this.showPrice = true,
-    this.showName = false,  // Add default value
+    this.showName = false,
+    this.highQuality = true, // Default to high quality
   }) : super(key: key);
 
   @override
@@ -61,6 +63,14 @@ class CardGridItem extends StatelessWidget {
                           ),
                         ),
                       );
+                    },
+                    // Performance optimization parameters
+                    filterQuality: highQuality ? FilterQuality.medium : FilterQuality.low,
+                    cacheWidth: highQuality ? null : 150,
+                    frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                      return frame != null 
+                        ? child 
+                        : Container(color: Theme.of(context).colorScheme.surfaceVariant);
                     },
                   ),
                 ),

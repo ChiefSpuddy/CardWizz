@@ -765,14 +765,17 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                           // Price Trend Chart
                           if (cards.isNotEmpty) ...[
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(horizontal: 8), // Reduced padding from 16 to 8
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const SizedBox(height: 24),
                                   Provider<List<TcgCard>>.value(
                                     value: cards,
-                                    child: const PortfolioValueChart(),
+                                    child: const PortfolioValueChart(
+                                      useFullWidth: true, // Set to true to use full width
+                                      chartPadding: 16, // Add padding for better appearance
+                                    ),
                                   ),
                                 ],
                               ),

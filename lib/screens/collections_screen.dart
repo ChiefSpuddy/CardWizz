@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
+import 'dart:async'; // Add this import
 import '../widgets/empty_collection_view.dart';
 import '../l10n/app_localizations.dart';  
 import '../services/storage_service.dart';
@@ -55,6 +56,14 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
   final List<_CollectionParticle> _particles = [];
   final Random _random = Random();
 
+  // Add properties for optimization
+  bool _isScrolling = false;
+  Timer? _debounceTimer;
+  
+  // Reduce particle count for better performance
+  final int _maxParticles = 8; // Reduced from 20
+  bool _animateParticles = true;
+
   @override
   void initState() {
     super.initState();
@@ -88,24 +97,25 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
       _valueController.forward();
       _toggleController.forward();
       
-      // Initialize background particles
+      // Initialize background particles with fewer particles
       _initializeParticles();
     });
   }
 
   void _initializeParticles() {
-    // Create particles for subtle background animation
-    for (int i = 0; i < 20; i++) {
+    // Create particles with reduced count
+    _particles.clear();
+    for (int i = 0; i < _maxParticles; i++) {
       _particles.add(
         _CollectionParticle(
           position: Offset(
             _random.nextDouble() * MediaQuery.of(context).size.width,
             _random.nextDouble() * MediaQuery.of(context).size.height,
           ),
-          size: 2 + _random.nextDouble() * 4,
-          speed: 0.2 + _random.nextDouble() * 0.3,
+          size: 2 + _random.nextDouble() * 3, // Slightly smaller particles
+          speed: 0.1 + _random.nextDouble() * 0.2, // Slower speed
           angle: _random.nextDouble() * 2 * pi,
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
         ),
       );
     }
@@ -118,6 +128,7 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     _valueController.dispose();
     _toggleController.dispose();
     _pageController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -516,115 +527,140 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
       extendBody: true,
       
       // Body with stack for beautiful backgrounds and animations
-      body: AnimatedBuilder(
-        animation: _fadeInController,
-        builder: (context, child) {
-          return Stack(
-            children: [
-              // Subtle animated background
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _CollectionBackgroundPainter(
-                    particles: _particles,
-                    isDark: isDark,
-                    primaryColor: colorScheme.primary,
-                  ),
-                ),
-              ),
-              
-              // Background gradient overlay
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Theme.of(context).scaffoldBackgroundColor,
-                        Theme.of(context).scaffoldBackgroundColor.withOpacity(0.9),
-                        Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
-                      ],
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          // Only animate particles when not scrolling
+          if (notification is ScrollStartNotification && _animateParticles) {
+            setState(() => _animateParticles = false);
+          } else if (notification is ScrollEndNotification && !_animateParticles) {
+            // Add small delay before re-enabling animations
+            _debounceTimer?.cancel();
+            _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                setState(() => _animateParticles = true);
+              }
+            });
+          }
+          return false;
+        },
+        child: AnimatedBuilder(
+          animation: _fadeInController,
+          builder: (context, child) {
+            return Stack(
+              children: [
+                // FIX: Correctly nest the particles background
+                // The issue is here - Positioned must be direct child of Stack
+                Positioned.fill(
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _CollectionBackgroundPainter(
+                        particles: _particles,
+                        isDark: isDark,
+                        primaryColor: colorScheme.primary,
+                        animate: _animateParticles,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              
-              // Main content
-              if (!isSignedIn)
-                const SignInView()
-              else
-                SafeArea(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 8),
-                      
-                      // Collection stats and value tracker
-                      StreamBuilder<List<TcgCard>>(
-                        stream: Provider.of<StorageService>(context).watchCards(),
-                        builder: (context, snapshot) {
-                          final cards = snapshot.data ?? [];
-                          if (cards.isEmpty) return const SizedBox.shrink();
-                          
-                          return _buildValueTrackerCard(cards, currencyProvider);
-                        },
+                
+                // Background gradient overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Theme.of(context).scaffoldBackgroundColor,
+                          Theme.of(context).scaffoldBackgroundColor.withOpacity(0.9),
+                          Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
+                        ],
                       ),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // New animated toggle
-                      _buildAnimatedToggle(),
-                      
-                      const SizedBox(height: 16),
-                      
-                      // Collection content
-                      Expanded(
-                        child: StreamBuilder<List<TcgCard>>(
+                    ),
+                  ),
+                ),
+                
+                // Main content
+                if (!isSignedIn)
+                  const SignInView()
+                else
+                  SafeArea(
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        
+                        // Collection stats and value tracker
+                        StreamBuilder<List<TcgCard>>(
                           stream: Provider.of<StorageService>(context).watchCards(),
                           builder: (context, snapshot) {
                             final cards = snapshot.data ?? [];
+                            if (cards.isEmpty) return const SizedBox.shrink();
                             
-                            if (_pageViewReady) {
-                              if (cards.isEmpty) {
-                                return const EmptyCollectionView(
-                                  title: 'Start Your Collection',
-                                  message: 'Add cards to build your collection',
-                                  buttonText: 'Browse Cards',
-                                  icon: Icons.add_circle_outline,
-                                );
-                              }
-                              
-                              return AnimatedOpacity(
-                                duration: const Duration(milliseconds: 500),
-                                opacity: _fadeInController.value,
-                                child: PageView(
-                                  controller: _pageController,
-                                  onPageChanged: _onPageChanged,
-                                  physics: const ClampingScrollPhysics(),
-                                  children: [
-                                    // Pass callbacks to both child widgets
-                                    CollectionGrid(
-                                      key: const PageStorageKey('main_collection'),
-                                      onMultiselectChange: setMultiselectActive,
-                                    ),
-                                    CustomCollectionsGrid(
-                                      key: const PageStorageKey('custom_collections'),
-                                      onMultiselectChange: setMultiselectActive,
-                                    ),
-                                  ],
-                                ),
-                              );
-                            } else {
-                              return const Center(child: CircularProgressIndicator());
-                            }
+                            return _buildValueTrackerCard(cards, currencyProvider);
                           },
                         ),
-                      ),
-                    ],
+                        
+                        const SizedBox(height: 16),
+                        
+                        // New animated toggle
+                        _buildAnimatedToggle(),
+                        
+                        const SizedBox(height: 16),
+                        
+                        // Collection content
+                        Expanded(
+                          child: FutureBuilder<List<TcgCard>>(
+                            future: Provider.of<StorageService>(context).getCards(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                              
+                              final cards = snapshot.data ?? [];
+                              
+                              if (_pageViewReady) {
+                                if (cards.isEmpty) {
+                                  return const EmptyCollectionView(
+                                    title: 'Start Your Collection',
+                                    message: 'Add cards to build your collection',
+                                    buttonText: 'Browse Cards',
+                                    icon: Icons.add_circle_outline,
+                                  );
+                                }
+                                
+                                return AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 500),
+                                  opacity: _fadeInController.value,
+                                  child: PageView(
+                                    controller: _pageController,
+                                    onPageChanged: _onPageChanged,
+                                    physics: const ClampingScrollPhysics(),
+                                    children: [
+                                      // Pass callbacks to both child widgets
+                                      CollectionGrid(
+                                        key: const PageStorageKey('main_collection'),
+                                        onMultiselectChange: setMultiselectActive,
+                                      ),
+                                      CustomCollectionsGrid(
+                                        key: const PageStorageKey('custom_collections'),
+                                        onMultiselectChange: setMultiselectActive,
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              } else {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
       
       // Only show FAB when not in multiselect mode
@@ -692,36 +728,64 @@ class _CollectionBackgroundPainter extends CustomPainter {
   final List<_CollectionParticle> particles;
   final bool isDark;
   final Color primaryColor;
+  final bool animate;
 
   _CollectionBackgroundPainter({
     required this.particles,
     required this.isDark,
     required this.primaryColor,
+    this.animate = true,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Update particle positions
+    // Only update positions when animate is true
+    if (animate) {
+      for (final particle in particles) {
+        // Calculate new position
+        double newX = (particle.position.dx + cos(particle.angle) * particle.speed);
+        double newY = (particle.position.dy + sin(particle.angle) * particle.speed);
+        
+        // Guard against NaN values
+        if (newX.isNaN) newX = 0;
+        if (newY.isNaN) newY = 0;
+        
+        // Ensure position is within bounds
+        newX = newX.isFinite ? newX % size.width : 0;
+        newY = newY.isFinite ? newY % size.height : 0;
+        
+        particle.position = Offset(newX, newY);
+      }
+    }
+    
+    // Draw particles with simplified rendering
+    final paint = Paint();
+    
     for (final particle in particles) {
-      particle.position = Offset(
-        (particle.position.dx + cos(particle.angle) * particle.speed) % size.width,
-        (particle.position.dy + sin(particle.angle) * particle.speed) % size.height,
-      );
+      // Skip invalid positions
+      if (particle.position.dx.isNaN || particle.position.dy.isNaN) continue;
       
-      // Draw particles with glow effect
-      final paint = Paint()..color = particle.color;
+      // Draw particles with less glow
+      paint.color = particle.color;
       canvas.drawCircle(particle.position, particle.size, paint);
       
-      // Add subtle glow
-      final glowPaint = Paint()
-        ..color = particle.color.withOpacity(0.3)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
-      canvas.drawCircle(particle.position, particle.size * 1.5, glowPaint);
+      // Only add glow to visible particles for better performance
+      if (particle.position.dx > 0 && 
+          particle.position.dx < size.width &&
+          particle.position.dy > 0 && 
+          particle.position.dy < size.height) {
+        final glowPaint = Paint()
+          ..color = particle.color.withOpacity(0.2)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+        canvas.drawCircle(particle.position, particle.size * 1.2, glowPaint);
+      }
     }
   }
 
   @override
-  bool shouldRepaint(_CollectionBackgroundPainter oldDelegate) => true;
+  bool shouldRepaint(_CollectionBackgroundPainter oldDelegate) {
+    return animate && oldDelegate.animate;
+  }
 }
 
 // Custom tween for string animation

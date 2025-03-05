@@ -121,7 +121,7 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
           height: 250,
           child: Padding(
             padding: widget.useFullWidth 
-                ? EdgeInsets.only(bottom: widget.chartPadding)
+                ? EdgeInsets.zero // Remove all padding when using full width
                 : const EdgeInsets.symmetric(horizontal: 24),
             child: LineChart(
               LineChartData(
@@ -482,7 +482,7 @@ class FullWidthPortfolioChart extends StatelessWidget {
         return SizedBox(
           width: constraints.maxWidth,
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: EdgeInsets.zero, // Remove padding for maximum width
             child: PortfolioValueChart(
               useFullWidth: true, 
               chartPadding: 16,

@@ -1749,7 +1749,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 const SizedBox(height: 12),
                                 Provider<List<TcgCard>>.value(
                                   value: cards,
-                                  child: const PortfolioValueChart(),
+                                  child: const PortfolioValueChart(
+                                    useFullWidth: true, // Set to true to use full width
+                                    chartPadding: 16, // Add padding for better appearance
+                                  ),
                                 ),
                                 const SizedBox(height: 16),
                                 _buildMarketInsightsCard(cards), // Add this line

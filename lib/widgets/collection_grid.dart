@@ -31,8 +31,48 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
   final Set<String> _selectedCards = {};
   bool _isMultiSelectMode = false;
 
+  // Add scroll controller and scroll state tracking
+  late ScrollController _scrollController;
+  bool _isScrolling = false;
+  bool _lowQualityRendering = false;
+
   @override
   bool get wantKeepAlive => true;  // Keep the state alive
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_scrollListener);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollListener() {
+    // Use scroll velocity to determine if we're scrolling fast enough to use low-quality rendering
+    if (_scrollController.position.activity?.velocity != null &&
+        _scrollController.position.activity!.velocity.abs() > 1000 && 
+        !_lowQualityRendering) {
+      setState(() => _lowQualityRendering = true);
+    } else if (_scrollController.position.activity?.velocity != null &&
+        _scrollController.position.activity!.velocity.abs() < 200 && 
+        _lowQualityRendering) {
+      setState(() => _lowQualityRendering = false);
+    }
+
+    // Also track if scrolling at all
+    final isCurrentlyScrolling = _scrollController.position.isScrollingNotifier.value;
+    if (isCurrentlyScrolling != _isScrolling) {
+      setState(() {
+        _isScrolling = isCurrentlyScrolling;
+      });
+    }
+  }
 
   void _toggleCardSelection(String cardId) {
     setState(() {
@@ -475,31 +515,7 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
         }
 
         // Sort the cards based on selected option
-        final sortedCards = List<TcgCard>.from(cards);
-        switch (sortOption) {
-          case CollectionSortOption.nameAZ:
-            sortedCards.sort((a, b) => a.name.compareTo(b.name));
-            break;
-          case CollectionSortOption.nameZA:
-            sortedCards.sort((a, b) => b.name.compareTo(a.name));
-            break;
-          case CollectionSortOption.valueHighLow:
-            sortedCards.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
-            break;
-          case CollectionSortOption.valueLowHigh:
-            sortedCards.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
-            break;
-          case CollectionSortOption.newest:
-            sortedCards.sort((a, b) => (b.addedToCollection ?? DateTime.now())
-                .compareTo(a.addedToCollection ?? DateTime.now()));
-            break;
-          case CollectionSortOption.oldest:
-            sortedCards.sort((a, b) => (a.addedToCollection ?? DateTime.now())
-                .compareTo(b.addedToCollection ?? DateTime.now()));
-            break;
-          default:
-            break;
-        }
+        final sortedCards = _getSortedCards(cards, sortOption);
 
         if (sortedCards.isEmpty) {
           return const EmptyCollectionView(
@@ -512,6 +528,7 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
         return Stack(
           children: [
             GridView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(8),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
@@ -520,95 +537,104 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
                 mainAxisSpacing: 8,
               ),
               itemCount: sortedCards.length,  // Use sortedCards instead of cards
+              cacheExtent: 500, // Increase cache extent for smoother scrolling
               itemBuilder: (context, index) {
+                // Optimize by only creating widgets for visible items during scrolling
+                if (_isScrolling && index > 30) {
+                  return const SizedBox();
+                }
+
                 final card = sortedCards[index];  // Use sortedCards instead of cards
                 final isSelected = _selectedCards.contains(card.id);
                 
-                return GestureDetector(
-                  onTap: () {
-                    if (_isMultiSelectMode) {
-                      _toggleCardSelection(card.id);
-                    } else {
-                      _showCardDetails(context, card);
-                    }
-                  },
-                  onLongPress: () {
-                    setState(() {
-                      _isMultiSelectMode = true;
-                      _toggleCardSelection(card.id);
-                      
-                      // Critical fix: Notify parent about entering multiselect mode
-                      if (widget.onMultiselectChange != null) {
-                        widget.onMultiselectChange!(true);
+                return RepaintBoundary(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_isMultiSelectMode) {
+                        _toggleCardSelection(card.id);
+                      } else {
+                        _showCardDetails(context, card);
                       }
-                    });
-                  },
-                  child: Container( // Wrap in Container to ensure gestures work
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      border: isSelected ? Border.all(
-                        color: Theme.of(context).colorScheme.primary,
-                        width: 2,
-                      ) : null,
-                    ),
-                    child: Stack(
-                      children: [
-                        Opacity(
-                          opacity: isSelected ? 0.8 : 1.0,
-                          child: CardGridItem(
-                            key: ValueKey(card.id),
-                            card: card,
-                            heroContext: 'collection',
-                            showPrice: true, // Changed to true
-                            showName: true,  // Added showName
-                            onTap: () => _showCardDetails(context, card), // Add direct handler here
+                    },
+                    onLongPress: () {
+                      setState(() {
+                        _isMultiSelectMode = true;
+                        _toggleCardSelection(card.id);
+                        
+                        // Critical fix: Notify parent about entering multiselect mode
+                        if (widget.onMultiselectChange != null) {
+                          widget.onMultiselectChange!(true);
+                        }
+                      });
+                    },
+                    child: Container( // Wrap in Container to ensure gestures work
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: isSelected ? Border.all(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        ) : null,
+                      ),
+                      child: Stack(
+                        children: [
+                          Opacity(
+                            opacity: isSelected ? 0.8 : 1.0,
+                            child: CardGridItem(
+                              key: ValueKey(card.id),
+                              card: card,
+                              heroContext: 'collection',
+                              showPrice: true, // Changed to true
+                              showName: true,  // Added showName
+                              highQuality: !_lowQualityRendering, // Use lower quality during scrolling
+                              onTap: () => _showCardDetails(context, card), // Add direct handler here
+                            ),
                           ),
-                        ),
-                        if (_isMultiSelectMode)
-                          Positioned.fill(
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              decoration: BoxDecoration(
-                                color: isSelected 
-                                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                                  : Colors.transparent,
-                              ),
-                              child: Center(
-                                child: AnimatedScale(
-                                  scale: _isMultiSelectMode ? 1.0 : 0.0,
-                                  duration: const Duration(milliseconds: 200),
-                                  child: Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: isSelected 
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Theme.of(context).colorScheme.surface.withOpacity(0.8),
-                                      border: Border.all(
-                                        color: isSelected
-                                          ? Colors.transparent
-                                          : Theme.of(context).colorScheme.primary,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: AnimatedScale(
-                                      scale: isSelected ? 1.0 : 0.8,
-                                      duration: const Duration(milliseconds: 200),
-                                      child: Icon(
-                                        isSelected ? Icons.check : Icons.add,
+                          if (_isMultiSelectMode)
+                            Positioned.fill(
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                decoration: BoxDecoration(
+                                  color: isSelected 
+                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                                    : Colors.transparent,
+                                ),
+                                child: Center(
+                                  child: AnimatedScale(
+                                    scale: _isMultiSelectMode ? 1.0 : 0.0,
+                                    duration: const Duration(milliseconds: 200),
+                                    child: Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
                                         color: isSelected 
-                                          ? Colors.white
-                                          : Theme.of(context).colorScheme.primary,
-                                        size: 24,
+                                          ? Theme.of(context).colorScheme.primary
+                                          : Theme.of(context).colorScheme.surface.withOpacity(0.8),
+                                        border: Border.all(
+                                          color: isSelected
+                                            ? Colors.transparent
+                                            : Theme.of(context).colorScheme.primary,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: AnimatedScale(
+                                        scale: isSelected ? 1.0 : 0.8,
+                                        duration: const Duration(milliseconds: 200),
+                                        child: Icon(
+                                          isSelected ? Icons.check : Icons.add,
+                                          color: isSelected 
+                                            ? Colors.white
+                                            : Theme.of(context).colorScheme.primary,
+                                          size: 24,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -708,5 +734,52 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
         );
       },
     );
+  }
+
+  // Cache sorting results
+  List<TcgCard>? _lastCards;
+  CollectionSortOption? _lastSortOption;
+  List<TcgCard>? _sortedResult;
+
+  List<TcgCard> _getSortedCards(List<TcgCard> cards, CollectionSortOption sortOption) {
+    // Return cached result if inputs haven't changed
+    if (_lastCards == cards && _lastSortOption == sortOption && _sortedResult != null) {
+      return _sortedResult!;
+    }
+
+    // Otherwise sort and cache
+    final sortedCards = List<TcgCard>.from(cards);
+
+    switch (sortOption) {
+      case CollectionSortOption.nameAZ:
+        sortedCards.sort((a, b) => a.name.compareTo(b.name));
+        break;
+      case CollectionSortOption.nameZA:
+        sortedCards.sort((a, b) => b.name.compareTo(a.name));
+        break;
+      case CollectionSortOption.valueHighLow:
+        sortedCards.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
+        break;
+      case CollectionSortOption.valueLowHigh:
+        sortedCards.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
+        break;
+      case CollectionSortOption.newest:
+        sortedCards.sort((a, b) => (b.addedToCollection ?? DateTime.now())
+            .compareTo(a.addedToCollection ?? DateTime.now()));
+        break;
+      case CollectionSortOption.oldest:
+        sortedCards.sort((a, b) => (a.addedToCollection ?? DateTime.now())
+            .compareTo(b.addedToCollection ?? DateTime.now()));
+        break;
+      default:
+        break;
+    }
+
+    // Update cache
+    _lastCards = cards;
+    _lastSortOption = sortOption;
+    _sortedResult = sortedCards;
+
+    return sortedCards;
   }
 }
