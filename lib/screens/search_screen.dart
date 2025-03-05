@@ -1208,28 +1208,64 @@ class _SearchScreenState extends State<SearchScreen> {
   // Add this method to handle adding cards from search results
   Future<void> _onCardAddToCollection(TcgCard card) async {
     try {
+      // Don't reset search state or navigate away
       final storageService = Provider.of<StorageService>(context, listen: false);
-      await storageService.addCard(card);
+      
+      // IMPORTANT: Set a flag to prevent other actions while adding
+      setState(() {
+        _isLoading = true; // Temporarily show loading to prevent duplicate taps
+      });
+      
+      await storageService.saveCard(card);
       
       // Notify app state about the change
       Provider.of<AppState>(context, listen: false).notifyCardChange();
       
-      // Show success toast
-      _showStyledToast(
-        title: 'Added to Collection',
-        message: card.name,
-        icon: Icons.check_circle,
-        durationSeconds: 2,
-      );
+      // Dismiss any existing snackbars
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      
+      // Make sure we're no longer in loading state
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Show success toast positioned above bottom nav bar
+        showToast(
+          context: context,
+          title: 'Added to Collection',
+          subtitle: card.name,
+          icon: Icons.check_circle,
+          durationSeconds: 2,
+          compact: true,
+          bottomOffset: 56, // Position above bottom nav bar
+          backgroundColor: Colors.green,
+          // No onTap handler needed
+          onTap: null,
+        );
+      }
     } catch (e) {
       print('Error adding card to collection: $e');
       
-      // Show error toast
-      _showStyledToast(
-        title: 'Failed to Add',
-        message: e.toString(),
+      // Reset loading state on error too
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      
+      // Dismiss any existing snackbars
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      
+      // Show error toast positioned above bottom nav bar
+      showToast(
+        context: context,
+        title: 'Unable to Add Card',
+        subtitle: e.toString(),
         icon: Icons.error_outline,
         isError: true,
+        compact: true,
+        bottomOffset: 56, // Position above bottom nav bar
       );
     }
   }
@@ -1241,160 +1277,139 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Scaffold(
         appBar: SearchAppBar(
           searchController: _searchController,
-          searchMode: _searchMode,
+          onSearchChanged: _onSearchChanged,
+          onClearSearch: _clearSearch,
           currentSort: _currentSort,
           sortAscending: _sortAscending,
-          onSearchChanged: _onSearchChanged,
           onSortOptionsPressed: _showSortOptions,
-          onSearchModeChanged: (modes) {
-            // Fix: Extract the single mode from the set
+          onCameraPressed: _onCameraPressed,
+          hasResults: _searchResults != null || _setResults != null,
+          searchMode: _searchMode,
+          onSearchModeChanged: (Set<SearchMode> selectedMode) {
             setState(() {
-              _searchMode = modes.first;
-              _searchResults = null;
-              _setResults = null;
-              _searchController.clear();
-              _showCategories = true;
-              
-              // Always set price high-to-low for MTG mode
-              if (_searchMode == SearchMode.mtg) {
-                _currentSort = 'cardmarket.prices.averageSellPrice';
-                _sortAscending = false;
-              }
+              _searchMode = selectedMode.first;
+              _clearSearch();
             });
           },
-          onClearSearch: _clearSearch,
-          onCameraPressed: _onCameraPressed, // Add this line
         ),
-        body: _buildContent(),
-      ),
-    );
-  }
-
-  Widget _buildContent() {
-    // Add this debug print to help identify when content is rebuilt
-    print('Building search content. IsLoading: $_isLoading, HasResults: ${_searchResults != null}');
-    
-    if (_isLoading) {
-      return const LoadingState();
-    }
-
-    return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),  // Ensure scrolling is always active
-      controller: _scrollController,
-      slivers: [
-        // Add a simple back button when showing search results
-        if (_searchResults != null || _setResults != null)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 8.0, top: 8.0),
-              child: TextButton.icon(
-                onPressed: _handleBackToCategories,
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Back to Search'),
-                style: TextButton.styleFrom(
-                  alignment: Alignment.centerLeft,
-                ),
-              ),
-            ),
-          ),
-          
-        // ...existing code for search results and categories...
-        if (_searchResults == null && _setResults == null) ...[
-          SliverToBoxAdapter(
-            child: SearchCategoriesHeader(
-              showCategories: _showCategories,
-              onToggleCategories: () => setState(() => _showCategories = !_showCategories),
-            ),
-          ),
-          if (_showCategories)
-            SliverToBoxAdapter(
-              child: SearchCategories(
-                searchMode: _searchMode,
-                onQuickSearch: _performQuickSearch,
-              ),
-            ),
-          SliverToBoxAdapter(
-            child: RecentSearches(
-              searchHistory: _searchHistory,
-              onSearchSelected: (query, search) => _onRecentSearchSelected(query, search),
-              onClearHistory: () {
-                _searchHistory?.clearHistory();
-                setState(() {});
-              },
-              isLoading: _isHistoryLoading,
-            ),
-          ),
-        ] else ...[
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverToBoxAdapter(
-              child: Text(
-                // Fix the text to be accurate about what we're searching
-                _searchMode == SearchMode.mtg 
-                    ? (_searchResults == null || _searchResults!.isEmpty ? 'Found 0 cards' : 'Found $_totalCards cards')
-                    : (_searchMode == SearchMode.eng || _searchMode == SearchMode.jpn) && _setResults != null 
-                        ? 'Found ${_setResults?.length ?? 0} sets'
-                        : 'Found $_totalCards cards',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-          ),
-          
-          // Replace the MTG card grid with a standard CardSearchGrid
-          if (_searchResults != null && _searchMode == SearchMode.mtg)
-            CardSearchGrid(
-              cards: _searchResults!,
-              imageCache: _imageCache,
-              loadImage: _loadImage,
-              loadingRequestedUrls: _loadingRequestedUrls,
-              onCardTap: _onCardTap,
-              onAddToCollection: _onCardAddToCollection, // Add this parameter
-            )
-          else if (_searchMode == SearchMode.eng && _searchResults != null)
-            CardSearchGrid(
-              cards: _searchResults!,
-              imageCache: _imageCache,
-              loadImage: _loadImage,
-              loadingRequestedUrls: _loadingRequestedUrls,
-              onCardTap: _onCardTap,
-              onAddToCollection: _onCardAddToCollection, // Add this parameter
-            )
-          else if (_setResults != null)
-            SetSearchGrid(
-              sets: _setResults!,
-              onSetSelected: (name) {
-                _searchController.text = name;
-              },
-              onSetQuerySelected: (query) {
-                _performSearch(query);
-              },
-            ),
-          
-          // Handle pagination for all modes
-          if (_hasMorePages && !_isLoadingMore)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Center(
-                  child: ElevatedButton(
-                    onPressed: _loadNextPage,
-                    child: Text('Load more cards'),
+        body: CustomScrollView(
+          controller: _scrollController, // Move the controller here
+          slivers: [
+            // Add a simple back button when showing search results
+            if (_searchResults != null || _setResults != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8.0, top: 8.0),
+                  child: TextButton.icon(
+                    onPressed: _handleBackToCategories,
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Back to Search'),
+                    style: TextButton.styleFrom(
+                      alignment: Alignment.centerLeft,
+                    ),
                   ),
                 ),
               ),
-            ),
-          
-          if (_isLoadingMore)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Center(
-                  child: CircularProgressIndicator(),
+              
+            // ...existing code for search results and categories...
+            if (_searchResults == null && _setResults == null) ...[
+              SliverToBoxAdapter(
+                child: SearchCategoriesHeader(
+                  showCategories: _showCategories,
+                  onToggleCategories: () => setState(() => _showCategories = !_showCategories),
                 ),
               ),
-            ),
-        ],
-      ],
+              if (_showCategories)
+                SliverToBoxAdapter(
+                  child: SearchCategories(
+                    searchMode: _searchMode,
+                    onQuickSearch: _performQuickSearch,
+                  ),
+                ),
+              SliverToBoxAdapter(
+                child: RecentSearches(
+                  searchHistory: _searchHistory,
+                  onSearchSelected: (query, search) => _onRecentSearchSelected(query, search),
+                  onClearHistory: () {
+                    _searchHistory?.clearHistory();
+                    setState(() {});
+                  },
+                  isLoading: _isHistoryLoading,
+                ),
+              ),
+            ] else ...[
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    // Fix the text to be accurate about what we're searching
+                    _searchMode == SearchMode.mtg 
+                        ? (_searchResults == null || _searchResults!.isEmpty ? 'Found 0 cards' : 'Found $_totalCards cards')
+                        : (_searchMode == SearchMode.eng || _searchMode == SearchMode.jpn) && _setResults != null 
+                            ? 'Found ${_setResults?.length ?? 0} sets'
+                            : 'Found $_totalCards cards',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ),
+              
+              // Replace the MTG card grid with a standard CardSearchGrid
+              if (_searchResults != null && _searchMode == SearchMode.mtg)
+                CardSearchGrid(
+                  cards: _searchResults!,
+                  imageCache: _imageCache,
+                  loadImage: _loadImage,
+                  loadingRequestedUrls: _loadingRequestedUrls,
+                  onCardTap: _onCardTap,
+                  onAddToCollection: _onCardAddToCollection, // Add this parameter
+                )
+              else if (_searchMode == SearchMode.eng && _searchResults != null)
+                CardSearchGrid(
+                  cards: _searchResults!,
+                  imageCache: _imageCache,
+                  loadImage: _loadImage,
+                  loadingRequestedUrls: _loadingRequestedUrls,
+                  onCardTap: _onCardTap,
+                  onAddToCollection: _onCardAddToCollection, // Add this parameter
+                )
+              else if (_setResults != null)
+                SetSearchGrid(
+                  sets: _setResults!,
+                  onSetSelected: (name) {
+                    _searchController.text = name;
+                  },
+                  onSetQuerySelected: (query) {
+                    _performSearch(query);
+                  },
+                ),
+              
+              // Handle pagination for all modes
+              if (_hasMorePages && !_isLoadingMore)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Center(
+                      child: ElevatedButton(
+                        onPressed: _loadNextPage,
+                        child: Text('Load more cards'),
+                      ),
+                    ),
+                  ),
+                ),
+              
+              if (_isLoadingMore)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 

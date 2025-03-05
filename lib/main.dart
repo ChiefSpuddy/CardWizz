@@ -29,8 +29,24 @@ import 'constants/app_colors.dart';
 import 'screens/scanner_screen.dart';
 import 'services/ebay_api_service.dart';  // Add this import
 import 'services/ebay_search_service.dart';  // Add this import
+import 'utils/logger.dart';
 
 void main() async {
+  // Set up error handling
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    AppLogger.e('Flutter error: ${details.exception}', 
+        error: details.exception, 
+        stackTrace: details.stack);
+  };
+
+  // Configure Logger - update this line to control logging
+  AppLogger.logLevel = 2; // Show only INFO level and above (remove many debug messages)
+  // AppLogger.quietMode(); // Uncomment this to see only warnings and errors
+  // AppLogger.disableLogging(); // Uncomment this to disable all logs
+
+  AppLogger.i('Flutter app starting...'); // This will still show
+
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     

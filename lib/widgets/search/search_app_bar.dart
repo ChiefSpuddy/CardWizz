@@ -139,7 +139,6 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
       child: Row(
         children: [
           _buildGameOption(context, SearchMode.eng, 'Pokemon', 'assets/icons/pokemon_logo.png'),
-          _buildGameOption(context, SearchMode.jpn, 'Japanese', 'assets/icons/jp_flag.png'),
           _buildGameOption(context, SearchMode.mtg, 'Magic', 'assets/icons/mtg_logo.png'),
         ],
       ),

@@ -4,6 +4,7 @@ import '../models/tcg_card.dart';
 import '../utils/card_details_router.dart';
 import '../services/storage_service.dart';
 import '../providers/app_state.dart';
+import '../widgets/styled_toast.dart';
 
 // This class is now just a router to the appropriate screen type
 class CardDetailsScreen extends StatefulWidget {
@@ -34,20 +35,37 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
       final storageService = Provider.of<StorageService>(context, listen: false);
       await storageService.addCard(widget.card);
 
-      // IMPORTANT: Add this line to make sure the app state knows cards were added
+      // Notify app state about the change
       Provider.of<AppState>(context, listen: false).notifyCardChange();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${widget.card.name} added to collection!')),
+        // Use green toast with consistent styling
+        showToast(
+          context: context,
+          title: 'Added to Collection',
+          subtitle: widget.card.name,
+          icon: Icons.check_circle,
+          backgroundColor: Colors.green,
+          compact: true,
+          bottomOffset: 0, // For full-screen details, position at bottom
+          onTap: null, // Don't navigate anywhere on tap
         );
+        
         setState(() => _isAddingToCollection = false);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isAddingToCollection = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+        
+        // Use styled toast for errors too
+        showToast(
+          context: context,
+          title: 'Unable to Add Card',
+          subtitle: e.toString(),
+          icon: Icons.error_outline,
+          isError: true,
+          compact: true,
+          bottomOffset: 0, // For full-screen details, position at bottom
         );
       }
     }

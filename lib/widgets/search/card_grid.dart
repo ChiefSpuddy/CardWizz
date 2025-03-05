@@ -142,43 +142,37 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
     }
   }
 
-  // Add card to collection
+  // Fix the issue with adding cards and standardize toast notifications
   Future<void> _addToCollection(TcgCard card) async {
     if (_storage == null) return;
     
     try {
+      // Add the card to collection
       await _storage!.saveCard(card);
-      // Instead of using listeners, directly update the state
+      
+      // Update local state immediately to show card as added
       setState(() {
         _collectionCardIds.add(card.id);
       });
       
-      // Use the new helper function for a cleaner toast
-      if (mounted) {
-        showToast(
-          context: context,
-          title: 'Added to Collection',
-          subtitle: '${card.name}',
-          icon: Icons.check_circle,
-          backgroundColor: Theme.of(context).colorScheme.secondary,
-          compact: true,
-          onTap: () {
-            // Here you could navigate to the binder dialog if needed
-            Navigator.of(context).pop();
-          },
-        );
+      // Use the widget's onAddToCollection handler if provided 
+      if (widget.onAddToCollection != null) {
+        widget.onAddToCollection!(card);
       }
+      // Remove the internal toast display - let the parent component handle it
     } catch (e) {
       print('Error adding card to collection: $e');
-      if (mounted) {
-        // Show error using compact styled toast
+      
+      // Only show error toast if parent handler not provided
+      if (widget.onAddToCollection == null && mounted) {
         showToast(
           context: context,
           title: 'Failed to Add Card',
-          subtitle: 'Could not add to collection',
+          subtitle: e.toString(),
           icon: Icons.error_outline,
           isError: true,
           compact: true,
+          bottomOffset: 56,
         );
       }
     }

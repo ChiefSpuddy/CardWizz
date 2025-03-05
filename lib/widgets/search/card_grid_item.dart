@@ -126,23 +126,12 @@ class CardGridItem extends StatelessWidget {
             child: Material(
               color: isInCollection 
                   ? Colors.green.withOpacity(0.9)
-                  : AppColors.primary.withOpacity(0.85),
+                  : Theme.of(context).colorScheme.primary.withOpacity(0.85),
               borderRadius: BorderRadius.circular(12),
               elevation: 2,
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
-                onTap: () async {
-                  try {
-                    await onAddToCollection(card);
-                    
-                    // Make sure to update any necessary global state - you'd need to implement this
-                    if (context.mounted) {
-                      Provider.of<AppState>(context, listen: false).notifyCardChange();
-                    }
-                  } catch (e) {
-                    print('Error adding card to collection: $e');
-                  }
-                },
+                onTap: isInCollection ? null : () => onAddToCollection(card),
                 child: Container(
                   width: 24,
                   height: 24,

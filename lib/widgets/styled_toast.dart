@@ -138,7 +138,8 @@ class StyledToast extends StatelessWidget {
   }
 }
 
-/// A helper function to show a styled toast notification
+/// A completely new overlay-based toast implementation that doesn't use Modal Bottom Sheet
+/// This avoids all navigation issues by using an Overlay entry instead
 void showToast({
   required BuildContext context,
   required String title,
@@ -149,41 +150,52 @@ void showToast({
   bool compact = false,
   int durationSeconds = 2,
   VoidCallback? onTap,
+  double bottomOffset = 0,
 }) {
   // Use error color if isError is true
   final bgColor = isError
       ? Theme.of(context).colorScheme.error
       : backgroundColor ?? Theme.of(context).colorScheme.primary;
 
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isDismissible: true,
-    enableDrag: true,
-    builder: (context) => Padding(
-      padding: EdgeInsets.all(compact ? 12 : 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          StyledToast(
-            title: title,
-            subtitle: subtitle,
-            icon: icon,
-            backgroundColor: bgColor,
-            onTap: onTap ?? () => Navigator.of(context).pop(),
-            compact: compact,
-          ),
-        ],
-      ),
-    ),
+  // Create padding with adjustable bottom offset
+  final padding = EdgeInsets.only(
+    left: compact ? 12 : 16,
+    right: compact ? 12 : 16,
+    bottom: bottomOffset + (compact ? 12 : 16), 
+    top: compact ? 12 : 16,
   );
 
-  // Auto-dismiss after the duration
-  Future.delayed(Duration(seconds: durationSeconds), () {
-    if (context.mounted) {
-      Navigator.of(context).popUntil((route) {
-        return route is! ModalBottomSheetRoute;
-      });
+  final overlay = Overlay.of(context);
+  
+  // Create an overlay entry
+  final overlayEntry = OverlayEntry(
+    builder: (context) {
+      return Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: SafeArea(
+          child: Padding(
+            padding: padding,
+            child: StyledToast(
+              title: title,
+              subtitle: subtitle,
+              icon: icon,
+              backgroundColor: bgColor,
+              onTap: onTap ?? () {},
+              compact: compact,
+            ),
+          ),
+        ),
+      );
     }
+  );
+
+  // Insert the overlay and remove after duration
+  overlay.insert(overlayEntry);
+  
+  // Auto-dismiss after duration
+  Future.delayed(Duration(seconds: durationSeconds), () {
+    overlayEntry.remove();
   });
 }

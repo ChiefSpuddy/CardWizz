@@ -11,6 +11,7 @@ import 'package:rxdart/rxdart.dart'; // Add this import
 import 'package:path/path.dart' show join;
 import 'package:sqflite/sqflite.dart' show Database, openDatabase, getDatabasesPath;
 import '../services/background_price_update_service.dart';  // Add this import
+import '../utils/logger.dart';
 
 class StorageService {
   static const int _freeUserCardLimit = 25;  // Changed from 10 to 25
@@ -66,7 +67,7 @@ class StorageService {
 
   // Modify the setCurrentUser method
   void setCurrentUser(String? userId) {
-    print('Setting current user ID: $userId (was: $_currentUserId)');
+    AppLogger.d('Setting current user ID: $userId (was: $_currentUserId)', tag: 'Storage');
     _currentUserId = userId;
     
     if (userId == null) {
@@ -83,7 +84,7 @@ class StorageService {
     
     // Explicitly print card count to verify it worked
     final cardCount = _getCards().length;
-    print('Storage loaded $cardCount cards for user $userId');
+    AppLogger.d('Storage loaded $cardCount cards for user $userId', tag: 'Storage');
     
     // Force emit to stream
     _cardsController.add(_getCards());
@@ -107,10 +108,10 @@ class StorageService {
 
       await clearSessionState();
       
-      print('Permanently deleted all data for user: $userId');
+      AppLogger.d('Permanently deleted all data for user: $userId', tag: 'Storage');
       
     } catch (e) {
-      print('Error deleting user data: $e');
+      AppLogger.e('Error deleting user data', tag: 'Storage', error: e);
       rethrow;
     }
   }
@@ -129,7 +130,7 @@ class StorageService {
                        _prefs.getString('user_id');
       
       if (savedUserId != null) {
-        print('StorageService found saved user ID: $savedUserId');
+        AppLogger.d('StorageService found saved user ID: $savedUserId', tag: 'Storage');
         _currentUserId = savedUserId;
         _loadInitialData();
       }
@@ -145,7 +146,7 @@ class StorageService {
 
   void _loadInitialData() {
     if (_currentUserId == null) {
-      print('No user ID during load');
+      AppLogger.d('No user ID during load', tag: 'Storage');
       _cardsController.add([]);
       return;
     }
@@ -158,7 +159,7 @@ class StorageService {
         _cardsController.add(cards);
       }
     } catch (e) {
-      print('Error loading cards: $e');
+      AppLogger.e('Error loading cards', tag: 'Storage', error: e);
       _cardsController.add([]);
     }
   }
@@ -209,11 +210,11 @@ class StorageService {
               .map((item) => TcgCard.fromJson(item as Map<String, dynamic>))
               .toList();
         } catch (e) {
-          print('Error decoding cards JSON: $e');
+          AppLogger.e('Error decoding cards JSON', tag: 'Storage', error: e);
         }
       }
     } catch (e) {
-      print('Error loading cards: $e');
+      AppLogger.e('Error loading cards', tag: 'Storage', error: e);
     }
     
     return [];
@@ -226,7 +227,7 @@ class StorageService {
       final cards = _getCards(); // Use the internal method directly
       return cards;
     } catch (e) {
-      print('❌ Storage error: $e');
+      AppLogger.e('❌ Storage error', tag: 'Storage', error: e);
       return [];
     }
   }
@@ -287,10 +288,10 @@ class StorageService {
       // Update the stream and notify listeners
       _cardsController.add(currentCards);  // First notify card stream
       _notifyCardChange();  // Then notify change listeners
-      print('Card saved and notifications sent');
+      AppLogger.d('Card saved and notifications sent', tag: 'Storage');
 
     } catch (e) {
-      print('Error saving card: $e');
+      AppLogger.e('Error saving card', tag: 'Storage', error: e);
       rethrow;
     }
   }
@@ -299,8 +300,8 @@ class StorageService {
     final cards = await getCards();
     final currentCount = cards.length;
     
-    print('DEBUG: Adding card when count=$currentCount, limit=$_freeUserCardLimit, isPremium=${_purchaseService.isPremium}');
-    print('DEBUG: Current user ID: $_currentUserId');
+    AppLogger.d('DEBUG: Adding card when count=$currentCount, limit=$_freeUserCardLimit, isPremium=${_purchaseService.isPremium}', tag: 'Storage');
+    AppLogger.d('DEBUG: Current user ID: $_currentUserId', tag: 'Storage');
     
     if (!_purchaseService.isPremium && currentCount >= _freeUserCardLimit) {
       throw 'Free users can only add up to $_freeUserCardLimit cards. Upgrade to Premium for unlimited cards!';
@@ -311,9 +312,9 @@ class StorageService {
     // Verify the card was saved correctly
     final updatedCards = await getCards();
     if (updatedCards.any((c) => c.id == card.id)) {
-      print('DEBUG: Card ${card.name} successfully added to storage');
+      AppLogger.d('DEBUG: Card ${card.name} successfully added to storage', tag: 'Storage');
     } else {
-      print('DEBUG: ERROR - Card ${card.name} NOT found in storage after save!');
+      AppLogger.d('DEBUG: ERROR - Card ${card.name} NOT found in storage after save!', tag: 'Storage');
     }
     
     await refreshState();
@@ -322,7 +323,7 @@ class StorageService {
   bool canAddMoreCards() {
     if (_purchaseService.isPremium) return true;
     final currentCount = _getCards().length;
-    print('Can add more cards? Current count: $currentCount, Limit: $_freeUserCardLimit'); // Debug print
+    AppLogger.d('Can add more cards? Current count: $currentCount, Limit: $_freeUserCardLimit', tag: 'Storage'); // Debug print
     return currentCount < _freeUserCardLimit;
   }
 
@@ -374,7 +375,7 @@ class StorageService {
       await refreshState(); // Add this line
 
     } catch (e) {
-      print('Error removing card: $e');
+      AppLogger.e('Error removing card', tag: 'Storage', error: e);
       rethrow;
     }
   }
@@ -410,28 +411,28 @@ class StorageService {
         try {
           return TcgCard.fromJson(cardJson);
         } catch (e) {
-          print('Error parsing card: $e');
+          AppLogger.e('Error parsing card', tag: 'Storage', error: e);
           return null;
         }
       })
       .whereType<TcgCard>() // Filter out null values
       .toList();
     } catch (e) {
-      print('Error loading cards: $e');
+      AppLogger.e('Error loading cards', tag: 'Storage', error: e);
       return [];
     }
   }
 
   // Update the debug method to use proper stream handling
   Future<void> debugStorage() async {
-    print('Current user ID: $_currentUserId');
+    AppLogger.d('Current user ID: $_currentUserId', tag: 'Storage');
     final cardsKey = _getUserKey('cards');
     final cards = _prefs.getStringList(cardsKey) ?? [];
-    print('Total cards in storage: ${cards.length}');
+    AppLogger.d('Total cards in storage: ${cards.length}', tag: 'Storage');
     
     // Get current cards from storage instead of trying to access stream value
     final currentCards = _getCards();
-    print('Current cards in memory: ${currentCards.length}');
+    AppLogger.d('Current cards in memory: ${currentCards.length}', tag: 'Storage');
   }
 
   Future<void> setString(String key, String value) async {
@@ -600,7 +601,7 @@ class StorageService {
         }
       }
     } catch (e) {
-      print('Error adding price history point: $e');
+      AppLogger.e('Error adding price history point', tag: 'Storage', error: e);
     }
   }
 
@@ -678,7 +679,7 @@ class StorageService {
         }
       }
     } catch (e) {
-      print('Error updating card price: $e');
+      AppLogger.e('Error updating card price', tag: 'Storage', error: e);
       rethrow;
     }
   }
@@ -698,10 +699,10 @@ class StorageService {
     try {
       final now = DateTime.now();
       await _addPortfolioValuePoint(value, now);
-      print('Saved new portfolio value point: $value at ${now.toIso8601String()}');
+      AppLogger.d('Saved new portfolio value point: $value at ${now.toIso8601String()}', tag: 'Storage');
       _notifyCardChange();  // Make sure to notify listeners
     } catch (e) {
-      print('Error saving portfolio value: $e');
+      AppLogger.e('Error saving portfolio value', tag: 'Storage', error: e);
     }
   }
 
@@ -714,9 +715,9 @@ class StorageService {
       final apiService = TcgApiService();
       backgroundService = BackgroundPriceUpdateService(this);
       await backgroundService!.initialize();  // Initialize after creation
-      print('Background service initialized successfully');
+      AppLogger.d('Background service initialized successfully', tag: 'Storage');
     } catch (e) {
-      print('Error initializing background service: $e');
+      AppLogger.e('Error initializing background service', tag: 'Storage', error: e);
       backgroundService = null;  // Reset on error
     }
   }
@@ -749,7 +750,7 @@ class StorageService {
       await _prefs.setString(portfolioHistoryKey, jsonEncode(history));
       
     } catch (e) {
-      print('Error saving portfolio value point: $e');
+      AppLogger.e('Error saving portfolio value point', tag: 'Storage', error: e);
     }
   }
 
@@ -782,9 +783,9 @@ class StorageService {
       await _prefs.setString(portfolioHistoryKey, jsonEncode(history));
       _notifyCardChange();
       
-      print('Added portfolio value point: \$${value.toStringAsFixed(2)} at ${timestamp.toIso8601String()}');
+      AppLogger.d('Added portfolio value point: \$${value.toStringAsFixed(2)} at ${timestamp.toIso8601String()}', tag: 'Storage');
     } catch (e) {
-      print('Error saving portfolio value point: $e');
+      AppLogger.e('Error saving portfolio value point', tag: 'Storage', error: e);
     }
   }
 
@@ -851,9 +852,9 @@ class StorageService {
       await _prefs.setString(portfolioHistoryKey, jsonEncode(history));
       _notifyCardChange();
       
-      print('Added portfolio value point: \$${value.toStringAsFixed(2)} at ${timestamp.toIso8601String()}');
+      AppLogger.d('Added portfolio value point: \$${value.toStringAsFixed(2)} at ${timestamp.toIso8601String()}', tag: 'Storage');
     } catch (e) {
-      print('Error saving portfolio value point: $e');
+      AppLogger.e('Error saving portfolio value point', tag: 'Storage', error: e);
     }
   }
 
@@ -895,7 +896,7 @@ class StorageService {
     if (_lastSyncTime != null) {
       final timeSinceLastSync = now.difference(_lastSyncTime!);
       if (timeSinceLastSync < const Duration(seconds: 3)) {
-        print('🕒 Last sync was ${timeSinceLastSync.inSeconds}s ago, waiting...');
+        AppLogger.d('🕒 Last sync was ${timeSinceLastSync.inSeconds}s ago, waiting...', tag: 'Storage');
         return false;
       }
     }
@@ -908,7 +909,7 @@ class StorageService {
 
     try {
       if (_isSyncing && !force) {
-        print('🔄 Sync already in progress, skipping');
+        AppLogger.d('🔄 Sync already in progress, skipping', tag: 'Storage');
         return false;
       }
       
@@ -917,7 +918,7 @@ class StorageService {
       _syncProgressController.add(0.0);
 
       final cards = await getCards();
-      print('📤 Syncing ${cards.length} cards to cloud...');
+      AppLogger.d('📤 Syncing ${cards.length} cards to cloud...', tag: 'Storage');
       _syncProgressController.add(0.5);
       
       await _saveToCloud(cards);
@@ -925,13 +926,13 @@ class StorageService {
       
       _lastSyncTime = DateTime.now();
       final message = 'Last synced: just now (${cards.length} cards)';
-      print('✅ $message');
+      AppLogger.d('✅ $message', tag: 'Storage');
       _syncStatusController.add(message);
       
       _isSyncing = false;
       return true;
     } catch (e) {
-      print('❌ Sync error: $e');
+      AppLogger.e('❌ Sync error', tag: 'Storage', error: e);
       _syncStatusController.add('Sync failed: $e');
       _isSyncing = false;
       return false;
@@ -940,7 +941,7 @@ class StorageService {
 
   Future<void> _saveToCloud(List<TcgCard> cards) async {
     try {
-      print('📦 Preparing cloud save...');
+      AppLogger.d('📦 Preparing cloud save...', tag: 'Storage');
       final cardsJson = cards.map((card) => card.toJson()).toList();
       final key = 'user_${_currentUserId}_cards';
       await _prefs.setString(key, jsonEncode(cardsJson));
@@ -949,9 +950,9 @@ class StorageService {
       if (_lastModifiedDates.length > 100) {
         _lastModifiedDates.removeAt(0);
       }
-      print('✅ Successfully saved to cloud storage');
+      AppLogger.d('✅ Successfully saved to cloud storage', tag: 'Storage');
     } catch (e) {
-      print('❌ Error saving to cloud: $e');
+      AppLogger.e('❌ Error saving to cloud', tag: 'Storage', error: e);
       rethrow;
     }
   }
@@ -969,34 +970,34 @@ class StorageService {
 
   Future<void> debugSyncStatus() async {
     if (_currentUserId == null) {
-      print('❌ No user logged in');
+      AppLogger.e('❌ No user logged in', tag: 'Storage');
       return;
     }
 
-    print('📊 Sync Status Debug:');
-    print('--------------------');
-    print('Sync Enabled: $_isSyncEnabled');
-    print('Currently Syncing: $_isSyncing');
-    print('Last Sync: ${_lastSyncTime?.toLocal() ?? 'Never'}');
-    print('User ID: $_currentUserId');
+    AppLogger.d('📊 Sync Status Debug:', tag: 'Storage');
+    AppLogger.d('--------------------', tag: 'Storage');
+    AppLogger.d('Sync Enabled: $_isSyncEnabled', tag: 'Storage');
+    AppLogger.d('Currently Syncing: $_isSyncing', tag: 'Storage');
+    AppLogger.d('Last Sync: ${_lastSyncTime?.toLocal() ?? 'Never'}', tag: 'Storage');
+    AppLogger.d('User ID: $_currentUserId', tag: 'Storage');
     
     final cards = await getCards();
     final cardsKey = _getUserKey('cards');
     final cloudData = _prefs.getString(cardsKey);
     
-    print('\n📱 Local Data:');
-    print('Cards in memory: ${cards.length}');
-    print('Cards in cloud storage: ${cloudData != null ? jsonDecode(cloudData).length : 0}');
+    AppLogger.d('\n📱 Local Data:', tag: 'Storage');
+    AppLogger.d('Cards in memory: ${cards.length}', tag: 'Storage');
+    AppLogger.d('Cards in cloud storage: ${cloudData != null ? jsonDecode(cloudData).length : 0}', tag: 'Storage');
     
     if (_lastSyncTime != null) {
       final timeSinceSync = DateTime.now().difference(_lastSyncTime!);
-      print('\n⏱️ Time since last sync:');
-      print('${timeSinceSync.inMinutes} minutes ago');
+      AppLogger.d('\n⏱️ Time since last sync:', tag: 'Storage');
+      AppLogger.d('${timeSinceSync.inMinutes} minutes ago', tag: 'Storage');
     }
     
-    print('\n🔄 Recent Changes:');
-    print('Changes in queue: ${_lastModifiedDates.length}');
-    print('Next sync interval: ${_calculateNextSyncInterval().inMinutes} minutes');
+    AppLogger.d('\n🔄 Recent Changes:', tag: 'Storage');
+    AppLogger.d('Changes in queue: ${_lastModifiedDates.length}', tag: 'Storage');
+    AppLogger.d('Next sync interval: ${_calculateNextSyncInterval().inMinutes} minutes', tag: 'Storage');
   }
 
   // Add this simple method near your other card management methods
