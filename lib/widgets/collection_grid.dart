@@ -15,10 +15,12 @@ import '../widgets/sign_in_view.dart';  // Add this import
 
 class CollectionGrid extends StatefulWidget {
   final bool keepAlive;  // Add this
+  final Function(bool)? onMultiselectChange;
 
   const CollectionGrid({
     super.key,
     this.keepAlive = false,  // Add this
+    this.onMultiselectChange,
   });
 
   @override
@@ -38,6 +40,10 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
         _selectedCards.remove(cardId);
         if (_selectedCards.isEmpty) {
           _isMultiSelectMode = false;
+          // Notify parent when exiting multiselect mode
+          if (widget.onMultiselectChange != null) {
+            widget.onMultiselectChange!(false);
+          }
         }
       } else {
         _selectedCards.add(cardId);
@@ -370,6 +376,44 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
     );
   }
 
+  void toggleMultiselect() {
+    setState(() {
+      _isMultiSelectMode = !_isMultiSelectMode;
+      if (!_isMultiSelectMode) {
+        _selectedCards.clear();
+      }
+      
+      // Notify parent about multiselect state
+      if (widget.onMultiselectChange != null) {
+        widget.onMultiselectChange!(_isMultiSelectMode);
+      }
+    });
+  }
+  
+  // Method to be called from parent to cancel multiselect
+  void cancelMultiselect() {
+    if (_isMultiSelectMode) {
+      setState(() {
+        _isMultiSelectMode = false;
+        _selectedCards.clear();
+      });
+    }
+  }
+  
+  // Method to be called from parent to remove selected items
+  void removeSelected() {
+    if (_selectedCards.isNotEmpty) {
+      // Call your removal logic here
+      // For example: 
+      // _selectedCardIds.forEach((id) => storageService.removeCard(id));
+      
+      setState(() {
+        _isMultiSelectMode = false;
+        _selectedCards.clear();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);  // Required for AutomaticKeepAliveClientMixin
@@ -492,6 +536,11 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
                     setState(() {
                       _isMultiSelectMode = true;
                       _toggleCardSelection(card.id);
+                      
+                      // Critical fix: Notify parent about entering multiselect mode
+                      if (widget.onMultiselectChange != null) {
+                        widget.onMultiselectChange!(true);
+                      }
                     });
                   },
                   child: Container( // Wrap in Container to ensure gestures work
@@ -571,62 +620,82 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
                 left: 0,
                 right: 0,
                 child: Container(
-                  color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, -1),
+                      ),
+                    ],
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  ),
                   child: SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       child: Row(
                         children: [
+                          // Styled selection counter
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              '${_selectedCards.length} selected',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w500,
-                                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                width: 1,
                               ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_circle_outline,
+                                  size: 16,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${_selectedCards.length}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  FilledButton.tonal(
-                                    onPressed: () => _addToCustomCollection(context),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: const [
-                                        Icon(Icons.collections_bookmark, size: 18),
-                                        SizedBox(width: 8),
-                                        Text('Add to Binder'),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  FilledButton.tonal(
-                                    onPressed: () => _removeSelectedCards(context),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                                      foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: const [
-                                        Icon(Icons.delete_outline, size: 18),
-                                        SizedBox(width: 8),
-                                        Text('Remove'),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          
+                          const Spacer(), // Push buttons to the right
+                          
+                          // Binder button with enhanced styling
+                          FilledButton.icon(
+                            onPressed: () => _addToCustomCollection(context),
+                            icon: const Icon(Icons.collections_bookmark_outlined, size: 16),
+                            label: const Text('Binder'),
+                            style: FilledButton.styleFrom(
+                              elevation: 2,
+                              minimumSize: const Size(0, 36),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                              foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
+                            ),
+                          ),
+                          
+                          const SizedBox(width: 10),
+                          
+                          // Remove button with enhanced styling
+                          FilledButton.icon(
+                            onPressed: () => _removeSelectedCards(context),
+                            icon: const Icon(Icons.delete_outlined, size: 16),
+                            label: const Text('Remove'),
+                            style: FilledButton.styleFrom(
+                              elevation: 2,
+                              minimumSize: const Size(0, 36),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                              foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
                             ),
                           ),
                         ],

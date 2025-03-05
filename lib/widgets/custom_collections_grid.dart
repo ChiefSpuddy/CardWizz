@@ -383,19 +383,25 @@ class BinderPatternPainter extends CustomPainter {
 
 class CustomCollectionsGrid extends StatefulWidget {
   final bool keepAlive;  // Add this
+  final Function(bool)? onMultiselectChange;
 
   const CustomCollectionsGrid({
     super.key,
-    this.keepAlive = false,  // Add this
+    this.keepAlive = false,
+    this.onMultiselectChange,
   });
 
   @override
-  State<CustomCollectionsGrid> createState() => _CustomCollectionsGridState();
+  State<CustomCollectionsGrid> createState() => CustomCollectionsGridState();
 }
 
-class _CustomCollectionsGridState extends State<CustomCollectionsGrid> with AutomaticKeepAliveClientMixin {
+class CustomCollectionsGridState extends State<CustomCollectionsGrid> with AutomaticKeepAliveClientMixin {
   late final CollectionService _collectionService;
   bool _isInitialized = false;
+  
+  // Add these for multiselect functionality
+  Set<String> _selectedCollectionIds = {};
+  bool _isMultiselect = false;
 
   @override
   void initState() {
@@ -408,6 +414,59 @@ class _CustomCollectionsGridState extends State<CustomCollectionsGrid> with Auto
     _collectionService = await CollectionService.getInstance();
     if (mounted) {
       setState(() => _isInitialized = true);
+    }
+  }
+  
+  // Add these methods to handle multiselect state
+  
+  void toggleMultiselect() {
+    setState(() {
+      _isMultiselect = !_isMultiselect;
+      if (!_isMultiselect) {
+        _selectedCollectionIds.clear();
+      }
+      
+      // Notify parent about multiselect state
+      if (widget.onMultiselectChange != null) {
+        widget.onMultiselectChange!(_isMultiselect);
+      }
+    });
+  }
+  
+  void cancelMultiselect() {
+    if (_isMultiselect) {
+      setState(() {
+        _isMultiselect = false;
+        _selectedCollectionIds.clear();
+        
+        // Notify parent about multiselect state change
+        if (widget.onMultiselectChange != null) {
+          widget.onMultiselectChange!(false);
+        }
+      });
+    }
+  }
+  
+  void removeSelected() async {
+    if (_selectedCollectionIds.isEmpty) return;
+    
+    // Implement actual removal logic
+    try {
+      for (final id in _selectedCollectionIds) {
+        await _collectionService.deleteCollection(id);
+      }
+      
+      setState(() {
+        _isMultiselect = false;
+        _selectedCollectionIds.clear();
+        
+        // Notify parent
+        if (widget.onMultiselectChange != null) {
+          widget.onMultiselectChange!(false);
+        }
+      });
+    } catch (e) {
+      print('Error removing collections: $e');
     }
   }
 
@@ -469,22 +528,98 @@ class _CustomCollectionsGridState extends State<CustomCollectionsGrid> with Auto
               itemCount: sortedCollections.length,
               itemBuilder: (context, index) {
                 final collection = sortedCollections[index];
+                final isSelected = _selectedCollectionIds.contains(collection.id);
                 
                 print('DEBUG: Collection ${collection.name} has IDs: ${collection.cardIds.join(', ')}');
                 
-                return BinderCard(
-                  collection: collection,
-                  cards: allCards,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CustomCollectionDetailScreen(
+                return GestureDetector(
+                  onLongPress: () {
+                    if (!_isMultiselect) {
+                      setState(() {
+                        _isMultiselect = true;
+                        _selectedCollectionIds.add(collection.id);
+                        
+                        // Notify parent
+                        if (widget.onMultiselectChange != null) {
+                          widget.onMultiselectChange!(true);
+                        }
+                      });
+                    }
+                  },
+                  onTap: () {
+                    if (_isMultiselect) {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedCollectionIds.remove(collection.id);
+                          if (_selectedCollectionIds.isEmpty) {
+                            _isMultiselect = false;
+                            if (widget.onMultiselectChange != null) {
+                              widget.onMultiselectChange!(false);
+                            }
+                          }
+                        } else {
+                          _selectedCollectionIds.add(collection.id);
+                        }
+                      });
+                    } else {
+                      // Regular navigation
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CustomCollectionDetailScreen(
+                            collection: collection,
+                            initialCards: allCards.where(
+                              (card) => collection.cardIds.contains(card.id.trim())
+                            ).toList(),
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: Stack(
+                    children: [
+                      BinderCard(
                         collection: collection,
-                        initialCards: allCards.where(
-                          (card) => collection.cardIds.contains(card.id.trim())
-                        ).toList(),
+                        cards: allCards,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CustomCollectionDetailScreen(
+                              collection: collection,
+                              initialCards: allCards.where(
+                                (card) => collection.cardIds.contains(card.id.trim())
+                              ).toList(),
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                      if (_isMultiselect)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isSelected 
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.white.withOpacity(0.8),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary,
+                                width: 2,
+                              ),
+                            ),
+                            child: isSelected 
+                              ? const Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: Colors.white,
+                                )
+                              : null,
+                          ),
+                        ),
+                    ],
                   ),
                 );
               },

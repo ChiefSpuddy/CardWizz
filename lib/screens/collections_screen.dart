@@ -41,6 +41,9 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
   bool _showCustomCollections = false;
   late bool _pageViewReady = false;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  
+  // Add this to track multiselect mode
+  bool _isMultiselectActive = false;
 
   // Animation controllers
   late AnimationController _fadeInController;
@@ -129,6 +132,16 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     setState(() {
       _showCustomCollections = value;
     });
+  }
+
+  // Add this method to update multiselect state from child widgets
+  void setMultiselectActive(bool active) {
+    if (_isMultiselectActive != active) {
+      print('Setting multiselect active: $active'); // Debug print
+      setState(() {
+        _isMultiselectActive = active;
+      });
+    }
   }
 
   // Improved toggle with animations
@@ -452,6 +465,9 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     final currencyProvider = context.watch<CurrencyProvider>();
     final isSignedIn = context.watch<AppState>().isAuthenticated;
     final colorScheme = Theme.of(context).colorScheme;
+    
+    // Debug print to verify state is correct during build
+    print('Building CollectionsScreen, multiselect active: $_isMultiselectActive');
 
     return Scaffold(
       key: _scaffoldKey,
@@ -585,8 +601,15 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
                                   onPageChanged: _onPageChanged,
                                   physics: const ClampingScrollPhysics(),
                                   children: [
-                                    const CollectionGrid(key: PageStorageKey('main_collection')),
-                                    const CustomCollectionsGrid(key: PageStorageKey('custom_collections')),
+                                    // Pass callbacks to both child widgets
+                                    CollectionGrid(
+                                      key: const PageStorageKey('main_collection'),
+                                      onMultiselectChange: setMultiselectActive,
+                                    ),
+                                    CustomCollectionsGrid(
+                                      key: const PageStorageKey('custom_collections'),
+                                      onMultiselectChange: setMultiselectActive,
+                                    ),
                                   ],
                                 ),
                               );
@@ -604,8 +627,8 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
         },
       ),
       
-      // Floating action button for adding cards/collections
-      floatingActionButton: isSignedIn
+      // Only show FAB when not in multiselect mode
+      floatingActionButton: isSignedIn && !_isMultiselectActive
           ? AnimatedBuilder(
               animation: _fadeInController,
               builder: (context, child) {
