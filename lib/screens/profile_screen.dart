@@ -1229,29 +1229,59 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             const Text('Data Attribution'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'CardWizz uses the following data sources:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '• Card data and market prices are provided by the Pokémon TCG API\n'
-              '• Images and card information are owned by their respective copyright holders\n'
-              '• CardWizz is not affiliated with or endorsed by these services',
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => launchUrl(
-                Uri.parse('https://docs.pokemontcg.io/'),
-                mode: LaunchMode.externalApplication,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'CardWizz uses the following data sources:',
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              child: const Text('API Documentation'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              _buildAttributionItem(
+                'Pokémon TCG API',
+                'Card data and market prices for Pokémon cards',
+                'https://pokemontcg.io/'
+              ),
+              const SizedBox(height: 8),
+              _buildAttributionItem(
+                'Scryfall API',
+                'Card data and pricing information for Magic: The Gathering cards',
+                'https://scryfall.com/docs/api'
+              ),
+              const SizedBox(height: 8),
+              _buildAttributionItem(
+                'TCGdex API',
+                'Japanese Pokémon card data and translations',
+                'https://www.tcgdex.net/'
+              ),
+              const SizedBox(height: 8),
+              _buildAttributionItem(
+                'PokéAPI',
+                'Pokémon species data and information',
+                'https://pokeapi.co/'
+              ),
+              const SizedBox(height: 8),
+              _buildAttributionItem(
+                'eBay API',
+                'Market data and recent sales information',
+                'https://developer.ebay.com/'
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'All card images, logos, symbols, and related information are copyright of their respective owners. CardWizz is not affiliated with, endorsed by, or sponsored by any of these services or companies.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -1260,6 +1290,39 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAttributionItem(String title, String description, String url) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          description,
+          style: TextStyle(
+            fontSize: 13,
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+          ),
+        ),
+        TextButton(
+          onPressed: () => launchUrl(
+            Uri.parse(url),
+            mode: LaunchMode.externalApplication,
+          ),
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(0, 36),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            alignment: Alignment.centerLeft,
+          ),
+          child: Text('Visit $title'),
+        ),
+      ],
     );
   }
 
