@@ -7,6 +7,7 @@ import './analytics_screen.dart';
 import './collection_index_screen.dart';
 import './profile_screen.dart';
 import '../constants/app_colors.dart';
+import './card_arena_screen.dart'; // Add this import for the Card Arena
 
 class RootNavigator extends StatefulWidget {
   final int initialTab;
@@ -17,10 +18,10 @@ class RootNavigator extends StatefulWidget {
   });
 
   @override
-  State<RootNavigator> createState() => _RootNavigatorState();
+  State<RootNavigator> createState() => RootNavigatorState(); // Make it public
 }
 
-class _RootNavigatorState extends State<RootNavigator> {
+class RootNavigatorState extends State<RootNavigator> { // Make class public
   late int _selectedIndex;
 
   @override
@@ -36,6 +37,7 @@ class _RootNavigatorState extends State<RootNavigator> {
     AnalyticsScreen(),
     CollectionIndexScreen(),
     ProfileScreen(),
+    CardArenaScreen(), // Add Card Arena tab
   ];
 
   void _onNavigationItemTapped(int index) {
@@ -52,7 +54,9 @@ class _RootNavigatorState extends State<RootNavigator> {
 
   // Add this public method
   void switchToTab(int index) {
-    setState(() => _selectedIndex = index);
+    if (index >= 0 && index < _screens.length) {
+      setState(() => _selectedIndex = index);
+    }
   }
 
   @override
@@ -112,6 +116,11 @@ class _RootNavigatorState extends State<RootNavigator> {
             icon: Icon(Icons.person_outline),
             activeIcon: Icon(Icons.person),
             label: 'Profile',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.sports_kabaddi_outlined),
+            activeIcon: Icon(Icons.sports_kabaddi),
+            label: 'Arena',
           ),
         ],
       ),

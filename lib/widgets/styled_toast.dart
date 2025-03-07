@@ -143,59 +143,191 @@ class StyledToast extends StatelessWidget {
 void showToast({
   required BuildContext context,
   required String title,
-  String subtitle = '',
-  IconData? icon,
-  Color? backgroundColor,
+  required String subtitle,
+  required IconData icon,
   bool isError = false,
+  Duration duration = const Duration(seconds: 3),
+  Color? backgroundColor,
   bool compact = false,
-  int durationSeconds = 2,
-  VoidCallback? onTap,
-  double bottomOffset = 0,
+  int? durationSeconds,
+  double? bottomOffset,  // Added parameter for positioning from bottom
+  VoidCallback? onTap,   // Add onTap parameter
 }) {
-  // Use error color if isError is true
-  final bgColor = isError
-      ? Theme.of(context).colorScheme.error
-      : backgroundColor ?? Theme.of(context).colorScheme.primary;
-
-  // Create padding with adjustable bottom offset
-  final padding = EdgeInsets.only(
-    left: compact ? 12 : 16,
-    right: compact ? 12 : 16,
-    bottom: bottomOffset + (compact ? 12 : 16), 
-    top: compact ? 12 : 16,
-  );
-
   final overlay = Overlay.of(context);
   
-  // Create an overlay entry
-  final overlayEntry = OverlayEntry(
-    builder: (context) {
-      return Positioned(
-        left: 0,
-        right: 0,
-        bottom: 0,
-        child: SafeArea(
-          child: Padding(
-            padding: padding,
-            child: StyledToast(
-              title: title,
-              subtitle: subtitle,
-              icon: icon,
-              backgroundColor: bgColor,
-              onTap: onTap ?? () {},
-              compact: compact,
+  // Calculate position
+  double topPosition = MediaQuery.of(context).padding.top + 16;
+  
+  // We need to declare the variable separately from its initialization
+  // to avoid the "variable referenced before declaration" error
+  late final OverlayEntry entryRef;
+  
+  entryRef = OverlayEntry(
+    builder: (context) => Positioned(
+      top: bottomOffset == null ? topPosition : null,
+      bottom: bottomOffset,  // Position from bottom if specified
+      left: 16,
+      right: 16,
+      child: Material(
+        color: Colors.transparent,
+        child: ToastWidget(
+          title: title,
+          subtitle: subtitle,
+          icon: icon,
+          isError: isError,
+          customOnTap: onTap,  // Pass the onTap callback
+          onDismiss: () {
+            entryRef.remove();
+          },
+        ),
+      ),
+    ),
+  );
+  
+  // Insert the overlay entry
+  overlay.insert(entryRef);
+  
+  // Use durationSeconds if provided, otherwise use the duration parameter
+  final finalDuration = durationSeconds != null 
+      ? Duration(seconds: durationSeconds) 
+      : duration;
+  
+  // Remove the toast after the duration
+  Future.delayed(finalDuration, () {
+    if (entryRef.mounted) {
+      entryRef.remove();
+    }
+  });
+}
+
+class ToastWidget extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool isError;
+  final VoidCallback onDismiss;
+  final VoidCallback? customOnTap;  // Add custom onTap callback
+  
+  const ToastWidget({
+    Key? key,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    this.isError = false,
+    required this.onDismiss,
+    this.customOnTap,  // Make it optional
+  }) : super(key: key);
+
+  @override
+  State<ToastWidget> createState() => _ToastWidgetState();
+}
+
+class _ToastWidgetState extends State<ToastWidget> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
+    
+    _controller.forward();
+  }
+  
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, -50 * (1 - _animation.value)),
+          child: Opacity(
+            opacity: _animation.value,
+            child: Card(
+              elevation: 6,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: widget.customOnTap ?? () {
+                    _controller.reverse().then((value) {
+                      widget.onDismiss();
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: widget.isError 
+                                ? Colors.red.withOpacity(0.2)
+                                : Colors.green.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            widget.icon,
+                            color: widget.isError ? Colors.red : Colors.green,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                widget.title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.subtitle,
+                                style: TextStyle(
+                                  color: Theme.of(context).textTheme.bodySmall?.color,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () {
+                            _controller.reverse().then((value) {
+                              widget.onDismiss();
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      );
-    }
-  );
-
-  // Insert the overlay and remove after duration
-  overlay.insert(overlayEntry);
-  
-  // Auto-dismiss after duration
-  Future.delayed(Duration(seconds: durationSeconds), () {
-    overlayEntry.remove();
-  });
+        );
+      },
+    );
+  }
 }

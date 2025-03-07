@@ -1,6 +1,6 @@
 name: cardwizz
 description: A TCG card collection management app with powerful scanning and pricing features
-version: 1.0.1+22  # Format is {version}+{build_number}
+version: 1.1.0+23  # Format is {version}+{build_number}
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -18,7 +18,7 @@ dependencies:
   shared_preferences: ^2.2.2
   http: ^1.1.0
   fl_chart: ^0.66.0  # Update to latest version
-  lottie: ^2.7.0
+  lottie: ^2.7.0  # Make sure this is present
   url_launcher: ^6.2.1
   cupertino_icons: ^1.0.5
   path_provider: ^2.1.1
@@ -49,6 +49,7 @@ dependencies:
   synchronized: ^3.1.0  # Add this line
   connectivity_plus: ^5.0.1  # Add this line
   flutter_svg: ^2.0.5  # Add this line for SVG support
+  flutter_secure_storage: ^8.0.0  # Make sure this line is present
 
 dev_dependencies:
   flutter_test:
@@ -86,7 +87,15 @@ flutter:
     - assets/images/cardback.png
     - assets/images/             # Add this line to include all images in the directory
     - assets/images/mtgback.png  # Add this line to include the mtgback.png file
-
+    - assets/animations/battle_effect.json
+    - assets/animations/fire_effect.json
+    - assets/animations/water_effect.json
+    - assets/animations/electric_effect.json
+    - assets/animations/earth_effect.json
+    - assets/animations/psychic_effect.json
+    - assets/animations/battle_intro.json
+    - assets/icons/
+    
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true

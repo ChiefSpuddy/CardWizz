@@ -976,7 +976,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           _buildChangeIndicator(change),
                           const SizedBox(height: 4),
                           Text(
-                            period.toString(),  // Convert Map to String
+                            _formatPricePeriod(period),  // Format the period properly
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
@@ -2178,5 +2178,22 @@ class FullWidthAnalyticsChart extends StatelessWidget {
       },
     );
   }
+}
+
+// Add this helper method to format the price period
+String _formatPricePeriod(dynamic period) {
+  if (period == null) return '';
+  
+  // If it's a Map, extract just the key (e.g., '2d')
+  if (period is Map && period.isNotEmpty) {
+    final entry = period.entries.first;
+    return entry.key.toString();
+  }
+  
+  // For simple string values
+  if (period is String) return period;
+  
+  // Default to last 24h if we can't interpret the period
+  return 'Last 24h';
 }
 

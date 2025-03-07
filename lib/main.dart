@@ -30,6 +30,7 @@ import 'screens/scanner_screen.dart';
 import 'services/ebay_api_service.dart';  // Add this import
 import 'services/ebay_search_service.dart';  // Add this import
 import 'utils/logger.dart';
+import 'services/battle_service.dart'; // Add the import for BattleService
 
 void main() async {
   // Set up error handling
@@ -64,6 +65,7 @@ void main() async {
     await purchaseService.initialize();  // Make sure to initialize
     final ebayApiService = EbayApiService();
     final ebaySearchService = EbaySearchService();
+    final battleService = BattleService(); // Add this line
     
     // Initialize providers with required parameters
     final appState = AppState(storageService, authService);
@@ -86,6 +88,9 @@ void main() async {
           Provider<CollectionService>.value(value: collectionService),
           Provider<ScannerService>.value(value: scannerService),
           Provider<EbayApiService>.value(value: ebayApiService),
+          
+          // Change this line from Provider to ChangeNotifierProvider
+          ChangeNotifierProvider<BattleService>.value(value: battleService),
           
           // ChangeNotifierProvider for state management
           ChangeNotifierProvider<AppState>.value(value: appState),
