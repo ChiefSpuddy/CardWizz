@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../widgets/app_drawer.dart';
+import '../providers/app_state.dart';
+import '../widgets/sign_in_view.dart';
 import 'home_overview.dart';
 import 'search_screen.dart';
 import 'root_navigator.dart';
-import './card_arena_screen.dart'; // Add this import
+import './card_arena_screen.dart';
+import '../widgets/standard_app_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -186,11 +190,23 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Check authentication status before building HomeScreen
+    final isSignedIn = Provider.of<AppState>(context).isAuthenticated;
+    
+    // If not signed in, return the SignInView directly
+    if (!isSignedIn) {
+      return const SignInView(showNavigationBar: false);
+    }
+    
+    // Only continue with Scaffold if authenticated
     return Scaffold(
       key: _scaffoldKey,
+      appBar: StandardAppBar(
+        title: 'CardWizz', // Keep app name instead of 'Home'
+        onLeadingPressed: () => _scaffoldKey.currentState?.openDrawer(),
+      ),
       drawer: const AppDrawer(),
-      // Don't use SingleChildScrollView here, the HomeOverview widget will handle its own scrolling
-      body: const HomeOverview(),
+      body: const HomeOverview(), // HomeOverview already has no Scaffold, it just returns content
     );
   }
 }

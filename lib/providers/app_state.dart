@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/collection_service.dart';
 import '../services/navigation_service.dart';  // Add this import
 import 'theme_provider.dart';  // Import our theme provider
+import 'dart:async'; // Add this for Timer
 
 class AppState with ChangeNotifier {
   final StorageService _storageService;
@@ -18,6 +19,7 @@ class AppState with ChangeNotifier {
   bool _searchHistoryEnabled = true;
   bool _profileVisible = false;
   bool _showPrices = true;
+  DateTime? _lastCardChangeTime;
 
   AppState(this._storageService, this._authService);
 
@@ -209,8 +211,30 @@ class AppState with ChangeNotifier {
     // Add more supported locales
   ];
 
-  // Add this simple method at the bottom of the class
-  Future<void> notifyCardChange() async {
+  // Find the notifyCardChange method and modify it to prevent navigation issues
+  void notifyCardChange() {
+    // Track last change time
+    _lastCardChangeTime = DateTime.now();
+    
+    // Just notify listeners directly - avoid any navigation/state resets
     notifyListeners();
+    
+    // Use a simple debounce for refreshing state to avoid excessive updates
+    _debounceCardChange(() {
+      // Safely refresh storage state after a short delay
+      _storageService.refreshState();
+    });
+  }
+
+  // Add this debounce helper
+  Timer? _cardChangeDebouncer;
+  void _debounceCardChange(VoidCallback callback) {
+    // Cancel previous timer if active
+    if (_cardChangeDebouncer?.isActive ?? false) {
+      _cardChangeDebouncer!.cancel();
+    }
+    
+    // Create new timer with the callback
+    _cardChangeDebouncer = Timer(const Duration(milliseconds: 300), callback);
   }
 }

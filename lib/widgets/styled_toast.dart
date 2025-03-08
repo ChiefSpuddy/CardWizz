@@ -153,6 +153,17 @@ void showToast({
   double? bottomOffset,  // Added parameter for positioning from bottom
   VoidCallback? onTap,   // Add onTap parameter
 }) {
+  // Skip showing toasts for search-related messages
+  if (title.contains('No Cards Found') || 
+      title.contains('Search Failed') ||
+      subtitle.contains('search') ||
+      subtitle.contains('Search')) {
+    // Just log silently and return without showing anything
+    print('Skipping search-related toast: $title - $subtitle');
+    return;
+  }
+  
+  // For all non-search related toasts, continue with normal behavior
   final overlay = Overlay.of(context);
   
   // Calculate position

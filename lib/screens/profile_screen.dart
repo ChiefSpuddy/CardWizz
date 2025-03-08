@@ -20,6 +20,7 @@ import '../services/collection_service.dart';
 import '../widgets/styled_toast.dart';  // Add this import
 import '../providers/theme_provider.dart'; // Add this import
 import '../widgets/app_drawer.dart'; // Add this import
+import '../widgets/standard_app_bar.dart'; // Add this import
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -29,6 +30,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
   late final AnimationController _animationController;
   String _deleteConfirmation = '';
   late final ScrollController _scrollController;
@@ -1706,30 +1708,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
-    final isSignedIn = appState.isAuthenticated;
-    final user = appState.currentUser;
-
+    final isSignedIn = context.watch<AppState>().isAuthenticated;
+    
     return Scaffold(
-      // Only show AppBar if signed in
-      appBar: isSignedIn ? AppBar(
-        toolbarHeight: 44,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        titleSpacing: 16,
-        // Replace the existing leading with a Builder to get correct Scaffold context
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu),
-            padding: EdgeInsets.zero,
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints(minWidth: 40),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),  // Use ctx to get the correct Scaffold context
-          ),
-        ),
-      ) : null,
-      // Update the drawer instantiation with proper constructor
-      drawer: const AppDrawer(),  // AppDrawer doesn't require any parameters
+      key: _scaffoldKey,
+      appBar: StandardAppBar.createIfSignedIn(
+        context,
+        title: 'Profile',
+        onLeadingPressed: () => _scaffoldKey.currentState?.openDrawer(),
+      ),
       body: Stack(
         children: [
           Positioned.fill(
@@ -1745,8 +1732,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ),
           ),
           SafeArea(
-            child: isSignedIn && user != null
-                ? _buildProfileContent(context, user)
+            child: isSignedIn && context.watch<AppState>().currentUser != null
+                ? _buildProfileContent(context, context.watch<AppState>().currentUser!)
                 : const SignInView(),
           ),
         ],

@@ -12,9 +12,16 @@ import '../models/tcg_card.dart';
 import '../constants/app_colors.dart';
 import 'dart:math' as math;
 import '../widgets/animated_gradient_button.dart';
+import '../widgets/styled_toast.dart'; // Add this import for StyledToast
 
 class SignInView extends StatefulWidget {
-  const SignInView({super.key});
+  // Change default to false since the RootNavigator already provides a navigation bar
+  final bool showNavigationBar;
+  
+  const SignInView({
+    super.key,
+    this.showNavigationBar = false, // Set default to false
+  });
 
   @override
   State<SignInView> createState() => _SignInViewState();
@@ -169,62 +176,114 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final size = MediaQuery.of(context).size;
     
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Animated background with particle effect
-        _buildAnimatedBackground(isDark, colorScheme),
-        
-        // Floating cards in background
-        if (_showcaseCards.isNotEmpty)
-          ..._buildFloatingCards(colorScheme),
-        
-        // Main content
-        SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // App logo with bounce animation
-                          _buildAnimatedLogo(colorScheme, isDark),
-                          
-                          const SizedBox(height: 32),
-                          
-                          // App headline with slide-in animation
-                          _buildAnimatedHeadline(colorScheme),
-                          
-                          const SizedBox(height: 32),
-                          
-                          // Feature cards with staggered animations
-                          _buildFeatureCards(context, colorScheme),
-                          
-                          const SizedBox(height: 40),
-                          
-                          // Sign-in button with pulse and gradient animations
-                          _buildSignInButton(context, colorScheme),
-                        ],
+    return Scaffold(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Animated background with particle effect
+          _buildAnimatedBackground(isDark, colorScheme),
+          
+          // Floating cards in background
+          if (_showcaseCards.isNotEmpty)
+            ..._buildFloatingCards(colorScheme),
+          
+          // Main content
+          SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // App logo with bounce animation
+                            _buildAnimatedLogo(colorScheme, isDark),
+                            
+                            const SizedBox(height: 32),
+                            
+                            // App headline with slide-in animation
+                            _buildAnimatedHeadline(colorScheme),
+                            
+                            const SizedBox(height: 32),
+                            
+                            // Feature cards with staggered animations
+                            _buildFeatureCards(context, colorScheme),
+                            
+                            const SizedBox(height: 40),
+                            
+                            // Sign-in button with pulse and gradient animations
+                            _buildSignInButton(context, colorScheme),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              
-              // Footer with privacy info
-              _buildFooter(colorScheme),
-            ],
+                
+                // Footer with privacy info
+                _buildFooter(colorScheme),
+              ],
+            ),
           ),
+        ],
+      ),
+      bottomNavigationBar: widget.showNavigationBar ? _buildBottomNavigationBar(context) : null,
+    );
+  }
+
+  Widget _buildBottomNavigationBar(BuildContext context) {
+    return BottomNavigationBar(
+      type: BottomNavigationBarType.fixed,
+      currentIndex: 0, // Home is selected
+      selectedItemColor: Theme.of(context).colorScheme.primary,
+      unselectedItemColor: Colors.grey,
+      selectedFontSize: 12,
+      unselectedFontSize: 12,
+      onTap: (_) {
+        // Use the StyledToast properly since it exists
+        showToast(
+          context: context,
+          title: 'Sign In Required',
+          subtitle: 'Please sign in to continue',
+          icon: Icons.login_rounded,
+          isError: false,
+          compact: true,
+          duration: const Duration(seconds: 2),
+        );
+      },
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home_outlined),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.style_outlined),
+          label: 'Collection',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.search_outlined),
+          label: 'Search',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.analytics_outlined),
+          label: 'Analytics',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.sports_kabaddi_outlined),
+          label: 'Arena',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline),
+          label: 'Profile',
         ),
       ],
     );
   }
-  
+
   Widget _buildAnimatedBackground(bool isDark, ColorScheme colorScheme) {
     return Stack(
       children: [
@@ -359,24 +418,13 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
             opacity: _headlineController.value,
             child: Column(
               children: [
-                ShaderMask(
-                  blendMode: BlendMode.srcIn,
-                  shaderCallback: (bounds) => LinearGradient(
-                    colors: [
-                      colorScheme.primary,
-                      colorScheme.secondary,
-                      colorScheme.tertiary,
-                    ],
-                  ).createShader(
-                    Rect.fromLTWH(0, 0, bounds.width, bounds.height),
-                  ),
-                  child: const Text(
-                    'CardWizz',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                    ),
+                Text(
+                  'CardWizz',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                    color: colorScheme.primary,
                   ),
                 ),
                 const SizedBox(height: 8),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
-import 'dart:async'; // Add this import
+import 'dart:async';
 import '../widgets/empty_collection_view.dart';
 import '../l10n/app_localizations.dart';  
 import '../services/storage_service.dart';
@@ -23,7 +23,9 @@ import '../widgets/sign_in_view.dart';
 import '../providers/app_state.dart';
 import '../providers/sort_provider.dart';
 import '../constants/layout.dart';
+import '../services/purchase_service.dart'; // Add this missing import
 import 'dart:math';
+import '../widgets/standard_app_bar.dart';
 
 class CollectionsScreen extends StatefulWidget {
   final bool _showEmptyState;
@@ -470,12 +472,29 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     return sets.length;
   }
 
+  // Add this method inside the class, before it's used in _buildSetDistribution
+  List<MapEntry<String, int>> _getSetDistribution(List<TcgCard> cards) {
+    // Group cards by set
+    final setMap = <String, int>{};
+    for (final card in cards) {
+      final set = card.setName ?? 'Unknown Set';
+      setMap[set] = (setMap[set] ?? 0) + 1;
+    }
+
+    // Sort sets by card count
+    final sortedSets = setMap.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return sortedSets;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currencyProvider = context.watch<CurrencyProvider>();
     final isSignedIn = context.watch<AppState>().isAuthenticated;
     final colorScheme = Theme.of(context).colorScheme;
+    final purchaseService = context.watch<PurchaseService>(); // Added for use in actions
     
     // Debug print to verify state is correct during build
     print('Building CollectionsScreen, multiselect active: $_isMultiselectActive');
@@ -483,109 +502,93 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     return Scaffold(
       key: _scaffoldKey,
       
-      // Clean design with minimal AppBar
-      appBar: isSignedIn 
-        ? PreferredSize(
-            preferredSize: const Size.fromHeight(44),
-            child: AppBar(
-              toolbarHeight: 44, 
-              elevation: 0,
-              backgroundColor: Colors.transparent,
-              centerTitle: false, 
-              leading: Builder(
-                builder: (ctx) => IconButton(
-                  icon: Icon(
-                    Icons.menu, 
-                    color: colorScheme.onBackground,
-                  ),
-                  onPressed: () => Scaffold.of(ctx).openDrawer(),
-                ),
-              ),
-              title: Text(
-                'Collection',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onBackground,
-                ),
-              ),
-              actions: [
-                IconButton(
-                  icon: Icon(
-                    Icons.sort,
-                    color: colorScheme.onBackground,
-                  ),
-                  onPressed: () => _showSortMenu(context),
-                ),
-              ],
+      // Use the static method to conditionally create appBar
+      appBar: StandardAppBar.createIfSignedIn(
+        context,
+        title: 'Collection',
+        transparent: true,
+        elevation: 0,
+        actions: isSignedIn ? [
+          // Only show action buttons if signed in
+          if (_isMultiselectActive)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: () {
+                // Handle delete action for multiselect
+                // This is a placeholder - implement your action
+                print('Delete selected items');
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.sort),
+              onPressed: () => _showSortMenu(context),
+              tooltip: 'Sort',
             ),
-          )
-        : null,
+        ] : null,
+      ),
       
       drawer: const AppDrawer(),
-      extendBodyBehindAppBar: true,
-      extendBody: true,
       
-      // Body with stack for beautiful backgrounds and animations
-      body: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          // Only animate particles when not scrolling
-          if (notification is ScrollStartNotification && _animateParticles) {
-            setState(() => _animateParticles = false);
-          } else if (notification is ScrollEndNotification && !_animateParticles) {
-            // Add small delay before re-enabling animations
-            _debounceTimer?.cancel();
-            _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-              if (mounted) {
-                setState(() => _animateParticles = true);
-              }
-            });
-          }
-          return false;
-        },
-        child: AnimatedBuilder(
-          animation: _fadeInController,
-          builder: (context, child) {
-            return Stack(
-              children: [
-                // FIX: Correctly nest the particles background
-                // The issue is here - Positioned must be direct child of Stack
-                Positioned.fill(
-                  child: RepaintBoundary(
-                    child: CustomPaint(
-                      painter: _CollectionBackgroundPainter(
-                        particles: _particles,
-                        isDark: isDark,
-                        primaryColor: colorScheme.primary,
-                        animate: _animateParticles,
+      // Main content with gradient at top for better app bar integration
+      body: !isSignedIn
+          ? const SignInView()
+          : NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                // Only animate particles when not scrolling
+                if (notification is ScrollStartNotification && _animateParticles) {
+                  setState(() => _animateParticles = false);
+                } else if (notification is ScrollEndNotification && !_animateParticles) {
+                  // Add small delay before re-enabling animations
+                  _debounceTimer?.cancel();
+                  _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+                    if (mounted) {
+                      setState(() => _animateParticles = true);
+                    }
+                  });
+                }
+                return false;
+              },
+              child: Stack(
+                children: [
+                  // Background effects
+                  Positioned.fill(
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        painter: _CollectionBackgroundPainter(
+                          particles: _particles,
+                          isDark: isDark,
+                          primaryColor: colorScheme.primary,
+                          animate: _animateParticles,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                
-                // Background gradient overlay
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Theme.of(context).scaffoldBackgroundColor,
-                          Theme.of(context).scaffoldBackgroundColor.withOpacity(0.9),
-                          Theme.of(context).scaffoldBackgroundColor.withOpacity(0.95),
-                        ],
+                  
+                  // Enhanced gradient overlay that extends behind app bar
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            // Darker at top to ensure app bar text visibility
+                            colorScheme.background.withOpacity(0.95),
+                            colorScheme.background.withOpacity(0.85),
+                            colorScheme.background.withOpacity(0.8),
+                            colorScheme.background,
+                          ],
+                          stops: const [0.0, 0.2, 0.5, 0.8],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                
-                // Main content
-                if (!isSignedIn)
-                  const SignInView()
-                else
+                  
+                  // Main content area
                   SafeArea(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const SizedBox(height: 8),
                         
@@ -594,114 +597,198 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
                           stream: Provider.of<StorageService>(context).watchCards(),
                           builder: (context, snapshot) {
                             final cards = snapshot.data ?? [];
-                            if (cards.isEmpty) return const SizedBox.shrink();
                             
-                            return _buildValueTrackerCard(cards, currencyProvider);
-                          },
-                        ),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // New animated toggle
-                        _buildAnimatedToggle(),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // Collection content
-                        Expanded(
-                          child: FutureBuilder<List<TcgCard>>(
-                            future: Provider.of<StorageService>(context).getCards(),
-                            builder: (context, snapshot) {
-                              if (!snapshot.hasData) {
-                                return const Center(child: CircularProgressIndicator());
-                              }
-                              
-                              final cards = snapshot.data ?? [];
-                              
-                              if (_pageViewReady) {
-                                if (cards.isEmpty) {
-                                  return const EmptyCollectionView(
-                                    title: 'Start Your Collection',
-                                    message: 'Add cards to build your collection',
-                                    buttonText: 'Browse Cards',
-                                    icon: Icons.add_circle_outline,
-                                  );
-                                }
-                                
-                                return AnimatedOpacity(
-                                  duration: const Duration(milliseconds: 500),
-                                  opacity: _fadeInController.value,
-                                  child: PageView(
-                                    controller: _pageController,
-                                    onPageChanged: _onPageChanged,
-                                    physics: const ClampingScrollPhysics(),
-                                    children: [
-                                      // Pass callbacks to both child widgets
-                                      CollectionGrid(
-                                        key: const PageStorageKey('main_collection'),
-                                        onMultiselectChange: setMultiselectActive,
-                                      ),
-                                      CustomCollectionsGrid(
-                                        key: const PageStorageKey('custom_collections'),
-                                        onMultiselectChange: setMultiselectActive,
-                                      ),
-                                    ],
+                            // Only show the toggle and stats when there are cards
+                            if (cards.isEmpty) {
+                              return const Expanded(
+                                child: EmptyCollectionView(
+                                  title: 'Start Your Collection',
+                                  message: 'Add cards to build your collection',
+                                  buttonText: 'Browse Cards',
+                                  icon: Icons.add_circle_outline,
+                                ),
+                              );
+                            }
+                            
+                            // Show the stats card if there are cards
+                            return Expanded(  // Add Expanded here to provide bounded height
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildValueTrackerCard(cards, currencyProvider),
+                                  
+                                  const SizedBox(height: 16),
+                                  
+                                  // Only show the toggle when we have cards
+                                  _buildAnimatedToggle(),
+                                  
+                                  const SizedBox(height: 16),
+                                  
+                                  // Wrap PageView in Expanded to ensure it gets a definite size
+                                  Expanded(
+                                    child: _pageViewReady 
+                                      ? AnimatedOpacity(
+                                          duration: const Duration(milliseconds: 500),
+                                          opacity: _fadeInController.value,
+                                          child: PageView(
+                                            controller: _pageController,
+                                            onPageChanged: _onPageChanged,
+                                            physics: const ClampingScrollPhysics(),
+                                            children: [
+                                              // Pass callbacks to both child widgets
+                                              CollectionGrid(
+                                                key: const PageStorageKey('main_collection'),
+                                                onMultiselectChange: setMultiselectActive,
+                                              ),
+                                              CustomCollectionsGrid(
+                                                key: const PageStorageKey('custom_collections'),
+                                                onMultiselectChange: setMultiselectActive,
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : const Center(
+                                          child: SizedBox(
+                                            width: 32,
+                                            height: 32,
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                        ),
                                   ),
-                                );
-                              } else {
-                                return const Center(child: CircularProgressIndicator());
-                              }
-                            },
-                          ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
                   ),
-              ],
-            );
-          },
-        ),
-      ),
+                ],
+              ),
+            ),
       
-      // Only show FAB when not in multiselect mode
+      // Only show FAB when not in multiselect mode AND collection is not empty
       floatingActionButton: isSignedIn && !_isMultiselectActive
-          ? AnimatedBuilder(
-              animation: _fadeInController,
-              builder: (context, child) {
-                return ScaleTransition(
-                  scale: Tween<double>(
-                    begin: 0.6,
-                    end: 1.0,
-                  ).animate(CurvedAnimation(
-                    parent: _fadeInController,
-                    curve: Curves.easeOutBack,
-                  )),
-                  child: FloatingActionButton(
-                    onPressed: () {
-                      if (_showCustomCollections) {
-                        _showCreateBinderDialog(context);
-                      } else {
-                        // Update this navigation logic to ensure it goes to the search screen
-                        final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                        if (homeState != null) {
-                          homeState.setSelectedIndex(2); // Index 2 is the Search tab
-                        } else {
-                          // Alternative navigation if not inside HomeScreen
-                          Navigator.of(context).pushNamed('/search');
-                        }
-                      }
-                    },
-                    backgroundColor: colorScheme.primary,
-                    elevation: 4,
-                    child: Icon(
-                      _showCustomCollections ? Icons.create_new_folder : Icons.add,
-                      color: Colors.white,
-                    ),
-                  ),
+          ? StreamBuilder<List<TcgCard>>(
+              stream: Provider.of<StorageService>(context).watchCards(),
+              builder: (context, snapshot) {
+                // Hide FAB if collection is empty
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Container(); // Return empty container instead of null
+                }
+                
+                // Otherwise show the FAB
+                return AnimatedBuilder(
+                  animation: _fadeInController,
+                  builder: (context, child) {
+                    return ScaleTransition(
+                      scale: Tween<double>(
+                        begin: 0.6,
+                        end: 1.0,
+                      ).animate(CurvedAnimation(
+                        parent: _fadeInController,
+                        curve: Curves.easeOutBack,
+                      )),
+                      child: FloatingActionButton(
+                        onPressed: () {
+                          if (_showCustomCollections) {
+                            _showCreateBinderDialog(context);
+                          } else {
+                            // Update this navigation logic to ensure it goes to the search screen
+                            final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                            if (homeState != null) {
+                              homeState.setSelectedIndex(2); // Index 2 is the Search tab
+                            } else {
+                              // Alternative navigation if not inside HomeScreen
+                              Navigator.of(context).pushNamed('/search');
+                            }
+                          }
+                        },
+                        backgroundColor: colorScheme.primary,
+                        elevation: 4,
+                        child: Icon(
+                          _showCustomCollections ? Icons.create_new_folder : Icons.add,
+                          color: Colors.white,
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
             )
           : null,
+    );
+  }
+
+  // Add the set distribution method inside the class
+  Widget _buildSetDistribution(List<TcgCard> cards) {
+    final purchaseService = Provider.of<PurchaseService>(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    // Get sorted sets
+    final sortedSets = _getSetDistribution(cards);
+    final totalCards = cards.length;
+    final displaySets = sortedSets.take(6).toList(); // Show top 6 sets
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Fix the syntax error by using proper conditional rendering
+          if (purchaseService.isPremium)
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  // Content for premium users would go here
+                  Text('Set Distribution Analysis'),
+                  SizedBox(height: 12),
+                  // Other widgets for premium users
+                ],
+              ),
+            )
+          else
+            _buildPremiumOverlay(purchaseService),
+        ],
+      ),
+    );
+  }
+  
+  // Add premium overlay method inside the class
+  Widget _buildPremiumOverlay(PurchaseService purchaseService) {
+    return Container(
+      color: Colors.black45,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.lock,
+            color: Colors.white,
+            size: 48,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Premium Feature',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Unlock detailed set analytics',
+            style: TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => purchaseService.purchasePremium(),
+            child: const Text('Upgrade Now'),
+          ),
+        ],
+      ),
     );
   }
 }

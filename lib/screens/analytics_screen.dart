@@ -34,6 +34,7 @@ import '../widgets/market_scan_button.dart';
 import '../widgets/acquisition_timeline_chart.dart';
 import '../widgets/rarity_distribution_chart.dart';
 import '../widgets/price_update_button.dart';  // Add this import
+import '../widgets/standard_app_bar.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -1727,93 +1728,135 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      appBar: isSignedIn ? AppBar(
-        toolbarHeight: 52, // Increased height to fit the button
-        automaticallyImplyLeading: false,
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          padding: EdgeInsets.zero,
-          visualDensity: VisualDensity.compact,
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+      // Updated app bar with conditional creation
+      appBar: StandardAppBar.createIfSignedIn(
+        context,
+        title: 'Analytics',
+        transparent: true,
+        elevation: 0,
+        actions: isSignedIn ? _buildAppBarActions() : null,
+        onLeadingPressed: () => _scaffoldKey.currentState?.openDrawer(),
+      ),
+      drawer: const AppDrawer(),
+      body: AnimatedBackground(
+        child: Stack(
+          children: [
+            // Add a soft gradient overlay behind the app bar for better text visibility
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 100, // Extend slightly below the app bar
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Theme.of(context).scaffoldBackgroundColor.withOpacity(0.8),
+                      Theme.of(context).scaffoldBackgroundColor.withOpacity(0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            
+            // Main content
+            SafeArea(
+              child: !isSignedIn
+                  ? const SignInView()
+                  : StreamBuilder<List<TcgCard>>(
+                      stream: Provider.of<StorageService>(context).watchCards(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        final cards = snapshot.data!;
+                        if (cards.isEmpty) {
+                          // Return empty state directly at the same level as other screens
+                          return _buildEmptyState();
+                        }
+
+                        // Add logging here
+                        print('AnalyticsScreen: cards.length = ${cards.length}');
+
+                        return CustomScrollView(
+                          key: const ValueKey('analytics_scroll_view'), // Add this key
+                          controller: AnalyticsScreen._scrollController,  // Use the controller here
+                          slivers: [
+                            // Increase top padding for better spacing below app bar
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: 24), // Increased from 16 to 24
+                            ),
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,  // Add this
+                                  children: [
+                                    _buildValueSummary(cards),
+                                    const SizedBox(height: 12),
+                                    Provider<List<TcgCard>>.value(
+                                      value: cards,
+                                      child: const PortfolioValueChart(
+                                        useFullWidth: true, // Set to true to use full width
+                                        chartPadding: 16, // Add padding for better appearance
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _buildMarketInsightsCard(cards), // Add this line
+                                    const SizedBox(height: 16),
+                                    _buildTopMovers(cards),
+                                    const SizedBox(height: 16),
+                                    _buildTopCardsCard(cards),
+                                    const SizedBox(height: 16),
+                                    _buildSetDistribution(cards),
+                                    const SizedBox(height: 16),
+                                    _buildPriceRangeDistribution(cards),
+                                    const SizedBox(height: 16),
+                                    AcquisitionTimelineChart(cards: cards),
+                                    const SizedBox(height: 16),
+                                    RarityDistributionChart(cards: cards),
+                                    const SizedBox(height: 32),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
-        actions: [
-          Padding(
+      ),
+    );
+  }
+
+  // Add this new method to handle the actions separately
+  List<Widget> _buildAppBarActions() {
+    return [
+      StreamBuilder<List<TcgCard>>(
+        stream: Provider.of<StorageService>(context).watchCards(),
+        builder: (context, snapshot) {
+          // Only show refresh button when cards exist
+          final hasCards = snapshot.hasData && (snapshot.data?.isNotEmpty ?? false);
+          
+          if (!hasCards) return const SizedBox.shrink();
+          
+          return Padding(
             padding: const EdgeInsets.only(right: 16, top: 6, bottom: 6),
             child: PriceUpdateButton(
               isLoading: _isRefreshing,
               lastUpdateTime: _lastUpdateTime,
               onPressed: _isRefreshing ? null : _refreshPrices,
             ),
-          ),
-        ],
-      ) : null,
-      drawer: const AppDrawer(),
-      body: AnimatedBackground(
-        child: SafeArea(
-          child: !isSignedIn
-              ? const SignInView()
-              : StreamBuilder<List<TcgCard>>(
-                  stream: Provider.of<StorageService>(context).watchCards(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    final cards = snapshot.data!;
-                    if (cards.isEmpty) {
-                      // Return empty state directly at the same level as other screens
-                      return _buildEmptyState();
-                    }
-
-                    // Add logging here
-                    print('AnalyticsScreen: cards.length = ${cards.length}');
-
-                    return CustomScrollView(
-                      key: const ValueKey('analytics_scroll_view'), // Add this key
-                      controller: AnalyticsScreen._scrollController,  // Use the controller here
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,  // Add this
-                              children: [
-                                _buildValueSummary(cards),
-                                const SizedBox(height: 12),
-                                Provider<List<TcgCard>>.value(
-                                  value: cards,
-                                  child: const PortfolioValueChart(
-                                    useFullWidth: true, // Set to true to use full width
-                                    chartPadding: 16, // Add padding for better appearance
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                _buildMarketInsightsCard(cards), // Add this line
-                                const SizedBox(height: 16),
-                                _buildTopMovers(cards),
-                                const SizedBox(height: 16),
-                                _buildTopCardsCard(cards),
-                                const SizedBox(height: 16),
-                                _buildSetDistribution(cards),
-                                const SizedBox(height: 16),
-                                _buildPriceRangeDistribution(cards),
-                                const SizedBox(height: 16),
-                                AcquisitionTimelineChart(cards: cards),
-                                const SizedBox(height: 16),
-                                RarityDistributionChart(cards: cards),
-                                const SizedBox(height: 32),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-        ),
+          );
+        }
       ),
-    );
+    ];
   }
 
   Widget _buildValueSummary(List<TcgCard> cards) {

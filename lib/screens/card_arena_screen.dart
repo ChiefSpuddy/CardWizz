@@ -19,6 +19,8 @@ import '../models/battle_stats.dart'; // This import is fine now that we removed
 import 'dart:ui';
 import '../widgets/styled_button.dart';
 import '../services/tcg_api_service.dart'; // Add this import
+import '../widgets/empty_collection_view.dart'; // Add this import
+import '../widgets/standard_app_bar.dart'; // Add this import
 
 class CardArenaScreen extends StatefulWidget {
   const CardArenaScreen({super.key});
@@ -294,15 +296,7 @@ void _startBattle() {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // User card with animation
-              TweenAnimationBuilder<double>(
-                duration: const Duration(milliseconds: 500),
-                tween: Tween(begin: -100.0, end: 0.0),
-                builder: (context, value, child) {
-                  return Transform.translate(
-                    offset: Offset(value, 0),
-                    child: child,
-                  );
-                },
+              Expanded(  // Add Expanded here to force this section to respect available width
                 child: Column(
                   children: [
                     if (_userCard != null)
@@ -329,6 +323,8 @@ void _startBattle() {
                           ),
                         ],
                       ),
+                      maxLines: 1,  // Limit to 1 line
+                      overflow: TextOverflow.ellipsis,  // Add overflow handling
                     ),
                   ],
                 ),
@@ -336,7 +332,7 @@ void _startBattle() {
               
               // VS animation - same as before
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 10),  // Reduce horizontal padding from 20 to 10
                 child: TweenAnimationBuilder<double>(
                   duration: const Duration(milliseconds: 800),
                   tween: Tween(begin: 0.0, end: 1.0),
@@ -367,43 +363,47 @@ void _startBattle() {
               ),
               
               // CPU card with animation - same as before
-              TweenAnimationBuilder<double>(
-                duration: const Duration(milliseconds: 500),
-                tween: Tween(begin: 100.0, end: 0.0),
-                builder: (context, value, child) {
-                  return Transform.translate(
-                    offset: Offset(value, 0),
-                    child: child,
-                  );
-                },
-                child: Column(
-                  children: [
-                    if (_cpuCard != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.network(
-                          _cpuCard!.imageUrl,
-                          height: 120,
-                          width: 90,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    const SizedBox(height: 10),
-                    Text(
-                      _cpuCard?.name ?? 'Opponent',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        shadows: [
-                          Shadow(
-                            blurRadius: 5,
-                            color: Colors.black,
-                            offset: Offset(1, 1),
+              Expanded(  // Add Expanded here to force this section to respect available width
+                child: TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 500),
+                  tween: Tween(begin: 100.0, end: 0.0),
+                  builder: (context, value, child) {
+                    return Transform.translate(
+                      offset: Offset(value, 0),
+                      child: child,
+                    );
+                  },
+                  child: Column(
+                    children: [
+                      if (_cpuCard != null)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            _cpuCard!.imageUrl,
+                            height: 120,
+                            width: 90,
+                            fit: BoxFit.cover,
                           ),
-                        ],
+                        ),
+                      const SizedBox(height: 10),
+                      Text(
+                        _cpuCard?.name ?? 'Opponent',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          shadows: [
+                            Shadow(
+                              blurRadius: 5,
+                              color: Colors.black,
+                              offset: Offset(1, 1),
+                            ),
+                          ],
+                        ),
+                        maxLines: 1,  // Limit to 1 line
+                        overflow: TextOverflow.ellipsis,  // Add overflow handling
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -431,30 +431,17 @@ void _showBattleCountdown() {
     _currentState = 'countdown';
   });
   
-  // Start countdown timer
-  Timer.periodic(Duration(seconds: 1), (timer) {
-    if (countdown > 0) {
-      setState(() {
-        countdown--;
-      });
-    } else {
-      // When countdown reaches 0, actually start the battle
-      timer.cancel();
-      setState(() {
-        _currentState = 'battling';
-        _animationController.reset();
-        _animationController.forward();
-      });
-    }
-  });
+  // Create a separate controller for the dialog state
+  final countdownNotifier = ValueNotifier<int>(countdown);
   
   // Show countdown overlay
   showDialog(
     context: context,
     barrierDismissible: false,
     barrierColor: Colors.black45,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) {
+    builder: (context) => ValueListenableBuilder<int>(
+      valueListenable: countdownNotifier,
+      builder: (context, value, child) {
         return Dialog(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -468,16 +455,16 @@ void _showBattleCountdown() {
                 );
               },
               child: Text(
-                countdown > 0 ? '$countdown' : 'FIGHT!',
-                key: ValueKey<int>(countdown),
+                value > 0 ? '$value' : 'FIGHT!',
+                key: ValueKey<int>(value),
                 style: TextStyle(
                   fontSize: 72,
                   fontWeight: FontWeight.bold,
-                  color: countdown > 0 ? Colors.amber : Colors.red,
+                  color: value > 0 ? Colors.amber : Colors.red,
                   shadows: [
                     Shadow(
                       blurRadius: 20,
-                      color: countdown > 0 ? Colors.orange : Colors.redAccent,
+                      color: value > 0 ? Colors.orange : Colors.redAccent,
                       offset: Offset(0, 0),
                     ),
                   ],
@@ -490,9 +477,21 @@ void _showBattleCountdown() {
     ),
   );
   
-  // Close countdown dialog when battle starts
-  Future.delayed(Duration(seconds: 4), () {
-    Navigator.of(context).pop();
+  // Start countdown timer
+  Timer.periodic(Duration(seconds: 1), (timer) {
+    countdown--;
+    countdownNotifier.value = countdown;
+    
+    if (countdown < 0) {
+      // When countdown reaches 0, actually start the battle
+      timer.cancel();
+      Navigator.of(context).pop(); // Close countdown dialog
+      setState(() {
+        _currentState = 'battling';
+        _animationController.reset();
+        _animationController.forward();
+      });
+    }
   });
 }
 
@@ -596,31 +595,56 @@ void _completeBattle(List<BattleMove> moves) {
 
   @override
   Widget build(BuildContext context) {
-    final isSignedIn = context.watch<AppState>().isAuthenticated;
-    
-    if (!isSignedIn) {
-      return const Scaffold(
-        body: SignInView(),
-      );
-    }
-    
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _currentState == 'card_selection' ? 'Choose Your Champion' : 'Card Arena',
-        ),
-        actions: [
-          if (_currentState == 'selecting')
+  final isSignedIn = context.watch<AppState>().isAuthenticated;
+  
+  if (!isSignedIn) {
+    return const Scaffold(
+      body: SignInView(),
+    );
+  }
+
+  return Scaffold(
+    appBar: StandardAppBar(
+      title: _currentState == 'card_selection' ? 'Choose Your Champion' : 'Card Arena',
+      actions: _currentState == 'selecting' 
+        ? [
             IconButton(
-              icon: Icon(Icons.swap_horiz),
+              icon: Icon(
+                Icons.swap_horiz,
+                color: Theme.of(context).colorScheme.onBackground,
+              ),
               onPressed: _showCardSelection,
               tooltip: 'Change Card',
             ),
-        ],
-      ),
-      body: _showBattleIntro ? _buildIntroAnimation() : _buildContent(),
-    );
-  }
+          ]
+        : null,
+    ),
+    body: _showBattleIntro ? _buildIntroAnimation() : StreamBuilder<List<TcgCard>>(
+      stream: Provider.of<StorageService>(context).watchCards(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        final cards = snapshot.data!;
+        
+        // Show empty state if no cards or no cards with prices
+        if (cards.isEmpty || !cards.any((card) => card.price != null && card.price! > 0)) {
+          return EmptyCollectionView(
+            title: 'Battle Arena',
+            message: 'Add cards with prices to your collection to battle them against each other',
+            buttonText: 'Add Cards',
+            icon: Icons.sports_kabaddi,
+            uniqueId: 'arena',
+          );
+        }
+        
+        return _buildContent();
+      },
+    ),
+  );
+}
+
   
   Widget _buildIntroAnimation() {
     return Stack(

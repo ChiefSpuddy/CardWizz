@@ -9,6 +9,8 @@ import 'package:provider/provider.dart';
 import 'card_grid_item.dart';
 import '../../widgets/styled_toast.dart'; // Add this import for StyledToast
 import '../../providers/currency_provider.dart';
+import 'package:flutter/services.dart'; // Add this import for HapticFeedback
+import '../../providers/app_state.dart';  // Import the AppState provider
 
 class CardSearchGrid extends StatefulWidget {
   final List<TcgCard> cards;
@@ -147,32 +149,47 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
     if (_storage == null) return;
     
     try {
-      // Add the card to collection
+      // Add haptic feedback for better user experience
+      HapticFeedback.lightImpact();
+      
+      // CRITICAL: Don't update any state or UI before completing the operation
+      
+      // Save card silently in the background
       await _storage!.saveCard(card);
       
-      // Update local state immediately to show card as added
-      setState(() {
-        _collectionCardIds.add(card.id);
-      });
-      
-      // Use the widget's onAddToCollection handler if provided 
-      if (widget.onAddToCollection != null) {
-        widget.onAddToCollection!(card);
+      // IMPORTANT: Update local state only *after* save completes
+      if (mounted) {
+        setState(() {
+          _collectionCardIds.add(card.id);
+        });
       }
-      // Remove the internal toast display - let the parent component handle it
-    } catch (e) {
-      print('Error adding card to collection: $e');
       
-      // Only show error toast if parent handler not provided
-      if (widget.onAddToCollection == null && mounted) {
-        showToast(
-          context: context,
-          title: 'Failed to Add Card',
-          subtitle: e.toString(),
-          icon: Icons.error_outline,
-          isError: true,
-          compact: true,
-          bottomOffset: 56,
+      // Show feedback only after everything is done
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${card.name} added to collection'),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.fromLTRB(20, 0, 20, 100), // Position higher up
+          ),
+        );
+      }
+      
+      // IMPORTANT: DO NOT navigate or trigger any parent functions
+    } catch (e) {
+      print('Error adding card: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+            margin: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+          ),
         );
       }
     }
@@ -210,12 +227,58 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
               widget.loadImage(imageUrl);
             }
             
-            // Use our new CardGridItem
+            // CRITICAL FIX: Create a direct add handler that bypasses the widget's handler completely
+            void directAddHandler(TcgCard cardToAdd) async {
+              // Add haptic feedback
+              HapticFeedback.lightImpact();
+              
+              try {
+                // Get the storage service directly to bypass any parent widget handlers
+                final storageService = Provider.of<StorageService>(context, listen: false);
+                
+                // Save directly without going through widget.onAddToCollection 
+                await storageService.saveCard(cardToAdd);
+                
+                // Update local state to show check immediately
+                setState(() {
+                  _collectionCardIds.add(cardToAdd.id);
+                });
+                
+                // Show non-disruptive feedback
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${cardToAdd.name} added to collection'),
+                    duration: const Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                
+                // Notify app state but with a delay to avoid navigation issues
+                Future.delayed(const Duration(milliseconds: 500), () {
+                  final appState = Provider.of<AppState>(context, listen: false);
+                  appState.notifyCardChange();
+                });
+              } catch (e) {
+                print('Error in direct add handler: $e');
+                // Show error feedback
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: $e'),
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+            
+            // Use our new CardGridItem with the direct handler
             return CardGridItem(
               card: card,
               cachedImage: widget.imageCache[imageUrl],
               onCardTap: widget.onCardTap,
-              onAddToCollection: widget.onAddToCollection ?? (_) {}, // Pass it here with a default
+              // CRITICAL: Use the direct handler instead of the parent's handler
+              onAddToCollection: directAddHandler,
               isInCollection: _collectionCardIds.contains(card.id),
               currencySymbol: currencyProvider.symbol,
             );

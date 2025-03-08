@@ -16,8 +16,9 @@ import '../screens/home_screen.dart';
 import '../utils/hero_tags.dart';
 import '../utils/cache_manager.dart';
 import '../services/chart_service.dart';
-import '../widgets/empty_collection_view.dart';  // Add this import
+import '../widgets/empty_collection_view.dart';
 import '../widgets/portfolio_value_chart.dart';
+import '../widgets/standard_app_bar.dart'; // Add this import
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -635,12 +636,12 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   }
 
   Widget _buildEmptyState() {
-    // Return EmptyCollectionView directly for uniform alignment
     return const EmptyCollectionView(
       title: 'Welcome to CardWizz',
       message: 'Start building your collection by adding cards',
       buttonText: 'Add Your First Card',
       icon: Icons.add_circle_outline,
+      showHeader: false, // Add this parameter to hide the redundant header
     );
   }
 
@@ -657,219 +658,210 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final isSignedIn = appState.isAuthenticated;
+
+    // If not signed in, return the SignInView without showing navigation bar
+    if (!isSignedIn) {
+      return const SignInView(showNavigationBar: false);
+    }
+
+    // User is signed in - do NOT wrap with another Scaffold since the parent HomeScreen already provides one
     final user = appState.currentUser;
     final localizations = AppLocalizations.of(context);
 
-    // Remove the Scaffold and use a Column instead
-    return Column(
-      children: [
-        if (isSignedIn)
-          AppBar(
-            toolbarHeight: 44,
-            automaticallyImplyLeading: false,
-            title: user?.username != null ? RichText(
-              text: TextSpan(
-                style: Theme.of(context).textTheme.titleMedium,
-                children: [
-                  TextSpan(
-                    text: '${localizations.translate('welcome')} ',
-                  ),
-                  TextSpan(
-                    text: '@${user?.username ?? 'Guest'}',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ) : null,
-            leading: IconButton(
-              icon: const Icon(Icons.menu),
-              padding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-          ),
-        if (!isSignedIn && ModalRoute.of(context)?.settings.name == '/')
-          const Expanded(child: SignInView())
-        else
-          Expanded(
-            child: Stack(
-              children: [
-                // Background animation
-                Positioned.fill(
-                  child: Opacity(
-                    opacity: 0.3,
-                    child: Lottie.asset( 
-                      'assets/animations/background.json',
-                      fit: BoxFit.cover,
-                      repeat: true,
-                      frameRate: FrameRate(30),
-                      controller: _animationController,
-                    ),
-                  ),
+    return StreamBuilder<List<TcgCard>>(
+      stream: Provider.of<StorageService>(context).watchCards(),
+      initialData: const [],
+      builder: (context, snapshot) {
+        final currencyProvider = context.watch<CurrencyProvider>();
+        final cards = snapshot.data ?? [];
+        
+        final totalValueEur = cards.fold<double>(
+          0, 
+          (sum, card) => sum + (card.price ?? 0)
+        );
+        
+        final displayValue = currencyProvider.formatValue(totalValueEur);
+        final reversedCards = cards.reversed.toList();
+        
+        if (cards.isEmpty) {
+          return _buildEmptyState();
+        }
+
+        return Stack(
+          children: [
+            // Background animation
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.3,
+                child: Lottie.asset( 
+                  'assets/animations/background.json',
+                  fit: BoxFit.cover,
+                  repeat: true,
+                  frameRate: FrameRate(30),
+                  controller: _animationController,
                 ),
-                // Content
-                StreamBuilder<List<TcgCard>>(
-                  stream: Provider.of<StorageService>(context).watchCards(),
-                  initialData: const [],
-                  builder: (context, snapshot) {
-                    final currencyProvider = context.watch<CurrencyProvider>();
-                    final cards = snapshot.data ?? [];
-                    
-                    final totalValueEur = cards.fold<double>(
-                      0, 
-                      (sum, card) => sum + (card.price ?? 0)
-                    );
-                    
-                    final displayValue = currencyProvider.formatValue(totalValueEur);
-                    final reversedCards = cards.reversed.toList();
-                    
-                    if (cards.isEmpty) {
-                      return _buildEmptyState();
-                    }
+              ),
+            ),
+            
+            // Main content
+            SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Welcome message - moved from AppBar to a Padding
+                  if (user?.username != null) 
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: RichText(
+                        text: TextSpan(
+                          style: Theme.of(context).textTheme.titleMedium,
+                          children: [
+                            TextSpan(
+                              text: '${localizations.translate('welcome')} ',
+                            ),
+                            TextSpan(
+                              text: '@${user?.username ?? 'Guest'}',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
 
-                    print('HomeOverview: cards.length = ${cards.length}');
+                  // Summary Cards
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildSummaryCard(
+                            context,
+                            'Total Cards',
+                            cards.length.toString(),
+                            Icons.style,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildSummaryCard(
+                            context,
+                            'Collection Value',
+                            displayValue,
+                            Icons.currency_exchange,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                    return SingleChildScrollView(
+                  // Price Trend Chart
+                  if (cards.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8), // Reduced padding from 16 to 8
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Summary Cards
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _buildSummaryCard(
-                                    context,
-                                    'Total Cards',
-                                    cards.length.toString(),
-                                    Icons.style,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: _buildSummaryCard(
-                                    context,
-                                    'Collection Value',
-                                    displayValue,
-                                    Icons.currency_exchange,
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(height: 24),
+                          Provider<List<TcgCard>>.value(
+                            value: cards,
+                            child: const PortfolioValueChart(
+                              useFullWidth: true, // Set to true to use full width
+                              chartPadding: 16, // Add padding for better appearance
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ],
 
-                          // Price Trend Chart
-                          if (cards.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8), // Reduced padding from 16 to 8
+                  // Most Valuable Cards
+                  if (cards.isNotEmpty) ...[
+                    _buildTopCards(cards),
+                    const SizedBox(height: 8),
+                    _buildLatestSetCards(context),
+                    const SizedBox(height: 8),
+                  ],
+
+                  // Recent Cards
+                  if (cards.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Row(
+                        children: [
+                          Text(
+                            localizations.translate('recentAdditions'),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: _navigateToCollection,
+                            child: Text(localizations.translate('viewAll')),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      height: 200,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: reversedCards.length.clamp(0, 10),
+                        itemBuilder: (context, index) {
+                          final card = reversedCards[index];
+                          return GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CardDetailsScreen(
+                                  card: card,
+                                  heroContext: 'home_recent',
+                                ),
+                              ),
+                            ),
+                            child: Container(
+                              width: 140,
+                              margin: const EdgeInsets.only(right: 4),
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const SizedBox(height: 24),
-                                  Provider<List<TcgCard>>.value(
-                                    value: cards,
-                                    child: const PortfolioValueChart(
-                                      useFullWidth: true, // Set to true to use full width
-                                      chartPadding: 16, // Add padding for better appearance
+                                  Expanded(
+                                    child: Hero(
+                                      tag: HeroTags.cardImage(card.id, context: 'home_recent'),
+                                      child: Image.network(
+                                        card.imageUrl,
+                                        fit: BoxFit.contain,
+                                      ),
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
-
-                          // Most Valuable Cards
-                          if (cards.isNotEmpty) ...[
-                            _buildTopCards(cards),
-                            const SizedBox(height: 8),
-                            _buildLatestSetCards(context),
-                            const SizedBox(height: 8),
-                          ],
-
-                          // Recent Cards
-                          if (cards.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    localizations.translate('recentAdditions'),
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  TextButton(
-                                    onPressed: _navigateToCollection,
-                                    child: Text(localizations.translate('viewAll')),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(
-                              height: 200,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: reversedCards.length.clamp(0, 10),
-                                itemBuilder: (context, index) {
-                                  final card = reversedCards[index];
-                                  return GestureDetector(
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => CardDetailsScreen(
-                                          card: card,
-                                          heroContext: 'home_recent',
+                                  if (card.price != null)
+                                    Padding(
+                                      padding: const EdgeInsets.all(4),
+                                      child: Text(
+                                        currencyProvider.formatValue(card.price!),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ),
-                                    child: Container(
-                                      width: 140,
-                                      margin: const EdgeInsets.only(right: 4),
-                                      child: Column(
-                                        children: [
-                                          Expanded(
-                                            child: Hero(
-                                              tag: HeroTags.cardImage(card.id, context: 'home_recent'),
-                                              child: Image.network(
-                                                card.imageUrl,
-                                                fit: BoxFit.contain,
-                                              ),
-                                            ),
-                                          ),
-                                          if (card.price != null)
-                                            Padding(
-                                              padding: const EdgeInsets.all(4),
-                                              child: Text(
-                                                currencyProvider.formatValue(card.price!),
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
+                                ],
                               ),
                             ),
-                          ],
-                        ],
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
-              ],
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-      ],
+          ],
+        );
+      },
     );
   }
 
