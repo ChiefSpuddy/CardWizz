@@ -1712,10 +1712,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     
     return Scaffold(
       key: _scaffoldKey,
-      appBar: const StandardAppBar(
+      appBar: isSignedIn ? const StandardAppBar(
         transparent: true,
         elevation: 0,
-      ),
+      ) : null, // Hide app bar when not signed in
       drawer: const AppDrawer(),
       body: Stack(
         children: [
@@ -1734,7 +1734,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           SafeArea(
             child: isSignedIn && context.watch<AppState>().currentUser != null
                 ? _buildProfileContent(context, context.watch<AppState>().currentUser!)
-                : const SignInView(),
+                : const SignInView(
+                    showAppBar: false, // Explicitly set to false
+                    showNavigationBar: false,
+                  ),
           ),
         ],
       ),

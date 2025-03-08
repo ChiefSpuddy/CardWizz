@@ -636,12 +636,20 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
   }
 
   Widget _buildEmptyState() {
-    return const EmptyCollectionView(
-      title: 'Welcome to CardWizz',
-      message: 'Start building your collection by adding cards',
-      buttonText: 'Add Your First Card',
-      icon: Icons.add_circle_outline,
-      showHeader: false, // Add this parameter to hide the redundant header
+    // Wrap in a Scaffold with no appBar to properly override parent Scaffold
+    return Scaffold(
+      // Explicitly set appBar to null to hide it
+      appBar: null,
+      // Make background transparent so parent's background shows through
+      backgroundColor: Colors.transparent,
+      body: const EmptyCollectionView(
+        title: 'Welcome to CardWizz',
+        message: 'Start building your collection by adding cards',
+        buttonText: 'Add Your First Card',
+        icon: Icons.add_circle_outline,
+        showHeader: false, // Hide the redundant header
+        showAppBar: false, // Explicitly set to false to hide app bar
+      ),
     );
   }
 
@@ -661,7 +669,12 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
 
     // If not signed in, return the SignInView without showing navigation bar
     if (!isSignedIn) {
-      return const SignInView(showNavigationBar: false);
+      // Use the same Scaffold wrapper approach for SignInView
+      return Scaffold(
+        appBar: null,
+        backgroundColor: Colors.transparent,
+        body: const SignInView(showNavigationBar: false, showAppBar: false),
+      );
     }
 
     // User is signed in - do NOT wrap with another Scaffold since the parent HomeScreen already provides one

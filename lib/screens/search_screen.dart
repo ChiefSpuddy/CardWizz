@@ -1285,13 +1285,25 @@ class _SearchScreenState extends State<SearchScreen> {
           if (_searchResults != null || _setResults != null)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.only(left: 8.0, top: 8.0),
+                padding: const EdgeInsets.fromLTRB(8.0, 12.0, 8.0, 4.0),
                 child: TextButton.icon(
                   onPressed: _handleBackToCategories,
                   icon: const Icon(Icons.arrow_back),
                   label: const Text('Back to Categories'),
                   style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.darkAccentPrimary  // Use accent color for dark mode
+                        : Theme.of(context).primaryColor,
+                    backgroundColor: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white.withOpacity(0.05)  // Add subtle background in dark mode
+                        : Colors.transparent,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: Theme.of(context).brightness == Brightness.dark
+                          ? BorderSide(color: Colors.white.withOpacity(0.1))  // Subtle border
+                          : BorderSide.none,
+                    ),
                   ),
                 ),
               ),

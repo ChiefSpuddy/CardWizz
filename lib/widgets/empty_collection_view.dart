@@ -15,6 +15,7 @@ class EmptyCollectionView extends StatefulWidget {
   final bool showButton;
   final String uniqueId;
   final bool showHeader;
+  final bool showAppBar; // Add this parameter
 
   const EmptyCollectionView({
     super.key,
@@ -26,6 +27,7 @@ class EmptyCollectionView extends StatefulWidget {
     this.showButton = true,
     this.uniqueId = '',
     this.showHeader = true,
+    this.showAppBar = false, // Default to false to be consistent with SignInView
   });
 
   @override

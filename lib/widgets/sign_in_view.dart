@@ -17,10 +17,12 @@ import '../widgets/styled_toast.dart'; // Add this import for StyledToast
 class SignInView extends StatefulWidget {
   // Change default to false since the RootNavigator already provides a navigation bar
   final bool showNavigationBar;
+  final bool showAppBar; // Add this parameter
   
   const SignInView({
     super.key,
     this.showNavigationBar = false, // Set default to false
+    this.showAppBar = false, // Default to false
   });
 
   @override
@@ -177,6 +179,11 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     final size = MediaQuery.of(context).size;
     
     return Scaffold(
+      // Hide app bar based on widget parameter
+      appBar: widget.showAppBar ? AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ) : null,
       body: Stack(
         fit: StackFit.expand,
         children: [
