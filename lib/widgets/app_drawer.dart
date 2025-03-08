@@ -188,12 +188,6 @@ class AppDrawer extends StatelessWidget {
                           title: 'Search',
                           onTap: () => _navigateAndClose(context, AppRoutes.search),
                         ),
-                        _buildMenuItem(
-                          context,
-                          icon: Icons.grid_view_outlined,
-                          title: 'Collection Tracker',
-                          onTap: () => _navigateAndClose(context, '/dex'), // Use /dex route instead of /collection-index
-                        ),
                         ListTile(
                           leading: const Icon(Icons.sports_kabaddi),
                           title: const Text('Card Arena'),

@@ -505,7 +505,6 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
       // Use the static method to conditionally create appBar
       appBar: StandardAppBar.createIfSignedIn(
         context,
-        title: 'Collection',
         transparent: true,
         elevation: 0,
         actions: isSignedIn ? [

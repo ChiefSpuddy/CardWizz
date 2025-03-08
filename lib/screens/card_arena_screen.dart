@@ -605,7 +605,7 @@ void _completeBattle(List<BattleMove> moves) {
 
   return Scaffold(
     appBar: StandardAppBar(
-      title: _currentState == 'card_selection' ? 'Choose Your Champion' : 'Card Arena',
+      transparent: true,
       actions: _currentState == 'selecting' 
         ? [
             IconButton(
@@ -847,19 +847,13 @@ void _completeBattle(List<BattleMove> moves) {
   }
   
   Widget _buildSelectingState() {
-  // Replace the background image with a gradient
+  // Get the theme colors to use appropriate background color based on mode
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final backgroundColor = Theme.of(context).colorScheme.background;
+  
+  // Use background color from theme instead of the purple gradient
   return Container(
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.purple.shade900,
-          Colors.indigo.shade900,
-          Colors.blue.shade900,
-        ],
-      ),
-    ),
+    color: backgroundColor, // Uses white in light mode, black in dark mode
     child: _isLoading 
       ? _buildLoadingView() 
       : SingleChildScrollView(

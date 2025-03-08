@@ -1731,7 +1731,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       // Updated app bar with conditional creation
       appBar: StandardAppBar.createIfSignedIn(
         context,
-        title: 'Analytics',
         transparent: true,
         elevation: 0,
         actions: isSignedIn ? _buildAppBarActions() : null,

@@ -1712,11 +1712,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     
     return Scaffold(
       key: _scaffoldKey,
-      appBar: StandardAppBar.createIfSignedIn(
-        context,
-        title: 'Profile',
-        onLeadingPressed: () => _scaffoldKey.currentState?.openDrawer(),
+      appBar: const StandardAppBar(
+        transparent: true,
+        elevation: 0,
       ),
+      drawer: const AppDrawer(),
       body: Stack(
         children: [
           Positioned.fill(
