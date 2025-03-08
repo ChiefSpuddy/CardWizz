@@ -1260,10 +1260,23 @@ class _SearchScreenState extends State<SearchScreen> {
     return Scaffold(
       key: _scaffoldKey,
       drawer: const AppDrawer(),
-      // Custom app bar with integrated search
-      appBar: const StandardAppBar(
-        transparent: true,
-        elevation: 0,
+      // Replace the StandardAppBar with our SearchAppBar
+      appBar: SearchAppBar(
+        searchController: _searchController,
+        onSearchChanged: _onSearchChanged,
+        onClearSearch: _clearSearch,
+        currentSort: _currentSort,
+        sortAscending: _sortAscending,
+        onSortOptionsPressed: _showSortOptions,
+        hasResults: _searchResults != null || _setResults != null,
+        searchMode: _searchMode,
+        onSearchModeChanged: (modes) {
+          setState(() {
+            _searchMode = modes.first;
+            _clearSearch();
+          });
+        },
+        onCameraPressed: _onCameraPressed,
       ),
       body: CustomScrollView(
         controller: _scrollController,

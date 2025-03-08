@@ -9,7 +9,8 @@
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
-		<string>com.sammay.cardwizz</string>  <!-- Make sure this matches your Xcode configuration -->
+		<string>com.sammay.cardwizz</string>
+		<!-- Make sure this matches your Xcode configuration -->
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>

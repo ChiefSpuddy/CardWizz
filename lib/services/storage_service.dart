@@ -121,26 +121,43 @@ class StorageService {
 
   Future<void> _init() async {
     if (!_isInitialized) {
-      _prefs = await SharedPreferences.getInstance();
-      _isInitialized = true;
-      _isReadyNotifier.value = true;  // Add this
-      
-      // Look for stored user ID and restore it
-      final savedUserId = _prefs.getString('current_user_id') ?? 
-                       _prefs.getString('user_id');
-      
-      if (savedUserId != null) {
-        AppLogger.d('StorageService found saved user ID: $savedUserId', tag: 'Storage');
-        _currentUserId = savedUserId;
-        _loadInitialData();
+      try {
+        // First load SharedPreferences as it's critical
+        _prefs = await SharedPreferences.getInstance();
+        
+        // Set initialized flag early - actual data can load in background
+        _isInitialized = true;
+        _isReadyNotifier.value = true;
+        
+        // Look for stored user ID and restore it
+        final savedUserId = _prefs.getString('current_user_id') ?? 
+                           _prefs.getString('user_id');
+        
+        if (savedUserId != null) {
+          AppLogger.d('StorageService found saved user ID: $savedUserId', tag: 'Storage');
+          _currentUserId = savedUserId;
+          
+          // Load data in background to avoid blocking UI
+          Future.microtask(() => _loadInitialData());
+        }
+        
+        _isSyncEnabled = _prefs.getBool('sync_enabled') ?? false;
+        
+        // Don't wait for sync to finish initialization
+        if (_isSyncEnabled) {
+          // Start sync in background
+          Future.delayed(
+            const Duration(seconds: 2),
+            () => _doSync(force: false),
+          );
+        }
+      } catch (e) {
+        AppLogger.e('Error initializing storage service', tag: 'Storage', error: e);
+        // Still mark as initialized to avoid blocking app startup
+        _isInitialized = true;
+        _isReadyNotifier.value = true;
+        rethrow;
       }
-      
-      _isSyncEnabled = _prefs.getBool('sync_enabled') ?? false;
-      if (_isSyncEnabled) {
-        // Start sync if it was enabled
-        _doSync(force: true);
-      }
-      _loadInitialData();
     }
   }
 
@@ -174,25 +191,49 @@ class StorageService {
   }
 
   // Make sure watchCards() always emits current data
-  Stream<List<TcgCard>> watchCards() {
-    // IMPORTANT: Print this to help with debugging
-    debugPrint('watchCards called, currentUserId: $_currentUserId, initialized: $_isInitialized');
-    
-    if (!_isInitialized || _currentUserId == null) {
-      return Stream.value([]);
+  Stream<List<TcgCard>> watchCards({bool verbose = false}) {
+    // Only log if verbose is true to reduce log spam
+    if (verbose) {
+      debugPrint('watchCards called, currentUserId: $_currentUserId, initialized: $_isInitialized');
+      
+      if (!_isInitialized || _currentUserId == null) {
+        return Stream.value([]);
+      }
+      
+      // Always load fresh cards from storage
+      final cards = _getCards();
+      debugPrint('watchCards: returning ${cards.length} cards for user $_currentUserId');
+      
+      // Create a new stream that emits current cards immediately then listens for updates
+      return _cardsController.stream.startWith(cards);
+    } else {
+      // Same functionality but without the logging
+      if (!_isInitialized || _currentUserId == null) {
+        return Stream.value([]);
+      }
+      
+      final cards = _getCards();
+      return _cardsController.stream.startWith(cards);
     }
-    
-    // Always load fresh cards from storage
-    final cards = _getCards();
-    debugPrint('watchCards: returning ${cards.length} cards for user $_currentUserId');
-    
-    // Create a new stream that emits current cards immediately then listens for updates
-    return _cardsController.stream.startWith(cards);
   }
 
   Future<void> refreshCards() async {
-    await _loadCards();
+  // Only load cards, don't trigger other UI updates
+  try {
+    if (_currentUserId == null) {
+      AppLogger.d('Cannot refresh cards: No current user ID', tag: 'Storage');
+      return;
+    }
+    
+    final cards = _getCards();
+    _cardsController.add(cards);
+    
+    // Don't call _notifyCardChange() to avoid cascading UI updates
+    AppLogger.d('Cards refreshed: ${cards.length} cards loaded', tag: 'Storage');
+  } catch (e) {
+    AppLogger.e('Error refreshing cards', tag: 'Storage', error: e);
   }
+}
 
   // Simplify the card storage/retrieval methods
   List<TcgCard> _getCards() {
@@ -223,9 +264,15 @@ class StorageService {
   // Keep async public method
   Future<List<TcgCard>> getCards() async {
     try {
-      final key = _getCardsKey();
-      final cards = _getCards(); // Use the internal method directly
-      return cards;
+      // Cache optimization: if we have loaded cards in memory and there are some,
+      // return them immediately to speed up first render
+      final cachedCards = _getCards();
+      if (cachedCards.isNotEmpty) {
+        return cachedCards;
+      }
+      
+      // Otherwise continue with normal loading
+      return _getCards();
     } catch (e) {
       AppLogger.e('❌ Storage error', tag: 'Storage', error: e);
       return [];

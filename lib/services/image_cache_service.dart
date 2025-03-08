@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
@@ -12,15 +13,26 @@ class ImageCacheService {
   factory ImageCacheService() => _instance;
   ImageCacheService._internal();
 
-  static final _cacheManager = CacheManager(
-    Config(
-      'pokemon_cards_cache',
-      stalePeriod: const Duration(days: 365),
-      maxNrOfCacheObjects: 2000,
-      repo: JsonCacheInfoRepository(databaseName: 'pokemon_cards_cache'),
-      fileService: HttpFileService(),
-    ),
-  );
+  late final CacheManager _cacheManager;
+  bool _isInitialized = false;
+
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+    
+    final cacheDir = await getTemporaryDirectory();
+    _cacheManager = CacheManager(
+      Config(
+        'cardwizz_image_cache',
+        stalePeriod: const Duration(days: 7),
+        maxNrOfCacheObjects: 200,
+        repo: JsonCacheInfoRepository(databaseName: 'cardwizz_image_cache'),
+        fileService: HttpFileService(),
+        fileSystem: IOFileSystem(cacheDir.path),
+      ),
+    );
+    
+    _isInitialized = true;
+  }
 
   Future<String?> getCachedImagePath(String url) async {
     try {

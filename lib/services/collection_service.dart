@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert'; // Add this import for jsonDecode
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
@@ -450,5 +451,75 @@ class CollectionService {
 
   void dispose() {
     _collectionsController.close();
+  }
+
+  // Update collection loading method:
+  Future<void> loadCollections() async {
+    if (_currentUserId == null) return;
+    
+    try {
+      final key = 'user_${_currentUserId}_collections';
+      final data = _storage.prefs.getString(key);
+      
+      if (data != null) {
+        final decoded = jsonDecode(data) as List;
+        
+        // Only parse basic info first, load full details later
+        _collections = decoded.map((item) {
+          final json = item as Map<String, dynamic>;
+          // Just create collection with minimal data
+          return CustomCollection(
+            id: json['id'] as String,
+            name: json['name'] as String,
+            description: json['description'] as String? ?? '',
+            cardIds: [],
+            createdAt: DateTime.fromMillisecondsSinceEpoch(json['created_at'] as int),
+            color: Color(json['color'] as int? ?? 0xFF90CAF9),
+          );
+        }).toList();
+        
+        // Notify listeners with basic data
+        _collectionsController.add(_collections);
+        
+        // Load full collection details in background
+        Future.microtask(() => _loadCollectionDetails(decoded));
+      } else {
+        _collections = [];
+        _collectionsController.add([]);
+      }
+    } catch (e) {
+      debugPrint('Error loading collections: $e');
+      _collections = [];
+      _collectionsController.add([]);
+    }
+  }
+
+  // Helper to load full collection details in background
+  Future<void> _loadCollectionDetails(List<dynamic> collectionsData) async {
+    try {
+      final allCards = await _storage.getCards();
+      
+      for (int i = 0; i < collectionsData.length; i++) {
+        final json = collectionsData[i] as Map<String, dynamic>;
+        final cardIds = (json['card_ids'] as String?)?.split(',')
+            .where((id) => id.isNotEmpty)
+            .toList() ?? [];
+        
+        // Find cards that belong to this collection
+        final collectionCards = allCards
+            .where((card) => cardIds.contains(card.id))
+            .toList();
+        
+        // Update collection with full card data
+        if (i < _collections.length) {
+          _collections[i] = _collections[i].copyWith(cardIds: cardIds);
+        }
+      }
+      
+      // Notify listeners with complete data
+      _collectionsController.add(_collections);
+    } catch (e) {
+      debugPrint('Error loading collection details: $e');
+    }
   }
 }

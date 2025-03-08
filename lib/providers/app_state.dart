@@ -23,47 +23,61 @@ class AppState with ChangeNotifier {
 
   AppState(this._storageService, this._authService);
 
-  // Fix the initialize method to properly restore user state
+  // Optimize the initialize method:
   Future<void> initialize() async {
     _isLoading = true;
     notifyListeners();
-
-    _prefs = await SharedPreferences.getInstance();
     
-    // First restore auth state
-    await _authService.restoreAuthState();
-    
-    // Initialize storage and collection services AFTER auth is restored
-    _collectionService = await CollectionService.getInstance();
-    
-    // Fix synchronization issue - make this explicit
-    if (_authService.isAuthenticated && _authService.currentUser != null) {
-      final userId = _authService.currentUser!.id;
-      print('AppState: Initializing with authenticated user: $userId');
+    try {
+      // Load preferences first - quick operation
+      _prefs = await SharedPreferences.getInstance();
       
-      // CRITICAL FIX: Wait for storage service to set user ID
-      _storageService.setCurrentUser(userId);
+      // Handle auth state restoration - critical for startup
+      await _authService.restoreAuthState();
       
-      // Wait for collection service too
-      if (_collectionService != null) {
-        await _collectionService!.setCurrentUser(userId);
+      // Initialize storage in a separate microtask to avoid blocking UI
+      if (_authService.isAuthenticated && _authService.currentUser != null) {
+        final userId = _authService.currentUser!.id;
+        print('AppState: Initializing with authenticated user: $userId');
+        
+        // Set user ID in storage service
+        _storageService.setCurrentUser(userId);
+        
+        // Load collection service in background
+        _initializeCollectionServiceAsync(userId);
+      } else {
+        print('AppState: No authenticated user found');
       }
       
-      // Give a small delay to ensure data is loaded correctly
-      await Future.delayed(const Duration(milliseconds: 100));
-      
-      // Force refresh storage to ensure cards are loaded
-      await _storageService.refreshState();
-      
-      print('AppState: User data initialized successfully');
-    } else {
-      print('AppState: No authenticated user found');
+      // Initialize these settings in background
+      Future.microtask(() => _initializePrivacySettings());
+    } catch (e) {
+      print('AppState initialization error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
+  }
 
-    await _initializePrivacySettings();
-
-    _isLoading = false;
-    notifyListeners();
+  // Add this helper method to move work to background
+  Future<void> _initializeCollectionServiceAsync(String userId) async {
+    try {
+      // Get collection service instance
+      _collectionService = await CollectionService.getInstance();
+      
+      // Set user ID
+      await _collectionService?.setCurrentUser(userId);
+      
+      // Refresh state in background
+      Future.delayed(
+        const Duration(milliseconds: 300),
+        () => _storageService.refreshState(),
+      );
+      
+      print('AppState: Collection service initialized successfully');
+    } catch (e) {
+      print('AppState: Error initializing collection service: $e');
+    }
   }
 
   bool get isLoading => _isLoading;

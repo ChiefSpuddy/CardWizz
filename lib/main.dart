@@ -27,87 +27,172 @@ import 'providers/sort_provider.dart';
 import 'utils/string_extensions.dart';
 import 'constants/app_colors.dart';
 import 'screens/scanner_screen.dart';
-import 'services/ebay_api_service.dart';  // Add this import
-import 'services/ebay_search_service.dart';  // Add this import
+import 'services/ebay_api_service.dart';
+import 'services/ebay_search_service.dart';
 import 'utils/logger.dart';
-import 'services/battle_service.dart'; // Add the import for BattleService
+import 'services/battle_service.dart';
+import 'screens/loading_screen.dart';
+import 'utils/create_card_back.dart'; // Add this import
+import 'package:flutter/animation.dart';
 
-void main() async {
-  // Set up error handling
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    AppLogger.e('Flutter error: ${details.exception}', 
-        error: details.exception, 
-        stackTrace: details.stack);
-  };
+// The simplest possible main function
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Start with just the loading screen
+  runApp(const SimpleLoadingApp());
+  
+  // Initialize the actual app behind the scenes
+  _initializeAppInBackground();
+}
 
-  // Configure Logger - update this line to control logging
-  AppLogger.logLevel = 2; // Show only INFO level and above (remove many debug messages)
-  // AppLogger.quietMode(); // Uncomment this to see only warnings and errors
-  // AppLogger.disableLogging(); // Uncomment this to disable all logs
-
-  AppLogger.i('Flutter app starting...'); // This will still show
-
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+// A clean, separate function to handle initialization with transition
+Future<void> _initializeAppInBackground() async {
+  try {
+    // Shorter initial delay
+    await Future.delayed(const Duration(milliseconds: 300));
     
-    debugPrint('Flutter app starting...');
+    // Initialize services
+    final storageService = await StorageService.init(null);
+    final authService = AuthService();
+    await authService.initialize();
     
-    // Initialize services first with proper constructors
-    final storageService = await StorageService.init(null); // Changed from initialize() to init()
-    final authService = AuthService(); // Removed storageService parameter
-    await authService.initialize(); // Initialize after construction
-    
+    // Prepare other services
     final tcgApiService = TcgApiService();
     final collectionService = await CollectionService.getInstance();
     final scannerService = ScannerService();
     final purchaseService = PurchaseService();
-    await purchaseService.initialize();  // Make sure to initialize
+    await purchaseService.initialize();
     final ebayApiService = EbayApiService();
     final ebaySearchService = EbaySearchService();
-    final battleService = BattleService(); // Add this line
+    final battleService = BattleService();
     
-    // Initialize providers with required parameters
+    // Initialize providers
     final appState = AppState(storageService, authService);
     final themeProvider = ThemeProvider();
     final currencyProvider = CurrencyProvider();
     final sortProvider = SortProvider();
     
-    // Run app with providers properly set up
-    runApp(
-      MultiProvider(
-        providers: [
-          // ListenableProvider for services that extend ChangeNotifier
-          ListenableProvider<PurchaseService>.value(value: purchaseService),
-          ListenableProvider<EbaySearchService>.value(value: ebaySearchService),
-          
-          // Regular Provider for services that don't need updates
-          Provider<StorageService>.value(value: storageService),
-          Provider<AuthService>.value(value: authService),
-          Provider<TcgApiService>.value(value: tcgApiService),
-          Provider<CollectionService>.value(value: collectionService),
-          Provider<ScannerService>.value(value: scannerService),
-          Provider<EbayApiService>.value(value: ebayApiService),
-          
-          // Change this line from Provider to ChangeNotifierProvider
-          ChangeNotifierProvider<BattleService>.value(value: battleService),
-          
-          // ChangeNotifierProvider for state management
-          ChangeNotifierProvider<AppState>.value(value: appState),
-          ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
-          ChangeNotifierProvider<CurrencyProvider>.value(value: currencyProvider),
-          ChangeNotifierProvider<SortProvider>.value(value: sortProvider),
-        ],
-        child: const MyApp(),
-      ),
+    // Create the full app widget for transition
+    final fullApp = MultiProvider(
+      providers: [
+        ListenableProvider<PurchaseService>.value(value: purchaseService),
+        ListenableProvider<EbaySearchService>.value(value: ebaySearchService),
+        Provider<StorageService>.value(value: storageService),
+        Provider<AuthService>.value(value: authService),
+        Provider<TcgApiService>.value(value: tcgApiService),
+        Provider<CollectionService>.value(value: collectionService),
+        Provider<ScannerService>.value(value: scannerService),
+        Provider<EbayApiService>.value(value: ebayApiService),
+        ChangeNotifierProvider<BattleService>.value(value: battleService),
+        ChangeNotifierProvider<AppState>.value(value: appState),
+        ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
+        ChangeNotifierProvider<CurrencyProvider>.value(value: currencyProvider),
+        ChangeNotifierProvider<SortProvider>.value(value: sortProvider),
+      ],
+      child: const MyApp(),
     );
     
-    debugPrint('App initialized with providers');
-  }, (error, stack) {
-    debugPrint('FATAL ERROR: $error');
-    debugPrint('Stack trace: $stack');
-  });
+    // Run the full app with a beautiful transition
+    runApp(AppTransition(child: fullApp));
+    
+  } catch (e, stack) {
+    debugPrint('Error during initialization: $e');
+    debugPrint(stack.toString());
+  }
 }
+
+// Simple app that ONLY shows the loading screen with animated progress
+class SimpleLoadingApp extends StatefulWidget {
+  const SimpleLoadingApp({Key? key}) : super(key: key);
+
+  @override
+  State<SimpleLoadingApp> createState() => _SimpleLoadingAppState();
+}
+
+class _SimpleLoadingAppState extends State<SimpleLoadingApp> {
+  double _simulatedProgress = 0.0;
+  String _loadingMessage = 'Starting CardWizz...';
+  late Timer _progressTimer;
+  final List<String> _loadingMessages = [
+    'Starting CardWizz...',
+    'Loading resources...',
+    'Getting things ready...',
+    'Finalizing...',  // Reduced number of messages for faster loading
+  ];
+  int _messageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startProgressSimulation();
+  }
+
+  void _startProgressSimulation() {
+    // Update progress every 50ms instead of 80ms for faster animation
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (_simulatedProgress < 0.95) {
+        setState(() {
+          // Increase increments for faster progress
+          double increment = 0.015;  // Was 0.01
+          if (_simulatedProgress > 0.7) {
+            increment = 0.01;  // Was 0.005
+          } else if (_simulatedProgress < 0.2) {
+            increment = 0.025;  // Was 0.015
+          }
+          
+          _simulatedProgress += increment;
+          
+          // Update messages more frequently (every 15 ticks instead of 25)
+          if (_simulatedProgress > 0.2 && 
+              _simulatedProgress < 0.9 && 
+              timer.tick % 15 == 0 && 
+              _messageIndex < _loadingMessages.length - 1) {
+            _messageIndex++;
+            _loadingMessage = _loadingMessages[_messageIndex];
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _progressTimer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.light(
+          primary: Colors.blue.shade700,
+          secondary: Colors.lightBlue,
+          surface: Colors.white,
+          background: Colors.white,
+        ),
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.dark(
+          primary: Colors.blue.shade300,
+          secondary: Colors.lightBlue,
+          surface: const Color(0xFF121212),
+          background: const Color(0xFF121212),
+        ),
+      ),
+      // Use system brightness to match the device theme
+      themeMode: ThemeMode.system,
+      home: LoadingScreen(
+        progress: _simulatedProgress,
+        message: _loadingMessage,
+      ),
+    );
+  }
+}
+
+// The rest of your code...
 
 // Debug wrapper to catch early startup issues
 class AppStartupDebugWrapper extends StatefulWidget {
@@ -261,6 +346,76 @@ class MyApp extends StatelessWidget {
           );
         }
         return null;
+      },
+    );
+  }
+}
+
+// New class for handling the transition animation
+class AppTransition extends StatefulWidget {
+  final Widget child;
+  
+  const AppTransition({Key? key, required this.child}) : super(key: key);
+  
+  @override
+  State<AppTransition> createState() => _AppTransitionState();
+}
+
+class _AppTransitionState extends State<AppTransition> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+  
+  @override
+  void initState() {
+    super.initState();
+    
+    // Create animation controller
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    // Create fade animation
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
+      ),
+    );
+    
+    // Create scale animation
+    _scaleAnimation = Tween<double>(begin: 1.05, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
+      ),
+    );
+    
+    // Start animation after build completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.forward();
+    });
+  }
+  
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return FadeTransition(
+          opacity: _fadeAnimation,
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            child: widget.child,
+          ),
+        );
       },
     );
   }
