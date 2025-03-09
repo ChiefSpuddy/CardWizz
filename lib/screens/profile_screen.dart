@@ -745,7 +745,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     leading: const Icon(Icons.privacy_tip_outlined),
                     title: Text(localizations.translate('privacyPolicy')),
                     onTap: () => launchUrl(
-                      Uri.parse('https://chiefspuddy.github.io/CardWizz/#privacy-policy'),
+                      Uri.parse('https://cardwizz.com/privacy.html'),
                       mode: LaunchMode.externalApplication,
                     ),
                   ),
@@ -1013,7 +1013,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         const SizedBox(width: 8),
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => _launchUrl('https://chiefspuddy.github.io/CardWizz/#privacy-policy'),
+                            onPressed: () => _launchUrl('https://cardwizz.com/privacy.html'),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
@@ -1205,7 +1205,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             child: const Text('Terms'),
           ),
           TextButton(
-            onPressed: () => _launchUrl('https://chiefspuddy.github.io/CardWizz/#privacy-policy'),
+            onPressed: () => _launchUrl('https://cardwizz.com/privacy.html'),
             child: const Text('Privacy'),
           ),
           TextButton(
