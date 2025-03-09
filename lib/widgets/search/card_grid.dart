@@ -12,6 +12,7 @@ import '../../providers/currency_provider.dart';
 import 'package:flutter/services.dart'; // Add this import for HapticFeedback
 import '../../providers/app_state.dart';  // Import the AppState provider
 import '../../widgets/bottom_notification.dart'; // Add our new notification class
+import 'package:collection/collection.dart'; // Add this import at the top with other imports
 
 class CardSearchGrid extends StatefulWidget {
   final List<TcgCard> cards;
@@ -97,9 +98,14 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
       final cards = await _storage!.getCards();
       if (!mounted) return;
       
-      setState(() {
-        _collectionCardIds = cards.map((c) => c.id).toSet();
-      });
+      final newIds = cards.map((c) => c.id).toSet();
+      
+      // Only update state if the collection has actually changed
+      if (!const SetEquality().equals(_collectionCardIds, newIds)) {
+        setState(() {
+          _collectionCardIds = newIds;
+        });
+      }
     } catch (e) {
       print('Error loading collection status: $e');
     }
@@ -206,6 +212,7 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
     }
     
     final currencyProvider = Provider.of<CurrencyProvider>(context);
+    final appState = Provider.of<AppState>(context);
 
     return SliverPadding(
       padding: const EdgeInsets.all(8),
@@ -228,56 +235,15 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
               widget.loadImage(imageUrl);
             }
             
-            // CRITICAL FIX: Create a direct add handler that bypasses the widget's handler completely
-            void directAddHandler(TcgCard cardToAdd) async {
-              // Add haptic feedback
-              HapticFeedback.lightImpact();
-              
-              try {
-                // Get the storage service directly to bypass any parent widget handlers
-                final storageService = Provider.of<StorageService>(context, listen: false);
-                
-                // Save directly without going through widget.onAddToCollection 
-                await storageService.saveCard(cardToAdd);
-                
-                // Update local state to show check immediately
-                setState(() {
-                  _collectionCardIds.add(cardToAdd.id);
-                });
-                
-                // Show feedback with our new notification
-                BottomNotification.show(
-                  context: context,
-                  title: 'Added to Collection',
-                  message: cardToAdd.name,
-                  icon: Icons.check_circle,
-                );
-                
-                // Notify app state but with a delay to avoid navigation issues
-                Future.delayed(const Duration(milliseconds: 500), () {
-                  final appState = Provider.of<AppState>(context, listen: false);
-                  appState.notifyCardChange();
-                });
-              } catch (e) {
-                print('Error in direct add handler: $e');
-                // Show error with our notification
-                BottomNotification.show(
-                  context: context,
-                  title: 'Error',
-                  message: 'Failed to add card: $e',
-                  icon: Icons.error_outline,
-                  isError: true,
-                );
-              }
-            }
-            
-            // Use our new CardGridItem with the direct handler
+            // FIXED: Add a key to force rebuild when collection status changes
+            // This ensures each card's UI reflects its current state
             return CardGridItem(
+              key: ValueKey('card_${card.id}_${_collectionCardIds.contains(card.id)}'),
               card: card,
               cachedImage: widget.imageCache[imageUrl],
               onCardTap: widget.onCardTap,
-              // CRITICAL: Use the direct handler instead of the parent's handler
-              onAddToCollection: directAddHandler,
+              // FIXED: No need to use an actual method here - it's all handled in the card item
+              onAddToCollection: (_) {/* No-op */},
               isInCollection: _collectionCardIds.contains(card.id),
               currencySymbol: currencyProvider.symbol,
             );

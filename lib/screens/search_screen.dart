@@ -42,6 +42,8 @@ import '../widgets/app_drawer.dart';  // For AppDrawer
 import '../widgets/styled_toast.dart';
 // Add this import at the top with other imports
 import '../utils/bottom_toast.dart';
+// Add this import at the top of the file
+import 'package:rxdart/rxdart.dart';
 
 enum SearchMode { eng, jpn, mtg }
 
@@ -115,6 +117,10 @@ class _SearchScreenState extends State<SearchScreen> {
   // Add this field
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  // Add this field to store cards in memory
+  final _collectionCardsSubject = BehaviorSubject<Set<String>>.seeded({});
+  Set<String> get _collectionCardIds => _collectionCardsSubject.value;
+
   @override
   void initState() {
     super.initState();
@@ -134,6 +140,11 @@ class _SearchScreenState extends State<SearchScreen> {
         _searchController.text = args['initialSearch'] as String;
         _performSearch(_searchController.text);
       }
+    });
+
+    // Setup the collection watcher
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupCollectionWatcher();
     });
   }
 
@@ -170,6 +181,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _scrollController.dispose();
     _searchController.dispose();
     _searchDebounce?.cancel();
+    _collectionCardsSubject.close();
     super.dispose();
   }
   
@@ -1418,6 +1430,15 @@ class _SearchScreenState extends State<SearchScreen> {
         ],
       ),
     );
+  }
+
+  // Add this method to watch collection changes
+  void _setupCollectionWatcher() {
+    final storageService = Provider.of<StorageService>(context, listen: false);
+    storageService.watchCards().listen((cards) {
+      final cardIds = cards.map((c) => c.id).toSet();
+      _collectionCardsSubject.add(cardIds);
+    });
   }
 
   // Update this helper method to use standard icons instead of missing assets

@@ -20,6 +20,7 @@ class AppState with ChangeNotifier {
   bool _profileVisible = false;
   bool _showPrices = true;
   DateTime? _lastCardChangeTime;
+  Timer? _debounceTimer;
 
   AppState(this._storageService, this._authService);
 
@@ -227,16 +228,13 @@ class AppState with ChangeNotifier {
 
   // Find the notifyCardChange method and modify it to prevent navigation issues
   void notifyCardChange() {
-    // Track last change time
-    _lastCardChangeTime = DateTime.now();
+    // Cancel any pending notifications
+    _debounceTimer?.cancel();
     
-    // Just notify listeners directly - avoid any navigation/state resets
-    notifyListeners();
-    
-    // Use a simple debounce for refreshing state to avoid excessive updates
-    _debounceCardChange(() {
-      // Safely refresh storage state after a short delay
-      _storageService.refreshState();
+    // Create a delayed notification to prevent navigation conflicts
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      // Only notify listeners after a short delay
+      notifyListeners();
     });
   }
 
@@ -250,5 +248,11 @@ class AppState with ChangeNotifier {
     
     // Create new timer with the callback
     _cardChangeDebouncer = Timer(const Duration(milliseconds: 300), callback);
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
   }
 }

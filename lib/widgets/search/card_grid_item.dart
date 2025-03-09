@@ -5,6 +5,7 @@ import '../../services/storage_service.dart';
 import '../../models/tcg_card.dart';
 import '../../constants/app_colors.dart';
 import '../../providers/app_state.dart';
+import '../../widgets/bottom_notification.dart';
 
 class CardGridItem extends StatelessWidget {
   final TcgCard card;
@@ -139,40 +140,98 @@ class CardGridItem extends StatelessWidget {
         Positioned(
           top: 6,
           right: 6,
-          child: GestureDetector(
-            // CRITICAL FIX: Using GestureDetector with behavior opaque stops ALL event propagation
-            behavior: HitTestBehavior.opaque,
-            onTap: () {
-              // Stop event propagation completely and call add function directly
-              onAddToCollection(card);
-            },
-            child: Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                color: isInCollection
-                    ? Colors.green.withOpacity(0.8)
-                    : Theme.of(context).colorScheme.primary.withOpacity(0.8),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              // CRITICAL: Use Material+InkWell instead of GestureDetector to prevent event bubbling
+              borderRadius: BorderRadius.circular(13),
+              onTap: () {
+                // Add haptic feedback for better user experience
+                HapticFeedback.lightImpact();
+                
+                // CRITICAL: Handle card addition directly here without callback
+                try {
+                  // Get the storage service directly
+                  final storageService = Provider.of<StorageService>(context, listen: false);
+                  
+                  // FIXED: First update the UI state immediately to show the check
+                  // This makes the UI feel responsive without needing to rebuild the entire grid
+                  if (context.mounted && !isInCollection) {
+                    // We don't wait for the async operation to complete here
+                    showBottomNotification(context);
+                  }
+                  
+                  // Save card in background using microtask to avoid blocking UI thread
+                  Future.microtask(() async {
+                    try {
+                      // Do the actual saving in a background task
+                      await storageService.saveCard(card);
+                      
+                      // Only notify AppState after successful save
+                      if (context.mounted) {
+                        // Notify the app state in a delayed manner to avoid navigation issues
+                        Future.delayed(const Duration(milliseconds: 100), () {
+                          if (context.mounted) {
+                            final appState = Provider.of<AppState>(context, listen: false);
+                            appState.notifyCardChange();
+                          }
+                        });
+                      }
+                    } catch (e) {
+                      // If error occurs, show error notification
+                      if (context.mounted) {
+                        BottomNotification.show(
+                          context: context,
+                          title: 'Error',
+                          message: 'Failed to add card: $e',
+                          icon: Icons.error_outline,
+                          isError: true,
+                        );
+                      }
+                    }
+                  });
+                } catch (e) {
+                  debugPrint('Error in direct add: $e');
+                }
+              },
+              child: Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: isInCollection
+                      ? Colors.green.withOpacity(0.8)
+                      : Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    isInCollection ? Icons.check : Icons.add,
+                    color: Colors.white,
+                    size: 16,
                   ),
-                ],
-              ),
-              child: Center(
-                child: Icon(
-                  isInCollection ? Icons.check : Icons.add,
-                  color: Colors.white,
-                  size: 16,
                 ),
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  // New helper method to show notification without triggering navigation issues
+  void showBottomNotification(BuildContext context) {
+    BottomNotification.show(
+      context: context,
+      title: 'Card Added',
+      message: '${card.name} added to collection',
+      icon: Icons.check_circle,
     );
   }
 }
