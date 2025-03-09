@@ -27,6 +27,35 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
   late final AnimationController _animationController;
   int _expandedIndex = 0;
   Brightness? _previousBrightness;
+  
+  // Define the missing category getters
+  final List<Map<String, dynamic>> _pokemonCategories = [
+    {'title': 'Featured', 'type': 'header'},
+    {'title': 'Popular Sets', 'type': 'sets'},
+    {'title': 'Recent Sets', 'type': 'sets'},
+    
+    {'title': 'Special Searches', 'type': 'header'},
+    {'title': 'All Cards', 'query': '', 'icon': '🃏', 'type': 'search'},
+    {'title': 'Most Valuable', 'query': 'cardmarket.prices.averageSellPrice:[20 TO 100000] -rarity:rare -supertype:trainer', 'icon': '💰', 'type': 'search', 'isValueSearch': true},
+    {'title': 'Alt Arts', 'query': 'name:*alt* OR name:*gallery* OR name:*illustration*', 'icon': '🎨', 'type': 'search'},
+    {'title': 'Full Arts', 'query': 'name:*full art*', 'icon': '🖼️', 'type': 'search'},
+    {'title': 'Rainbow Cards', 'query': 'name:rainbow rare', 'icon': '🌈', 'type': 'search'},
+    {'title': 'Gold Cards', 'query': 'name:*gold* -name:golden', 'icon': '✨', 'type': 'search'},
+  ];
+  
+  final List<Map<String, dynamic>> _mtgCategories = [
+    {'title': 'Featured', 'type': 'header'},
+    {'title': 'Standard Sets', 'type': 'sets'},
+    {'title': 'Commander Sets', 'type': 'sets'},
+    
+    {'title': 'Special Searches', 'type': 'header'},
+    {'title': 'All Cards', 'query': '', 'icon': '🃏', 'type': 'search'},
+    {'title': 'Most Valuable', 'query': 'usd>=50', 'icon': '💰', 'type': 'search', 'isValueSearch': true},
+    {'title': 'Mythic Rares', 'query': 'r:mythic', 'icon': '🌟', 'type': 'search'},
+    {'title': 'Legends', 'query': 't:legend', 'icon': '👑', 'type': 'search'},
+    {'title': 'Planeswalkers', 'query': 't:planeswalker', 'icon': '🔮', 'type': 'search'},
+    {'title': 'Showcase Arts', 'query': 'is:showcase', 'icon': '🖼️', 'type': 'search'},
+  ];
 
   @override
   void initState() {
@@ -211,12 +240,6 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
           {'title': 'e-Card Series', 'sets': PokemonSets.eCard},
           {'title': 'Classic WOTC', 'sets': PokemonSets.classic},
         ];
-      case SearchMode.jpn:
-        return [
-          {'title': 'Latest Sets', 'sets': JapaneseSets.scarletViolet},
-          {'title': 'Sword & Shield', 'sets': JapaneseSets.swordShield},
-          {'title': 'Sun & Moon', 'sets': JapaneseSets.sunMoon},
-        ];
       case SearchMode.mtg:
         return [
           {'title': 'Standard Sets', 'sets': _createSetMap(MtgSets.standard)},
@@ -263,8 +286,6 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
     switch (mode) {
       case SearchMode.eng:
         return AppColors.primaryPokemon;
-      case SearchMode.jpn:
-        return AppColors.primaryJapanese;
       case SearchMode.mtg:
         return AppColors.primaryMtg;
     }
@@ -357,9 +378,7 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
   Widget _buildStandardSetLogo(BuildContext context, Map<String, dynamic> item, String? setCode, ColorScheme colorScheme) {
     // For Pokemon sets, use the Pokemon TCG API
     if (setCode != null) {
-      final logoUrl = widget.searchMode == SearchMode.jpn
-          ? CardImageUtils.getJapaneseSetLogo(setCode)
-          : CardImageUtils.getPokemonSetLogo(setCode);
+      final logoUrl = CardImageUtils.getPokemonSetLogo(setCode);
 
       return Image.network(
         logoUrl,
@@ -384,6 +403,39 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
         fontSize: 20,
         color: colorScheme.primary.withOpacity(0.8)
       ),
+    );
+  }
+
+  // UPDATED: Return categories based on search mode (fixed)
+  List<Map<String, dynamic>> get _categories {
+    switch (widget.searchMode) {
+      case SearchMode.eng:
+        return _pokemonCategories;
+      case SearchMode.mtg:
+        return _mtgCategories;
+    }
+  }
+
+  // UPDATED: Return sets based on search mode (fixed)
+  List<Map<String, dynamic>> _getSetsForCategory(String category) {
+    switch (widget.searchMode) {
+      case SearchMode.eng:
+        return PokemonSets.getSetsForCategory(category);
+      case SearchMode.mtg:
+        return MtgSets.getSetsForCategory(category);
+    }
+  }
+
+  // UPDATED: Get logo based on search mode (fixed)
+  Widget _getCategoryLogo() {
+    final logoUrl = widget.searchMode == SearchMode.mtg
+        ? 'assets/icons/mtg_logo.png'
+        : 'assets/icons/pokemon_logo.png';
+        
+    return Image.asset(
+      logoUrl,
+      height: 40,
+      fit: BoxFit.contain,
     );
   }
 }

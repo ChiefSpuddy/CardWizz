@@ -45,7 +45,7 @@ import '../utils/bottom_toast.dart';
 // Add this import at the top of the file
 import 'package:rxdart/rxdart.dart';
 
-enum SearchMode { eng, jpn, mtg }
+enum SearchMode { eng, mtg }
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -342,12 +342,6 @@ class _SearchScreenState extends State<SearchScreen> {
     // Handle MTG mode separately
     if (_searchMode == SearchMode.mtg) {
       _performMtgSearch(query);
-      return;
-    }
-
-    // Handle Japanese set mode separately
-    if (_searchMode == SearchMode.jpn) {
-      _performSetSearch(query);
       return;
     }
 
@@ -675,15 +669,6 @@ class _SearchScreenState extends State<SearchScreen> {
     try {
       if (_searchMode == SearchMode.eng) {
         final results = await _apiService.searchSets(query: query);
-        if (mounted) {
-          setState(() {
-            _setResults = results['data'] as List?;
-            _isLoading = false;
-          });
-        }
-      } else if (_searchMode == SearchMode.jpn) {
-        // Use TCGdex API for Japanese sets
-        final results = await _tcgdexApi.searchJapaneseSet(query);
         if (mounted) {
           setState(() {
             _setResults = results['data'] as List?;
@@ -1366,7 +1351,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: Text(
                   _searchMode == SearchMode.mtg
                       ? (_searchResults == null || _searchResults!.isEmpty ? 'Found 0 cards' : 'Found $_totalCards cards')
-                      : (_searchMode == SearchMode.eng || _searchMode == SearchMode.jpn) && _setResults != null
+                      : (_searchMode == SearchMode.eng) && _setResults != null
                           ? 'Found ${_setResults?.length ?? 0} sets'
                           : 'Found $_totalCards cards',
                   style: Theme.of(context).textTheme.titleMedium,
@@ -1530,8 +1515,6 @@ class _SearchScreenState extends State<SearchScreen> {
     switch (_searchMode) {
       case SearchMode.eng:
         return 'Search Pokémon cards...';
-      case SearchMode.jpn:
-        return 'Search Japanese sets...';
       case SearchMode.mtg:
         return 'Search Magic cards...';
     }
@@ -1607,6 +1590,27 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       },
     );
+  }
+
+  // Modify the onSearchModeChanged method to handle the updated enum values
+  void _onSearchModeChanged(List<SearchMode> modes) {
+    final newMode = modes.first;
+    
+    if (newMode == _searchMode) return;
+    
+    setState(() {
+      _searchMode = newMode;
+      _clearSearch();
+      
+      // Reset sort ordering based on mode
+      if (_searchMode == SearchMode.mtg) {
+        _currentSort = 'cardmarket.prices.averageSellPrice';
+        _sortAscending = false;
+      } else {
+        _currentSort = 'number';
+        _sortAscending = true;
+      }
+    });
   }
 }
 
