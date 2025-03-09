@@ -151,6 +151,7 @@ void showToast({
   bool compact = false,
   int? durationSeconds,
   double? bottomOffset,  // Added parameter for positioning from bottom
+  bool fromBottom = false, // Whether to display from bottom
   VoidCallback? onTap,   // Add onTap parameter
 }) {
   // Skip showing toasts for search-related messages
@@ -175,8 +176,9 @@ void showToast({
   
   entryRef = OverlayEntry(
     builder: (context) => Positioned(
-      top: bottomOffset == null ? topPosition : null,
-      bottom: bottomOffset,  // Position from bottom if specified
+      // Position based on fromBottom parameter
+      top: fromBottom || bottomOffset != null ? null : (MediaQuery.of(context).padding.top + 16),
+      bottom: fromBottom || bottomOffset != null ? (bottomOffset ?? 32) : null,
       left: 16,
       right: 16,
       child: Material(
@@ -187,8 +189,11 @@ void showToast({
           icon: icon,
           isError: isError,
           customOnTap: onTap,  // Pass the onTap callback
+          fromBottom: fromBottom || bottomOffset != null, // Pass this to toast widget
           onDismiss: () {
-            entryRef.remove();
+            if (entryRef.mounted) {
+              entryRef.remove();
+            }
           },
         ),
       ),
@@ -216,6 +221,7 @@ class ToastWidget extends StatefulWidget {
   final String subtitle;
   final IconData icon;
   final bool isError;
+  final bool fromBottom; // Add this parameter
   final VoidCallback onDismiss;
   final VoidCallback? customOnTap;  // Add custom onTap callback
   
@@ -225,6 +231,7 @@ class ToastWidget extends StatefulWidget {
     required this.subtitle,
     required this.icon,
     this.isError = false,
+    this.fromBottom = false, // Default to false for backward compatibility
     required this.onDismiss,
     this.customOnTap,  // Make it optional
   }) : super(key: key);
@@ -264,8 +271,16 @@ class _ToastWidgetState extends State<ToastWidget> with SingleTickerProviderStat
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
+        // CRITICAL FIX: For bottom animation, we need to START at a positive offset
+        // and move UP to zero, rather than the other way around
+        final double startOffsetY = widget.fromBottom ? 50.0 : -50.0;
+        final double endOffsetY = 0.0;
+        
+        // Calculate current offset based on animation value
+        final double currentOffsetY = startOffsetY * (1.0 - _animation.value);
+        
         return Transform.translate(
-          offset: Offset(0, -50 * (1 - _animation.value)),
+          offset: Offset(0, currentOffsetY),
           child: Opacity(
             opacity: _animation.value,
             child: Card(

@@ -11,6 +11,7 @@ import '../../widgets/styled_toast.dart'; // Add this import for StyledToast
 import '../../providers/currency_provider.dart';
 import 'package:flutter/services.dart'; // Add this import for HapticFeedback
 import '../../providers/app_state.dart';  // Import the AppState provider
+import '../../widgets/bottom_notification.dart'; // Add our new notification class
 
 class CardSearchGrid extends StatefulWidget {
   final List<TcgCard> cards;
@@ -244,13 +245,12 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
                   _collectionCardIds.add(cardToAdd.id);
                 });
                 
-                // Show non-disruptive feedback
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${cardToAdd.name} added to collection'),
-                    duration: const Duration(seconds: 1),
-                    behavior: SnackBarBehavior.floating,
-                  ),
+                // Show feedback with our new notification
+                BottomNotification.show(
+                  context: context,
+                  title: 'Added to Collection',
+                  message: cardToAdd.name,
+                  icon: Icons.check_circle,
                 );
                 
                 // Notify app state but with a delay to avoid navigation issues
@@ -260,14 +260,13 @@ class _CardSearchGridState extends State<CardSearchGrid> with AutomaticKeepAlive
                 });
               } catch (e) {
                 print('Error in direct add handler: $e');
-                // Show error feedback
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error: $e'),
-                    duration: const Duration(seconds: 2),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: Colors.red,
-                  ),
+                // Show error with our notification
+                BottomNotification.show(
+                  context: context,
+                  title: 'Error',
+                  message: 'Failed to add card: $e',
+                  icon: Icons.error_outline,
+                  isError: true,
                 );
               }
             }

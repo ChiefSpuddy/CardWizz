@@ -4,7 +4,10 @@ import '../models/tcg_card.dart';
 import '../utils/card_details_router.dart';
 import '../services/storage_service.dart';
 import '../providers/app_state.dart';
-import '../widgets/styled_toast.dart';
+// Import the bottom toast instead of styled_toast
+import '../utils/bottom_toast.dart';
+// Update imports - add our new notification class
+import '../widgets/bottom_notification.dart'; 
 
 // This class is now just a router to the appropriate screen type
 class CardDetailsScreen extends StatefulWidget {
@@ -33,39 +36,33 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
 
     try {
       final storageService = Provider.of<StorageService>(context, listen: false);
-      await storageService.addCard(widget.card);
+      await storageService.saveCard(widget.card);
 
       // Notify app state about the change
       Provider.of<AppState>(context, listen: false).notifyCardChange();
 
       if (mounted) {
-        // Use green toast with consistent styling
-        showToast(
+        setState(() => _isAddingToCollection = false);
+        
+        // *** Use our new bottom notification implementation ***
+        BottomNotification.show(
           context: context,
           title: 'Added to Collection',
-          subtitle: widget.card.name,
+          message: widget.card.name,
           icon: Icons.check_circle,
-          backgroundColor: Colors.green,
-          compact: true,
-          bottomOffset: 0, // For full-screen details, position at bottom
-          onTap: null, // Don't navigate anywhere on tap
         );
-        
-        setState(() => _isAddingToCollection = false);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isAddingToCollection = false);
         
-        // Use styled toast for errors too
-        showToast(
+        // Show errors with the new implementation too
+        BottomNotification.show(
           context: context,
-          title: 'Unable to Add Card',
-          subtitle: e.toString(),
+          title: 'Error',
+          message: 'Failed to add card: $e',
           icon: Icons.error_outline,
           isError: true,
-          compact: true,
-          bottomOffset: 0, // For full-screen details, position at bottom
         );
       }
     }

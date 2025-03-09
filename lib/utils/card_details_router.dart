@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../models/tcg_card.dart';
 import '../screens/mtg_card_details_screen.dart';
 import '../screens/pokemon_card_details_screen.dart';
+import 'package:provider/provider.dart'; // Add this import
+import '../services/storage_service.dart'; // Add this import
+import '../providers/app_state.dart'; // Add this import
+import '../utils/bottom_toast.dart'; // Add this import
 
 class CardDetailsRouter {
   /// Routes to the appropriate card details screen based on card type
@@ -203,6 +207,38 @@ class CardDetailsRouter {
           isFromCollection: isFromCollection,
         ),
       ),
+    );
+  }
+}
+
+// Find the _onAddToCollection method in this file and update it to use bottomToast
+/// Helper method to add a card to collection and show a toast notification
+Future<void> onAddToCollection(BuildContext context, TcgCard card) async {
+  final appState = Provider.of<AppState>(context, listen: false);
+  final storageService = Provider.of<StorageService>(context, listen: false);
+
+  try {
+    // Save card
+    await storageService.saveCard(card);
+    
+    // Notify app state about the change
+    appState.notifyCardChange();
+    
+    // Use the bottom toast implementation
+    showBottomToast(
+      context: context,
+      title: 'Added to Collection',
+      message: '${card.name}',
+      icon: Icons.check_circle,
+    );
+  } catch (e) {
+    // Show error toast from bottom
+    showBottomToast(
+      context: context,
+      title: 'Error',
+      message: 'Failed to add card: $e',
+      icon: Icons.error_outline,
+      isError: true,
     );
   }
 }

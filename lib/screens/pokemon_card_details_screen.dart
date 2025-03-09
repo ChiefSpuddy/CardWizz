@@ -13,6 +13,10 @@ import '../utils/hero_tags.dart';
 import 'base_card_details_screen.dart';
 import '../widgets/pokemon_set_icon.dart';
 import '../widgets/card_back_fallback.dart';
+import '../utils/bottom_toast.dart';
+import '../providers/app_state.dart';
+import '../services/storage_service.dart';
+import '../widgets/bottom_notification.dart';
 
 class PokemonCardDetailsScreen extends BaseCardDetailsScreen {
   const PokemonCardDetailsScreen({
@@ -32,6 +36,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
   final _ebayService = EbayApiService();
   Map<String, dynamic>? _additionalData;
   Map<String, List<Map<String, dynamic>>>? _salesByCategory;
+  bool _isAddingToCollection = false;
 
   @override
   void loadData() {
@@ -1947,5 +1952,73 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
         );
       },
     );
+  }
+
+  @override
+  Future<void> addToCollection(BuildContext context) async {
+    try {
+      // Get services
+      final storageService = Provider.of<StorageService>(context, listen: false);
+      final appState = Provider.of<AppState>(context, listen: false);
+      
+      // Save the card
+      await storageService.saveCard(widget.card);
+      
+      // Notify app state about the change
+      appState.notifyCardChange();
+      
+      // Use our custom notification that shows from the bottom
+      BottomNotification.show(
+        context: context,
+        title: 'Added to Collection',
+        message: widget.card.name,
+        icon: Icons.check_circle,
+      );
+    } catch (e) {
+      if (mounted) {
+        BottomNotification.show(
+          context: context,
+          title: 'Error',
+          message: 'Failed to add card: $e',
+          icon: Icons.error_outline,
+          isError: true,
+        );
+      }
+    }
+  }
+
+  Future<void> _onAddToCollectionPressed() async {
+    setState(() => _isAddingToCollection = true);
+
+    try {
+      final storageService = Provider.of<StorageService>(context, listen: false);
+      final appState = Provider.of<AppState>(context, listen: false);
+      
+      await storageService.saveCard(widget.card);
+      appState.notifyCardChange();
+      
+      if (mounted) {
+        setState(() => _isAddingToCollection = false);
+        
+        // Use our new bottom notification
+        BottomNotification.show(
+          context: context,
+          title: 'Added to Collection',
+          message: widget.card.name,
+          icon: Icons.check_circle,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isAddingToCollection = false);
+        BottomNotification.show(
+          context: context,
+          title: 'Error',
+          message: 'Failed to add card: $e',
+          icon: Icons.error_outline,
+          isError: true,
+        );
+      }
+    }
   }
 }

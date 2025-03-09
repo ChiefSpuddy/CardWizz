@@ -38,6 +38,10 @@ import '../constants/app_colors.dart';
 // Add these missing imports at the top
 import 'package:flutter/services.dart';  // For HapticFeedback
 import '../widgets/app_drawer.dart';  // For AppDrawer
+// Add the missing import for StyledToast
+import '../widgets/styled_toast.dart';
+// Add this import at the top with other imports
+import '../utils/bottom_toast.dart';
 
 enum SearchMode { eng, jpn, mtg }
 
@@ -1212,17 +1216,12 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // Fix the fundamental issue in _onCardAddToCollection
+  // Fix the fundamental issue in _onCardAddToCollection - use our reliable bottom toast
   Future<void> _onCardAddToCollection(TcgCard card) async {
-    // Here's the CRITICAL FIX - don't log or print before saving
-    // This fixes the issue where the screen resets to search page
-
     try {
       // Get services without rebuilding UI
       final appState = Provider.of<AppState>(context, listen: false);
       final storageService = Provider.of<StorageService>(context, listen: false);
-      
-      // NO setState calls in this method!
       
       // Just save the card silently
       await storageService.saveCard(card);
@@ -1230,23 +1229,21 @@ class _SearchScreenState extends State<SearchScreen> {
       // Notify app state AFTER save is complete
       appState.notifyCardChange();
       
-      // Show non-disruptive feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${card.name} added to collection'),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ),
+      // Use our dedicated bottom toast implementation
+      showBottomToast(
+        context: context,
+        title: 'Card Added',
+        message: '${card.name} added to collection',
+        icon: Icons.check_circle,
       );
     } catch (e) {
-      // Show error without affecting navigation
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red,
-        ),
+      // Show error with bottom toast
+      showBottomToast(
+        context: context,
+        title: 'Error',
+        message: 'Failed to add card: $e',
+        icon: Icons.error_outline,
+        isError: true,
       );
     }
   }
@@ -1285,25 +1282,13 @@ class _SearchScreenState extends State<SearchScreen> {
           if (_searchResults != null || _setResults != null)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(8.0, 12.0, 8.0, 4.0),
+                padding: const EdgeInsets.only(left: 8.0, top: 8.0),
                 child: TextButton.icon(
                   onPressed: _handleBackToCategories,
                   icon: const Icon(Icons.arrow_back),
                   label: const Text('Back to Categories'),
                   style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).brightness == Brightness.dark
-                        ? AppColors.darkAccentPrimary  // Use accent color for dark mode
-                        : Theme.of(context).primaryColor,
-                    backgroundColor: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white.withOpacity(0.05)  // Add subtle background in dark mode
-                        : Colors.transparent,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: Theme.of(context).brightness == Brightness.dark
-                          ? BorderSide(color: Colors.white.withOpacity(0.1))  // Subtle border
-                          : BorderSide.none,
-                    ),
+                    foregroundColor: Theme.of(context).primaryColor,
                   ),
                 ),
               ),
