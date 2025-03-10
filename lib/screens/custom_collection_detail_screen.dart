@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';  // Add this import
+import 'package:provider/provider.dart';
 import '../models/custom_collection.dart';
 import '../models/tcg_card.dart';
 import '../services/collection_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/card_grid_item.dart';
-import '../screens/card_details_screen.dart';  // Add this import
-import '../providers/currency_provider.dart';  // Add this import
-import '../widgets/animated_background.dart';  // Add this import
-import '../screens/home_screen.dart';  // Add this import
-import '../screens/collections_screen.dart';  // Add this import
+import '../screens/card_details_screen.dart';
+import '../providers/currency_provider.dart';
+import '../widgets/animated_background.dart';
+import '../screens/home_screen.dart';
+import '../screens/collections_screen.dart';
+// Add this import for RootNavigatorState
+import '../root_navigator.dart';  // Import the root navigator class
 
 class CustomCollectionDetailScreen extends StatefulWidget {
   final CustomCollection collection;
@@ -279,86 +281,7 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
             ).toList();
 
             if (_cards!.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.style_outlined,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'This binder is empty',
-                      style: TextStyle(fontSize: 18),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Add cards from your collection',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      height: 46,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(23),
-                        gradient: LinearGradient(
-                          colors: Theme.of(context).brightness == Brightness.dark ? [
-                            Colors.blue[700]!,
-                            Colors.blue[900]!,
-                          ] : [
-                            Theme.of(context).colorScheme.primary,
-                            Theme.of(context).colorScheme.secondary,
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).popUntil((route) => route.isFirst);
-                          if (mounted) {
-                            // First find HomeScreenState to switch to collections tab
-                            final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                            if (homeState != null) {
-                              homeState.setSelectedIndex(1);
-                            }
-                            // Then find CollectionsScreen to toggle view
-                            final collectionsScreen = context.findRootAncestorStateOfType<CollectionsScreenState>();
-                            if (collectionsScreen != null) {
-                              collectionsScreen.showCustomCollections = false;
-                            }
-                            Navigator.popUntil(context, (route) => route.isFirst);
-                          }
-                        },
-                        icon: const Icon(Icons.style, color: Colors.white),
-                        label: const Text(
-                          'Go to Collection',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
+              return _buildEmptyState(context);
             }
 
             return GridView.builder(
@@ -382,6 +305,88 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.collections_bookmark_outlined,
+              size: 64,
+              color: Theme.of(context).primaryColor.withOpacity(0.8),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No Cards Yet',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Add cards from your collection or scan new cards',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                onPressed: () {
+                  // UPDATED: Navigate to the root navigator and select the collection tab
+                  Navigator.of(context).pop(); // Close current screen
+                  
+                  // Find the RootNavigator and switch to Collections tab (index 1)
+                  final rootNavigatorState = 
+                      Navigator.of(context, rootNavigator: true).context
+                      .findRootAncestorStateOfType<RootNavigatorState>();
+                  
+                  if (rootNavigatorState != null) {
+                    // Switch to the Collections tab
+                    rootNavigatorState.switchToTab(1);
+                    
+                    // Switch Collections screen to Main collection view (not Binders)
+                    // Use delayed execution to ensure the tab switch completes first
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      final collectionsScreenState = rootNavigatorState.context
+                          .findAncestorStateOfType<CollectionsScreenState>();
+                      
+                      if (collectionsScreenState != null) {
+                        // Set to show main collection (not binders)
+                        collectionsScreenState.showCustomCollections = false;
+                      }
+                    });
+                  }
+                },
+                child: const Text('Go to Collection'),
+              ),
+              const SizedBox(width: 16),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                onPressed: () {
+                  // Navigate to search screen
+                  Navigator.of(context).pushNamed('/search');
+                },
+                child: const Text('Search Cards'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -1,13 +1,13 @@
-import 'profile_screen.dart';
-import 'analytics_screen.dart';
-import 'scanner_screen.dart';
-import 'search_screen.dart';
-import 'collection_screen.dart';
-import 'home_screen.dart';
-import 'package:intl/intl.dart';
-import '../providers/currency_provider.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
+import 'screens/profile_screen.dart';
+import 'screens/analytics_screen.dart';
+import 'screens/scanner_screen.dart';
+import 'screens/search_screen.dart';
+import 'screens/collections_screen.dart'; // Note: renamed from collection_screen.dart
+import 'screens/home_screen.dart';
+import 'package:intl/intl.dart';
+import 'providers/currency_provider.dart'; // Fixed path
+import 'package:provider/provider.dart';
 
 class RootNavigator extends StatefulWidget {
   const RootNavigator({
@@ -136,7 +136,7 @@ class TabNavigator extends StatelessWidget {
     if (tabIndex == 0) {
       child = const HomeScreen();
     } else if (tabIndex == 1) {
-      child = const CollectionScreen();
+      child = const CollectionsScreen(); // Changed from CollectionScreen
     } else if (tabIndex == 2) {
       child = const SearchScreen();
     } else if (tabIndex == 3) {
