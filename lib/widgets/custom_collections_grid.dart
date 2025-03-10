@@ -166,11 +166,11 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
         onTapDown: _onTapDown,
         onTapUp: _onTapUp,
         onTapCancel: _onTapCancel,
-        onLongPress: () => _showDeleteDialog(context),  // Add this line
+        onLongPress: () => _showDeleteDialog(context),
         child: Container(
           decoration: BoxDecoration(
             color: binderColor,
-            borderRadius: BorderRadius.circular(16), // Increased from 12
+            borderRadius: BorderRadius.circular(16), 
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -197,17 +197,48 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
           ),
           child: Stack(
             children: [
-              // Subtle pattern overlay
+              // Improved pattern overlay - leather texture instead of lines
               Positioned.fill(
-                child: CustomPaint(
-                  painter: BinderPatternPainter(
-                    color: isLightColor 
-                        ? Colors.white.withOpacity(0.1)
-                        : Colors.black.withOpacity(0.1),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: CustomPaint(
+                    painter: BinderTexturePainter(
+                      color: isLightColor 
+                          ? Colors.white.withOpacity(0.08)
+                          : Colors.black.withOpacity(0.08),
+                      accentColor: isLightColor
+                          ? Colors.black.withOpacity(0.04)
+                          : Colors.white.withOpacity(0.03),
+                    ),
                   ),
                 ),
               ),
-              // Spine with embossed effect
+              
+              // Add subtle highlight at the top
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 40,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withOpacity(isLightColor ? 0.15 : 0.07),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Enhanced spine with more realistic binding effect
               Positioned(
                 left: 0,
                 top: 0,
@@ -221,43 +252,75 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                     borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withOpacity(0.4),
                         offset: const Offset(1, 0),
-                        blurRadius: 2,
-                      ),
-                      BoxShadow(
-                        color: Colors.white.withOpacity(0.1),
-                        offset: const Offset(-1, 0),
                         blurRadius: 2,
                       ),
                     ],
                   ),
-                  child: RotatedBox(
-                    quarterTurns: 1,
-                    child: Center(
-                      child: Text(
-                        widget.collection.name.toUpperCase(),
-                        style: TextStyle(
-                          color: textColor,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                          letterSpacing: 1.2,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withOpacity(0.3),
-                              offset: const Offset(0, 1),
-                              blurRadius: 2,
-                            ),
-                          ],
+                  child: Stack(
+                    children: [
+                      // Spine texture
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: BinderSpinePainter(
+                            color: isLightColor 
+                                ? Colors.black.withOpacity(0.06)
+                                : Colors.white.withOpacity(0.04),
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
+                      // Binding rings effect
+                      Positioned(
+                        top: 0,
+                        bottom: 0,
+                        left: 0,
+                        width: 6,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: HSLColor.fromColor(binderColor)
+                                .withLightness((HSLColor.fromColor(binderColor).lightness * 0.7))
+                                .toColor(),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 1,
+                                offset: const Offset(1, 0),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Title text
+                      RotatedBox(
+                        quarterTurns: 1,
+                        child: Center(
+                          child: Text(
+                            widget.collection.name.toUpperCase(),
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                              letterSpacing: 1.2,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withOpacity(0.3),
+                                  offset: const Offset(0, 1),
+                                  blurRadius: 2,
+                                ),
+                              ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              // Content area
+              // Content area - keep this as is since you like it
+              // ...existing content area code...
               Padding(
                 padding: const EdgeInsets.fromLTRB(36, 16, 16, 16),
                 child: Column(
@@ -282,7 +345,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '${binderCards.length} cards', // Updated to use actual card count
+                      '${binderCards.length} cards', 
                       style: TextStyle(
                         color: ThemeData.estimateBrightnessForColor(widget.collection.color) == Brightness.light
                           ? Colors.black54
@@ -308,12 +371,14 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                           ),
                         ),
                       ),
-                    if (binderCards.isNotEmpty)
-                      SizedBox(
-                        height: 63,
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
+                    // CHANGE: Always include the SizedBox height placeholder, regardless of cards
+                    SizedBox(
+                      height: 63,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Only add card images when there are cards
+                          if (binderCards.isNotEmpty)
                             for (var i = 0; i < min(3, binderCards.length); i++)
                               Positioned(
                                 right: i * 12.0,
@@ -342,12 +407,38 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
+                          
+                          // ADD: Show an empty placeholder when there are no cards
+                          if (binderCards.isEmpty)
+                            Positioned(
+                              right: 0,
+                              child: Container(
+                                width: 45,
+                                height: 63,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  color: Colors.black.withOpacity(0.1),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.add_photo_alternate_outlined,
+                                    color: Colors.white.withOpacity(0.4),
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
+                    ),
                   ],
                 ),
               ),
+              
             ],
           ),
         ),
@@ -356,27 +447,101 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
   }
 }
 
-class BinderPatternPainter extends CustomPainter {
+// Replace the simple line painter with a more appealing texture painter
+class BinderTexturePainter extends CustomPainter {
   final Color color;
-
-  BinderPatternPainter({required this.color});
+  final Color accentColor;
+  
+  BinderTexturePainter({required this.color, required this.accentColor});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 1;
+      ..strokeWidth = 1.5;
+    
+    final accentPaint = Paint()
+      ..color = accentColor
+      ..strokeWidth = 1.0;
 
-    // Draw subtle horizontal lines instead of diagonal
-    for (double y = 0.0; y < size.height; y += 12.0) {
-      canvas.drawLine(
-        Offset(0.0, y),
-        Offset(size.width, y),
-        paint,
-      );
+    final random = math.Random(42); // Fixed seed for consistent pattern
+    
+    // Create a leather-like texture with small dots and marks
+    for (int i = 0; i < size.width * size.height / 120; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height;
+      final radius = random.nextDouble() * 2.5;
+      
+      canvas.drawCircle(Offset(x, y), radius, paint);
+      
+      // Add some subtle line marks
+      if (i % 5 == 0) {
+        final startX = x - 2 + random.nextDouble() * 4;
+        final startY = y - 2 + random.nextDouble() * 4;
+        final endX = startX + random.nextDouble() * 6 - 3;
+        final endY = startY + random.nextDouble() * 6 - 3;
+        
+        canvas.drawLine(
+          Offset(startX, startY),
+          Offset(endX, endY),
+          accentPaint,
+        );
+      }
+    }
+    
+    // Add subtle grain texture
+    for (int i = 0; i < size.width; i += 4) {
+      for (int j = 0; j < size.height; j += 4) {
+        if (random.nextDouble() < 0.2) {
+          final x = i + random.nextDouble() * 4;
+          final y = j + random.nextDouble() * 4;
+          canvas.drawCircle(Offset(x, y), 0.5, accentPaint);
+        }
+      }
     }
   }
 
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// Add a spine-specific texture painter
+class BinderSpinePainter extends CustomPainter {
+  final Color color;
+  
+  BinderSpinePainter({required this.color});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+      
+    // Create subtle horizontal ridges for the spine
+    for (double y = 5.0; y < size.height - 5; y += 8.0) {
+      // Slightly randomize the spacing
+      final offsetY = y + (y % 16 == 0 ? 1 : 0);
+      
+      // Draw the ridge
+      canvas.drawLine(
+        Offset(2.0, offsetY),
+        Offset(size.width - 2, offsetY),
+        paint,
+      );
+      
+      // Add a highlight above the ridge
+      final highlightPaint = Paint()
+        ..color = Colors.white.withOpacity(0.15)
+        ..strokeWidth = 0.5;
+        
+      canvas.drawLine(
+        Offset(2.0, offsetY - 0.5),
+        Offset(size.width - 2, offsetY - 0.5),
+        highlightPaint,
+      );
+    }
+  }
+  
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
