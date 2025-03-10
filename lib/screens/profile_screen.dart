@@ -843,7 +843,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: () => _showPremiumInfoDialog(context),
+            onTap: purchaseService.isPremium 
+                ? () => _showPremiumInfoDialog(context) 
+                : () => _initiatePremiumPurchase(context),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -1116,6 +1118,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _showPremiumInfoDialog(BuildContext context) {
+    final purchaseService = Provider.of<PurchaseService>(context, listen: false);
+    final isPremium = purchaseService.isPremium;
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1200,21 +1205,117 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => _launchUrl('https://chiefspuddy.github.io/CardWizz/#terms-of-service'),
-            child: const Text('Terms'),
-          ),
-          TextButton(
-            onPressed: () => _launchUrl('https://cardwizz.com/privacy.html'),
-            child: const Text('Privacy'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+              if (!isPremium)
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _initiatePremiumPurchase(context);
+                  },
+                  icon: const Text('💎'),
+                  label: const Text('Subscribe Now'),
+                ),
+            ],
           ),
         ],
       ),
     );
+  }
+  
+  Future<void> _initiatePremiumPurchase(BuildContext context) async {
+    final purchaseService = Provider.of<PurchaseService>(context, listen: false);
+    
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Connecting to App Store...'),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      // Store initial premium state
+      final wasPremiumBefore = purchaseService.isPremium;
+      
+      // Attempt to make the purchase
+      await purchaseService.purchasePremium();
+      
+      // Close loading dialog
+      if (context.mounted) Navigator.of(context).pop();
+      
+      // Check if premium state changed to determine success
+      final isPremiumNow = purchaseService.isPremium;
+      final purchaseSucceeded = !wasPremiumBefore && isPremiumNow;
+      
+      if (context.mounted) {
+        if (purchaseSucceeded || isPremiumNow) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: StyledToast(
+                title: 'Premium Activated!',
+                subtitle: 'Thank you for your support. Enjoy all premium features!',
+                icon: Icons.check_circle_outline,
+                backgroundColor: Colors.green,
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
+          );
+          // Force UI refresh
+          setState(() {});
+        } else if (!isPremiumNow) {
+          // Purchase was canceled or failed
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: StyledToast(
+                title: 'Subscription Not Completed',
+                subtitle: 'Premium subscription was not purchased',
+                icon: Icons.info_outline,
+                backgroundColor: Colors.orange,
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Handle errors
+      if (context.mounted) Navigator.of(context).pop(); // Close loading dialog
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: StyledToast(
+              title: 'Subscription Error',
+              subtitle: 'Could not process subscription. Please try again later.',
+              icon: Icons.error_outline,
+              backgroundColor: Colors.red,
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+          ),
+        );
+      }
+    }
   }
 
   void _showDataAttributionDialog(BuildContext context) {

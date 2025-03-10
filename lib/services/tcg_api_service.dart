@@ -22,6 +22,9 @@ class TcgApiService {
   final Dio _dio;
   static const String _baseUrl = 'https://api.pokemontcg.io/v2';
   
+  // Add this line to define the _headers field
+  final Map<String, String> _headers = {'X-Api-Key': apiKey};
+  
   // Rate limiting constants
   static const _requestDelay = Duration(milliseconds: 250);
   static const _maxRetries = 3;
@@ -712,5 +715,26 @@ class TcgApiService {
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value);
     return null;
+  }
+
+  // Add a new method to fetch all available rarities
+  Future<List<String>> getRarities() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.pokemontcg.io/v2/rarities'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> rarities = data['data'];
+        return rarities.map((r) => r.toString()).toList();
+      } else {
+        throw Exception('Failed to load rarities: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching rarities: $e');
+      return [];
+    }
   }
 }

@@ -752,7 +752,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _performQuickSearch(Map<String, dynamic> searchItem) async {
     setState(() {
-      _searchController.text = searchItem['name'];
+      // Fix: Use title for display if name is missing
+      _searchController.text = searchItem['title'] ?? searchItem['name'] ?? searchItem['query'] ?? '';
       _isLoading = true;
       _searchResults = null;
       _currentPage = 1;
@@ -1143,10 +1144,13 @@ class _SearchScreenState extends State<SearchScreen> {
   // Add this method where the other class methods are
   void _addToSearchHistory(String query, {String? imageUrl}) {
     if (_searchHistory != null) {
-      _searchHistory!.addSearch(query, imageUrl: imageUrl);
-      // Force rebuild to show new search
-      if (mounted) {
-        setState(() {});
+      // Only add if we have a valid query
+      if (query.isNotEmpty) {
+        _searchHistory!.addSearch(query, imageUrl: imageUrl);
+        // Force rebuild to show new search
+        if (mounted) {
+          setState(() {});
+        }
       }
     }
   }

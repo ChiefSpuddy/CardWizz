@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
+import '../services/purchase_service.dart';
+import '../widgets/styled_toast.dart';
 
 class PremiumDialog extends StatelessWidget {
   const PremiumDialog({super.key});
@@ -10,11 +13,99 @@ class PremiumDialog extends StatelessWidget {
     }
   }
 
+  Future<bool> _handlePurchase(BuildContext context) async {
+    final purchaseService = Provider.of<PurchaseService>(context, listen: false);
+    
+    // Pop the current dialog
+    Navigator.pop(context);
+    
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Connecting to App Store...'),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      // Attempt to make the purchase
+      final success = await purchaseService.purchasePremium();
+      
+      // Close loading dialog
+      if (context.mounted) Navigator.of(context).pop();
+      
+      if (context.mounted) {
+        if (success) {
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: StyledToast(
+                title: 'Premium Activated!',
+                subtitle: 'Thank you for your support. Enjoy all premium features!',
+                icon: Icons.check_circle_outline,
+                backgroundColor: Colors.green,
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
+          );
+          return true;
+        } else {
+          // Purchase was canceled or failed
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: StyledToast(
+                title: 'Subscription Not Completed',
+                subtitle: 'Premium subscription was not purchased',
+                icon: Icons.info_outline,
+                backgroundColor: Colors.orange,
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
+          );
+          return false;
+        }
+      }
+      return false;
+    } catch (e) {
+      // Handle errors
+      if (context.mounted) Navigator.of(context).pop(); // Close loading dialog
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: StyledToast(
+              title: 'Subscription Error',
+              subtitle: 'Could not process subscription. Please try again later.',
+              icon: Icons.error_outline,
+              backgroundColor: Colors.red,
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: SingleChildScrollView(  // Add this wrapper
+      child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -227,7 +318,12 @@ class PremiumDialog extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: FilledButton.icon(
-                      onPressed: () => Navigator.pop(context, true),
+                      onPressed: () async {
+                        final success = await _handlePurchase(context);
+                        if (context.mounted) {
+                          Navigator.pop(context, success);
+                        }
+                      },
                       icon: const Text('💎'),
                       label: const Text('Subscribe Now'),
                     ),
