@@ -9,7 +9,6 @@ import '../screens/collections_screen.dart';
 import '../screens/analytics_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../screens/home_screen.dart';
-import '../screens/card_arena_screen.dart'; // Add this import
 
 class AppDrawer extends StatelessWidget {
   final GlobalKey<ScaffoldState>? scaffoldKey;
@@ -38,11 +37,8 @@ class AppDrawer extends StatelessWidget {
         case AppRoutes.analytics:
           homeState.setSelectedIndex(3);
           break;
-        case '/dex':
-          homeState.setSelectedIndex(4);
-          break;
         case '/profile':
-          homeState.setSelectedIndex(5);
+          homeState.setSelectedIndex(4);
           break;
         default:
           Navigator.pushNamed(context, route);
@@ -187,16 +183,6 @@ class AppDrawer extends StatelessWidget {
                           icon: Icons.search_outlined,
                           title: 'Search',
                           onTap: () => _navigateAndClose(context, AppRoutes.search),
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.sports_kabaddi),
-                          title: const Text('Card Arena'),
-                          onTap: () {
-                            Navigator.pop(context);
-                            Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const CardArenaScreen())
-                            );
-                          },
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),

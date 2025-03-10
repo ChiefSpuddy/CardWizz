@@ -6,7 +6,6 @@ import '../widgets/sign_in_view.dart';
 import 'home_overview.dart';
 import 'search_screen.dart';
 import 'root_navigator.dart';
-import './card_arena_screen.dart';
 import '../widgets/standard_app_bar.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -77,16 +76,7 @@ class HomeScreenState extends State<HomeScreen> {
             scrollDirection: Axis.horizontal,
             children: [
               // ...existing feature items...
-              
-              // Add this new feature card for Card Arena
-              _buildFeatureCard(
-                title: 'Card Arena',
-                icon: Icons.sports_kabaddi,
-                color: Colors.deepPurple,
-                onTap: () => _navigateToTab(6), // Use proper index for Card Arena
-                description: 'Battle your cards',
-                isNew: true, // Mark as new feature
-              ),
+              // Card Arena feature card removed
             ],
           ),
         ),

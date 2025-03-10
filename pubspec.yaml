@@ -87,13 +87,6 @@ flutter:
     - assets/images/cardback.png
     - assets/images/             # Add this line to include all images in the directory
     - assets/images/mtgback.png  # Add this line to include the mtgback.png file
-    - assets/animations/battle_effect.json
-    - assets/animations/fire_effect.json
-    - assets/animations/water_effect.json
-    - assets/animations/electric_effect.json
-    - assets/animations/earth_effect.json
-    - assets/animations/psychic_effect.json
-    - assets/animations/battle_intro.json
     - assets/icons/
     
 flutter_launcher_icons:

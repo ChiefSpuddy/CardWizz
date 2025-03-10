@@ -7,7 +7,6 @@ import './search_screen.dart';
 import './analytics_screen.dart';
 import './profile_screen.dart';
 import '../constants/app_colors.dart';
-import './card_arena_screen.dart';
 import '../providers/app_state.dart';
 import '../widgets/sign_in_view.dart';
 import '../widgets/styled_toast.dart'; // Add this import for showToast function
@@ -38,8 +37,7 @@ class RootNavigatorState extends State<RootNavigator> {
     CollectionsScreen(),
     SearchScreen(),
     AnalyticsScreen(),
-    CardArenaScreen(),   // Now at index 4
-    ProfileScreen(),     // Now at index 5 (last position)
+    ProfileScreen(),     // Now at index 4
   ];
 
   void _onNavigationItemTapped(int index) {
@@ -101,11 +99,6 @@ class RootNavigatorState extends State<RootNavigator> {
             icon: Icon(Icons.analytics_outlined),
             activeIcon: Icon(Icons.analytics),
             label: 'Analytics',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.sports_kabaddi_outlined),
-            activeIcon: Icon(Icons.sports_kabaddi),
-            label: 'Arena',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),

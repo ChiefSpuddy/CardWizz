@@ -1,6 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../models/battle_stats.dart';
+
+// Simple replacement for the removed CardBattleStats class
+class CardBattleStats {
+  final double attackPower;
+  final double defensePower;
+  final double specialPower;
+  final double speed;
+  
+  CardBattleStats({
+    required this.attackPower,
+    required this.defensePower,
+    required this.specialPower,
+    required this.speed,
+  });
+}
 
 class CardStatsRadar extends StatelessWidget {
   final CardBattleStats stats;

@@ -30,9 +30,8 @@ import 'screens/scanner_screen.dart';
 import 'services/ebay_api_service.dart';
 import 'services/ebay_search_service.dart';
 import 'utils/logger.dart';
-import 'services/battle_service.dart';
 import 'screens/loading_screen.dart';
-import 'utils/create_card_back.dart'; // Add this import
+import 'utils/create_card_back.dart';
 import 'package:flutter/animation.dart';
 
 // The simplest possible main function
@@ -65,7 +64,6 @@ Future<void> _initializeAppInBackground() async {
     await purchaseService.initialize();
     final ebayApiService = EbayApiService();
     final ebaySearchService = EbaySearchService();
-    final battleService = BattleService();
     
     // Initialize providers
     final appState = AppState(storageService, authService);
@@ -84,7 +82,6 @@ Future<void> _initializeAppInBackground() async {
         Provider<CollectionService>.value(value: collectionService),
         Provider<ScannerService>.value(value: scannerService),
         Provider<EbayApiService>.value(value: ebayApiService),
-        ChangeNotifierProvider<BattleService>.value(value: battleService),
         ChangeNotifierProvider<AppState>.value(value: appState),
         ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
         ChangeNotifierProvider<CurrencyProvider>.value(value: currencyProvider),

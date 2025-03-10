@@ -1,177 +1,161 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}  }    );      },        );          builder: (context) => child,        return MaterialPageRoute(      onGenerateRoute: (routeSettings) {      key: navigatorKey,    return Navigator(    }      child = const SizedBox.shrink();    } else {      child = const CardArenaScreen(); // Add the Card Arena screen    } else if (tabIndex == 6) {      child = const ProfileScreen();    } else if (tabIndex == 5) {      child = const AnalyticsScreen();    } else if (tabIndex == 4) {      child = const ScannerScreen();    } else if (tabIndex == 3) {      child = const SearchScreen();    } else if (tabIndex == 2) {      child = const CollectionScreen();    } else if (tabIndex == 1) {      child = const HomeScreen();    if (tabIndex == 0) {    Widget child;  Widget build(BuildContext context) {  @override  });    required this.tabIndex,    required this.navigatorKey,  const TabNavigator({    final int tabIndex;  final GlobalKey<NavigatorState> navigatorKey;class TabNavigator extends StatelessWidget {}  }    );      ),        tabIndex: index,        navigatorKey: _navigatorKeys[index],      child: TabNavigator(      offstage: _selectedIndex != index,    return Offstage(  Widget _buildOffstageNavigator(int index) {  }    );      ),        ),          ],            ),              label: 'Arena',              icon: Icon(Icons.sports_kabaddi),            BottomNavigationBarItem(            ),              label: 'Profile',              icon: Icon(Icons.account_circle),            BottomNavigationBarItem(            ),              label: 'Analytics',              icon: Icon(Icons.analytics),            BottomNavigationBarItem(            ),              label: 'Scan',              icon: Icon(Icons.add_a_photo),            BottomNavigationBarItem(            ),              label: 'Search',              icon: Icon(Icons.search),            BottomNavigationBarItem(            ),              label: 'Collection',              icon: Icon(Icons.library_books),            BottomNavigationBarItem(            ),              label: 'Home',              icon: Icon(Icons.home),            BottomNavigationBarItem(          items: const [          unselectedLabelStyle: TextStyle(fontSize: 12),          selectedLabelStyle: TextStyle(fontSize: 12),          type: BottomNavigationBarType.fixed,          onTap: _onNavigationItemTapped,          currentIndex: _selectedIndex,        bottomNavigationBar: BottomNavigationBar(        ),          ],            _buildOffstageNavigator(6), // Add Card Arena tab            _buildOffstageNavigator(5),            _buildOffstageNavigator(4),            _buildOffstageNavigator(3),            _buildOffstageNavigator(2),            _buildOffstageNavigator(1),            _buildOffstageNavigator(0),          children: [        body: Stack(      child: Scaffold(      },        return isFirstRouteInCurrentTab;        }          }            return false;            _onNavigationItemTapped(0);          if (_selectedIndex != 0) {        if (isFirstRouteInCurrentTab) {            !await _navigatorKeys[_selectedIndex].currentState!.maybePop();        final isFirstRouteInCurrentTab =       onWillPop: () async {    return WillPopScope(  Widget build(BuildContext context) {  @override  }    });      _selectedIndex = index;    setState(() {  void _onNavigationItemTapped(int index) {  }    _onNavigationItemTapped(index);  void switchToTab(int index) {  // Method to allow other widgets to programmatically switch tabs    }    _selectedIndex = widget.initialTab;    super.initState();  void initState() {  @override  ];    GlobalKey<NavigatorState>(), // Add key for Card Arena tab    GlobalKey<NavigatorState>(),    GlobalKey<NavigatorState>(),    GlobalKey<NavigatorState>(),    GlobalKey<NavigatorState>(),    GlobalKey<NavigatorState>(),    GlobalKey<NavigatorState>(),  final List<GlobalKey<NavigatorState>> _navigatorKeys = [  late int _selectedIndex;class RootNavigatorState extends State<RootNavigator> {}  State<RootNavigator> createState() => RootNavigatorState();  @override  }) : super(key: key);    this.initialTab = 0,    Key? key,  const RootNavigator({    final int initialTab;class RootNavigator extends StatefulWidget {import 'card_arena_screen.dart';import 'profile_screen.dart';import 'analytics_screen.dart';import 'scanner_screen.dart';import 'search_screen.dart';import 'collection_screen.dart';import 'home_screen.dart';import 'package:intl/intl.dart';import '../widgets/animated_background.dart';import '../models/battle_stats.dart'; // This import is fine now that we removed duplicatesimport '../models/battle_result.dart';import '../providers/currency_provider.dart';import 'package:provider/provider.dart';import 'package:flutter/material.dart';// Update to include the Card Arena tab
+import 'profile_screen.dart';
+import 'analytics_screen.dart';
+import 'scanner_screen.dart';
+import 'search_screen.dart';
+import 'collection_screen.dart';
+import 'home_screen.dart';
+import 'package:intl/intl.dart';
+import '../providers/currency_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter/material.dart';
+
+class RootNavigator extends StatefulWidget {
+  const RootNavigator({
+    Key? key,
+    this.initialTab = 0,
+  }) : super(key: key);
+
+  final int initialTab;
+
+  @override
+  State<RootNavigator> createState() => RootNavigatorState();
+}
+
+class RootNavigatorState extends State<RootNavigator> {
+  late int _selectedIndex;
+  final List<GlobalKey<NavigatorState>> _navigatorKeys = [
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialTab;
+  }
+
+  void switchToTab(int index) {
+    _onNavigationItemTapped(index);
+  }
+
+  void _onNavigationItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async {
+        final isFirstRouteInCurrentTab =
+            !await _navigatorKeys[_selectedIndex].currentState!.maybePop();
+        if (isFirstRouteInCurrentTab) {
+          if (_selectedIndex != 0) {
+            _onNavigationItemTapped(0);
+            return false;
+          }
+        }
+        return isFirstRouteInCurrentTab;
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            _buildOffstageNavigator(0),
+            _buildOffstageNavigator(1),
+            _buildOffstageNavigator(2),
+            _buildOffstageNavigator(3),
+            _buildOffstageNavigator(4),
+            _buildOffstageNavigator(5),
+          ],
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onNavigationItemTapped,
+          type: BottomNavigationBarType.fixed,
+          selectedLabelStyle: TextStyle(fontSize: 12),
+          unselectedLabelStyle: TextStyle(fontSize: 12),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.library_books),
+              label: 'Collection',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.search),
+              label: 'Search',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.add_a_photo),
+              label: 'Scan',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.analytics),
+              label: 'Analytics',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.account_circle),
+              label: 'Profile',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOffstageNavigator(int index) {
+    return Offstage(
+      offstage: _selectedIndex != index,
+      child: TabNavigator(
+        navigatorKey: _navigatorKeys[index],
+        tabIndex: index,
+      ),
+    );
+  }
+}
+
+class TabNavigator extends StatelessWidget {
+  const TabNavigator({
+    required this.navigatorKey,
+    required this.tabIndex,
+  });
+
+  final GlobalKey<NavigatorState> navigatorKey;
+  final int tabIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget child;
+    if (tabIndex == 0) {
+      child = const HomeScreen();
+    } else if (tabIndex == 1) {
+      child = const CollectionScreen();
+    } else if (tabIndex == 2) {
+      child = const SearchScreen();
+    } else if (tabIndex == 3) {
+      child = const ScannerScreen();
+    } else if (tabIndex == 4) {
+      child = const AnalyticsScreen();
+    } else if (tabIndex == 5) {
+      child = const ProfileScreen();
+    } else {
+      child = const SizedBox.shrink();
+    }
+
+    return Navigator(
+      key: navigatorKey,
+      onGenerateRoute: (routeSettings) {
+        return MaterialPageRoute(
+          builder: (context) => child,
+        );
+      },
+    );
+  }
+}
