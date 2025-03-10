@@ -187,9 +187,15 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
   @override
   Widget build(BuildContext context) {
     final currencyProvider = context.watch<CurrencyProvider>();
+    final colorScheme = Theme.of(context).colorScheme;
+    final binderColor = widget.collection.color;
     
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: binderColor.withOpacity(0.95),
+        foregroundColor: ThemeData.estimateBrightnessForColor(binderColor) == Brightness.light
+            ? Colors.black
+            : Colors.white,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -213,16 +219,20 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
                       '${binderCards.length} cards',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: ThemeData.estimateBrightnessForColor(binderColor) == Brightness.light
+                            ? Colors.black.withOpacity(0.7)
+                            : Colors.white.withOpacity(0.9),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      currencyProvider.formatValue(totalValue),  // Update this line
+                      currencyProvider.formatValue(totalValue),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: ThemeData.estimateBrightnessForColor(binderColor) == Brightness.light
+                            ? Colors.black
+                            : Colors.white,
                       ),
                     ),
                   ],
@@ -231,6 +241,7 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
             ),
           ],
         ),
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -267,7 +278,18 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
           ),
         ],
       ),
-      body: AnimatedBackground(  // Wrap the body with AnimatedBackground
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              binderColor.withOpacity(0.3),
+              colorScheme.background.withOpacity(0.95),
+            ],
+            stops: const [0.0, 0.3],
+          ),
+        ),
         child: StreamBuilder<List<TcgCard>>(
           stream: Provider.of<StorageService>(context).watchCards(),
           builder: (context, snapshot) {
@@ -284,26 +306,483 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
               return _buildEmptyState(context);
             }
 
-            return GridView.builder(
-              padding: const EdgeInsets.all(8),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                childAspectRatio: 0.7,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              itemCount: _cards!.length,
-              itemBuilder: (context, index) {
-                final card = _cards![index];
-                return CardGridItem(
-                  card: card,
-                  heroContext: widget.collection.id,
-                  showPrice: false,
-                  onTap: () => _showCardDetails(context, card),
-                );
-              },
-            );
+            // Show cards with enhanced UI
+            return _buildCardGrid(context, _cards!, binderColor);
           },
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildCardGrid(BuildContext context, List<TcgCard> cards, Color binderColor) {
+    return CustomScrollView(
+      slivers: [
+        // Binder info section
+        SliverToBoxAdapter(
+          child: _buildBinderInfoCard(context, cards, binderColor),
+        ),
+        
+        // Quick stats section
+        SliverToBoxAdapter(
+          child: _buildQuickStats(context, cards),
+        ),
+        
+        // Grid header
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Cards in Binder',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                FilledButton.tonal(
+                  onPressed: _showSortOptions,
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.sort, size: 16),
+                      SizedBox(width: 4),
+                      Text('Sort'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Actual card grid with enhanced styling
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              childAspectRatio: 0.7,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 12,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final card = cards[index];
+                return _buildEnhancedCardItem(context, card, index);
+              },
+              childCount: cards.length,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildEnhancedCardItem(BuildContext context, TcgCard card, int index) {
+    return Hero(
+      tag: 'binder_${widget.collection.id}_${card.id}',
+      child: Material(
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.3),
+        child: InkWell(
+          onTap: () => _showCardDetails(context, card),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Card image
+              Positioned.fill(
+                child: Image.network(
+                  card.imageUrl,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.grey[800],
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / 
+                                  (loadingProgress.expectedTotalBytes ?? 1)
+                              : null,
+                          strokeWidth: 2,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey[850],
+                      child: const Center(
+                        child: Icon(Icons.broken_image, color: Colors.white70),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              
+              // Bottom info overlay
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.8),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Only show price if available
+                      if (card.price != null && card.price! > 0)
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            context.read<CurrencyProvider>().formatValue(card.price!),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              // Top rarity indicator
+              if (card.rarity != null && card.rarity!.isNotEmpty)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _getRarityColor(card.rarity!),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    child: Text(
+                      _formatRarity(card.rarity!),
+                      style: const TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Color _getRarityColor(String rarity) {
+    rarity = rarity.toLowerCase();
+    if (rarity.contains('secret')) return Colors.purple;
+    if (rarity.contains('ultra')) return const Color(0xFFE0AB37);
+    if (rarity.contains('rare')) return Colors.blue;
+    if (rarity.contains('uncommon')) return Colors.green;
+    return Colors.grey;
+  }
+  
+  String _formatRarity(String rarity) {
+    if (rarity.toLowerCase().contains('secret')) return 'SCR';
+    if (rarity.toLowerCase().contains('ultra')) return 'UR';
+    if (rarity.toLowerCase().contains('holo')) return 'HR';
+    if (rarity.toLowerCase().contains('rare')) return 'R';
+    if (rarity.toLowerCase().contains('uncommon')) return 'UC';
+    return 'C';
+  }
+  
+  Widget _buildBinderInfoCard(BuildContext context, List<TcgCard> cards, Color binderColor) {
+    final currencyProvider = context.read<CurrencyProvider>();
+    final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+    final colorBrightness = ThemeData.estimateBrightnessForColor(binderColor);
+    final textColor = colorBrightness == Brightness.light ? Colors.black87 : Colors.white;
+    
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: binderColor.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: binderColor.withOpacity(0.4),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Binder icon
+          Container(
+            width: 50,
+            height: 60,
+            decoration: BoxDecoration(
+              color: binderColor,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                // Spine lines
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 10,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: binderColor.withOpacity(0.7),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        bottomLeft: Radius.circular(8),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: List.generate(
+                        4,
+                        (index) => Container(
+                          width: 6,
+                          height: 2,
+                          color: Colors.white.withOpacity(0.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Card count
+                Center(
+                  child: Text(
+                    '${cards.length}',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(width: 16),
+          
+          // Binder stats
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.collection.description.isEmpty
+                      ? 'Binder Value'
+                      : widget.collection.description,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: textColor.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  currencyProvider.formatValue(totalValue),
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildQuickStats(BuildContext context, List<TcgCard> cards) {
+    // Calculate stats
+    int raresCount = 0;
+    int holoCount = 0;
+    int secretRaresCount = 0;
+    
+    for (final card in cards) {
+      final rarity = card.rarity?.toLowerCase() ?? '';
+      
+      if (rarity.contains('secret') || 
+          rarity.contains('ultra') ||
+          rarity.contains('alt art')) {
+        secretRaresCount++;
+      } else if (rarity.contains('holo') || rarity.contains('rare')) {
+        holoCount++;
+      } else if (rarity.contains('rare')) {
+        raresCount++;
+      }
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          _buildStatCard(
+            context, 
+            raresCount, 
+            'Rares',
+            Colors.blue,
+          ),
+          const SizedBox(width: 8),
+          _buildStatCard(
+            context, 
+            holoCount, 
+            'Holos',
+            Colors.amber,
+          ),
+          const SizedBox(width: 8),
+          _buildStatCard(
+            context, 
+            secretRaresCount, 
+            'Ultra Rares',
+            Colors.purple,
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildStatCard(BuildContext context, int count, String label, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              count.toString(),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  void _showSortOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                'Sort By',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.attach_money),
+              title: const Text('Price (High to Low)'),
+              onTap: () {
+                setState(() {
+                  _cards?.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
+                });
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.money_off),
+              title: const Text('Price (Low to High)'),
+              onTap: () {
+                setState(() {
+                  _cards?.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
+                });
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.sort_by_alpha),
+              title: const Text('Name (A to Z)'),
+              onTap: () {
+                setState(() {
+                  _cards?.sort((a, b) => a.name.compareTo(b.name));
+                });
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.format_list_numbered),
+              title: const Text('Card Number'),
+              onTap: () {
+                setState(() {
+                  _cards?.sort((a, b) {
+                    final aNum = int.tryParse(a.number ?? '') ?? 0;
+                    final bNum = int.tryParse(b.number ?? '') ?? 0;
+                    return aNum.compareTo(bNum);
+                  });
+                });
+                Navigator.pop(context);
+              },
+            ),
+          ],
         ),
       ),
     );

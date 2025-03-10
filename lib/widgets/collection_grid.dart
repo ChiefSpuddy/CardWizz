@@ -35,6 +35,7 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
   late ScrollController _scrollController;
   bool _isScrolling = false;
   bool _lowQualityRendering = false;
+  bool _initialRendering = true;  // Add this flag to track initial rendering
 
   @override
   bool get wantKeepAlive => true;  // Keep the state alive
@@ -44,6 +45,15 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
     super.initState();
     _scrollController = ScrollController();
     _scrollController.addListener(_scrollListener);
+    
+    // Reset initial rendering after frame is drawn
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _initialRendering = false;
+        });
+      }
+    });
   }
 
   @override
@@ -54,15 +64,19 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
   }
 
   void _scrollListener() {
-    // Use scroll velocity to determine if we're scrolling fast enough to use low-quality rendering
-    if (_scrollController.position.activity?.velocity != null &&
-        _scrollController.position.activity!.velocity.abs() > 1000 && 
-        !_lowQualityRendering) {
-      setState(() => _lowQualityRendering = true);
-    } else if (_scrollController.position.activity?.velocity != null &&
-        _scrollController.position.activity!.velocity.abs() < 200 && 
-        _lowQualityRendering) {
-      setState(() => _lowQualityRendering = false);
+    // Only enable low-quality rendering during very fast scrolling
+    if (_scrollController.position.activity?.velocity != null) {
+      final velocity = _scrollController.position.activity!.velocity.abs();
+      
+      // Use higher threshold for activating low quality mode (1500 instead of 1000)
+      // and only when not in initial rendering
+      if (velocity > 1500 && !_lowQualityRendering && !_initialRendering) {
+        setState(() => _lowQualityRendering = true);
+      } 
+      // More quickly turn off low quality mode (300 instead of 200)
+      else if (velocity < 300 && _lowQualityRendering) {
+        setState(() => _lowQualityRendering = false);
+      }
     }
 
     // Also track if scrolling at all
@@ -70,6 +84,11 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
     if (isCurrentlyScrolling != _isScrolling) {
       setState(() {
         _isScrolling = isCurrentlyScrolling;
+        
+        // When scrolling stops, always ensure high quality
+        if (!isCurrentlyScrolling) {
+          _lowQualityRendering = false;
+        }
       });
     }
   }
@@ -539,8 +558,8 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
               itemCount: sortedCards.length,  // Use sortedCards instead of cards
               cacheExtent: 500, // Increase cache extent for smoother scrolling
               itemBuilder: (context, index) {
-                // Optimize by only creating widgets for visible items during scrolling
-                if (_isScrolling && index > 30) {
+                // Modify this condition to never use empty placeholders during initial load
+                if (_isScrolling && index > 60 && !_initialRendering) {
                   return const SizedBox();
                 }
 
@@ -585,7 +604,8 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
                               heroContext: 'collection',
                               showPrice: true, // Changed to true
                               showName: true,  // Added showName
-                              highQuality: !_lowQualityRendering, // Use lower quality during scrolling
+                              // Always use high quality for initial rendering and non-scrolling
+                              highQuality: !_lowQualityRendering || _initialRendering,
                               onTap: () => _showCardDetails(context, card), // Add direct handler here
                             ),
                           ),
