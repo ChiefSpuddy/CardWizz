@@ -567,6 +567,16 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
   // Add these for multiselect functionality
   Set<String> _selectedCollectionIds = {};
   bool _isMultiselect = false;
+  
+  // Add a flag to control debug output
+  static const bool _enableDebugLogs = false;  // Set to false to disable verbose logging
+
+  // Add helper method for controlled debug logging
+  void _debugLog(String message) {
+    if (_enableDebugLogs) {
+      print(message);
+    }
+  }
 
   @override
   void initState() {
@@ -652,7 +662,8 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
         }
 
         final collections = collectionsSnapshot.data ?? [];
-        print('Rendering ${collections.length} binders'); // Debug print
+        // Replace debug print with controlled debug log
+        _debugLog('Rendering ${collections.length} binders');
 
         if (collections.isEmpty) {
           return const Center(
@@ -680,7 +691,8 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
           stream: Provider.of<StorageService>(context).watchCards(),
           builder: (context, cardsSnapshot) {
             final allCards = cardsSnapshot.data ?? [];
-            print('DEBUG: Total available cards: ${allCards.length}');
+            // Replace debug print with controlled debug log
+            _debugLog('DEBUG: Total available cards: ${allCards.length}');
             
             return GridView.builder(
               padding: const EdgeInsets.all(16),
@@ -695,7 +707,8 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
                 final collection = sortedCollections[index];
                 final isSelected = _selectedCollectionIds.contains(collection.id);
                 
-                print('DEBUG: Collection ${collection.name} has IDs: ${collection.cardIds.join(', ')}');
+                // Replace debug print with controlled debug log
+                _debugLog('DEBUG: Collection ${collection.name} has IDs: ${collection.cardIds.join(', ')}');
                 
                 return GestureDetector(
                   onLongPress: () {

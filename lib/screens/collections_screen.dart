@@ -66,6 +66,16 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
   final int _maxParticles = 8; // Reduced from 20
   bool _animateParticles = true;
 
+  // Add a flag to control debug output
+  static const bool _enableDebugLogs = false;  // Set to false to disable verbose logging
+  
+  // Add helper method for controlled debug logging
+  void _debugLog(String message) {
+    if (_enableDebugLogs) {
+      print(message);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -150,7 +160,7 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
   // Add this method to update multiselect state from child widgets
   void setMultiselectActive(bool active) {
     if (_isMultiselectActive != active) {
-      print('Setting multiselect active: $active'); // Debug print
+      _debugLog('Setting multiselect active: $active'); // Controlled debug log
       setState(() {
         _isMultiselectActive = active;
       });
@@ -496,8 +506,8 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     final colorScheme = Theme.of(context).colorScheme;
     final purchaseService = context.watch<PurchaseService>(); // Added for use in actions
     
-    // Debug print to verify state is correct during build
-    print('Building CollectionsScreen, multiselect active: $_isMultiselectActive');
+    // Replace debug print with controlled debug log
+    _debugLog('Building CollectionsScreen, multiselect active: $_isMultiselectActive');
 
     return Scaffold(
       key: _scaffoldKey,
