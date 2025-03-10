@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:math'; // Add this import for math functions like sin, pi, and Random
 import '../models/custom_collection.dart';
 import '../models/tcg_card.dart';
 import '../services/collection_service.dart';
@@ -10,8 +11,7 @@ import '../providers/currency_provider.dart';
 import '../widgets/animated_background.dart';
 import '../screens/home_screen.dart';
 import '../screens/collections_screen.dart';
-// Add this import for RootNavigatorState
-import '../root_navigator.dart';  // Import the root navigator class
+import '../root_navigator.dart';  
 
 class CustomCollectionDetailScreen extends StatefulWidget {
   final CustomCollection collection;
@@ -310,87 +310,356 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
   }
 
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.collections_bookmark_outlined,
-              size: 64,
-              color: Theme.of(context).primaryColor.withOpacity(0.8),
+    final colorScheme = Theme.of(context).colorScheme;
+    final binderColor = widget.collection.color;
+    final brightness = ThemeData.estimateBrightnessForColor(binderColor);
+    final contrastColor = brightness == Brightness.light ? Colors.black87 : Colors.white;
+    
+    return Stack(
+      children: [
+        // Decorative background elements - subtle pattern matching the binder color
+        Positioned.fill(
+          child: CustomPaint(
+            painter: EmptyBinderPatternPainter(
+              color: binderColor.withOpacity(0.06),
+              accentColor: binderColor.withOpacity(0.1),
             ),
           ),
-          const SizedBox(height: 24),
-          Text(
-            'No Cards Yet',
-            style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        
+        // Main content with scroll for smaller screens
+        Positioned.fill(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 40),
+                  
+                  // Empty binder illustration
+                  Container(
+                    width: 160,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: binderColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: binderColor.withOpacity(0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: Stack(
+                      children: [
+                        // Left spine
+                        Positioned(
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: 20,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: binderColor,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(10),
+                                bottomLeft: Radius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        // Rings on spine
+                        ...List.generate(
+                          5,
+                          (index) => Positioned(
+                            left: 10,
+                            top: 30.0 + (index * 30.0),
+                            width: 12,
+                            height: 8,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.4),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        // Empty card slots
+                        ...List.generate(
+                          3,
+                          (index) => Positioned(
+                            right: 15 + (index * 4.0),
+                            top: 70 + (index * 5.0),
+                            child: Container(
+                              width: 45,
+                              height: 63,
+                              decoration: BoxDecoration(
+                                color: binderColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: binderColor.withOpacity(0.5),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Center(
+                                child: Icon(
+                                  Icons.add_rounded,
+                                  color: binderColor.withOpacity(0.6),
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        // Add card icon with animation
+                        Positioned(
+                          right: 50,
+                          bottom: 40,
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0.0, end: 1.0),
+                            duration: const Duration(seconds: 1),
+                            builder: (context, value, child) {
+                              return Transform.translate(
+                                offset: Offset(0, -5 * sin(value * 2 * pi).toDouble()), // Fix: Convert num to double
+                                child: child,
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: colorScheme.primary.withOpacity(0.4),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.add_photo_alternate_outlined,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Title with binder name 
+                  Text(
+                    widget.collection.name,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onBackground,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Empty state text
+                  Text(
+                    'Your binder is ready for cards',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // UPDATED: Two ways to add cards (removed scan option)
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Add cards from:',
+                          style: Theme.of(context).textTheme.titleMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        // Two ways to add cards
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            // From Collection option
+                            _buildAddOption(
+                              context: context,
+                              icon: Icons.style_outlined,
+                              label: 'Collection',
+                              color: Colors.blue,
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                final rootNavigatorState = Navigator.of(context, rootNavigator: true)
+                                    .context.findRootAncestorStateOfType<RootNavigatorState>();
+                                if (rootNavigatorState != null) {
+                                  rootNavigatorState.switchToTab(1);
+                                  Future.delayed(const Duration(milliseconds: 100), () {
+                                    final collectionsScreenState = rootNavigatorState.context
+                                        .findAncestorStateOfType<CollectionsScreenState>();
+                                    if (collectionsScreenState != null) {
+                                      collectionsScreenState.showCustomCollections = false;
+                                    }
+                                  });
+                                }
+                              },
+                            ),
+                            
+                            // From Search option 
+                            _buildAddOption(
+                              context: context,
+                              icon: Icons.search,
+                              label: 'Search',
+                              color: Colors.green,
+                              onTap: () {
+                                Navigator.of(context).pushNamed('/search');
+                              },
+                            ),
+                            
+                            // Scan option removed
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Tips section
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorScheme.primary.withOpacity(0.2),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.lightbulb_outline),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Tips',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildTipItem(
+                          context: context, 
+                          text: 'Use search to find specific cards by name'
+                        ),
+                        _buildTipItem(
+                          context: context, 
+                          text: 'Scan cards with your camera to instantly add them'
+                        ),
+                        _buildTipItem(
+                          context: context, 
+                          text: 'Create multiple binders for different categories'
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // Helper method to build add options
+  Widget _buildAddOption({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: color.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 28,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Add cards from your collection or scan new cards',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                onPressed: () {
-                  // UPDATED: Navigate to the root navigator and select the collection tab
-                  Navigator.of(context).pop(); // Close current screen
-                  
-                  // Find the RootNavigator and switch to Collections tab (index 1)
-                  final rootNavigatorState = 
-                      Navigator.of(context, rootNavigator: true).context
-                      .findRootAncestorStateOfType<RootNavigatorState>();
-                  
-                  if (rootNavigatorState != null) {
-                    // Switch to the Collections tab
-                    rootNavigatorState.switchToTab(1);
-                    
-                    // Switch Collections screen to Main collection view (not Binders)
-                    // Use delayed execution to ensure the tab switch completes first
-                    Future.delayed(const Duration(milliseconds: 100), () {
-                      final collectionsScreenState = rootNavigatorState.context
-                          .findAncestorStateOfType<CollectionsScreenState>();
-                      
-                      if (collectionsScreenState != null) {
-                        // Set to show main collection (not binders)
-                        collectionsScreenState.showCustomCollections = false;
-                      }
-                    });
-                  }
-                },
-                child: const Text('Go to Collection'),
-              ),
-              const SizedBox(width: 16),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                onPressed: () {
-                  // Navigate to search screen
-                  Navigator.of(context).pushNamed('/search');
-                },
-                child: const Text('Search Cards'),
-              ),
-            ],
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
     );
   }
-
+  
+  // Helper method to build tip items
+  Widget _buildTipItem({required BuildContext context, required String text}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.check_circle_outline,
+            size: 16,
+            color: Colors.green,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text),
+          ),
+        ],
+      ),
+    );
+  }
+  
   void _showCardDetails(BuildContext context, TcgCard card) {
     if (!mounted) return;
     // Add check to ensure we're not in the middle of navigation
@@ -407,4 +676,40 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
       );
     });
   }
+}
+
+// Add a custom painter for the empty binder background pattern
+class EmptyBinderPatternPainter extends CustomPainter {
+  final Color color;
+  final Color accentColor;
+  
+  EmptyBinderPatternPainter({required this.color, required this.accentColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final dotPaint = Paint()..color = color;
+    final accentPaint = Paint()..color = accentColor;
+    final random = Random(42); // Now Random is defined from dart:math import
+    
+    // Draw subtle dots
+    for (int i = 0; i < 300; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height;
+      final radius = 0.5 + random.nextDouble() * 1.5;
+      
+      canvas.drawCircle(Offset(x, y), radius, dotPaint);
+    }
+    
+    // Draw a few larger accent circles
+    for (int i = 0; i < 30; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height;
+      final radius = 2.0 + random.nextDouble() * 4.0;
+      
+      canvas.drawCircle(Offset(x, y), radius, accentPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
