@@ -6,6 +6,7 @@ import '../../models/tcg_card.dart';
 import '../../constants/app_colors.dart';
 import '../../providers/app_state.dart';
 import '../../widgets/bottom_notification.dart';
+import '../../widgets/styled_toast.dart'; // Add this import for showToast function
 
 class CardGridItem extends StatelessWidget {
   final TcgCard card;
@@ -143,56 +144,50 @@ class CardGridItem extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              // CRITICAL: Use Material+InkWell instead of GestureDetector to prevent event bubbling
               borderRadius: BorderRadius.circular(13),
               onTap: () {
                 // Add haptic feedback for better user experience
                 HapticFeedback.lightImpact();
                 
-                // CRITICAL: Handle card addition directly here without callback
-                try {
-                  // Get the storage service directly
-                  final storageService = Provider.of<StorageService>(context, listen: false);
-                  
-                  // FIXED: First update the UI state immediately to show the check
-                  // This makes the UI feel responsive without needing to rebuild the entire grid
-                  if (context.mounted && !isInCollection) {
-                    // We don't wait for the async operation to complete here
-                    showBottomNotification(context);
-                  }
-                  
-                  // Save card in background using microtask to avoid blocking UI thread
-                  Future.microtask(() async {
-                    try {
-                      // Do the actual saving in a background task
-                      await storageService.saveCard(card);
-                      
-                      // Only notify AppState after successful save
-                      if (context.mounted) {
-                        // Notify the app state in a delayed manner to avoid navigation issues
-                        Future.delayed(const Duration(milliseconds: 100), () {
-                          if (context.mounted) {
-                            final appState = Provider.of<AppState>(context, listen: false);
-                            appState.notifyCardChange();
-                          }
-                        });
-                      }
-                    } catch (e) {
-                      // If error occurs, show error notification
-                      if (context.mounted) {
-                        BottomNotification.show(
-                          context: context,
-                          title: 'Error',
-                          message: 'Failed to add card: $e',
-                          icon: Icons.error_outline,
-                          isError: true,
-                        );
-                      }
-                    }
-                  });
-                } catch (e) {
-                  debugPrint('Error in direct add: $e');
+                // Get the services we need
+                final storageService = Provider.of<StorageService>(context, listen: false);
+                
+                // FIXED: Use styled toast instead of basic SnackBar
+                if (!isInCollection) {
+                  // Use the styled toast that doesn't trigger navigation
+                  showToast(
+                    context: context,
+                    title: 'Card Added',
+                    subtitle: '${card.name} added to collection',
+                    icon: Icons.check_circle,
+                    fromBottom: true,
+                    bottomOffset: 70,  // Position it above the bottom nav bar
+                    duration: const Duration(seconds: 2),
+                  );
                 }
+                
+                // Save card without affecting navigation
+                Future.microtask(() async {
+                  try {
+                    // Do the actual saving in a background task
+                    await storageService.saveCard(card);
+                    
+                    // CRITICAL: Don't notify the app state at all for search results
+                    // This is what's causing the navigation issue
+                  } catch (e) {
+                    if (context.mounted) {
+                      showToast(
+                        context: context,
+                        title: 'Error',
+                        subtitle: e.toString(),
+                        icon: Icons.error_outline,
+                        isError: true,
+                        fromBottom: true,
+                        bottomOffset: 70,
+                      );
+                    }
+                  }
+                });
               },
               child: Container(
                 width: 26,
@@ -225,13 +220,16 @@ class CardGridItem extends StatelessWidget {
     );
   }
 
-  // New helper method to show notification without triggering navigation issues
+  // Replace this method with a simpler version that won't affect navigation
   void showBottomNotification(BuildContext context) {
-    BottomNotification.show(
-      context: context,
-      title: 'Card Added',
-      message: '${card.name} added to collection',
-      icon: Icons.check_circle,
-    );
+    // Use the scaffold messenger for notifications that don't affect navigation
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('${card.name} added to collection'),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      ));
   }
 }

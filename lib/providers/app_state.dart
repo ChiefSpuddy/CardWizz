@@ -227,15 +227,18 @@ class AppState with ChangeNotifier {
   ];
 
   // Find the notifyCardChange method and modify it to prevent navigation issues
-  void notifyCardChange() {
-    // Cancel any pending notifications
-    _debounceTimer?.cancel();
+  // Add forceNavigate parameter with default true for backward compatibility
+  void notifyCardChange({bool forceNavigate = true}) {
+    // Record the time of change for debouncing
+    _lastCardChangeTime = DateTime.now();
     
-    // Create a delayed notification to prevent navigation conflicts
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      // Only notify listeners after a short delay
-      notifyListeners();
-    });
+    // Notify listeners of the change
+    notifyListeners();
+    
+    // Only trigger navigation if explicitly requested
+    if (forceNavigate) {
+      // Your existing navigation code here if any
+    }
   }
 
   // Add this debounce helper
