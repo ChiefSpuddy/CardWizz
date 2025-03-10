@@ -38,14 +38,16 @@ class RootNavigatorState extends State<RootNavigator> {
     _selectedIndex = widget.initialTab;
   }
 
+  // Make this method public
   void switchToTab(int index) {
-    _onNavigationItemTapped(index);
-  }
-
-  void _onNavigationItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  // Keep this method in case there are direct calls to it
+  void _onNavigationItemTapped(int index) {
+    switchToTab(index);
   }
 
   @override

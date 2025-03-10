@@ -66,6 +66,66 @@ class SearchScreen extends StatefulWidget {
     }
   }
 
+  // Improve the static setSearchMode method for more robust behavior
+  static void setSearchMode(BuildContext context, SearchMode mode) {
+    print('SearchScreen.setSearchMode called with mode: ${mode.toString()}');
+    
+    // Try to find the state directly
+    final state = context.findRootAncestorStateOfType<_SearchScreenState>();
+    if (state != null) {
+      print('Found _SearchScreenState directly, calling setSearchMode()');
+      state.setSearchMode(mode);
+      return;
+    }
+    
+    // If direct state access fails, try to find through Navigator
+    print('Direct state access failed, trying alternate methods');
+    final navigatorKey = NavigationService.navigatorKey;
+    if (navigatorKey.currentContext != null) {
+      final searchState = navigatorKey.currentContext!
+          .findRootAncestorStateOfType<_SearchScreenState>();
+      if (searchState != null) {
+        print('Found _SearchScreenState through NavigatorKey, calling setSearchMode()');
+        searchState.setSearchMode(mode);
+        return;
+      }
+    }
+    
+    // Last resort - use a global method that will be picked up on next frame
+    print('Unable to find _SearchScreenState, using delayed approach');
+    _pendingSearchMode = mode;
+    
+    // Schedule a check after rendering
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPendingSearchMode(context);
+    });
+  }
+  
+  // Add this static field to track pending mode changes
+  static SearchMode? _pendingSearchMode;
+  
+  // Add this helper method to check for pending mode changes
+  static void _checkPendingSearchMode(BuildContext context) {
+    if (_pendingSearchMode != null) {
+      print('Applying pending search mode: ${_pendingSearchMode.toString()}');
+      
+      // Try all methods to find the search screen state
+      final state = context.findRootAncestorStateOfType<_SearchScreenState>();
+      if (state != null) {
+        state.setSearchMode(_pendingSearchMode!);
+        _pendingSearchMode = null;
+        return;
+      }
+      
+      // Schedule another check if we still can't find it
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_pendingSearchMode != null) {
+          _checkPendingSearchMode(context);
+        }
+      });
+    }
+  }
+
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
@@ -127,6 +187,8 @@ class _SearchScreenState extends State<SearchScreen> {
     _scrollController.addListener(_onScroll);
     _initSearchHistory();
     
+    // Simplify - Remove the pendingSearchMode check
+    
     // Listen for theme changes to refresh the UI
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Store provider reference for later use
@@ -140,6 +202,8 @@ class _SearchScreenState extends State<SearchScreen> {
         _searchController.text = args['initialSearch'] as String;
         _performSearch(_searchController.text);
       }
+      
+      // Remove NavigationService.applyPendingSearchMode call
     });
 
     // Setup the collection watcher
@@ -161,6 +225,7 @@ class _SearchScreenState extends State<SearchScreen> {
       // Only clear if coming from bottom nav and no previous search
       if (fromBottomNav && !_wasSearchActive) {
         _clearSearch();
+        // Remove NavigationService.applyPendingSearchMode call
       } else if (_wasSearchActive && _lastActiveSearch != null) {
         // Don't clear results when returning from card details
         if (_searchResults == null || _searchResults!.isEmpty) {
@@ -1430,191 +1495,35 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  // Update this helper method to use standard icons instead of missing assets
-  Widget _buildModeToggleButton(SearchMode mode, String label) {
-    final isSelected = _searchMode == mode;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorScheme = Theme.of(context).colorScheme;
+  // Update this method to be more robust and add debug logging
+  void setSearchMode(SearchMode mode) {
+    print('_SearchScreenState.setSearchMode called with mode: ${mode.toString()}');
+    print('Current mode: $_searchMode');
     
-    // Get appropriate icon for each mode using standard Flutter icons
-    Widget icon;
-    if (mode == SearchMode.eng) {
-      icon = Icon(
-        Icons.catching_pokemon,  // Using a standard Pokemon-like icon
-        size: 16,
-        color: isSelected 
-            ? (isDark ? Colors.white : colorScheme.onPrimaryContainer)
-            : (isDark ? Colors.white70 : Colors.black54),
-      );
+    if (_searchMode != mode) {
+      setState(() {
+        _searchMode = mode;
+        _clearSearch();
+        
+        // Reset sort ordering based on mode
+        if (_searchMode == SearchMode.mtg) {
+          _currentSort = 'cardmarket.prices.averageSellPrice';
+          _sortAscending = false;
+        } else {
+          _currentSort = 'number';
+          _sortAscending = true;
+        }
+        
+        print('Mode changed to: $_searchMode');
+      });
     } else {
-      icon = Icon(
-        Icons.auto_awesome,
-        size: 16,
-        color: isSelected 
-            ? (isDark ? Colors.white : colorScheme.onPrimaryContainer)
-            : (isDark ? Colors.white70 : Colors.black54),
-      );
-    }
-    
-    // Rest of the method remains the same
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _searchMode = mode;
-          _clearSearch();
-        });
-        HapticFeedback.lightImpact();
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? (isDark 
-                  ? colorScheme.primary.withOpacity(0.8) 
-                  : colorScheme.primaryContainer)
-              : (isDark 
-                  ? Colors.white.withOpacity(0.05) 
-                  : Colors.black.withOpacity(0.03)),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? (isDark 
-                    ? colorScheme.primary 
-                    : colorScheme.primary.withOpacity(0.5))
-                : Colors.transparent,
-            width: 1,
-          ),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: colorScheme.primary.withOpacity(isDark ? 0.3 : 0.2),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            )
-          ] : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            icon,
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected
-                    ? (isDark ? Colors.white : colorScheme.onPrimaryContainer)
-                    : (isDark ? Colors.white70 : Colors.black87),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Add this method to get the appropriate search placeholder
-  String _getSearchPlaceholder() {
-    switch (_searchMode) {
-      case SearchMode.eng:
-        return 'Search Pokémon cards...';
-      case SearchMode.mtg:
-        return 'Search Magic cards...';
+      print('No mode change needed - already in mode: $_searchMode');
     }
   }
-
-  // Add this method for the sort icon
-  IconData _getSortIcon() {
-    switch (_currentSort) {
-      case 'cardmarket.prices.averageSellPrice':
-        return _sortAscending ? Icons.trending_up : Icons.trending_down;
-      case 'name':
-        return _sortAscending ? Icons.sort_by_alpha : Icons.sort_by_alpha_outlined;
-      case 'number':
-        return _sortAscending ? Icons.format_list_numbered : Icons.format_list_numbered_rtl;
-      default:
-        return Icons.sort;
-    }
-  }
-
-  // Add this method for filter options
-  void _showFilterOptions() {
-    // For now, just show a simple dialog with filter options
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Filter Options',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.monetization_on),
-                title: const Text('Show cards with prices only'),
-                onTap: () {
-                  Navigator.pop(context);
-                  if (_searchController.text.isNotEmpty) {
-                    _performSearch('cardmarket.prices.averageSellPrice:[0.01 TO *] ' + _searchController.text);
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.star),
-                title: const Text('Rarest cards only'),
-                onTap: () {
-                  Navigator.pop(context);
-                  if (_searchController.text.isNotEmpty) {
-                    final baseQuery = _searchController.text;
-                    _performSearch('(rarity:"Secret Rare" OR rarity:"Hyper Rare" OR rarity:"Ultra Rare") ' + baseQuery);
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Close'),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // Modify the onSearchModeChanged method to handle the updated enum values
+  
+  // Update to use our single setSearchMode method
   void _onSearchModeChanged(List<SearchMode> modes) {
-    final newMode = modes.first;
-    
-    if (newMode == _searchMode) return;
-    
-    setState(() {
-      _searchMode = newMode;
-      _clearSearch();
-      
-      // Reset sort ordering based on mode
-      if (_searchMode == SearchMode.mtg) {
-        _currentSort = 'cardmarket.prices.averageSellPrice';
-        _sortAscending = false;
-      } else {
-        _currentSort = 'number';
-        _sortAscending = true;
-      }
-    });
+    setSearchMode(modes.first);
   }
 }
 

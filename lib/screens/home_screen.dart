@@ -43,11 +43,12 @@ class HomeScreenState extends State<HomeScreen> {
     HomeScreen._scrollController.addListener(_onScroll);
   }
   
+  // Update this method to use the public switchToTab method instead of private _onNavigationItemTapped
   void setSelectedIndex(int index) {
     // Find RootNavigator and set its index
-    final rootNavigator = context.findRootAncestorStateOfType<State<RootNavigator>>();
+    final rootNavigator = context.findRootAncestorStateOfType<RootNavigatorState>();
     if (rootNavigator != null) {
-      (rootNavigator as dynamic)._onNavigationItemTapped(index);
+      rootNavigator.switchToTab(index);
     }
   }
 

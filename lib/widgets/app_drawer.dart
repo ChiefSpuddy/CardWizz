@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 import 'dart:ui';
 import '../providers/app_state.dart';
 import '../providers/currency_provider.dart';
-import '../providers/theme_provider.dart'; // Add this import
+import '../providers/theme_provider.dart'; 
 import '../routes.dart';
 import '../screens/collections_screen.dart';
 import '../screens/analytics_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../screens/home_screen.dart';
+import '../screens/search_screen.dart'; 
+import '../services/navigation_service.dart';
 
 class AppDrawer extends StatelessWidget {
   final GlobalKey<ScaffoldState>? scaffoldKey;
@@ -18,7 +20,8 @@ class AppDrawer extends StatelessWidget {
     this.scaffoldKey,
   });
 
-  void _navigateAndClose(BuildContext context, String route) {
+  // Simplify the navigation method to handle search without mode parameter
+  void _navigateAndClose(BuildContext context, String route, {Map<String, dynamic>? arguments}) {
     Navigator.pop(context); // Close drawer
     
     // Try to use bottom nav first
@@ -41,205 +44,15 @@ class AppDrawer extends StatelessWidget {
           homeState.setSelectedIndex(4);
           break;
         default:
-          Navigator.pushNamed(context, route);
+          Navigator.pushNamed(context, route, arguments: arguments);
       }
     } else {
       // Fallback to direct navigation if not in HomeScreen
-      Navigator.pushNamed(context, route);
+      Navigator.pushNamed(context, route, arguments: arguments);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final currencyProvider = context.watch<CurrencyProvider>();
-    final themeProvider = context.watch<ThemeProvider>(); // Add this
-    final isDark = themeProvider.isDarkMode; // Use themeProvider instead of Theme.of
-    final localizations = AppLocalizations.of(context);
-
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Drawer(
-          width: MediaQuery.of(context).size.width * 0.6, // Changed from 0.75 to 0.6
-          backgroundColor: isDark 
-              ? Colors.black.withOpacity(0.7) 
-              : Colors.white.withOpacity(0.9),
-          child: Consumer<AppState>(
-            builder: (context, appState, _) {
-              final username = appState.currentUser?.username;  // Get username
-              return Column(
-                children: [
-                  // Slimmer header with animation
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: EdgeInsets.only(
-                      top: MediaQuery.of(context).padding.top + 16, // Reduced padding
-                      bottom: 16, // Reduced padding
-                      left: 16, // Reduced padding
-                      right: 16, // Reduced padding
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          colorScheme.primary.withOpacity(0.8),
-                          colorScheme.secondary.withOpacity(0.8),
-                        ],
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        // Smaller avatar
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: colorScheme.primary.withOpacity(0.3),
-                                blurRadius: 15, // Reduced blur
-                                spreadRadius: 1, // Reduced spread
-                              ),
-                            ],
-                          ),
-                          child: Hero(
-                            tag: 'avatar',
-                            child: CircleAvatar(
-                              radius: 24, // Reduced radius
-                              backgroundColor: Colors.white.withOpacity(0.2),
-                              child: appState.currentUser?.avatarPath != null
-                                  ? ClipOval(
-                                      child: Image.asset(
-                                        appState.currentUser!.avatarPath!,
-                                        width: 44, // Reduced size
-                                        height: 44, // Reduced size
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : const Icon(Icons.person, size: 28, color: Colors.white), // Reduced icon size
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12), // Reduced spacing
-                        // User info with adjusted text sizes
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                username ?? localizations.translate('welcome'),  // Use username or 'Welcome'
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18, // Reduced font size
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              if (appState.currentUser?.email != null)
-                                Text(
-                                  appState.currentUser!.email!,
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontSize: 13, // Reduced font size
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Menu items with new styling
-                  Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                      children: [
-                        _buildMenuItem(
-                          context,
-                          icon: Icons.home_rounded,
-                          title: 'Home',
-                          onTap: () => _navigateAndClose(context, AppRoutes.home),
-                        ),
-                        _buildMenuItem(
-                          context,
-                          icon: Icons.style_outlined,
-                          title: 'Collection',
-                          onTap: () => _navigateAndClose(context, AppRoutes.collection),
-                        ),
-                        _buildMenuItem(
-                          context,
-                          icon: Icons.collections_bookmark_outlined,
-                          title: localizations.translate('binders'),
-                          onTap: () => _navigateAndClose(context, AppRoutes.collection),  // Keep using collection route
-                        ),
-                        _buildMenuItem(
-                          context,
-                          icon: Icons.analytics_outlined,
-                          title: localizations.translate('analytics'),
-                          onTap: () => _navigateAndClose(context, AppRoutes.analytics),  // Already using correct route
-                        ),
-                        _buildMenuItem(
-                          context,
-                          icon: Icons.search_outlined,
-                          title: 'Search',
-                          onTap: () => _navigateAndClose(context, AppRoutes.search),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Divider(
-                            height: 32,
-                            color: isDark ? Colors.white12 : Colors.black12,
-                          ),
-                        ),
-                        // Settings Group
-                        _buildMenuItem(
-                          context,
-                          icon: Icons.currency_exchange,
-                          title: 'Currency',
-                          subtitle: currencyProvider.currentCurrency,
-                          onTap: () {
-                            showModalBottomSheet(
-                              context: context,
-                              builder: (context) => _buildCurrencyPicker(
-                                context,
-                                currencyProvider,
-                              ),
-                            );
-                          },
-                        ),
-                        _buildMenuItem(
-                          context,
-                          icon: isDark ? Icons.light_mode : Icons.dark_mode,
-                          title: isDark ? 'Light Mode' : 'Dark Mode',
-                          onTap: () {
-                            themeProvider.toggleTheme(); // Use themeProvider instead
-                            Navigator.pop(context);
-                          },
-                        ),
-                        if (appState.isAuthenticated) ...[
-                          const Divider(height: 1),
-                          _buildMenuItem(
-                            context,
-                            icon: Icons.logout,
-                            title: 'Sign Out',
-                            onTap: () {
-                              Navigator.pop(context);
-                              appState.signOut();
-                            },
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
+  // Add the missing _buildMenuItem method
   Widget _buildMenuItem(
     BuildContext context, {
     required IconData icon,
@@ -319,6 +132,7 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
+  // Add the missing _buildCurrencyPicker method
   Widget _buildCurrencyPicker(
     BuildContext context,
     CurrencyProvider currencyProvider,
@@ -349,7 +163,6 @@ class AppDrawer extends StatelessWidget {
                   : null,
               onTap: () {
                 currencyProvider.setCurrency(entry.key);
-  final VoidCallback onTap;
                 Navigator.pop(context);
               },
             ),
@@ -358,15 +171,208 @@ class AppDrawer extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final currencyProvider = context.watch<CurrencyProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDark = themeProvider.isDarkMode;
+    final localizations = AppLocalizations.of(context);
+
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Drawer(
+          width: MediaQuery.of(context).size.width * 0.6,
+          backgroundColor: isDark 
+              ? Colors.black.withOpacity(0.7) 
+              : Colors.white.withOpacity(0.9),
+          child: Consumer<AppState>(
+            builder: (context, appState, _) {
+              final username = appState.currentUser?.username;
+              return Column(
+                children: [
+                  // Slimmer header with animation
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: EdgeInsets.only(
+                      top: MediaQuery.of(context).padding.top + 16,
+                      bottom: 16,
+                      left: 16,
+                      right: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          colorScheme.primary.withOpacity(0.8),
+                          colorScheme.secondary.withOpacity(0.8),
+                        ],
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // ...existing code...
+                        Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: colorScheme.primary.withOpacity(0.3),
+                                blurRadius: 15,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: Hero(
+                            tag: 'avatar',
+                            child: CircleAvatar(
+                              radius: 24,
+                              backgroundColor: Colors.white.withOpacity(0.2),
+                              child: appState.currentUser?.avatarPath != null
+                                  ? ClipOval(
+                                      child: Image.asset(
+                                        appState.currentUser!.avatarPath!,
+                                        width: 44,
+                                        height: 44,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    )
+                                  : const Icon(Icons.person, size: 28, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                username ?? localizations.translate('welcome'),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (appState.currentUser?.email != null)
+                                Text(
+                                  appState.currentUser!.email!,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Menu items with new styling
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                      children: [
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.home_rounded,
+                          title: 'Home',
+                          onTap: () => _navigateAndClose(context, AppRoutes.home),
+                        ),
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.style_outlined,
+                          title: 'Collection',
+                          onTap: () => _navigateAndClose(context, AppRoutes.collection),
+                        ),
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.collections_bookmark_outlined,
+                          title: localizations.translate('binders'),
+                          onTap: () => _navigateAndClose(context, AppRoutes.collection),
+                        ),
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.analytics_outlined,
+                          title: localizations.translate('analytics'),
+                          onTap: () => _navigateAndClose(context, AppRoutes.analytics),
+                        ),
+                        // Simplified Search option - no mode specification
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.search,
+                          title: 'Search',
+                          onTap: () => _navigateAndClose(context, AppRoutes.search),
+                        ),
+                        // MTG option removed
+                        
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Divider(
+                            height: 32,
+                            color: isDark ? Colors.white12 : Colors.black12,
+                          ),
+                        ),
+                        // Settings Group
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.currency_exchange,
+                          title: 'Currency',
+                          subtitle: currencyProvider.currentCurrency,
+                          onTap: () {
+                            showModalBottomSheet(
+                              context: context,
+                              builder: (context) => _buildCurrencyPicker(
+                                context,
+                                currencyProvider,
+                              ),
+                            );
+                          },
+                        ),
+                        _buildMenuItem(
+                          context,
+                          icon: isDark ? Icons.light_mode : Icons.dark_mode,
+                          title: isDark ? 'Light Mode' : 'Dark Mode',
+                          onTap: () {
+                            themeProvider.toggleTheme();
+                            Navigator.pop(context);
+                          },
+                        ),
+                        if (appState.isAuthenticated) ...[
+                          const Divider(height: 1),
+                          _buildMenuItem(
+                            context,
+                            icon: Icons.logout,
+                            title: 'Sign Out',
+                            onTap: () {
+                              Navigator.pop(context);
+                              appState.signOut();
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-// Fix the DrawerItem class (keep only one version)
+// DrawerItem class for any helpers
 class DrawerItem {
   final IconData icon;
   final String title;
   final String? subtitle;
   final Color? textColor;
-  final double fontSize;  // Add fontSize parameter
+  final double fontSize;  
   final VoidCallback onTap;
 
   DrawerItem({
@@ -374,7 +380,7 @@ class DrawerItem {
     required this.title,
     this.subtitle,
     this.textColor,
-    this.fontSize = 15,  // Default fontSize
+    this.fontSize = 15,  
     required this.onTap,
   });
 }
