@@ -6,6 +6,7 @@ class AnimatedBackground extends StatefulWidget {
   final int particleCount;
   final Color? particleColor;
   final double maxParticleSize;
+  final Color? color; // Add color parameter
   
   const AnimatedBackground({
     super.key,
@@ -13,6 +14,7 @@ class AnimatedBackground extends StatefulWidget {
     this.particleCount = 20,
     this.particleColor,
     this.maxParticleSize = 4.0,
+    this.color, // Make this optional
   });
 
   @override
@@ -65,25 +67,32 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with SingleTick
     final color = widget.particleColor ?? Theme.of(context).primaryColor;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
+    // Use provided color or default based on theme
+    final backgroundColor = widget.color ?? (isDarkMode 
+        ? Colors.grey[900] // Darker background for dark mode
+        : const Color(0xFFEEF6FF)); // Light blue for light mode
+    
     return Stack(
       fit: StackFit.expand,
       children: [
         // Gradient background
         Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
+            color: backgroundColor,
+            // Only use the gradient in light mode unless color is explicitly provided
+            gradient: widget.color == null && !isDarkMode ? LinearGradient(
               begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDarkMode
-                  ? [
-                      const Color(0xFF1A2036),
-                      const Color(0xFF0D1425),
-                    ]
-                  : [
-                      Theme.of(context).colorScheme.surface,
-                      Theme.of(context).colorScheme.surface,
-                    ],
-            ),
+              end: Alignment.bottomRight.add(Alignment(
+                math.sin(_controller.value * 2 * math.pi) * 0.2,
+                math.cos(_controller.value * 2 * math.pi) * 0.2,
+              )),
+              colors: [
+                const Color(0xFFEEF6FF),
+                const Color(0xFFE3F2FF),
+                const Color(0xFFD6EBFF),
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ) : null,
           ),
         ),
         

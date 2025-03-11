@@ -14,6 +14,9 @@ class PriceService {
   
   // Price expiration - refresh after 12 hours
   static const Duration _priceCacheDuration = Duration(hours: 12);
+
+  // Add a property to cache the most recent price changes
+  List<Map<String, dynamic>>? _lastRecentPriceChanges;
   
   /// Get the most accurate price for a card with the following priority:
   /// 1. eBay sold listings (median price)
@@ -340,6 +343,95 @@ class PriceService {
   // Replace print statements with logging service calls
   void _logPriceInfo(String message) {
     LoggingService.debug(message, tag: 'Price');
+  }
+
+  // Modify method to cache results - Fixed the missing result variable
+  Future<List<Map<String, dynamic>>> getRecentPriceChanges(List<TcgCard> cards) async {
+    try {
+      // Declare the result variable here
+      final List<Map<String, dynamic>> result = [];
+      
+      // Find cards with direct price changes from the latest update
+      for (final card in cards) {
+        if (card.lastPriceChange != null && card.previousPrice != null && card.price != null) {
+          final change = ((card.price! - card.previousPrice!) / card.previousPrice!) * 100;
+          if (change.abs() > 0.01) {
+            result.add({
+              'card': card,
+              'change': change,
+              'period': 'Last update',
+            });
+          }
+        }
+      }
+      
+      // Also check price history for changes
+      for (final card in cards) {
+        if (card.price != null && card.priceHistory.length >= 2) {
+          final change = card.getPriceChange(const Duration(days: 1)) ??
+                        card.getPriceChange(const Duration(days: 7)) ??
+                        card.getPriceChange(const Duration(days: 30));
+          
+          if (change != null && change.abs() > 0.01) {
+            // Check if we already have this card from direct changes
+            if (!result.any((item) => (item['card'] as TcgCard).id == card.id)) {
+              result.add({
+                'card': card,
+                'change': change,
+                'period': '${card.getPriceChangePeriod() ?? 'Recent'}',
+              });
+            }
+          }
+        }
+      }
+      
+      // Sort by absolute change percentage (largest changes first)
+      result.sort((a, b) => (b['change'] as double).abs().compareTo((a['change'] as double).abs()));
+      
+      // Store the result in cache before returning
+      _lastRecentPriceChanges = result;
+      return result;
+    } catch (e) {
+      print('Error getting recent price changes: $e');
+      // If we have cached results, return them on error
+      if (_lastRecentPriceChanges != null) {
+        return _lastRecentPriceChanges!;
+      }
+      return [];
+    }
+  }
+
+  // Add a method to get cached changes
+  List<Map<String, dynamic>>? getCachedPriceChanges() {
+    return _lastRecentPriceChanges;
+  }
+  
+  // Ensure market scanner doesn't reset the recent price changes - Fixed missing result variable
+  Future<List<Map<String, dynamic>>> scanMarket() async {
+    // Preserve the recent price changes cache
+    final cachedChanges = _lastRecentPriceChanges;
+    
+    // Declare the result variable
+    final List<Map<String, dynamic>> result = [];
+    
+    try {
+      // Implementation for market scanning
+      // This is a simplified placeholder - you would add your actual market scanning logic here
+      
+      // For example:
+      // final marketData = await _fetchMarketData();
+      // result.addAll(marketData);
+      
+    } catch (e) {
+      print('Error scanning market: $e');
+    } finally {
+      // Restore the cache if it was cleared during the process
+      if (cachedChanges != null) {
+        _lastRecentPriceChanges = cachedChanges;
+      }
+    }
+    
+    return result;
   }
 }
 
