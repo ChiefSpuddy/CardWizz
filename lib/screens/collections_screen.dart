@@ -26,6 +26,7 @@ import '../constants/layout.dart';
 import '../services/purchase_service.dart'; // Add this missing import
 import 'dart:math';
 import '../widgets/standard_app_bar.dart';
+import '../utils/card_details_router.dart';
 
 class CollectionsScreen extends StatefulWidget {
   final bool _showEmptyState;
@@ -339,136 +340,149 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
   Widget _buildValueTrackerCard(List<TcgCard> cards, CurrencyProvider currencyProvider) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
     
-    return FadeTransition(
-      opacity: _fadeInController,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.2),
-          end: Offset.zero,
-        ).animate(_slideController),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0), // Changed from 16 to 20
-          child: InkWell(
-            onTap: () {
-              // Navigate to analytics page on tap
-              final homeState = context.findAncestorStateOfType<HomeScreenState>();
-              if (homeState != null) {
-                homeState.setSelectedIndex(3); // Index for analytics tab
-              }
-            },
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              height: 56, // Much shorter height
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    isDark 
-                      ? colorScheme.surfaceVariant.withOpacity(0.4)
-                      : colorScheme.surface,
-                    isDark 
-                      ? colorScheme.surface.withOpacity(0.3)
-                      : colorScheme.surface,
-                  ],
-                ),
+    // Calculate raw total by fetching and summing raw card prices
+    return FutureBuilder<double>(
+      future: _calculateRawTotalValue(cards),
+      builder: (context, snapshot) {
+        final totalValue = snapshot.data ?? cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+        
+        return FadeTransition(
+          opacity: _fadeInController,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.2),
+              end: Offset.zero,
+            ).animate(_slideController),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0), // Changed from 16 to 20
+              child: InkWell(
+                onTap: () {
+                  // Navigate to analytics page on tap
+                  final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                  if (homeState != null) {
+                    homeState.setSelectedIndex(3); // Index for analytics tab
+                  }
+                },
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: colorScheme.outline.withOpacity(0.1),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 4,
-                    margin: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade500,
-                      borderRadius: BorderRadius.circular(2),
+                child: Container(
+                  height: 56, // Much shorter height
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        isDark 
+                          ? colorScheme.surfaceVariant.withOpacity(0.4)
+                          : colorScheme.surface,
+                        isDark 
+                          ? colorScheme.surface.withOpacity(0.3)
+                          : colorScheme.surface,
+                      ],
                     ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: colorScheme.outline.withOpacity(0.1),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  // Portfolio value with animation
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Collection Value',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurface.withOpacity(0.7),
-                          ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        margin: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade500,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        const SizedBox(height: 2),
-                        _valueController.value < 1.0
-                          ? Text(
-                              currencyProvider.formatValue(totalValue),
+                      ),
+                      const SizedBox(width: 12),
+                      // Portfolio value with animation
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Collection Value',
                               style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
-                              ),
-                            )
-                          : TweenAnimationBuilder<double>(
-                              duration: const Duration(milliseconds: 1500),
-                              curve: Curves.easeOutCubic,
-                              tween: Tween(begin: 0, end: totalValue),
-                              builder: (context, value, child) => Text(
-                                currencyProvider.formatValue(value),
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
+                                fontSize: 12,
+                                color: colorScheme.onSurface.withOpacity(0.7),
                               ),
                             ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          '${cards.length}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.primary,
-                          ),
+                            const SizedBox(height: 2),
+                            _valueController.value < 1.0
+                              ? Text(
+                                  currencyProvider.formatValue(totalValue),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                )
+                              : TweenAnimationBuilder<double>(
+                                  duration: const Duration(milliseconds: 1500),
+                                  curve: Curves.easeOutCubic,
+                                  tween: Tween(begin: 0, end: totalValue),
+                                  builder: (context, value, child) => Text(
+                                    currencyProvider.formatValue(value),
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                          ],
                         ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.style_outlined,
-                          size: 14,
-                          color: colorScheme.primary,
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          children: [
+                            Text(
+                              '${cards.length}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.style_outlined,
+                              size: 14,
+                              color: colorScheme.primary,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  // Helper method to calculate raw total value
+  Future<double> _calculateRawTotalValue(List<TcgCard> cards) async {
+    // Use the batch calculation method from CardDetailsRouter for consistency
+    return CardDetailsRouter.calculateRawTotalValue(cards);
   }
 
   // Helper method to count unique sets

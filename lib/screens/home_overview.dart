@@ -112,209 +112,37 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     final currencyProvider = context.watch<CurrencyProvider>();
     final storageService = Provider.of<StorageService>(context, listen: false);
     
-    // Use raw card prices for the chart data
-    final points = ChartService.getPortfolioHistoryRaw(storageService, cards);
-    
-    // Early returns for empty states...
-    if (points.length < 2) return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.show_chart,
-              size: 48,
-              color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Price Trend Coming Soon',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Check back tomorrow to see how your collection value changes over time!',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    // Calculate current total value
-    final currentTotalValue = ChartService.calculateTotalValue(cards);
-
-    // Extract values and calculate ranges
-    final values = points.map((p) => p.$2).toList();
-    final maxValue = values.reduce(max);
-    final minValue = values.reduce(min);
-    
-    // Increase the chart padding for better visualization
-    final chartPadding = (maxValue - minValue) * 0.15;
-    
-    // Calculate nice intervals for the chart
-    final interval = _calculateNiceInterval(maxValue - minValue);
-    final adjustedMin = (minValue / interval).floor() * interval;
-    final adjustedMax = ((maxValue / interval).ceil()) * interval;
-
-    // Convert to spots for the chart
-    final spots = points.map((point) {
-      return FlSpot(
-        point.$1.millisecondsSinceEpoch.toDouble(),
-        point.$2,
-      );
-    }).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'Collection Value Trend',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Spacer(),
-            Text(
-              currencyProvider.formatValue(maxValue),
-              style: TextStyle(
-                color: Colors.green.shade700,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        SizedBox(
+    // Use the consistent total value calculation
+    return FutureBuilder<double>(
+      future: CardDetailsRouter.calculateRawTotalValue(cards),
+      builder: (context, snapshot) {
+        final totalValue = snapshot.data ?? cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+        
+        // Return a chart or placeholder
+        return Container(
           height: 200,
-          child: Padding(
-            padding: const EdgeInsets.only(left: 8, right: 24), // Add left padding and increase right padding
-            child: LineChart(
-              LineChartData(
-                lineTouchData: LineTouchData(
-                  enabled: true,
-                  touchTooltipData: LineTouchTooltipData(
-                    tooltipBgColor: Theme.of(context).colorScheme.surface,
-                    tooltipRoundedRadius: 8,
-                    fitInsideHorizontally: true,  // Add this line
-                    fitInsideVertically: true,    // Add this line
-                    getTooltipItems: (spots) {
-                      return spots.map((spot) {
-                        final date = DateTime.fromMillisecondsSinceEpoch(spot.x.toInt());
-                        return LineTooltipItem(
-                          '${_formatDate(date)}\n${currencyProvider.formatValue(spot.y)}',
-                          TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        );
-                      }).toList();
-                    },
-                  ),
-                  handleBuiltInTouches: true,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Collection Value: ${currencyProvider.formatValue(totalValue)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: true,
-                  horizontalInterval: interval, // Use calculated interval
-                  verticalInterval: const Duration(days: 7).inMilliseconds.toDouble(),
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: Theme.of(context).dividerColor.withOpacity(0.1),
-                    strokeWidth: 1,
-                  ),
-                  getDrawingVerticalLine: (value) => FlLine(
-                    color: Theme.of(context).dividerColor.withOpacity(0.1),
-                    strokeWidth: 1,
-                  ),
-                ),
-                titlesData: FlTitlesData(
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: const Duration(days: 7).inMilliseconds.toDouble(),
-                      getTitlesWidget: (value, _) {
-                        final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            _formatDate(date),
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: interval,  // Use calculated interval
-                      reservedSize: 46,
-                      getTitlesWidget: (value, _) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Text(
-                          currencyProvider.formatChartValue(value),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                minY: adjustedMin,
-                maxY: adjustedMax,
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: spots,  // Use spots instead of chartSpots
-                    isCurved: true,
-                    curveSmoothness: 0.8, // Increased from 0.3 to 0.8 for more curve
-                    preventCurveOverShooting: false, // Changed to false to allow smoother curves
-                    color: Colors.green.shade600,
-                    barWidth: 3, // Slightly increased for better visibility
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, percent, bar, index) {
-                        return FlDotCirclePainter(
-                          radius: 6, // Increased from 4
-                          color: Colors.white,
-                          strokeWidth: 2.5, // Increased from 2
-                          strokeColor: Colors.green.shade600,
-                        );
-                      },
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.green.shade600.withOpacity(0.3), // Slightly increased opacity
-                          Colors.green.shade600.withOpacity(0.0),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
               ),
-            ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Provider<List<TcgCard>>.value(
+                  value: cards,
+                  child: const FullWidthPortfolioChart(),
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -903,6 +731,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     );
   }
 
+  // Replace the current _buildSummaryCard method for the portfolio value card
   Widget _buildSummaryCard(
     BuildContext context,
     String title,
@@ -914,7 +743,46 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                           title == 'Collection Value' ? 'portfolioValue' : 
                           title.toLowerCase().replaceAll(' ', '_');
     
-    // Remove animation opacity to keep cards always visible
+    // If this is the Collection Value card, use FutureBuilder with CardDetailsRouter
+    if (title == 'Collection Value') {
+      // IMPORTANT: Don't try to access Provider<List<TcgCard>> directly
+      return Card(
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Icon(
+                Icons.currency_exchange,
+                size: 32,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                localizations.translate(translationKey),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 4),
+              // Use the value provided from the parent instead of trying to recalculate
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Regular summary card for non-value tiles
     return Card(
       elevation: 2,
       child: Padding(
@@ -1075,6 +943,30 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceRow(String label, dynamic price, {bool isHighlight = false}) {
+    final currencyProvider = context.watch<CurrencyProvider>();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: isHighlight
+                ? Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)
+                : Theme.of(context).textTheme.bodyLarge,
+          ),
+          Text(
+            currencyProvider.formatValue(price.toDouble()),
+            style: isHighlight
+                ? TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade700)
+                : TextStyle(color: Colors.green.shade700),
           ),
         ],
       ),

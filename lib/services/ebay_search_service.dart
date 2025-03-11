@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/ebay_api_service.dart';
 import '../models/tcg_card.dart';
+import '../services/logging_service.dart';
 
 class EbaySearchService extends ChangeNotifier {
   final EbayApiService _ebayApi = EbayApiService();
@@ -107,7 +108,7 @@ class EbaySearchService extends ChangeNotifier {
       
       return price ?? card.price; // Fall back to card.price if no eBay data
     } catch (e) {
-      print('Error fetching eBay price data: $e');
+      LoggingService.error('Error fetching eBay price data: $e', tag: 'eBay');
       return card.price; // Fall back to card.price on error
     }
   }

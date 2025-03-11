@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/tcg_card.dart';
 import '../services/ebay_api_service.dart';
 import '../services/ebay_search_service.dart';
+import '../services/logging_service.dart';
 
 class PriceService {
   final EbayApiService _ebayApi = EbayApiService();
@@ -52,7 +53,7 @@ class PriceService {
       
       // If we have valid eBay data, use it and cache it
       if (ebayPrice != null && ebayPrice > 0) {
-        print('Using eBay sold price for ${card.name}: \$${ebayPrice.toStringAsFixed(2)}' +
+        _logPriceInfo('Using eBay sold price for ${card.name}: \$${ebayPrice.toStringAsFixed(2)}' +
               (includeGraded ? ' (including graded cards)' : ' (raw cards only)'));
         _priceCache[cacheKey] = _PriceData(
           price: ebayPrice,
@@ -64,7 +65,7 @@ class PriceService {
       
       // Second priority: Use the TCG API price if available
       if (card.price != null && card.price! > 0) {
-        print('Using TCG API price for ${card.name}: \$${card.price!.toStringAsFixed(2)}');
+        _logPriceInfo('Using TCG API price for ${card.name}: \$${card.price!.toStringAsFixed(2)}');
         _priceCache[cacheKey] = _PriceData(
           price: card.price!,
           source: PriceSource.tcgApi,
@@ -74,11 +75,11 @@ class PriceService {
       }
       
       // No valid price found
-      print('No valid price found for ${card.name}');
+      _logPriceInfo('No valid price found for ${card.name}');
       return null;
       
     } catch (e) {
-      print('Error getting accurate price: $e');
+      _logPriceInfo('Error getting accurate price: $e');
       // Fallback to existing price in case of error
       return card.price;
     }
@@ -107,20 +108,20 @@ class PriceService {
     // Get the all-inclusive price data (includes graded)
     final allInclusiveResult = await getPriceData(card, includeGraded: true);
     
-    print('Price analysis for ${card.name}:');
-    print('  - Raw price: ${rawResult.price != null ? "\$${rawResult.price!.toStringAsFixed(2)}" : "N/A"}');
-    print('  - All-inclusive price: ${allInclusiveResult.price != null ? "\$${allInclusiveResult.price!.toStringAsFixed(2)}" : "N/A"}');
+    _logPriceInfo('Price analysis for ${card.name}:');
+    _logPriceInfo('  - Raw price: ${rawResult.price != null ? "\$${rawResult.price!.toStringAsFixed(2)}" : "N/A"}');
+    _logPriceInfo('  - All-inclusive price: ${allInclusiveResult.price != null ? "\$${allInclusiveResult.price!.toStringAsFixed(2)}" : "N/A"}');
     
     // Check if we have meaningful difference between raw and all-inclusive prices
     if (rawResult.price != null && allInclusiveResult.price != null) {
       final difference = allInclusiveResult.price! - rawResult.price!;
       final percentDifference = (difference / rawResult.price!) * 100;
       
-      print('  - Price difference: ${difference.toStringAsFixed(2)} (${percentDifference.toStringAsFixed(1)}%)');
+      _logPriceInfo('  - Price difference: ${difference.toStringAsFixed(2)} (${percentDifference.toStringAsFixed(1)}%)');
       
       // If all-inclusive price is significantly higher (>10%), we likely have graded sales
       if (percentDifference > 10.0) {
-        print('  - Detected significant price difference, assuming graded sales exist');
+        _logPriceInfo('  - Detected significant price difference, assuming graded sales exist');
         gradedPrice = allInclusiveResult.price;
         gradedToRawRatio = allInclusiveResult.price! / rawResult.price!;
         hasGradedSales = true;
@@ -141,7 +142,7 @@ class PriceService {
             }
           }
           
-          print('  - Found $gradedCount graded sales');
+          _logPriceInfo('  - Found $gradedCount graded sales');
           
           if (gradedCount >= 3 && gradedPrices.isNotEmpty) {
             // Calculate average graded price
@@ -150,11 +151,11 @@ class PriceService {
             gradedToRawRatio = avgGradedPrice / rawResult.price!;
             hasGradedSales = true;
             
-            print('  - Calculated graded price: \$${avgGradedPrice.toStringAsFixed(2)}');
-            print('  - Grading premium: ${((gradedToRawRatio - 1) * 100).toStringAsFixed(1)}%');
+            _logPriceInfo('  - Calculated graded price: \$${avgGradedPrice.toStringAsFixed(2)}');
+            _logPriceInfo('  - Grading premium: ${((gradedToRawRatio - 1) * 100).toStringAsFixed(1)}%');
           }
         } catch (e) {
-          print('  - Error determining graded prices: $e');
+          _logPriceInfo('  - Error determining graded prices: $e');
         }
       }
     }
@@ -229,7 +230,7 @@ class PriceService {
         isMtg: isMtg,
       );
       
-      print('Total eBay sales found for ${card.name}: ${allSales.length}');
+      _logPriceInfo('Total eBay sales found for ${card.name}: ${allSales.length}');
       
       // Filter out graded cards
       final rawSales = allSales.where((sale) {
@@ -254,7 +255,7 @@ class PriceService {
         return true;
       }).toList();
       
-      print('Filtered to ${rawSales.length} raw card sales (excluded ${allSales.length - rawSales.length} graded sales)');
+      _logPriceInfo('Filtered to ${rawSales.length} raw card sales (excluded ${allSales.length - rawSales.length} graded sales)');
       
       // If we have at least 3 raw sales, calculate the price
       if (rawSales.length >= 3) {
@@ -283,17 +284,17 @@ class PriceService {
         }
         final trimmedMean = trimmedPrices.reduce((a, b) => a + b) / trimmedPrices.length;
         
-        print('Raw card price analysis for ${card.name} (${rawSales.length} raw sales):');
-        print('  - Range: \$${prices.first.toStringAsFixed(2)} to \$${prices.last.toStringAsFixed(2)}');
-        print('  - Median: \$${median.toStringAsFixed(2)}');
-        print('  - Mean: \$${mean.toStringAsFixed(2)}');
-        print('  - Trimmed Mean (15%): \$${trimmedMean.toStringAsFixed(2)}');
+        _logPriceInfo('Raw card price analysis for ${card.name} (${rawSales.length} raw sales):');
+        _logPriceInfo('  - Range: \$${prices.first.toStringAsFixed(2)} to \$${prices.last.toStringAsFixed(2)}');
+        _logPriceInfo('  - Median: \$${median.toStringAsFixed(2)}');
+        _logPriceInfo('  - Mean: \$${mean.toStringAsFixed(2)}');
+        _logPriceInfo('  - Trimmed Mean (15%): \$${trimmedMean.toStringAsFixed(2)}');
         
         // For regular cards, we prefer trimmed mean
         return trimmedMean;
       }
       
-      print('Not enough raw sales found for ${card.name} (only ${rawSales.length})');
+      _logPriceInfo('Not enough raw sales found for ${card.name} (only ${rawSales.length})');
       
       // If not enough raw sales, fall back to the TCG price if available
       if (card.price != null && card.price! > 0) {
@@ -303,7 +304,7 @@ class PriceService {
       return null;
       
     } catch (e) {
-      print('Error calculating raw card price: $e');
+      _logPriceInfo('Error calculating raw card price: $e');
       return null;
     }
   }
@@ -334,6 +335,11 @@ class PriceService {
   /// Clear the price cache
   void clearCache() {
     _priceCache.clear();
+  }
+  
+  // Replace print statements with logging service calls
+  void _logPriceInfo(String message) {
+    LoggingService.debug(message, tag: 'Price');
   }
 }
 

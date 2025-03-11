@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/tcg_card.dart';
+import '../providers/currency_provider.dart';
+import 'package:provider/provider.dart';
+import '../utils/card_details_router.dart';
 import '../constants/card_styles.dart';
 
 class CardGridItem extends StatelessWidget {
@@ -24,6 +27,9 @@ class CardGridItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currencyProvider = Provider.of<CurrencyProvider>(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return AspectRatio(
       aspectRatio: 0.7,
       child: Container(
@@ -97,7 +103,7 @@ class CardGridItem extends StatelessWidget {
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
-                          Colors.black.withOpacity(0.8),
+                          Colors.black.withOpacity(0.85), // Increased opacity for better contrast
                           Colors.black.withOpacity(0.0),
                         ],
                         stops: const [0.0, 1.0],
@@ -123,18 +129,33 @@ class CardGridItem extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        if (showPrice && card.price != null && card.price! > 0)
-                          Text(
-                            '\$${card.price!.toStringAsFixed(2)}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withOpacity(0.5),
-                                  blurRadius: 2,
-                                ),
-                              ],
+                        if (showPrice && card.price != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: FutureBuilder<double?>(
+                              future: CardDetailsRouter.getRawCardPrice(card),
+                              builder: (context, snapshot) {
+                                final displayPrice = snapshot.data ?? card.price;
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isDarkMode 
+                                      ? Colors.green.shade700.withOpacity(0.85) 
+                                      : Colors.green.shade100.withOpacity(0.85),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    currencyProvider.formatValue(displayPrice!),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      color: isDarkMode ? Colors.white : Colors.green.shade900,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                );
+                              },
                             ),
                           ),
                       ],

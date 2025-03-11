@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../services/storage_service.dart';
 import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
+import '../utils/card_details_router.dart';
 
 class PortfolioValueChart extends StatefulWidget {
   final bool useFullWidth;
@@ -45,6 +46,18 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
 
   @override
   Widget build(BuildContext context) {
+    return FutureBuilder<Widget>(
+      future: _buildChartWidget(context),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return snapshot.data ?? _buildEmptyState(context);
+      },
+    );
+  }
+
+  Future<Widget> _buildChartWidget(BuildContext context) async {
     final currencyProvider = context.watch<CurrencyProvider>();
     final storageService = Provider.of<StorageService>(context, listen: false);
     final cards = Provider.of<List<TcgCard>>(context);
@@ -67,6 +80,29 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
         return (timestamp, eurValue);
       }).toList()
         ..sort((a, b) => a.$1.compareTo(b.$1));
+
+      // Add current value point if it's significantly different
+      // Use CardDetailsRouter.calculateRawTotalValue for consistency
+      final currentValue = await CardDetailsRouter.calculateRawTotalValue(cards);
+      final now = DateTime.now();
+      
+      // Only add if it's been at least 6 hours since last point or value differs by more than 5%
+      if (points.isNotEmpty) {
+        final lastPoint = points.last;
+        final hoursSinceLastPoint = now.difference(lastPoint.$1).inHours;
+        final valueDifference = (currentValue - lastPoint.$2).abs() / max(1.0, lastPoint.$2);
+        
+        if (hoursSinceLastPoint >= 6 || valueDifference > 0.05) {
+          points.add((now, currentValue));
+          
+          // Optionally save the updated history
+          final updatedHistory = points.map((p) => {
+            'timestamp': p.$1.toIso8601String(),
+            'value': p.$2,
+          }).toList();
+          await storageService.prefs.setString(portfolioHistoryKey, json.encode(updatedHistory));
+        }
+      }
 
       if (points.length < 2) {
         return _buildEmptyState(context);

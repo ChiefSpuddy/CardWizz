@@ -570,22 +570,14 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
           Text(
             label,
             style: isHighlight
-                ? Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    )
+                ? Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold)
                 : Theme.of(context).textTheme.bodyLarge,
           ),
           Text(
             currencyProvider.formatValue(price.toDouble()),
             style: isHighlight
-                ? Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green.shade600,
-                    )
-                : Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                ? TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade700)
+                : TextStyle(color: Colors.green.shade700),
           ),
         ],
       ),

@@ -41,19 +41,23 @@ class CurrencyProvider extends ChangeNotifier {
   double get rate => _currencies[_currentCurrency]!.$2;
   Map<String, (String, double)> get currencies => _currencies;
 
-  // For general use (exact values)
+  // Improve currency formatting consistency
   String formatValue(double eurValue) {
+    if (eurValue == 0) return '$symbol 0';  // Fix: Added space between symbol and 0
+    
     final convertedValue = eurValue * rate;
     
     // Use consistent formatting for values of different sizes
-    if (convertedValue >= 1000) {
-      return '$symbol${convertedValue.toInt()}';  // No decimal places for large values
+    if (convertedValue >= 10000) {
+      return '$symbol${convertedValue.round()}'; // No decimal places for very large values
+    } else if (convertedValue >= 1000) {
+      return '$symbol${convertedValue.round()}'; // No decimal places for large values
     } else if (convertedValue >= 100) {
-      return '$symbol${convertedValue.toStringAsFixed(0)}';  // No decimal places
+      return '$symbol${convertedValue.toStringAsFixed(0)}'; // No decimal places
     } else if (convertedValue >= 10) {
-      return '$symbol${convertedValue.toStringAsFixed(1)}';  // One decimal place
+      return '$symbol${convertedValue.toStringAsFixed(1)}'; // One decimal place
     } else {
-      return '$symbol${convertedValue.toStringAsFixed(2)}';  // Two decimal places for small values
+      return '$symbol${convertedValue.toStringAsFixed(2)}'; // Two decimal places for small values
     }
   }
 

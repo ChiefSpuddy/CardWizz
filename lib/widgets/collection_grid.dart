@@ -12,6 +12,9 @@ import '../providers/sort_provider.dart';
 import '../screens/home_screen.dart';  // Add this import
 import '../widgets/empty_collection_view.dart';
 import '../widgets/sign_in_view.dart';  // Add this import
+import '../providers/currency_provider.dart';  // Add this import for CurrencyProvider
+import '../utils/card_details_router.dart';  // Add this import for CardDetailsRouter
+import 'dart:async'; // Ensure this import is present
 
 class CollectionGrid extends StatefulWidget {
   final bool keepAlive;  // Add this
@@ -27,14 +30,21 @@ class CollectionGrid extends StatefulWidget {
   State<CollectionGrid> createState() => _CollectionGridState();
 }
 
-class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAliveClientMixin {
+// Update the class declaration to include TickerProviderStateMixin
+class _CollectionGridState extends State<CollectionGrid> 
+    with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
   final Set<String> _selectedCards = {};
   bool _isMultiSelectMode = false;
 
+  // Add these animation controllerss
+  late AnimationController _fadeInController;
+  late AnimationController _slideController;
+  late AnimationController _valueController;
+  
   // Add scroll controller and scroll state tracking
   late ScrollController _scrollController;
   bool _isScrolling = false;
-  bool _lowQualityRendering = false;
+  bool _lowQualityRendering = false;  
   bool _initialRendering = true;  // Add this flag to track initial rendering
 
   @override
@@ -43,6 +53,28 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
   @override
   void initState() {
     super.initState();
+    
+    // Initialize animation controllers with proper duration
+    _fadeInController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    
+    _valueController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    
+    // Start animations
+    _fadeInController.forward();
+    _slideController.forward();
+    _valueController.forward();
+    
     _scrollController = ScrollController();
     _scrollController.addListener(_scrollListener);
     
@@ -58,6 +90,9 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
 
   @override
   void dispose() {
+    _fadeInController.dispose();
+    _slideController.dispose();
+    _valueController.dispose();
     _scrollController.removeListener(_scrollListener);
     _scrollController.dispose();
     super.dispose();
@@ -801,5 +836,163 @@ class _CollectionGridState extends State<CollectionGrid> with AutomaticKeepAlive
     _sortedResult = sortedCards;
 
     return sortedCards;
+  }
+
+  // Update the price display in GridView.builder to use raw prices
+  Widget _buildCardPrice(BuildContext context, TcgCard card) {
+    final currencyProvider = Provider.of<CurrencyProvider>(context);
+    
+    return FutureBuilder<double?>(
+      future: CardDetailsRouter.getRawCardPrice(card),
+      builder: (context, snapshot) {
+        final displayPrice = snapshot.data ?? card.price;
+        return Text(
+          currencyProvider.formatValue(displayPrice!),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            color: Colors.green.shade700,
+          ),
+        );
+      },
+    );
+  }
+
+  // Replace the _buildValueTrackerCard method in CollectionsScreenStateor
+  Widget _buildValueTrackerCard(List<TcgCard> cards, CurrencyProvider currencyProvider) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Get total value directly from cards parameter instead of Provider
+    final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+    
+    return FadeTransition(
+      opacity: _fadeInController,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.2),
+          end: Offset.zero,
+        ).animate(_slideController),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+          child: InkWell(
+            onTap: () {
+              // Navigate to analytics page on tap
+              final homeState = context.findAncestorStateOfType<HomeScreenState>();
+              if (homeState != null) {
+                homeState.setSelectedIndex(3); // Index for analytics tab
+              }
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              height: 56, 
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    isDark 
+                      ? colorScheme.surfaceVariant.withOpacity(0.4)
+                      : colorScheme.surface,
+                    isDark 
+                      ? colorScheme.surface.withOpacity(0.3)
+                      : colorScheme.surface,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.outline.withOpacity(0.1),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4,
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade500,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Portfolio value with animation
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Collection Value',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        _valueController.value < 1.0
+                          ? Text(
+                              currencyProvider.formatValue(totalValue),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            )
+                          : TweenAnimationBuilder<double>(
+                              duration: const Duration(milliseconds: 1500),
+                              curve: Curves.easeOutCubic,
+                              tween: Tween(begin: 0, end: totalValue),
+                              builder: (context, value, child) => Text(
+                                currencyProvider.formatValue(value),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${cards.length}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.style_outlined,
+                          size: 14,
+                          color: colorScheme.primary,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

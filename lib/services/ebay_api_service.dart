@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:math' show Random;  // Add this import for Random
 import '../models/tcg_card.dart';
+import '../services/logging_service.dart';
 
 // Define enum at the top level, not inside the class
 enum CardMatchResult {
@@ -18,6 +19,16 @@ class EbayApiService {
   static const String _baseUrl = 'api.ebay.com';
   String? _accessToken;
   DateTime? _tokenExpiry;
+
+  // Add this at the top of your class
+  static const bool _enableDebugLogging = false; // Set to false to disable all the spam
+
+  // Modify all print statements in the class to use this helper method
+  void _log(String message) {
+    if (_enableDebugLogging) {
+      LoggingService.debug(message, tag: 'eBay');
+    }
+  }
 
   Future<String> _getAccessToken() async {
     if (_accessToken != null && _tokenExpiry != null && _tokenExpiry!.isAfter(DateTime.now())) {
@@ -98,9 +109,9 @@ class EbayApiService {
       
       final searchQuery = queryParts.join(' ');
       
-      print('Searching eBay with query: $searchQuery');
+      _log('Searching eBay with query: $searchQuery');
       if (number != null && number.isNotEmpty) {
-        print('Searching for specific card number: $number');
+        _log('Searching for specific card number: $number');
       }
       
       // Use correct category ID based on card type
@@ -126,11 +137,11 @@ class EbayApiService {
         final items = data['itemSummaries'] as List?;
         
         if (items == null || items.isEmpty) {
-          print('No items found in eBay response');
+          _log('No items found in eBay response');
           return [];
         }
 
-        print('Found ${items.length} items in eBay response');
+        _log('Found ${items.length} items in eBay response');
         final sales = <Map<String, dynamic>>[];
         final normalizedCardName = cardName.toLowerCase().trim();
         final normalizedCardNumber = number?.toLowerCase().trim() ?? '';
@@ -236,21 +247,21 @@ class EbayApiService {
                           'exactMatch' : 'nameMatch',
             });
           } catch (e, stack) {
-            print('Error processing item: $e');
+            _log('Error processing item: $e');
             continue;
           }
         }
 
-        print('Successfully filtered to ${sales.length} valid sales');
+        _log('Successfully filtered to ${sales.length} valid sales');
         if (hasCardNumber) {
-          print('Match statistics: $exactMatches exact matches, ' +
+          _log('Match statistics: $exactMatches exact matches, ' +
                 '$nameOnlyMatches name-only matches, $rejectedItems rejected items');
         }
         
         // If we have a card number and found exact matches, only return exact matches
         if (hasCardNumber && sales.any((s) => s['matchType'] == 'exactMatch')) {
           final exactMatchSales = sales.where((s) => s['matchType'] == 'exactMatch').toList();
-          print('Returning ${exactMatchSales.length} exact matches only');
+          _log('Returning ${exactMatchSales.length} exact matches only');
           
           // Remove outliers to get more accurate pricing
           return _removeOutliers(exactMatchSales);
@@ -260,10 +271,10 @@ class EbayApiService {
         return _removeOutliers(sales);
       }
       
-      print('eBay API error: ${response.statusCode}');
+      _log('eBay API error: ${response.statusCode}');
       return [];
     } catch (e, stack) {
-      print('Error fetching eBay sales history: $e');
+      _log('Error fetching eBay sales history: $e');
       return [];
     }
   }
@@ -286,16 +297,16 @@ class EbayApiService {
     final lowerBound = q1 - (iqr * 2.0);
     final upperBound = q3 + (iqr * 2.0);
     
-    print('Price statistics: Min=${prices.first.toStringAsFixed(2)}, Q1=${q1.toStringAsFixed(2)}, ' +
+    _log('Price statistics: Min=${prices.first.toStringAsFixed(2)}, Q1=${q1.toStringAsFixed(2)}, ' +
           'Q3=${q3.toStringAsFixed(2)}, Max=${prices.last.toStringAsFixed(2)}, IQR=${iqr.toStringAsFixed(2)}');
-    print('Filtering prices outside range: ${lowerBound.toStringAsFixed(2)} - ${upperBound.toStringAsFixed(2)}');
+    _log('Filtering prices outside range: ${lowerBound.toStringAsFixed(2)} - ${upperBound.toStringAsFixed(2)}');
     
     final filteredSales = sales.where((sale) {
       final price = sale['price'] as double;
       return price >= lowerBound && price <= upperBound;
     }).toList();
     
-    print('Removed ${sales.length - filteredSales.length} outliers from ${sales.length} sales');
+    _log('Removed ${sales.length - filteredSales.length} outliers from ${sales.length} sales');
     
     return filteredSales;
   }
@@ -315,7 +326,7 @@ class EbayApiService {
       );
       
       if (sales.isEmpty) {
-        print('No sales found for $cardName');
+        _log('No sales found for $cardName');
         return null;
       }
       
@@ -326,7 +337,7 @@ class EbayApiService {
           .toList();
       
       if (prices.isEmpty) {
-        print('No valid prices found for $cardName');
+        _log('No valid prices found for $cardName');
         return null;
       }
       
@@ -349,34 +360,34 @@ class EbayApiService {
       }
       final trimmedMean = trimmedPrices.reduce((a, b) => a + b) / trimmedPrices.length;
       
-      print('Price analysis for $cardName:');
-      print('  - ${prices.length} valid prices');
-      print('  - Range: \$${prices.first.toStringAsFixed(2)} to \$${prices.last.toStringAsFixed(2)}');
-      print('  - Median: \$${median.toStringAsFixed(2)}');
-      print('  - Mean: \$${mean.toStringAsFixed(2)}');
-      print('  - Trimmed Mean (15%): \$${trimmedMean.toStringAsFixed(2)}');
+      _log('Price analysis for $cardName:');
+      _log('  - ${prices.length} valid prices');
+      _log('  - Range: \$${prices.first.toStringAsFixed(2)} to \$${prices.last.toStringAsFixed(2)}');
+      _log('  - Median: \$${median.toStringAsFixed(2)}');
+      _log('  - Mean: \$${mean.toStringAsFixed(2)}');
+      _log('  - Trimmed Mean (15%): \$${trimmedMean.toStringAsFixed(2)}');
       
       // For highly volatile prices (high standard deviation), we prefer median
       // For more stable prices, trimmed mean can be better
       final stdDev = _calculateStandardDeviation(prices, mean);
       final coefficientOfVariation = stdDev / mean;
       
-      print('  - Standard Deviation: \$${stdDev.toStringAsFixed(2)}');
-      print('  - Coefficient of Variation: ${(coefficientOfVariation * 100).toStringAsFixed(2)}%');
+      _log('  - Standard Deviation: \$${stdDev.toStringAsFixed(2)}');
+      _log('  - Coefficient of Variation: ${(coefficientOfVariation * 100).toStringAsFixed(2)}%');
       
       // Choose price based on volatility
       double finalPrice;
       if (coefficientOfVariation > 0.25) { // High volatility
-        print('  - High price volatility, using median: \$${median.toStringAsFixed(2)}');
+        _log('  - High price volatility, using median: \$${median.toStringAsFixed(2)}');
         finalPrice = median;
       } else { // Low volatility
-        print('  - Low price volatility, using trimmed mean: \$${trimmedMean.toStringAsFixed(2)}');
+        _log('  - Low price volatility, using trimmed mean: \$${trimmedMean.toStringAsFixed(2)}');
         finalPrice = trimmedMean;
       }
       
       return finalPrice;
     } catch (e) {
-      print('Error getting average price for $cardName: $e');
+      _log('Error getting average price for $cardName: $e');
       return null;
     }
   }
@@ -411,7 +422,7 @@ class EbayApiService {
       
       return null;
     } catch (e) {
-      print('Error extracting price from: $priceInfo - $e');
+      _log('Error extracting price from: $priceInfo - $e');
       return null;
     }
   }
@@ -480,7 +491,7 @@ class EbayApiService {
       
       return results;
     } catch (e) {
-      print('Error getting card details: $e');
+      _log('Error getting card details: $e');
       return results;
     }
   }
@@ -513,19 +524,19 @@ class EbayApiService {
         },
       );
 
-      print('eBay search URL: https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(trimmedQuery)}');
+      _log('eBay search URL: https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(trimmedQuery)}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final items = data['itemSummaries'] as List?;
         
         if (items == null || items.isEmpty) {
-          print('No real items found in eBay response - falling back to simulation');
+          _log('No real items found in eBay response - falling back to simulation');
           // Fall back to simulation if API returns no results
           return _createSimulatedResults(trimmedQuery, isMtg);
         }
         
-        print('Found ${items.length} real items from eBay API');
+        _log('Found ${items.length} real items from eBay API');
         
         // Convert eBay API response to our expected sales format
         final results = <Map<String, dynamic>>[];
@@ -548,24 +559,24 @@ class EbayApiService {
               'date': soldDate,
             });
           } catch (e) {
-            print('Error processing eBay item: $e');
+            _log('Error processing eBay item: $e');
           }
         }
         
         if (results.isNotEmpty) {
-          print('Successfully processed ${results.length} real sales');
+          _log('Successfully processed ${results.length} real sales');
           return results;
         }
       } else {
-        print('eBay API error: ${response.statusCode} - ${response.body}');
+        _log('eBay API error: ${response.statusCode} - ${response.body}');
       }
       
       // Fall back to simulated data if API call fails or returns no processable items
-      print('Falling back to simulated sales data');
+      _log('Falling back to simulated sales data');
       return _createSimulatedResults(trimmedQuery, isMtg);
       
     } catch (e) {
-      print('Error searching eBay (will use simulation instead): $e');
+      _log('Error searching eBay (will use simulation instead): $e');
       return _createSimulatedResults(query, isMtg);
     }
   }
@@ -599,7 +610,7 @@ class EbayApiService {
       
       return numValue;
     } catch (e) {
-      print('Error extracting price: $e');
+      _log('Error extracting price: $e');
       return null;
     }
   }
@@ -640,11 +651,11 @@ class EbayApiService {
     for (final card in cards) {
       try {
         processedCards++;
-        print('Analyzing market for: ${card.name} (${processedCards}/$total)');
+        _log('Analyzing market for: ${card.name} (${processedCards}/$total)');
         
         final currentPrice = card.price ?? 0.0;
         if (currentPrice == 0) {
-          print('Skipping ${card.name} - No current price');
+          _log('Skipping ${card.name} - No current price');
           continue;
         }
 
@@ -684,10 +695,10 @@ class EbayApiService {
 
               if (medianPrice > currentPrice * 1.15) {
                 opportunities['undervalued']!.add(insight);
-                print('Added ${card.name} to undervalued (${opportunities['undervalued']!.length})');
+                _log('Added ${card.name} to undervalued (${opportunities['undervalued']!.length})');
               } else if (medianPrice < currentPrice * 0.85) {
                 opportunities['overvalued']!.add(insight);
-                print('Added ${card.name} to overvalued (${opportunities['overvalued']!.length})');
+                _log('Added ${card.name} to overvalued (${opportunities['overvalued']!.length})');
               }
             }
           }
@@ -696,7 +707,7 @@ class EbayApiService {
         await Future.delayed(const Duration(milliseconds: 500));
 
       } catch (e) {
-        print('Error analyzing market for ${card.name}: $e');
+        _log('Error analyzing market for ${card.name}: $e');
       }
     }
 
@@ -861,7 +872,7 @@ class EbayApiService {
   }) {
     // Extract card name from query if not provided
     final effectiveCardName = cardName ?? query.split(' ').take(2).join(' ');
-    print('Creating simulated results for: $effectiveCardName');
+    _log('Creating simulated results for: $effectiveCardName');
     
     final random = Random();  // Fixed: Use Random directly, not as a type
     final results = <Map<String, dynamic>>[];
@@ -873,7 +884,7 @@ class EbayApiService {
     if (_isPremiumCard(effectiveCardName)) {
       // For premium cards like Charizard, set higher baseline
       basePrice = _getPremiumCardBasePrice(effectiveCardName);
-      print('Detected premium card: $effectiveCardName - Base price: \$$basePrice');
+      _log('Detected premium card: $effectiveCardName - Base price: \$$basePrice');
     } else {
       // Regular cards - use type to determine base price range
       basePrice = isMtg ? 15.0 : 10.0;
@@ -935,7 +946,7 @@ class EbayApiService {
       });
     }
     
-    print('Generated ${results.length} simulated results with avg price: ' +
+    _log('Generated ${results.length} simulated results with avg price: ' +
           '\$${results.fold<double>(0, (sum, item) => sum + (item["price"] as double)) / results.length}');
     
     return results;
@@ -1125,7 +1136,7 @@ class EbayApiService {
         isMtg: isMtg,
       );
       
-      print('Total eBay sales found for ${card.name}: ${allSales.length}');
+      _log('Total eBay sales found for ${card.name}: ${allSales.length}');
       
       // Filter out graded cards
       final rawSales = allSales.where((sale) {
@@ -1172,7 +1183,7 @@ class EbayApiService {
         return true;
       }).toList();
       
-      print('Filtered to ${rawSales.length} raw card sales (excluded ${allSales.length - rawSales.length} graded sales)');
+      _log('Filtered to ${rawSales.length} raw card sales (excluded ${allSales.length - rawSales.length} graded sales)');
       
       // If we have at least 3 raw sales, calculate the price
       if (rawSales.length >= 3) {
@@ -1201,17 +1212,17 @@ class EbayApiService {
         }
         final trimmedMean = trimmedPrices.reduce((a, b) => a + b) / trimmedPrices.length;
         
-        print('Raw card price analysis for ${card.name} (${rawSales.length} raw sales):');
-        print('  - Range: \$${prices.first.toStringAsFixed(2)} to \$${prices.last.toStringAsFixed(2)}');
-        print('  - Median: \$${median.toStringAsFixed(2)}');
-        print('  - Mean: \$${mean.toStringAsFixed(2)}');
-        print('  - Trimmed Mean (15%): \$${trimmedMean.toStringAsFixed(2)}');
+        _log('Raw card price analysis for ${card.name} (${rawSales.length} raw sales):');
+        _log('  - Range: \$${prices.first.toStringAsFixed(2)} to \$${prices.last.toStringAsFixed(2)}');
+        _log('  - Median: \$${median.toStringAsFixed(2)}');
+        _log('  - Mean: \$${mean.toStringAsFixed(2)}');
+        _log('  - Trimmed Mean (15%): \$${trimmedMean.toStringAsFixed(2)}');
         
         // For regular cards, we prefer trimmed mean
         return trimmedMean;
       }
       
-      print('Not enough raw sales found for ${card.name} (only ${rawSales.length})');
+      _log('Not enough raw sales found for ${card.name} (only ${rawSales.length})');
       
       // If not enough raw sales, fall back to the TCG price if available
       if (card.price != null && card.price! > 0) {
@@ -1221,7 +1232,7 @@ class EbayApiService {
       return null;
       
     } catch (e) {
-      print('Error calculating raw card price: $e');
+      _log('Error calculating raw card price: $e');
       return null;
     }
   }

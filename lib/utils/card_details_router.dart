@@ -7,6 +7,8 @@ import '../services/storage_service.dart';
 import '../providers/app_state.dart';
 import '../utils/bottom_toast.dart';
 import '../services/price_service.dart';
+import '../services/logging_service.dart';
+import 'dart:math' show min;
 
 class CardDetailsRouter {
   // Static instance of the price service
@@ -21,7 +23,7 @@ class CardDetailsRouter {
   }) {
     // Check if this is an MTG card with improved detection
     final isMtgCard = _isMtgCard(card);
-    print("Card ${card.name} detected as ${isMtgCard ? 'MTG' : 'Pokemon'} card");
+    LoggingService.log("Card ${card.name} detected as ${isMtgCard ? 'MTG' : 'Pokemon'} card");
     
     if (isMtgCard) {
       return MtgCardDetailsScreen(
@@ -43,7 +45,7 @@ class CardDetailsRouter {
   /// Helper method to determine if a card is MTG
   static bool _isMtgCard(TcgCard card) {
     // Force explicit log for debugging
-    print("Evaluating card type for: ${card.name} (set: ${card.setName ?? 'Unknown'}, id: ${card.set.id})");
+    LoggingService.log("Evaluating card type for: ${card.name} (set: ${card.setName ?? 'Unknown'}, id: ${card.set.id})");
     
     // Known Pokemon sets that were wrongly classified
     const knownPokemonSets = {
@@ -56,7 +58,7 @@ class CardDetailsRouter {
     
     // Check if this is a known Pokemon set
     if (knownPokemonSets.contains(card.set.id)) {
-      print("Card belongs to a known Pokemon set: ${card.set.id}");
+      LoggingService.log("Card belongs to a known Pokemon set: ${card.set.id}");
       return false;
     }
     
@@ -66,17 +68,17 @@ class CardDetailsRouter {
       if (card.set.id.startsWith('swsh') || 
           card.set.id.startsWith('sv') || 
           card.set.id.startsWith('sm')) {
-        print("Overriding isMtg flag for Pokemon set");
+        LoggingService.log("Overriding isMtg flag for Pokemon set");
         return false;
       }
       
-      print("Card has explicit isMtg flag: ${card.isMtg}");
+      LoggingService.log("Card has explicit isMtg flag: ${card.isMtg}");
       return card.isMtg!;
     }
     
     // Check ID pattern - very reliable
     if (card.id.startsWith('mtg_')) {
-      print("Card ID starts with 'mtg_', detecting as MTG");
+      LoggingService.log("Card ID starts with 'mtg_', detecting as MTG");
       return true;
     }
     
@@ -89,7 +91,7 @@ class CardDetailsRouter {
     // Check for Pokemon set ID prefixes
     for (final prefix in pokemonSetPrefixes) {
       if (card.set.id.toLowerCase().startsWith(prefix)) {
-        print("Set ID starts with known Pokemon prefix '$prefix', detecting as Pokemon");
+        LoggingService.log("Set ID starts with known Pokemon prefix '$prefix', detecting as Pokemon");
         return false; // Definitely Pokemon
       }
     }
@@ -108,7 +110,7 @@ class CardDetailsRouter {
     final setNameLower = (card.setName ?? '').toLowerCase();
     for (final term in pokemonSetNames) {
       if (setNameLower.contains(term)) {
-        print("Set name contains Pokemon term '$term', detecting as Pokemon");
+        LoggingService.log("Set name contains Pokemon term '$term', detecting as Pokemon");
         return false; // Pokemon set
       }
     }
@@ -126,7 +128,7 @@ class CardDetailsRouter {
     // Check for MTG set names
     for (final term in mtgSetNames) {
       if (setNameLower.contains(term)) {
-        print("Set name contains MTG term '$term', detecting as MTG");
+        LoggingService.log("Set name contains MTG term '$term', detecting as MTG");
         return true; // MTG set
       }
     }
@@ -144,7 +146,7 @@ class CardDetailsRouter {
     // Check for Pokemon character names
     for (final name in pokemonNames) {
       if (nameLower.contains(name)) {
-        print("Card name contains Pokemon character '$name', detecting as Pokemon");
+        LoggingService.log("Card name contains Pokemon character '$name', detecting as Pokemon");
         return false; // Contains Pokemon name
       }
     }
@@ -158,38 +160,38 @@ class CardDetailsRouter {
         nameLower.endsWith(' v') || 
         nameLower.contains(' vmax') || 
         nameLower.contains(' vstar')) {
-      print("Card name has Pokemon card type suffix (ex, gx, v, vmax, vstar), detecting as Pokemon");
+      LoggingService.log("Card name has Pokemon card type suffix (ex, gx, v, vmax, vstar), detecting as Pokemon");
       return false;
     }
     
     // Check image URL for hints
     if (card.imageUrl.contains('scryfall') || 
         card.imageUrl.contains('gatherer.wizards.com')) {
-      print("Image URL contains MTG source, detecting as MTG");
+      LoggingService.log("Image URL contains MTG source, detecting as MTG");
       return true;
     }
     
     // Check for Pokemon image URLs
     if (card.imageUrl.toLowerCase().contains('pokemon')) {
-      print("Image URL contains 'pokemon', detecting as Pokemon");
+      LoggingService.log("Image URL contains 'pokemon', detecting as Pokemon");
       return false;
     }
     
     // If all else fails, cards with sv or swsh in the set ID are Pokemon
     if (card.set.id.contains('swsh') || card.set.id.contains('sv')) {
-      print("Set ID contains 'swsh' or 'sv', definitely Pokemon: ${card.set.id}");
+      LoggingService.log("Set ID contains 'swsh' or 'sv', definitely Pokemon: ${card.set.id}");
       return false;
     }
     
     // If the set ID is 3 or fewer characters, it's likely MTG 
     // (unless it's one of the exceptions we already checked)
     if (card.set.id.length <= 3) {
-      print("Set ID is 3 or fewer chars, likely MTG: ${card.set.id}");
+      LoggingService.log("Set ID is 3 or fewer chars, likely MTG: ${card.set.id}");
       return true;
     }
     
     // Default - assume Pokemon for safety
-    print("Using default detection: Pokemon");
+    LoggingService.log("Using default detection: Pokemon");
     return false;
   }
   
@@ -210,7 +212,40 @@ class CardDetailsRouter {
   
   /// Get price for raw (ungraded) cards only
   static Future<double?> getRawCardPrice(TcgCard card) async {
-    return await _priceService.getRawCardPrice(card);
+    // If card already has a price, use it as is (it's already in EUR)
+    // The EUR value is already what we want since that's our base currency
+    if (card.price != null) {
+      return card.price;
+    }
+    
+    // For cards without a price, we could try to fetch it from an API,
+    // but for now return null to avoid inconsistencies
+    return null;
+  }
+  
+  // Update or add this method to ensure consistent calculation
+  static Future<double> calculateRawTotalValue(List<TcgCard> cards) async {
+    // If there are no cards, return 0
+    if (cards.isEmpty) return 0.0;
+    
+    // Use a more efficient approach for large collections
+    double totalValue = 0.0;
+    
+    // Process cards in batches to avoid overloading async queue
+    const int batchSize = 20;
+    for (int i = 0; i < cards.length; i += batchSize) {
+      final batch = cards.sublist(i, min(i + batchSize, cards.length));
+      final futures = batch.map((card) => getRawCardPrice(card));
+      final results = await Future.wait(futures);
+      
+      for (final price in results) {
+        if (price != null) {
+          totalValue += price;
+        }
+      }
+    }
+    
+    return totalValue;
   }
   
   /// Navigate to the appropriate card details screen
