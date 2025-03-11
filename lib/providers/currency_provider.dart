@@ -44,7 +44,17 @@ class CurrencyProvider extends ChangeNotifier {
   // For general use (exact values)
   String formatValue(double eurValue) {
     final convertedValue = eurValue * rate;
-    return '$symbol${convertedValue.toStringAsFixed(2)}';
+    
+    // Use consistent formatting for values of different sizes
+    if (convertedValue >= 1000) {
+      return '$symbol${convertedValue.toInt()}';  // No decimal places for large values
+    } else if (convertedValue >= 100) {
+      return '$symbol${convertedValue.toStringAsFixed(0)}';  // No decimal places
+    } else if (convertedValue >= 10) {
+      return '$symbol${convertedValue.toStringAsFixed(1)}';  // One decimal place
+    } else {
+      return '$symbol${convertedValue.toStringAsFixed(2)}';  // Two decimal places for small values
+    }
   }
 
   // Convert EUR to current currency
@@ -61,5 +71,25 @@ class CurrencyProvider extends ChangeNotifier {
       return '$symbol${(convertedValue / 1000).toStringAsFixed(1)}k';
     }
     return '$symbol${convertedValue.toInt()}';
+  }
+
+  // Add a short format option that's more concise for space-constrained UIs
+  String formatShortValue(double eurValue) {
+    final convertedValue = eurValue * rate;
+    
+    if (convertedValue >= 1000000) {
+      return '$symbol${(convertedValue / 1000000).toStringAsFixed(1)}M';
+    } else if (convertedValue >= 1000) {
+      return '$symbol${(convertedValue / 1000).toStringAsFixed(1)}k';
+    } else if (convertedValue >= 100) {
+      // No decimal places needed for larger values
+      return '$symbol${convertedValue.toInt()}';
+    } else if (convertedValue >= 10) {
+      // One decimal place for medium values
+      return '$symbol${convertedValue.toStringAsFixed(1)}';
+    }
+    
+    // Two decimal places for small values
+    return '$symbol${convertedValue.toStringAsFixed(2)}';
   }
 }

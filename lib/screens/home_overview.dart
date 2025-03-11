@@ -19,6 +19,7 @@ import '../services/chart_service.dart';
 import '../widgets/empty_collection_view.dart';
 import '../widgets/portfolio_value_chart.dart';
 import '../widgets/standard_app_bar.dart'; // Add this import
+import '../utils/card_details_router.dart';
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -111,8 +112,8 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     final currencyProvider = context.watch<CurrencyProvider>();
     final storageService = Provider.of<StorageService>(context, listen: false);
     
-    // Get timeline points from service
-    final points = ChartService.getPortfolioHistory(storageService, cards);
+    // Use raw card prices for the chart data
+    final points = ChartService.getPortfolioHistoryRaw(storageService, cards);
     
     // Early returns for empty states...
     if (points.length < 2) return Card(
@@ -330,6 +331,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     return powerOf10 * 10;
   }
 
+  // Update _buildTopCards to use CardDetailsRouter.getRawCardPrice and ensure correct currency
   Widget _buildTopCards(List<TcgCard> cards) {
     final localizations = AppLocalizations.of(context);
     final currencyProvider = context.watch<CurrencyProvider>();
@@ -396,11 +398,19 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                             if (card.price != null)
                               Padding(
                                 padding: const EdgeInsets.all(4),
-                                child: Text(
-                                  currencyProvider.formatValue(card.price!),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                // Use FutureBuilder to get and display raw price with correct currency
+                                child: FutureBuilder<double?>(
+                                  future: CardDetailsRouter.getRawCardPrice(card),
+                                  builder: (context, snapshot) {
+                                    final displayPrice = snapshot.data ?? card.price;
+                                    return Text(
+                                      currencyProvider.formatValue(displayPrice!),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                           ],
@@ -456,13 +466,19 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                               ),
                             ),
                             Expanded(
-                              child: Text(
-                                currencyProvider.formatValue(card.price ?? 0),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.green.shade600,  // Modern green color
-                                ),
-                                textAlign: TextAlign.right,
+                              child: FutureBuilder<double?>(
+                                future: CardDetailsRouter.getRawCardPrice(card),
+                                builder: (context, snapshot) {
+                                  final displayPrice = snapshot.data ?? card.price ?? 0;
+                                  return Text(
+                                    currencyProvider.formatValue(displayPrice),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.green.shade600,  // Modern green color
+                                    ),
+                                    textAlign: TextAlign.right,
+                                  );
+                                },
                               ),
                             ),
                           ],
@@ -590,8 +606,9 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                                   padding: const EdgeInsets.all(4),
                                   child: Text(
                                     currencyProvider.formatValue(tcgCard.price!),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade700,
                                     ),
                                   ),
                                 ),
@@ -854,11 +871,19 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                                   if (card.price != null)
                                     Padding(
                                       padding: const EdgeInsets.all(4),
-                                      child: Text(
-                                        currencyProvider.formatValue(card.price!),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                      // Use FutureBuilder to get and display raw price
+                                      child: FutureBuilder<double?>(
+                                        future: CardDetailsRouter.getRawCardPrice(card),
+                                        builder: (context, snapshot) {
+                                          final displayPrice = snapshot.data ?? card.price;
+                                          return Text(
+                                            currencyProvider.formatValue(displayPrice!),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.green.shade700,
+                                            ),
+                                          );
+                                        },
                                       ),
                                     ),
                                 ],

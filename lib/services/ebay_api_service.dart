@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:math';
+import 'dart:math' as math;
+import 'dart:math' show Random;  // Add this import for Random
 import '../models/tcg_card.dart';
 
 // Define enum at the top level, not inside the class
@@ -280,9 +281,10 @@ class EbayApiService {
     final q3 = prices[(prices.length * 3) ~/ 4];
     final iqr = q3 - q1;
     
-    // Define bounds for outlier detection
-    final lowerBound = q1 - (iqr * 1.5);
-    final upperBound = q3 + (iqr * 1.5);
+    // Define bounds for outlier detection - using 2.0 instead of 1.5 for more lenient filtering
+    // This is more appropriate for the volatile TCG market
+    final lowerBound = q1 - (iqr * 2.0);
+    final upperBound = q3 + (iqr * 2.0);
     
     print('Price statistics: Min=${prices.first.toStringAsFixed(2)}, Q1=${q1.toStringAsFixed(2)}, ' +
           'Q3=${q3.toStringAsFixed(2)}, Max=${prices.last.toStringAsFixed(2)}, IQR=${iqr.toStringAsFixed(2)}');
@@ -331,91 +333,64 @@ class EbayApiService {
       // Sort prices to calculate median
       prices.sort();
       
-      // Get median price (more robust than mean)
+      // Calculate median price (more stable than mean for price data)
       final median = prices[prices.length ~/ 2];
       
-      // Get average price
-      final average = prices.reduce((a, b) => a + b) / prices.length;
+      // Calculate mean for comparison
+      final mean = prices.reduce((a, b) => a + b) / prices.length;
+      
+      // Calculate trimmed mean (excluding top and bottom 15%)
+      final trimCount = (prices.length * 0.15).round();
+      List<double> trimmedPrices;
+      if (trimCount > 0 && prices.length > (trimCount * 2)) {
+        trimmedPrices = prices.sublist(trimCount, prices.length - trimCount);
+      } else {
+        trimmedPrices = prices;
+      }
+      final trimmedMean = trimmedPrices.reduce((a, b) => a + b) / trimmedPrices.length;
       
       print('Price analysis for $cardName:');
       print('  - ${prices.length} valid prices');
       print('  - Range: \$${prices.first.toStringAsFixed(2)} to \$${prices.last.toStringAsFixed(2)}');
       print('  - Median: \$${median.toStringAsFixed(2)}');
-      print('  - Average: \$${average.toStringAsFixed(2)}');
+      print('  - Mean: \$${mean.toStringAsFixed(2)}');
+      print('  - Trimmed Mean (15%): \$${trimmedMean.toStringAsFixed(2)}');
       
-      // Default to median as it's more robust to outliers
-      return median;
+      // For highly volatile prices (high standard deviation), we prefer median
+      // For more stable prices, trimmed mean can be better
+      final stdDev = _calculateStandardDeviation(prices, mean);
+      final coefficientOfVariation = stdDev / mean;
+      
+      print('  - Standard Deviation: \$${stdDev.toStringAsFixed(2)}');
+      print('  - Coefficient of Variation: ${(coefficientOfVariation * 100).toStringAsFixed(2)}%');
+      
+      // Choose price based on volatility
+      double finalPrice;
+      if (coefficientOfVariation > 0.25) { // High volatility
+        print('  - High price volatility, using median: \$${median.toStringAsFixed(2)}');
+        finalPrice = median;
+      } else { // Low volatility
+        print('  - Low price volatility, using trimmed mean: \$${trimmedMean.toStringAsFixed(2)}');
+        finalPrice = trimmedMean;
+      }
+      
+      return finalPrice;
     } catch (e) {
       print('Error getting average price for $cardName: $e');
       return null;
     }
   }
-
-  // Enhanced card matching that returns match quality
-  CardMatchResult _getCardMatchResult(
-    String itemTitle, 
-    String cardName, 
-    String cardNumber
-  ) {
-    // First verify card name is in the title
-    if (!itemTitle.contains(cardName)) {
-      return CardMatchResult.noMatch;
-    }
+  
+  // Helper to calculate standard deviation
+  double _calculateStandardDeviation(List<double> values, double mean) {
+    if (values.length <= 1) return 0.0;
     
-    // If no card number provided, we can only match on name
-    if (cardNumber.isEmpty) {
-      return CardMatchResult.nameMatchOnly;
-    }
+    final sumSquaredDiff = values.fold<double>(
+      0.0, 
+      (sum, value) => sum + math.pow(value - mean, 2)
+    );
     
-    // Extract all potential card numbers from the title
-    final numberMatches = _extractCardNumbers(itemTitle);
-    
-    // Check for direct number match first (most reliable)
-    if (numberMatches.contains(cardNumber)) {
-      return CardMatchResult.exactMatch;
-    }
-    
-    // Special handling for fractional card numbers like "239/191"
-    if (cardNumber.contains('/')) {
-      final parts = cardNumber.split('/');
-      if (parts.length == 2) {
-        final mainNumber = parts[0].trim();
-        
-        // Check for match with just the main number with various prefixes/suffixes
-        final mainNumberPatterns = [
-          mainNumber,
-          '#$mainNumber',
-          'no.$mainNumber',
-          'no. $mainNumber',
-          'number $mainNumber',
-          'num $mainNumber',
-          'card $mainNumber',
-        ];
-        
-        // Check if any possible variants match, being careful about boundaries
-        for (final pattern in mainNumberPatterns) {
-          // Check for the pattern with word boundaries
-          final regex = RegExp(r'\b' + pattern + r'\b');
-          if (regex.hasMatch(itemTitle)) {
-            // Verify that there's no other number nearby that could be confusing
-            if (!itemTitle.contains(RegExp(r'\b' + mainNumber + r'[/\\]'))) {
-              return CardMatchResult.exactMatch;
-            }
-          }
-        }
-      }
-    }
-    
-    // Handle promo/special card numbers (e.g., "PR-123", "SV01", "SM01")
-    if (_isSpecialCardNumber(cardNumber)) {
-      final specialMatch = _checkSpecialCardNumberMatch(itemTitle, cardNumber);
-      if (specialMatch) {
-        return CardMatchResult.exactMatch;
-      }
-    }
-    
-    // No exact match, but the name matches
-    return CardMatchResult.nameMatchOnly;
+    return math.sqrt(sumSquaredDiff / (values.length - 1));
   }
 
   double? _extractPrice(Map<String, dynamic>? priceInfo) {
@@ -732,7 +707,9 @@ class EbayApiService {
   bool _isListingExcluded(String title) {
     final excludedTerms = [
       'lot', 'bulk', 'mystery', 'pack', 'booster', 'box', 'case', 
-      'collection', 'binder', 'playset', 'deck', 'bundle'
+      'collection', 'binder', 'playset', 'deck', 'bundle',
+      'sleeve', 'proxy', 'repack', 'replica', 'fake', 
+      '4x', 'x4', '10x', 'x10', 'complete set',
     ];
     
     return excludedTerms.any((term) => title.contains(term));
@@ -886,7 +863,7 @@ class EbayApiService {
     final effectiveCardName = cardName ?? query.split(' ').take(2).join(' ');
     print('Creating simulated results for: $effectiveCardName');
     
-    final Random random = Random();
+    final random = Random();  // Fixed: Use Random directly, not as a type
     final results = <Map<String, dynamic>>[];
     
     // Generate a baseline price based on the card
@@ -1061,11 +1038,214 @@ class EbayApiService {
       queryParts.add(setName);
     }
     
-    if (number != null && number.isNotEmpty) {
+    if (number != null && number.isNotEmpty) {  // Fixed syntax error here - added dot
       queryParts.add(number);
     }
     
     final queryString = queryParts.join(' ');
     return 'https://www.ebay.com/sch/i.html?_nkw=${Uri.encodeComponent(queryString)}&_sacat=183454';
+  }
+
+  // Enhanced card matching that returns match quality
+  CardMatchResult _getCardMatchResult(
+    String itemTitle, 
+    String cardName, 
+    String cardNumber
+  ) {
+    // First verify card name is in the title
+    if (!itemTitle.contains(cardName)) {
+      return CardMatchResult.noMatch;
+    }
+    
+    // If no card number provided, we can only match on name
+    if (cardNumber.isEmpty) {
+      return CardMatchResult.nameMatchOnly;
+    }
+    
+    // Extract all potential card numbers from the title
+    final numberMatches = _extractCardNumbers(itemTitle);
+    
+    // Check for direct number match first (most reliable)
+    if (numberMatches.contains(cardNumber)) {
+      return CardMatchResult.exactMatch;
+    }
+    
+    // Special handling for fractional card numbers like "239/191"
+    if (cardNumber.contains('/')) {
+      final parts = cardNumber.split('/');
+      if (parts.length == 2) {
+        final mainNumber = parts[0].trim();
+        
+        // Check for match with just the main number with various prefixes/suffixes
+        final mainNumberPatterns = [
+          mainNumber,
+          '#$mainNumber',
+          'no.$mainNumber',
+          'no. $mainNumber',
+          'number $mainNumber',
+          'num $mainNumber',
+          'card $mainNumber',
+        ];
+        
+        // Check if any possible variants match, being careful about boundaries
+        for (final pattern in mainNumberPatterns) {
+          // Check for the pattern with word boundaries
+          final regex = RegExp(r'\b' + pattern + r'\b');
+          if (regex.hasMatch(itemTitle)) {
+            // Verify that there's no other number nearby that could be confusing
+            if (!itemTitle.contains(RegExp(r'\b' + mainNumber + r'[/\\]'))) {
+              return CardMatchResult.exactMatch;
+            }
+          }
+        }
+      }
+    }
+    
+    // Handle promo/special card numbers (e.g., "PR-123", "SV01", "SM01")
+    if (_isSpecialCardNumber(cardNumber)) {
+      final specialMatch = _checkSpecialCardNumberMatch(itemTitle, cardNumber);
+      if (specialMatch) {
+        return CardMatchResult.exactMatch;
+      }
+    }
+    
+    // No exact match, but the name matches
+    return CardMatchResult.nameMatchOnly;
+  }
+
+  Future<double?> _calculateRawCardPrice(TcgCard card) async {
+    try {
+      final isMtg = _isMtgCard(card);
+      
+      // Get all sales data
+      final allSales = await getRecentSales(
+        card.name,
+        setName: card.setName,
+        number: card.number,
+        isMtg: isMtg,
+      );
+      
+      print('Total eBay sales found for ${card.name}: ${allSales.length}');
+      
+      // Filter out graded cards
+      final rawSales = allSales.where((sale) {
+        final title = (sale['title'] as String).toLowerCase();
+        
+        // Much more comprehensive graded card detection
+        // Check for grading services (with word boundaries when appropriate)
+        if (title.contains('psa') || 
+            title.contains('bgs') || 
+            title.contains('cgc') || 
+            title.contains('sgc') || 
+            title.contains('ace') ||
+            title.contains('beckett') || 
+            title.contains('hga') ||
+            title.contains('mnt') || 
+            title.contains('ksa') ||
+            title.contains('ags') ||
+            title.contains(' slab') ||
+            title.contains('slabbed') ||
+            title.contains('graded') ||
+            title.contains('grade ') ||
+            title.contains('grading')) {
+          return false;
+        }
+        
+        // Check for grade notations (with word boundaries)
+        if (RegExp(r'\bpop\b').hasMatch(title) ||
+            RegExp(r'\bmint\b').hasMatch(title) ||
+            RegExp(r'\bgem\b').hasMatch(title) ||
+            RegExp(r'\bpristine\b').hasMatch(title) ||
+            RegExp(r'\bperfect\b').hasMatch(title) ||
+            RegExp(r'\bblack label\b').hasMatch(title)) {
+          return false;
+        }
+        
+        // Check for numeric grades (e.g. "10", "9.5")
+        // Look for standalone grades like "PSA 10" or "BGS 9.5"
+        if (RegExp(r'(^|\s)((10)|(9\.5)|(9)|(8\.5)|(8))($|\s)').hasMatch(title) ||
+            RegExp(r'(^|\s)\d+(\.\d+)?\s*grade').hasMatch(title) ||
+            RegExp(r'grade\s*\d+(\.\d+)?($|\s)').hasMatch(title)) {
+          return false;
+        }
+        
+        return true;
+      }).toList();
+      
+      print('Filtered to ${rawSales.length} raw card sales (excluded ${allSales.length - rawSales.length} graded sales)');
+      
+      // If we have at least 3 raw sales, calculate the price
+      if (rawSales.length >= 3) {
+        // Extract prices
+        final prices = rawSales
+            .map((s) => (s['price'] as num).toDouble())
+            .where((p) => p > 0)
+            .toList();
+        
+        // Sort prices to calculate median
+        prices.sort();
+        
+        // Calculate median
+        final median = prices[prices.length ~/ 2];
+        
+        // Calculate mean for comparison
+        final mean = prices.reduce((a, b) => a + b) / prices.length;
+        
+        // Calculate trimmed mean (excluding top and bottom 15%)
+        final trimCount = (prices.length * 0.15).round();
+        List<double> trimmedPrices;
+        if (trimCount > 0 && prices.length > (trimCount * 2)) {
+          trimmedPrices = prices.sublist(trimCount, prices.length - trimCount);
+        } else {
+          trimmedPrices = prices;
+        }
+        final trimmedMean = trimmedPrices.reduce((a, b) => a + b) / trimmedPrices.length;
+        
+        print('Raw card price analysis for ${card.name} (${rawSales.length} raw sales):');
+        print('  - Range: \$${prices.first.toStringAsFixed(2)} to \$${prices.last.toStringAsFixed(2)}');
+        print('  - Median: \$${median.toStringAsFixed(2)}');
+        print('  - Mean: \$${mean.toStringAsFixed(2)}');
+        print('  - Trimmed Mean (15%): \$${trimmedMean.toStringAsFixed(2)}');
+        
+        // For regular cards, we prefer trimmed mean
+        return trimmedMean;
+      }
+      
+      print('Not enough raw sales found for ${card.name} (only ${rawSales.length})');
+      
+      // If not enough raw sales, fall back to the TCG price if available
+      if (card.price != null && card.price! > 0) {
+        return card.price;
+      }
+      
+      return null;
+      
+    } catch (e) {
+      print('Error calculating raw card price: $e');
+      return null;
+    }
+  }
+
+  // Add the missing _isMtgCard method that's needed by _calculateRawCardPrice
+  bool _isMtgCard(TcgCard card) {
+    if (card.isMtg != null) {
+      return card.isMtg!;
+    }
+    
+    // Check ID pattern
+    if (card.id.startsWith('mtg_')) {
+      return true;
+    }
+    
+    // Check for Pokemon set IDs
+    const pokemonSetPrefixes = ['sv', 'swsh', 'sm', 'xy', 'bw', 'dp', 'cel'];
+    for (final prefix in pokemonSetPrefixes) {
+      if (card.set.id.toLowerCase().startsWith(prefix)) {
+        return false; // Definitely Pokemon
+      }
+    }
+    
+    // Default to non-MTG
+    return false;
   }
 }

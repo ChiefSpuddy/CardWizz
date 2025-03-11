@@ -17,6 +17,7 @@ import '../utils/bottom_toast.dart';
 import '../providers/app_state.dart';
 import '../services/storage_service.dart';
 import '../widgets/bottom_notification.dart';
+import '../widgets/card_price_display.dart';
 
 class PokemonCardDetailsScreen extends BaseCardDetailsScreen {
   const PokemonCardDetailsScreen({
@@ -37,6 +38,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
   Map<String, dynamic>? _additionalData;
   Map<String, List<Map<String, dynamic>>>? _salesByCategory;
   bool _isAddingToCollection = false;
+  bool _includeGradedPrices = false;
 
   @override
   void loadData() {
@@ -1822,7 +1824,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
                         ),
                       ),
                     const SizedBox(height: 24),
-                    _buildPricingSection(),
+                    _buildEnhancedPriceDisplay(),
                     const SizedBox(height: 24),
                     _buildCardInfo(),
                     
@@ -2020,5 +2022,500 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
         );
       }
     }
+  }
+
+  Widget _buildEnhancedPriceDisplay() {
+    // Track if we should show graded prices - REMOVED toggle functionality
+    final isValuableCard = widget.card.price != null && widget.card.price! >= 50.0;
+    final bool hasGradedSales = _hasGradedSalesData();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // REMOVED: The toggle widget
+        // if (hasGradedSales) 
+        //   _buildPriceToggle(),
+        
+        CardPriceDisplay(
+          card: widget.card,
+          showSource: true,
+          textSize: 18,
+          isDetailed: true,
+          includeGraded: false, // Always show raw prices, not graded
+        ),
+        
+        // For valuable cards, show a grading value projection
+        if (isValuableCard && hasGradedSales) ...[
+          const SizedBox(height: 8),
+          _buildGradingValueProjection(),
+        ],
+      ],
+    );
+  }
+
+  bool _hasGradedSalesData() {
+    if (_salesByCategory == null) return false;
+    
+    int gradedSalesCount = 0;
+    for (final key in _salesByCategory!.keys) {
+      if (key != 'ungraded' && _salesByCategory![key] != null) {
+        gradedSalesCount += _salesByCategory![key]!.length;
+      }
+    }
+    
+    return gradedSalesCount >= 3; // Only count if we have at least 3 graded sales
+  }
+
+  Widget _buildGradingValueProjection() {
+    // Check if we have actual graded sales data
+    bool hasGradedSales = false;
+    int gradedCount = 0;
+    
+    if (_salesByCategory != null) {
+      for (final key in _salesByCategory!.keys) {
+        if (key != 'ungraded' && 
+            _salesByCategory![key] != null && 
+            _salesByCategory![key]!.isNotEmpty) {
+          hasGradedSales = true;
+          gradedCount += _salesByCategory![key]!.length;
+        }
+      }
+    }
+    
+    if (!hasGradedSales) {
+      return const SizedBox.shrink(); // Don't show anything if no graded sales
+    }
+    
+    return InkWell(
+      onTap: () {
+        // Scroll to the graded sales section or show more details
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => _buildGradedValueModal(),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Icon(Icons.trending_up, size: 16, color: Colors.purple.shade700),
+            const SizedBox(width: 8),
+            Text(
+              'Graded sales data available ($gradedCount sales)',
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                color: Colors.purple.shade700,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
+            ),
+            const Spacer(),
+            Icon(Icons.arrow_forward_ios, size: 12, color: Colors.purple.shade700),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGradedValueModal() {
+    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+    
+    // Calculate graded price statistics
+    double? averageGradedPrice;
+    double? minGradedPrice;
+    double? maxGradedPrice;
+    int totalGradedSales = 0;
+    Map<String, int> gradedCountsByService = {};
+    Map<String, double> averagePriceByService = {};
+    
+    // Process grading sales data
+    if (_salesByCategory != null) {
+      List<double> allGradedPrices = [];
+      
+      for (final key in _salesByCategory!.keys) {
+        if (key != 'ungraded' && _salesByCategory![key]!.isNotEmpty) {
+          final prices = _salesByCategory![key]!
+              .map((sale) => (sale['price'] as num).toDouble())
+              .toList();
+              
+          if (prices.isNotEmpty) {
+            gradedCountsByService[key] = prices.length;
+            totalGradedSales += prices.length;
+            
+            final avgPrice = prices.reduce((a, b) => a + b) / prices.length;
+            averagePriceByService[key] = avgPrice;
+            
+            allGradedPrices.addAll(prices);
+          }
+        }
+      }
+      
+      // Calculate overall statistics
+      if (allGradedPrices.isNotEmpty) {
+        allGradedPrices.sort();
+        minGradedPrice = allGradedPrices.first;
+        maxGradedPrice = allGradedPrices.last;
+        averageGradedPrice = allGradedPrices.reduce((a, b) => a + b) / allGradedPrices.length;
+      }
+    }
+    
+    // Get raw price for comparison
+    double? rawPrice;
+    if (_salesByCategory?['ungraded'] != null && _salesByCategory!['ungraded']!.isNotEmpty) {
+      final rawPrices = _salesByCategory!['ungraded']!
+          .map((sale) => (sale['price'] as num).toDouble())
+          .toList();
+          
+      if (rawPrices.isNotEmpty) {
+        rawPrice = rawPrices.reduce((a, b) => a + b) / rawPrices.length;
+      }
+    }
+    
+    // Calculate grading premium
+    double? gradingPremium;
+    if (rawPrice != null && averageGradedPrice != null && rawPrice > 0) {
+      gradingPremium = ((averageGradedPrice / rawPrice) - 1) * 100;
+    }
+    
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.verified, color: Colors.purple.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  'Graded Card Value Analysis',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          
+          // Content
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // Price comparison card
+                if (rawPrice != null && averageGradedPrice != null) ...[
+                  Card(
+                    elevation: 2,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Price Comparison',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildPriceComparisonItem(
+                                  title: 'Raw Card',
+                                  price: rawPrice!,
+                                  color: Colors.blue.shade700,
+                                  icon: Icons.crop_original,
+                                ),
+                              ),
+                              Expanded(
+                                child: _buildPriceComparisonItem(
+                                  title: 'Graded',
+                                  price: averageGradedPrice!,
+                                  color: Colors.purple.shade700,
+                                  icon: Icons.verified,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (gradingPremium != null) ...[
+                            const Divider(height: 32),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.trending_up, 
+                                  color: Colors.green.shade600,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Grading Premium: ${gradingPremium.toStringAsFixed(1)}%',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green.shade700,
+                                    fontSize: 16,
+                                  ),
+                                )
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                
+                // Grading service breakdown
+                if (averagePriceByService.isNotEmpty) ...[
+                  Card(
+                    elevation: 2,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Grading Service Breakdown',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ...averagePriceByService.entries.map((entry) => 
+                            _buildGradingServiceRow(
+                              service: entry.key,
+                              avgPrice: entry.value,
+                              count: gradedCountsByService[entry.key] ?? 0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                
+                // Graded sales statistics
+                if (minGradedPrice != null && maxGradedPrice != null) ...[
+                  Card(
+                    elevation: 2,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Graded Sales Statistics',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildStatRow('Total Sales', '$totalGradedSales graded cards'),
+                          const SizedBox(height: 8),
+                          _buildStatRow(
+                            'Price Range', 
+                            '${currencyProvider.formatValue(minGradedPrice)} - ${currencyProvider.formatValue(maxGradedPrice)}'
+                          ),
+                          if (minGradedPrice > 0 && maxGradedPrice > minGradedPrice) ...[
+                            const SizedBox(height: 8),
+                            _buildStatRow(
+                              'Volatility', 
+                              '${(((maxGradedPrice / minGradedPrice) - 1) * 100).toStringAsFixed(1)}%'
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                
+                // Tips for graded cards
+                Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.lightbulb_outline, color: Colors.amber.shade700),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Grading Tips',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTipItem('Only grade cards in near mint condition or better'),
+                        _buildTipItem('PSA and BGS generally command the highest premiums'),
+                        _buildTipItem('Consider the cost of grading vs. potential value increase'),
+                        _buildTipItem('Popular or chase cards tend to see the highest grading premiums'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper methods for the graded value modal
+  Widget _buildPriceComparisonItem({
+    required String title,
+    required double price,
+    required Color color,
+    required IconData icon,
+  }) {
+    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+    
+    return Column(
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 28),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          currencyProvider.formatValue(price),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: color,
+            fontSize: 18,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGradingServiceRow({
+    required String service,
+    required double avgPrice,
+    required int count,
+  }) {
+    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              service,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  currencyProvider.formatValue(avgPrice),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '$count sales',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTipItem(String tip) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(
+            child: Text(tip),
+          ),
+        ],
+      ),
+    );
   }
 }

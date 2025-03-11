@@ -48,6 +48,39 @@ class ChartService {
     }
   }
 
+  // Fix the implementation of getPortfolioHistoryRaw to avoid using PriceService and getPortfolioSnapshots
+  static List<(DateTime, double)> getPortfolioHistoryRaw(StorageService storageService, List<TcgCard> cards) {
+    // Instead of using PriceService, we'll use the existing getPortfolioHistory method
+    // and just make sure we're returning raw prices
+    final points = getPortfolioHistory(storageService, cards);
+    
+    // The portfolio history already uses raw prices from the cards,
+    // so we can return the same data
+    
+    // Make sure the last point has the current total value
+    if (points.isNotEmpty) {
+      final now = DateTime.now();
+      final currentTotal = calculateTotalValue(cards);
+      
+      // Update the last point if it's from today, otherwise add a new point
+      final lastPoint = points.last;
+      if (_isSameDay(lastPoint.$1, now)) {
+        // Replace the last point with current value
+        points[points.length - 1] = (now, currentTotal);
+      } else {
+        // Add a new point for today
+        points.add((now, currentTotal));
+      }
+    }
+    
+    return points;
+  }
+
+  // Helper to check if two dates are on the same day
+  static bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
   // New method to combine points that are too close together
   static List<(DateTime, double)> _combineClosePoints(List<(DateTime, double)> points) {
     if (points.length < 2) return points;
@@ -121,5 +154,55 @@ class ChartService {
 
   static double calculateTotalValue(List<TcgCard> cards) {
     return cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+  }
+}
+
+// Mock implementation of portfolio snapshot for backwards compatibility
+// This avoids having to change the StorageService
+class PortfolioSnapshot {
+  final DateTime date;
+  final List<TcgCard> cards;
+  
+  PortfolioSnapshot({required this.date, required this.cards});
+}
+
+// Extension method to add getPortfolioSnapshots to StorageService
+extension PortfolioExtension on StorageService {
+  List<PortfolioSnapshot> getPortfolioSnapshots() {
+    // Create a snapshot for the current date based on portfolio_history
+    final portfolioHistoryKey = getUserKey('portfolio_history');
+    final portfolioHistoryJson = prefs.getString(portfolioHistoryKey);
+    
+    if (portfolioHistoryJson == null) {
+      // No history yet
+      return [];
+    }
+    
+    try {
+      final List<dynamic> history = json.decode(portfolioHistoryJson);
+      final snapshots = history.map<PortfolioSnapshot>((point) {
+        final date = DateTime.parse(point['timestamp'] as String);
+        final value = (point['value'] as num).toDouble();
+        
+        // Create a mock card to represent the value at this date
+        final mockCard = TcgCard(
+          id: 'snapshot_${date.millisecondsSinceEpoch}',
+          name: 'Portfolio Snapshot',
+          imageUrl: '',
+          price: value,
+          set: TcgSet(id: '', name: ''),
+        );
+        
+        return PortfolioSnapshot(
+          date: date,
+          cards: [mockCard],
+        );
+      }).toList();
+      
+      return snapshots;
+    } catch (e) {
+      print('Error parsing portfolio history: $e');
+      return [];
+    }
   }
 }

@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import '../models/tcg_card.dart';
 import '../screens/mtg_card_details_screen.dart';
 import '../screens/pokemon_card_details_screen.dart';
-import 'package:provider/provider.dart'; // Add this import
-import '../services/storage_service.dart'; // Add this import
-import '../providers/app_state.dart'; // Add this import
-import '../utils/bottom_toast.dart'; // Add this import
+import 'package:provider/provider.dart';
+import '../services/storage_service.dart';
+import '../providers/app_state.dart';
+import '../utils/bottom_toast.dart';
+import '../services/price_service.dart';
 
 class CardDetailsRouter {
+  // Static instance of the price service
+  static final PriceService _priceService = PriceService();
+  
   /// Routes to the appropriate card details screen based on card type
   static Widget getDetailsScreen({
     required TcgCard card,
@@ -189,6 +193,26 @@ class CardDetailsRouter {
     return false;
   }
   
+  /// Get the most accurate price for a card using eBay sold data when available
+  static Future<double?> getAccuratePrice(TcgCard card, {bool includeGraded = false}) async {
+    return await _priceService.getAccuratePrice(card, includeGraded: includeGraded);
+  }
+  
+  /// Get detailed price information including source and confidence
+  static Future<PriceResult> getPriceData(TcgCard card, {bool includeGraded = false}) async {
+    return await _priceService.getPriceData(card, includeGraded: includeGraded);
+  }
+  
+  /// Get comprehensive price data including graded and raw prices
+  static Future<ComprehensivePriceData> getComprehensivePriceData(TcgCard card) async {
+    return await _priceService.getComprehensivePriceData(card);
+  }
+  
+  /// Get price for raw (ungraded) cards only
+  static Future<double?> getRawCardPrice(TcgCard card) async {
+    return await _priceService.getRawCardPrice(card);
+  }
+  
   /// Navigate to the appropriate card details screen
   static void navigateToCardDetails(
     BuildContext context, 
@@ -211,13 +235,18 @@ class CardDetailsRouter {
   }
 }
 
-// Find the _onAddToCollection method in this file and update it to use bottomToast
 /// Helper method to add a card to collection and show a toast notification
 Future<void> onAddToCollection(BuildContext context, TcgCard card) async {
   final appState = Provider.of<AppState>(context, listen: false);
   final storageService = Provider.of<StorageService>(context, listen: false);
 
   try {
+    // Update price with the most accurate raw card price data
+    final accuratePrice = await CardDetailsRouter.getRawCardPrice(card);
+    if (accuratePrice != null) {
+      card = card.copyWith(price: accuratePrice);
+    }
+    
     // Save card
     await storageService.saveCard(card);
     

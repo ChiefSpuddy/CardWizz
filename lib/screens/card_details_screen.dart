@@ -4,10 +4,9 @@ import '../models/tcg_card.dart';
 import '../utils/card_details_router.dart';
 import '../services/storage_service.dart';
 import '../providers/app_state.dart';
-// Import the bottom toast instead of styled_toast
 import '../utils/bottom_toast.dart';
-// Update imports - add our new notification class
-import '../widgets/bottom_notification.dart'; 
+import '../widgets/bottom_notification.dart';
+import '../services/price_service.dart' as price_service;  // Import with namespace
 
 // This class is now just a router to the appropriate screen type
 class CardDetailsScreen extends StatefulWidget {
@@ -30,13 +29,54 @@ class CardDetailsScreen extends StatefulWidget {
 
 class _CardDetailsScreenState extends State<CardDetailsScreen> {
   bool _isAddingToCollection = false;
+  double? _accuratePrice;
+  price_service.PriceSource _priceSource = price_service.PriceSource.unknown;  // Fixed namespace
+  bool _isLoadingPrice = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAccuratePrice();
+  }
+  
+  // Load the most accurate price from eBay sold data
+  Future<void> _loadAccuratePrice() async {
+    if (mounted) {
+      setState(() => _isLoadingPrice = true);
+    }
+    
+    try {
+      // Get detailed price data
+      final priceData = await CardDetailsRouter.getPriceData(widget.card);
+      
+      if (mounted) {
+        setState(() {
+          _accuratePrice = priceData.price;
+          _priceSource = priceData.source;
+          _isLoadingPrice = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading accurate price: $e');
+      if (mounted) {
+        setState(() => _isLoadingPrice = false);
+      }
+    }
+  }
 
   Future<void> _addToCollection() async {
     setState(() => _isAddingToCollection = true);
 
     try {
       final storageService = Provider.of<StorageService>(context, listen: false);
-      await storageService.saveCard(widget.card);
+      
+      // Create a copy of the card with the accurate price
+      final updatedCard = _accuratePrice != null 
+          ? widget.card.copyWith(price: _accuratePrice) 
+          : widget.card;
+          
+      // Save the card with accurate pricing
+      await storageService.saveCard(updatedCard);
 
       // Notify app state about the change
       Provider.of<AppState>(context, listen: false).notifyCardChange();
@@ -44,7 +84,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
       if (mounted) {
         setState(() => _isAddingToCollection = false);
         
-        // *** Use our new bottom notification implementation ***
+        // Use our new bottom notification implementation
         BottomNotification.show(
           context: context,
           title: 'Added to Collection',

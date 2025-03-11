@@ -1057,3 +1057,45 @@ Future<void> _showCreateBinderDialog(BuildContext context) async {
     );
   }
 }
+
+// Fix currency display issues in collections screen
+
+// Find where collection values are displayed and update to use currencyProvider.formatValue consistently
+Widget _buildCollectionValueSummary(BuildContext context, List<TcgCard> cards) {
+  final currencyProvider = Provider.of<CurrencyProvider>(context);
+  final totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+  
+  return Container(
+    // ...existing code...
+    child: Column(
+      // ...existing code...
+      children: [
+        Text(
+          currencyProvider.formatValue(totalValue),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onPrimary,
+          ),
+        ),
+        // ...existing code...
+      ],
+    ),
+  );
+}
+
+// Also check collection list items to ensure they use the same currency format
+Widget _buildCollectionListItem(BuildContext context, String name, int cardCount, double value) {
+  final currencyProvider = Provider.of<CurrencyProvider>(context);
+  return ListTile(
+    // ...existing code...
+    trailing: Text(
+      currencyProvider.formatValue(value),
+      style: TextStyle(
+        fontWeight: FontWeight.bold,
+        color: Colors.green.shade700,
+      ),
+    ),
+    // ...existing code...
+  );
+}
