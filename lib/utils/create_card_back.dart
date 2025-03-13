@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -108,16 +109,16 @@ Future<void> replacePokemonCardBacks() async {
       try {
         final file = File(path);
         if (await file.exists()) {
-          print('Replacing card back at $path');
+          LoggingService.debug('Replacing card back at $path');
           await file.writeAsBytes(bytes);
         }
       } catch (e) {
-        print('Error replacing file at $path: $e');
+        LoggingService.debug('Error replacing file at $path: $e');
       }
     }
     
-    print('Successfully replaced all pokemon card back images');
+    LoggingService.debug('Successfully replaced all pokemon card back images');
   } catch (e) {
-    print('Error in replacePokemonCardBacks: $e');
+    LoggingService.debug('Error in replacePokemonCardBacks: $e');
   }
 }

@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';  // Add this import
 
 /// A utility class for handling and logging errors throughout the app
 class ErrorHandler {

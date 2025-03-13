@@ -7,6 +7,7 @@ class LoggingService {
   static const bool _enableDebugLogging = false; // Master switch for all debug logs
   static const bool _enableEbayApiLogs = false; // Specific for eBay API logs
   static const bool _enableStorageLogs = true; // Keep storage logs for now
+  static const bool _enableAnalyticsLogs = true; // Enable analytics logs
   
   // Additional flags for specific features
   static const bool _enablePriceCalculationLogs = false;
@@ -27,6 +28,7 @@ class LoggingService {
     if (tag == 'Price' && !_enablePriceCalculationLogs) return;
     if (tag == 'Network' && !_enableNetworkRequestLogs) return;
     if (tag == 'Performance' && !_enablePerformanceLogs) return;
+    if (tag == 'Analytics' && !_enableAnalyticsLogs) return;
     
     // Format the message with an emoji prefix
     final emoji = _getEmojiForLevel(level);

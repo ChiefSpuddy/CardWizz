@@ -1,10 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:math' as math;
-import 'dart:math' show Random;  // Add this import for Random
-import '../models/tcg_card.dart';
 import '../services/logging_service.dart';
+import 'dart:math' as math;  // Add this import for math operations
+import '../models/tcg_card.dart';  // Add this import for TcgCard class
+import 'dart:math' show Random;  // Add this import for Random
 
 // Define enum at the top level, not inside the class
 enum CardMatchResult {

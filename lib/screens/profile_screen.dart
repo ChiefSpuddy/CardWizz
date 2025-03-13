@@ -1,26 +1,24 @@
 import 'dart:async';  // Add this import
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:lottie/lottie.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';  // Add this import
 import '../providers/app_state.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
-import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/avatar_picker_dialog.dart';
 import '../l10n/app_localizations.dart';  // Fix this import path
 import '../screens/privacy_settings_screen.dart';
 import '../services/purchase_service.dart';  // Make sure this is added
-import 'package:flutter/foundation.dart';  // Add this import for kDebugMode
 import '../widgets/sign_in_view.dart';
 import '../services/collection_service.dart';
 import '../widgets/styled_toast.dart';  // Add this import
 import '../providers/theme_provider.dart'; // Add this import
 import '../widgets/app_drawer.dart'; // Add this import
 import '../widgets/standard_app_bar.dart'; // Add this import
+import 'package:lottie/lottie.dart'; // Add this import
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -103,34 +101,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         await context.read<AppState>().updateAvatar(avatarPath);
         
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: StyledToast(
-                title: 'Avatar Updated',
-                subtitle: 'Your profile picture has been changed successfully',
-                icon: Icons.check_circle_outline,
-                backgroundColor: Colors.green,
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-            ),
+          showToast(
+            context: context,
+            title: 'Profile updated',
+            subtitle: 'Your profile picture has been changed successfully',
+            icon: Icons.check,
           );
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: StyledToast(
-                title: 'Update Failed',
-                subtitle: 'Could not update avatar',
-                icon: Icons.error_outline,
-                backgroundColor: Colors.red,
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-            ),
+          showToast(
+            context: context,
+            title: 'Error',
+            subtitle: 'Could not update avatar',
+            icon: Icons.error,
           );
         }
       }
@@ -222,34 +206,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         await context.read<AppState>().updateUsername(newUsername);
         
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: StyledToast(
-                title: 'Username Updated',
-                subtitle: 'Your username has been changed successfully',
-                icon: Icons.check_circle_outline,
-                backgroundColor: Colors.green,
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-            ),
+          showToast(
+            context: context,
+            title: 'Profile updated',
+            subtitle: 'Your username has been changed successfully',
+            icon: Icons.check,
           );
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: StyledToast(
-                title: 'Update Failed',
-                subtitle: 'Could not update username',
-                icon: Icons.error_outline,
-                backgroundColor: Colors.red,
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-            ),
+          showToast(
+            context: context,
+            title: 'Error',
+            subtitle: 'Could not update username',
+            icon: Icons.error,
           );
         }
       }
@@ -309,8 +279,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
+          showToast(
+            context: context,
+            title: 'Error',
+            subtitle: 'Could not delete account',
+            icon: Icons.error,
           );
         }
       }
@@ -435,8 +408,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final storageService = Provider.of<StorageService>(context);
     final themeProvider = Provider.of<ThemeProvider>(context); // Add this
     final isDark = themeProvider.isDarkMode; // Use this instead
-    
-    return StreamBuilder<List<TcgCard>>(
+
+    return StreamBuilder<List<dynamic>>(
       stream: storageService.watchCards(),
       builder: (context, snapshot) {
         final cards = snapshot.data ?? [];
@@ -523,13 +496,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         ),
                       ),
                     ),
+                    onTap: () => _showLanguageDialog(context),
                   ),
                   const Divider(height: 1),
                   ListTile(
                     leading: Icon(Icons.currency_exchange, color: colorScheme.primary),
                     title: Text(localizations.translate('currency')),
                     trailing: Container(
-                      height: 48, // Match the height
+                      height: 48, // Match the height of the DropdownButton
                       constraints: const BoxConstraints(maxWidth: 120),
                       child: Theme(
                         data: Theme.of(context).copyWith(
@@ -561,7 +535,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             items: currencyProvider.currencies.entries
                                 .map((entry) => DropdownMenuItem(
                                       value: entry.key,
-                                      child: Text('${entry.key} (${entry.value.$1})'),
+                                      child: Text('${entry.key} (${entry.value.symbol})'),
                                     ))
                                 .toList(),
                           ),
@@ -570,51 +544,37 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                   ),
                   const Divider(height: 1),
-                  // 2. Sync & Data
-                  ListTile(
-                    leading: const Icon(Icons.cloud_sync),
+                  SwitchListTile(
                     title: const Text('Cloud Sync'),
                     subtitle: Text(storageService.isSyncEnabled ? 'Auto-sync every 30 minutes' : 'Off'),
-                    trailing: Switch(
-                      value: storageService.isSyncEnabled,
-                      onChanged: (enabled) {
-                        final storage = context.read<StorageService>();
-                        if (enabled) {
-                          storage.startSync();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: StyledToast(
-                                title: 'Cloud Sync Enabled',
-                                subtitle: 'Your collection will sync every 30 minutes',
-                                icon: Icons.cloud_done,
-                                backgroundColor: Colors.green,
-                              ),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: Colors.transparent,
-                              elevation: 0,
-                              duration: const Duration(seconds: 2), // Reduced from default 4 seconds
-                            ),
-                          );
-                        } else {
-                          storage.stopSync();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: StyledToast(
-                                title: 'Cloud Sync Disabled',
-                                subtitle: 'Auto-sync turned off',
-                                icon: Icons.cloud_off,
-                                backgroundColor: Colors.orange,
-                              ),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: Colors.transparent,
-                              elevation: 0,
-                              duration: const Duration(seconds: 2), // Reduced from default 4 seconds
-                            ),
-                          );
-                        }
-                        setState(() {});
-                      },
-                    ),
+                    value: storageService.isSyncEnabled,
+                    onChanged: (enabled) {
+                      final storage = context.read<StorageService>();
+                      if (enabled) {
+                        storage.startSync();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Auto-sync enabled: Your collection will sync every 30 minutes'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: Colors.transparent,
+                            elevation: 0,
+                            duration: const Duration(seconds: 2), // Reduced from default 4 seconds
+                          ),
+                        );
+                      } else {
+                        storage.stopSync();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Auto-sync turned off'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: Colors.transparent,
+                            elevation: 0,
+                            duration: const Duration(seconds: 2), // Reduced from default 4 seconds
+                          ),
+                        );
+                      }
+                      setState(() {});
+                    },
                   ),
                   if (storageService.isSyncEnabled) ...[
                     const Divider(height: 1),
@@ -625,34 +585,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         final storage = context.read<StorageService>();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: StyledToast(
-                              title: 'Syncing...',
-                              subtitle: 'Updating your collection',
-                              icon: Icons.sync,
-                              backgroundColor: Colors.blue,
-                            ),
+                            content: Text('Updating your collection'),
                             behavior: SnackBarBehavior.floating,
-                            backgroundColor: Colors.transparent,
-                            elevation: 0,
-                            duration: const Duration(milliseconds: 1500),
                           ),
                         );
-                        
                         final wasSuccessful = await storage.syncNow();
-                        
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: StyledToast(
-                                title: wasSuccessful ? 'Sync Complete' : 'Sync Failed',
-                                subtitle: wasSuccessful ? 'Your collection is up to date' : 'Please try again later',
-                                icon: wasSuccessful ? Icons.check_circle_outline : Icons.error_outline,
-                                backgroundColor: wasSuccessful ? Colors.green : Colors.red,
+                              content: Text(
+                                wasSuccessful ? 'Your collection is up to date' : 'Please try again later'
                               ),
                               behavior: SnackBarBehavior.floating,
-                              backgroundColor: Colors.transparent,
-                              elevation: 0,
-                              duration: const Duration(seconds: 2),
                             ),
                           );
                         }
@@ -670,7 +614,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       onChanged: null,  // Coming soon
                     ),
                   ),
-                  // 4. Information
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.info_outline),
@@ -777,7 +720,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             ),
                             const SizedBox(width: 4),
                             Icon(
-                              Icons.expand_more, 
+                              Icons.expand_more,
                               size: 20,
                               color: Theme.of(context).colorScheme.primary,
                             ),
@@ -817,7 +760,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: purchaseService.isPremium
+              colors: purchaseService.isPremium 
                   ? [
                       colorScheme.primaryContainer,
                       colorScheme.primary.withOpacity(0.2),
@@ -843,8 +786,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: purchaseService.isPremium 
-                ? () => _showPremiumInfoDialog(context) 
+            onTap: purchaseService.isPremium
+                ? () => _showPremiumInfoDialog(context)
                 : () => _initiatePremiumPurchase(context),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -948,30 +891,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Monthly Auto-Renewable Subscription',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text('\$2.99 USD per month'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildFeatureComparison(),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.surfaceVariant,
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -995,40 +914,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => _launchUrl('https://chiefspuddy.github.io/CardWizz/#terms-of-service'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            child: const Center(  // Wrap with Center
-                              child: Text(
-                                'Terms of Use',
-                                maxLines: 1,  // Add this to prevent text wrapping
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => _launchUrl('https://cardwizz.com/privacy.html'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                            child: const Center(  // Wrap with Center
-                              child: Text(
-                                'Privacy Policy',
-                                maxLines: 1,  // Add this to prevent text wrapping
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                    _buildFeatureComparison(),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'All card images, logos, symbols, and related information are copyright of their respective owners. CardWizz is not affiliated with, endorsed by, or sponsored by any of these services or companies.',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                   ],
                 ),
@@ -1120,7 +1017,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   void _showPremiumInfoDialog(BuildContext context) {
     final purchaseService = Provider.of<PurchaseService>(context, listen: false);
     final isPremium = purchaseService.isPremium;
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1161,7 +1058,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   children: [
                     Text(
                       '• Monthly subscription\n'
-                      '• \$2.99 USD per month\n'
+                      '• \$1.99 USD per month\n'
                       '• Auto-renews unless cancelled\n'
                       '• Cancel anytime in App Store',
                       style: TextStyle(fontSize: 13),
@@ -1227,10 +1124,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       ),
     );
   }
-  
+
   Future<void> _initiatePremiumPurchase(BuildContext context) async {
     final purchaseService = Provider.of<PurchaseService>(context, listen: false);
-    
+
     // Show loading indicator
     showDialog(
       context: context,
@@ -1241,57 +1138,35 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Connecting to App Store...'),
+            Text('Processing subscription...'),
           ],
         ),
       ),
     );
-    
+
     try {
-      // Store initial premium state
       final wasPremiumBefore = purchaseService.isPremium;
-      
-      // Attempt to make the purchase
       await purchaseService.purchasePremium();
-      
-      // Close loading dialog
-      if (context.mounted) Navigator.of(context).pop();
-      
-      // Check if premium state changed to determine success
       final isPremiumNow = purchaseService.isPremium;
       final purchaseSucceeded = !wasPremiumBefore && isPremiumNow;
-      
+
+      if (context.mounted) Navigator.of(context).pop(); // Close loading dialog
+
       if (context.mounted) {
         if (purchaseSucceeded || isPremiumNow) {
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: StyledToast(
-                title: 'Premium Activated!',
-                subtitle: 'Thank you for your support. Enjoy all premium features!',
-                icon: Icons.check_circle_outline,
-                backgroundColor: Colors.green,
-              ),
+              content: const Text('Subscription successful! Enjoy all premium features!'),
               behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
             ),
           );
-          // Force UI refresh
-          setState(() {});
-        } else if (!isPremiumNow) {
-          // Purchase was canceled or failed
+        } else {
+          // Show already subscribed message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: StyledToast(
-                title: 'Subscription Not Completed',
-                subtitle: 'Premium subscription was not purchased',
-                icon: Icons.info_outline,
-                backgroundColor: Colors.orange,
-              ),
+              content: const Text('You are already subscribed to premium.'),
               behavior: SnackBarBehavior.floating,
-              backgroundColor: Colors.transparent,
-              elevation: 0,
             ),
           );
         }
@@ -1303,15 +1178,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: StyledToast(
-              title: 'Subscription Error',
-              subtitle: 'Could not process subscription. Please try again later.',
-              icon: Icons.error_outline,
-              backgroundColor: Colors.red,
-            ),
+            content: Text('Could not process subscription. Please try again later.'),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
           ),
         );
       }

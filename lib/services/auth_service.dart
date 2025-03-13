@@ -1,11 +1,13 @@
+import '../services/logging_service.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
-import 'dart:math';
 import '../services/collection_service.dart';
 import '../services/storage_service.dart';  // Add this import
 import 'package:characters/characters.dart';
+// Add import for Random
+import 'dart:math';
 
 class AuthService {
   static const defaultUsername = 'Pokemon Trainer';
@@ -65,9 +67,22 @@ class AuthService {
 
   Future<void> updateAvatar(String avatarPath) async {
     if (_currentUser != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('${_currentUser!.id}_avatar', avatarPath);
-      _currentUser = _currentUser!.copyWith(avatarPath: avatarPath); // Add this method to AuthUser
+      try {
+        // Validate avatar path format
+        if (!avatarPath.startsWith('assets/')) {
+          LoggingService.debug('Invalid avatar path format: $avatarPath');
+          return;
+        }
+        
+        // Save the avatar path
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('${_currentUser!.id}_avatar', avatarPath);
+        _currentUser = _currentUser!.copyWith(avatarPath: avatarPath);
+        
+        LoggingService.debug('Avatar updated to: $avatarPath');
+      } catch (e) {
+        LoggingService.debug('Error updating avatar: $e');
+      }
     }
   }
 
@@ -151,7 +166,7 @@ class AuthService {
       }
       return null;
     } catch (e) {
-      print('Sign in with Apple error: $e');
+      LoggingService.debug('Sign in with Apple error: $e');
       return null;
     }
   }
@@ -228,13 +243,13 @@ class AuthService {
           final storage = await StorageService.init(null);
           storage.setCurrentUser(savedUserId);
           
-          print('Auth state restored for user: $savedUserId');
+          LoggingService.debug('Auth state restored for user: $savedUserId');
         }
       } catch (e) {
-        print('Error restoring user data: $e');
+        LoggingService.debug('Error restoring user data: $e');
       }
     } else {
-      print('No saved user ID found during auth restore');
+      LoggingService.debug('No saved user ID found during auth restore');
     }
   }
 }

@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 import 'dart:io';
 
 void main() {
@@ -15,9 +16,9 @@ void main() {
   final List<String> unused = _findUnused(paths, imports);
   
   // Print results
-  print('Found ${unused.length} potentially unused files:');
+  LoggingService.debug('Found ${unused.length} potentially unused files:');
   for (final path in unused) {
-    print('- $path');
+    LoggingService.debug('- $path');
   }
 }
 

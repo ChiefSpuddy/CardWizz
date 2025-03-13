@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 
@@ -8,13 +9,13 @@ import 'package:path/path.dart' as path;
  */
 class CodeCleaner {
   static void analyzeImports() {
-    print('📊 Starting code analysis for unused files...');
+    LoggingService.debug('📊 Starting code analysis for unused files...');
     
     final projectDir = Directory('/Users/sam.may/CardWizz');
     final libDir = Directory('${projectDir.path}/lib');
     
     if (!libDir.existsSync()) {
-      print('❌ Error: Could not find lib directory at ${libDir.path}');
+      LoggingService.debug('❌ Error: Could not find lib directory at ${libDir.path}');
       return;
     }
     
@@ -24,7 +25,7 @@ class CodeCleaner {
     
     // First pass: collect all Dart files
     _collectDartFiles(libDir, allDartFiles);
-    print('📁 Found ${allDartFiles.length} Dart files in the project');
+    LoggingService.debug('📁 Found ${allDartFiles.length} Dart files in the project');
     
     // Second pass: analyze imports
     _analyzeFilesForImports(libDir, allDartFiles, importCount);
@@ -42,22 +43,22 @@ class CodeCleaner {
       .toList();
     
     // Output results
-    print('\n🔍 ANALYSIS RESULTS:');
-    print('${unusedFiles.length} potentially unused files found:');
+    LoggingService.debug('\n🔍 ANALYSIS RESULTS:');
+    LoggingService.debug('${unusedFiles.length} potentially unused files found:');
     for (var file in unusedFiles) {
-      print('  - $file');
+      LoggingService.debug('  - $file');
     }
     
-    print('\n📉 ${rarelyUsedFiles.length} files imported only once:');
+    LoggingService.debug('\n📉 ${rarelyUsedFiles.length} files imported only once:');
     for (var file in rarelyUsedFiles.take(10)) {
-      print('  - $file');
+      LoggingService.debug('  - $file');
     }
     
-    print('\n⚠️ Note: This analysis is not perfect. Some files might be:');
-    print('   1. Entry points (like main.dart)');
-    print('   2. Referenced dynamically');
-    print('   3. Used in assets or as part of other mechanisms');
-    print('   Always review before deleting any files.');
+    LoggingService.debug('\n⚠️ Note: This analysis is not perfect. Some files might be:');
+    LoggingService.debug('   1. Entry points (like main.dart)');
+    LoggingService.debug('   2. Referenced dynamically');
+    LoggingService.debug('   3. Used in assets or as part of other mechanisms');
+    LoggingService.debug('   Always review before deleting any files.');
   }
   
   static bool _isEntryPoint(String filePath) {
@@ -140,14 +141,14 @@ class CodeCleaner {
   }
   
   static List<String> getUnusedWidgets() {
-    print('🔍 Searching for unused widget classes...');
+    LoggingService.debug('🔍 Searching for unused widget classes...');
     
     final libDir = Directory('/Users/sam.may/CardWizz/lib');
     final unusedWidgets = <String>[];
     final definedWidgets = <String, String>{};  // widget name -> file path
     
     if (!libDir.existsSync()) {
-      print('❌ Error: Could not find lib directory');
+      LoggingService.debug('❌ Error: Could not find lib directory');
       return unusedWidgets;
     }
     
@@ -251,7 +252,7 @@ class CodeCleaner {
     Map<String, int> fileSizes = {};
     
     if (!libDir.existsSync()) {
-      print('❌ Error: Could not find lib directory');
+      LoggingService.debug('❌ Error: Could not find lib directory');
       return;
     }
     
@@ -267,11 +268,11 @@ class CodeCleaner {
     final sortedFiles = fileSizes.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     
-    print('\n📊 FILES BY SIZE (largest first):');
+    LoggingService.debug('\n📊 FILES BY SIZE (largest first):');
     for (var i = 0; i < sortedFiles.length && i < 20; i++) {
       final entry = sortedFiles[i];
       final sizeKb = entry.value / 1024;
-      print('${i+1}. ${entry.key}: ${sizeKb.toStringAsFixed(1)} KB');
+      LoggingService.debug('${i+1}. ${entry.key}: ${sizeKb.toStringAsFixed(1)} KB');
     }
   }
 }
@@ -280,18 +281,18 @@ class CodeCleaner {
 void main() {
   CodeCleaner.analyzeImports();
   
-  print('\n==================================\n');
+  LoggingService.debug('\n==================================\n');
   
   final unusedWidgets = CodeCleaner.getUnusedWidgets();
-  print('\n🧩 POTENTIALLY UNUSED WIDGETS:');
+  LoggingService.debug('\n🧩 POTENTIALLY UNUSED WIDGETS:');
   for (var widget in unusedWidgets) {
-    print('  - $widget');
+    LoggingService.debug('  - $widget');
   }
   
-  print('\n==================================\n');
+  LoggingService.debug('\n==================================\n');
   
   CodeCleaner.printFilesSortedBySize();
   
-  print('\n✅ Analysis complete. Review the results before removing any files.');
-  print('Remember that some files might be referenced through routes or reflection!');
+  LoggingService.debug('\n✅ Analysis complete. Review the results before removing any files.');
+  LoggingService.debug('Remember that some files might be referenced through routes or reflection!');
 }

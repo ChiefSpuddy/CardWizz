@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 import 'dart:async';
 import 'storage_service.dart';
 import 'tcg_api_service.dart';
@@ -15,7 +16,7 @@ class BackgroundPriceUpdateService {
 
   Future<void> initialize() async {
     // Perform any necessary initialization tasks here
-    print('BackgroundPriceUpdateService initialized');
+    LoggingService.debug('BackgroundPriceUpdateService initialized');
   }
 
   void startPriceUpdates() {
@@ -25,13 +26,13 @@ class BackgroundPriceUpdateService {
     _timer = Timer.periodic(const Duration(hours: 6), (timer) {
       _updatePrices();
     });
-    print('Background price updates started');
+    LoggingService.debug('Background price updates started');
   }
 
   void stopPriceUpdates() {
     _timer?.cancel();
     _isRunning = false;
-    print('Background price updates stopped');
+    LoggingService.debug('Background price updates stopped');
   }
 
   Future<void> _updatePrices() async {
@@ -59,13 +60,13 @@ class BackgroundPriceUpdateService {
             }
           }
         } catch (e) {
-          print('Error updating price for ${card.name}: $e');
+          LoggingService.debug('Error updating price for ${card.name}: $e');
         }
       }
       
       _lastUpdateTime = DateTime.now();
     } catch (e) {
-      print('Error during price refresh: $e');
+      LoggingService.debug('Error during price refresh: $e');
     }
   }
 
@@ -102,7 +103,7 @@ class BackgroundPriceUpdateService {
         if (_cancelled) break;
 
         final card = cards[i];
-        print('🔍 Checking price for ${card.name} (${i + 1}/${cards.length})');
+        LoggingService.debug('🔍 Checking price for ${card.name} (${i + 1}/${cards.length})');
         
         try {
           // Get latest price from API
@@ -110,16 +111,16 @@ class BackgroundPriceUpdateService {
           
           if (price != null && price != card.price) {
             await _storageService.updateCardPrice(card, price);
-            print('✅ Updated price for ${card.name}: ${card.price} -> $price');
+            LoggingService.debug('✅ Updated price for ${card.name}: ${card.price} -> $price');
             updatedCount++;
           } else {
-            print('ℹ️ No price change for ${card.name}');
+            LoggingService.debug('ℹ️ No price change for ${card.name}');
           }
           
           totalValue += price ?? card.price ?? 0;
           
         } catch (e) {
-          print('❌ Error updating price for ${card.name}: $e');
+          LoggingService.debug('❌ Error updating price for ${card.name}: $e');
         }
 
         // Show progress for current card
@@ -147,7 +148,7 @@ class BackgroundPriceUpdateService {
       }
       
     } catch (e) {
-      print('Error refreshing prices: $e');
+      LoggingService.debug('Error refreshing prices: $e');
       _storageService.notifyPriceUpdateComplete(-1);
     } finally {
       _isRefreshing = false;
@@ -179,7 +180,7 @@ class BackgroundPriceUpdateService {
       DialogManager.instance.hideDialog();
       
     } catch (e) {
-      print('Error updating prices: $e');
+      LoggingService.debug('Error updating prices: $e');
       DialogManager.instance.hideDialog();
     }
   }

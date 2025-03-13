@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'; // Add this import for kReleaseMode and debugPrint
 
 /// Logger utility to control debug output throughout the app
 class AppLogger {

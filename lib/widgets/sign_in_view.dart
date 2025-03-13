@@ -1,28 +1,25 @@
+import '../services/logging_service.dart';
 import 'dart:ui';
+import 'dart:math' as math;  // Add this import
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:provider/provider.dart';
-import 'package:lottie/lottie.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
-import '../l10n/app_localizations.dart';
-import '../services/tcg_api_service.dart';
-import '../screens/card_details_screen.dart';
-import '../models/tcg_card.dart';
-import '../constants/app_colors.dart';
-import 'dart:math' as math;
+import '../services/storage_service.dart';
+import '../utils/hero_tags.dart';
+import '../utils/error_handler.dart';
 import '../widgets/animated_gradient_button.dart';
-import '../widgets/styled_toast.dart'; // Add this import for StyledToast
+import '../widgets/styled_toast.dart';
+import '../services/tcg_api_service.dart';  // Add this import
 
 class SignInView extends StatefulWidget {
-  // Change default to false since the RootNavigator already provides a navigation bar
   final bool showNavigationBar;
-  final bool showAppBar; // Add this parameter
-  
+  final bool showAppBar;
+
   const SignInView({
     super.key,
-    this.showNavigationBar = false, // Set default to false
-    this.showAppBar = false, // Default to false
+    this.showNavigationBar = false,
+    this.showAppBar = false,
   });
 
   @override
@@ -39,7 +36,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   
   bool _isSigningIn = false;
   
-  // For animated cards
   final List<Map<String, dynamic>> _showcaseCards = [];
   bool _isLoadingCards = true;
 
@@ -47,43 +43,36 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     
-    // Background animation
     _backgroundController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 30),
     )..repeat();
     
-    // Logo animation with bounce effect
     _logoController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
     
-    // Headline animation
     _headlineController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
     
-    // Content animation for features and button
     _contentController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
     
-    // Particle animation
     _particleController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 20),
     )..repeat();
     
-    // Pulse animation for highlights
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
     
-    // Staggered animations
     Future.delayed(const Duration(milliseconds: 100), () => _logoController.forward());
     Future.delayed(const Duration(milliseconds: 400), () => _headlineController.forward());
     Future.delayed(const Duration(milliseconds: 700), () => _contentController.forward());
@@ -106,9 +95,8 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     try {
       final apiService = Provider.of<TcgApiService>(context, listen: false);
       
-      // Fix the search query format
       final response = await apiService.searchCards(
-        query: 'rarity:"Secret Rare" OR rarity:"Alt Art"',  // Simplified query
+        query: 'rarity:"Secret Rare" OR rarity:"Alt Art"',
         pageSize: 8,
         orderBy: 'cardmarket.prices.averageSellPrice',
         orderByDesc: true,
@@ -122,7 +110,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
         });
       }
     } catch (e) {
-      print('Error loading showcase cards: $e');
+      LoggingService.debug('Error loading showcase cards: $e');
       if (mounted) {
         setState(() => _isLoadingCards = false);
       }
@@ -132,7 +120,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   Future<void> _handleSignIn(BuildContext context) async {
     if (_isSigningIn) return;
     
-    // Add haptic feedback for better user experience
     HapticFeedback.mediumImpact();
 
     setState(() => _isSigningIn = true);
@@ -179,7 +166,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     final size = MediaQuery.of(context).size;
     
     return Scaffold(
-      // Hide app bar based on widget parameter
       appBar: widget.showAppBar ? AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -187,14 +173,11 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Animated background with particle effect
           _buildAnimatedBackground(isDark, colorScheme),
           
-          // Floating cards in background
           if (_showcaseCards.isNotEmpty)
             ..._buildFloatingCards(colorScheme),
           
-          // Main content
           SafeArea(
             child: Column(
               children: [
@@ -207,22 +190,18 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // App logo with bounce animation
                             _buildAnimatedLogo(colorScheme, isDark),
                             
                             const SizedBox(height: 32),
                             
-                            // App headline with slide-in animation
                             _buildAnimatedHeadline(colorScheme),
                             
                             const SizedBox(height: 32),
                             
-                            // Feature cards with staggered animations
                             _buildFeatureCards(context, colorScheme),
                             
                             const SizedBox(height: 40),
                             
-                            // Sign-in button with pulse and gradient animations
                             _buildSignInButton(context, colorScheme),
                           ],
                         ),
@@ -231,7 +210,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                   ),
                 ),
                 
-                // Footer with privacy info
                 _buildFooter(colorScheme),
               ],
             ),
@@ -245,13 +223,12 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   Widget _buildBottomNavigationBar(BuildContext context) {
     return BottomNavigationBar(
       type: BottomNavigationBarType.fixed,
-      currentIndex: 0, // Home is selected
+      currentIndex: 0,
       selectedItemColor: Theme.of(context).colorScheme.primary,
       unselectedItemColor: Colors.grey,
       selectedFontSize: 12,
       unselectedFontSize: 12,
       onTap: (_) {
-        // Use the StyledToast properly since it exists
         showToast(
           context: context,
           title: 'Sign In Required',
@@ -294,7 +271,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   Widget _buildAnimatedBackground(bool isDark, ColorScheme colorScheme) {
     return Stack(
       children: [
-        // Gradient background
         AnimatedBuilder(
           animation: _backgroundController,
           builder: (context, child) {
@@ -305,8 +281,8 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                   end: Alignment.bottomRight,
                   colors: [
                     isDark 
-                      ? colorScheme.surface.withOpacity(0.8)
-                      : colorScheme.background.withOpacity(0.8),
+                      ? colorScheme.surface.withAlpha((0.8 * 255).round())
+                      : colorScheme.background.withAlpha((0.8 * 255).round()),
                     isDark
                       ? Color.lerp(colorScheme.surface, colorScheme.primary, 0.05) ?? colorScheme.surface
                       : Color.lerp(colorScheme.background, colorScheme.primary, 0.03) ?? colorScheme.background,
@@ -314,8 +290,8 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                       ? Color.lerp(colorScheme.surface, colorScheme.primary, 0.1) ?? colorScheme.surface
                       : Color.lerp(colorScheme.background, colorScheme.primary, 0.07) ?? colorScheme.background,
                     isDark
-                      ? colorScheme.surface.withOpacity(0.8)
-                      : colorScheme.background.withOpacity(0.8),
+                      ? colorScheme.surface.withAlpha((0.8 * 255).round())
+                      : colorScheme.background.withAlpha((0.8 * 255).round()),
                   ],
                   stops: [
                     0,
@@ -329,7 +305,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
           },
         ),
         
-        // Subtle pattern overlay
         Positioned.fill(
           child: Opacity(
             opacity: 0.05,
@@ -343,7 +318,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
           ),
         ),
         
-        // Animated particles
         AnimatedBuilder(
           animation: _particleController,
           builder: (context, child) {
@@ -351,7 +325,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
               painter: ParticlePainter(
                 animation: _particleController.value,
                 isDark: isDark,
-                particleColor: colorScheme.primary.withOpacity(0.3),
+                particleColor: colorScheme.primary.withAlpha((0.3 * 255).round()),
                 particleCount: 60,
               ),
               size: Size.infinite,
@@ -391,7 +365,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.3 + (_pulseController.value * 0.2)),
+                      color: colorScheme.primary.withAlpha((0.3 * 255).round() + (_pulseController.value * 0.2 * 255).round()),
                       blurRadius: 20 + (_pulseController.value * 8),
                       spreadRadius: 1 + (_pulseController.value * 2),
                     ),
@@ -448,7 +422,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                   'Your complete card collection assistant',
                   style: TextStyle(
                     fontSize: 14,
-                    color: colorScheme.onBackground.withOpacity(0.7),
+                    color: colorScheme.onBackground.withAlpha((0.7 * 255).round()),
                   ),
                 ),
               ],
@@ -483,7 +457,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       builder: (context, child) {
         return Column(
           children: List.generate(features.length, (index) {
-            // Calculate staggered delay based on index
             final delay = index * 0.2;
             final animationProgress = (_contentController.value - delay) / (1 - delay);
             final progress = animationProgress.clamp(0.0, 1.0);
@@ -500,14 +473,14 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
-                    color: colorScheme.surface.withOpacity(0.7),
+                    color: colorScheme.surface.withAlpha((0.7 * 255).round()),
                     border: Border.all(
-                      color: colorScheme.primary.withOpacity(0.1),
+                      color: colorScheme.primary.withAlpha((0.1 * 255).round()),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.05),
+                        color: colorScheme.primary.withAlpha((0.05 * 255).round()),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
@@ -549,7 +522,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                               features[index].$2,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: colorScheme.onBackground.withOpacity(0.7),
+                                color: colorScheme.onBackground.withAlpha((0.7 * 255).round()),
                               ),
                             ),
                           ],
@@ -628,7 +601,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                       'Privacy focused - your data stays on your device',
                       style: TextStyle(
                         fontSize: 12,
-                        color: colorScheme.onBackground.withOpacity(0.7),
+                        color: colorScheme.onBackground.withAlpha((0.7 * 255).round()),
                       ),
                     ),
                   ],
@@ -657,19 +630,14 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     return List.generate(
       math.min(6, _showcaseCards.length), 
       (index) {
-        // Calculate positions for better layout
         double top = random.nextDouble() * screenSize.height * 0.7;
         
-        // Distribute cards evenly around the edges
         double left;
         if (index % 3 == 0) {
-          // Left side
           left = -50 + random.nextDouble() * 40; 
         } else if (index % 3 == 1) {
-          // Right side
           left = screenSize.width - 60 - random.nextDouble() * 40;
         } else {
-          // Random vertical position, left or right side
           left = random.nextBool() 
               ? -50 + random.nextDouble() * 40
               : screenSize.width - 60 - random.nextDouble() * 40;
@@ -690,7 +658,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
           child: AnimatedBuilder(
             animation: _backgroundController,
             builder: (context, child) {
-              // Calculate floating effect with unique movement
               final wave = index % 2 == 0 ? math.sin : math.cos;
               final horizontalOffset = wave(_backgroundController.value * math.pi * 2 + index) * 5.0;
               final verticalOffset = wave(_backgroundController.value * math.pi * 2 + index * 0.7) * 5.0;
@@ -711,7 +678,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                    color: colorScheme.primary.withOpacity(0.2),
+                    color: colorScheme.primary.withAlpha((0.2 * 255).round()),
                     blurRadius: 10,
                     spreadRadius: 1,
                   ),
@@ -724,7 +691,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                   fit: BoxFit.cover,
                   opacity: const AlwaysStoppedAnimation(0.15),
                   errorBuilder: (context, error, stackTrace) => 
-                      Container(color: colorScheme.primary.withOpacity(0.05)),
+                      Container(color: colorScheme.primary.withAlpha((0.05 * 255).round())),
                 ),
               ),
             ),
@@ -735,7 +702,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   }
 }
 
-// Improved card pattern painter for a more appealing background
 class CardPatternPainter extends CustomPainter {
   final double animation;
   final bool isDark;
@@ -750,11 +716,10 @@ class CardPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = primaryColor.withOpacity(isDark ? 0.15 : 0.1)
+      ..color = primaryColor.withAlpha(isDark ? (0.15 * 255).round() : (0.1 * 255).round())
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
       
-    // Draw a card deck pattern that animates subtly
     const spacing = 100.0;
     const cardWidth = 50.0;
     const cardHeight = 70.0;
@@ -762,7 +727,6 @@ class CardPatternPainter extends CustomPainter {
     
     for (var x = -cardWidth; x < size.width + cardWidth; x += spacing) {
       for (var y = -cardHeight; y < size.height + cardHeight; y += spacing) {
-        // Add subtle movement
         final offsetX = 8 * math.sin(animation * math.pi * 2 + (x + y) / 500);
         final offsetY = 8 * math.cos(animation * math.pi * 2 + (x - y) / 500);
         
@@ -778,7 +742,6 @@ class CardPatternPainter extends CustomPainter {
         
         canvas.drawRRect(rect, paint);
         
-        // Draw inner card pattern
         final innerRect = RRect.fromRectAndRadius(
           Rect.fromLTWH(
             x + offsetX + 3, 
@@ -798,7 +761,6 @@ class CardPatternPainter extends CustomPainter {
   bool shouldRepaint(CardPatternPainter oldDelegate) => true;
 }
 
-// More efficient particle painter
 class ParticlePainter extends CustomPainter {
   final double animation;
   final bool isDark;
@@ -835,7 +797,7 @@ class ParticlePainter extends CustomPainter {
       final y = (particle.position.dy + animation * 80 * particle.speed) % size.height;
       
       final paint = Paint()
-        ..color = particleColor.withOpacity(particle.opacity);
+        ..color = particleColor.withAlpha((particle.opacity * 255).round());
       
       canvas.drawCircle(
         Offset(x, y),
@@ -877,10 +839,10 @@ void _showPrivacyInfo(BuildContext context) {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: colorScheme.surface.withOpacity(0.9),
+            color: colorScheme.surface.withAlpha((0.9 * 255).round()),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             border: Border.all(
-              color: colorScheme.primary.withOpacity(0.1),
+              color: colorScheme.primary.withAlpha((0.1 * 255).round()),
               width: 1,
             ),
           ),
@@ -893,7 +855,7 @@ void _showPrivacyInfo(BuildContext context) {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.1),
+                      color: colorScheme.primary.withAlpha((0.1 * 255).round()),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -924,7 +886,7 @@ void _showPrivacyInfo(BuildContext context) {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: colorScheme.primary.withOpacity(0.1),
+                            color: colorScheme.primary.withAlpha((0.1 * 255).round()),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(

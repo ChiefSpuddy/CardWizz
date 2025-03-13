@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PrivacyTestHelper {
@@ -10,11 +11,11 @@ class PrivacyTestHelper {
     final profileVisible = prefs.getBool('profile_visible');
     final showPrices = prefs.getBool('show_prices');
 
-    print('Privacy Settings Test:');
-    print('Analytics Enabled: $analyticsEnabled');
-    print('Search History Enabled: $searchHistoryEnabled');
-    print('Profile Visible: $profileVisible');
-    print('Show Prices: $showPrices');
+    LoggingService.debug('Privacy Settings Test:');
+    LoggingService.debug('Analytics Enabled: $analyticsEnabled');
+    LoggingService.debug('Search History Enabled: $searchHistoryEnabled');
+    LoggingService.debug('Profile Visible: $profileVisible');
+    LoggingService.debug('Show Prices: $showPrices');
 
     // Verify settings are being saved
     return analyticsEnabled != null &&

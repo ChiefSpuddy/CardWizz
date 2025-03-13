@@ -1,6 +1,10 @@
+import '../services/logging_service.dart';
 import 'dart:convert';
-import '../models/tcg_card.dart';
 import 'storage_service.dart';
+// Add import for TcgCard
+import '../models/tcg_card.dart';
+// Use the local TcgSet import
+import '../models/tcg_set.dart' as models;
 
 class ChartService {
   // Add minimum time between points
@@ -43,7 +47,7 @@ class ChartService {
       
       return points;
     } catch (e) {
-      print('Error parsing portfolio history: $e');
+      LoggingService.debug('Error parsing portfolio history: $e');
       return [(DateTime.now(), calculateTotalValue(cards))];
     }
   }
@@ -190,7 +194,7 @@ extension PortfolioExtension on StorageService {
           name: 'Portfolio Snapshot',
           imageUrl: '',
           price: value,
-          set: TcgSet(id: '', name: ''),
+          set: models.TcgSet(id: '', name: ''),  // Use aliased version
         );
         
         return PortfolioSnapshot(
@@ -201,7 +205,7 @@ extension PortfolioExtension on StorageService {
       
       return snapshots;
     } catch (e) {
-      print('Error parsing portfolio history: $e');
+      LoggingService.debug('Error parsing portfolio history: $e');
       return [];
     }
   }

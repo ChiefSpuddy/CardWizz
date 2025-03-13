@@ -1,6 +1,6 @@
+import '../services/logging_service.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../models/tcg_card.dart';
 import '../utils/image_utils.dart';
 
 class TcgdexApiService {
@@ -32,7 +32,7 @@ class TcgdexApiService {
         throw Exception('Failed to load Japanese sets: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching Japanese sets: $e');
+      LoggingService.debug('Error fetching Japanese sets: $e');
       return [];
     }
   }
@@ -79,7 +79,7 @@ class TcgdexApiService {
         }).toList(),
       };
     } catch (e) {
-      print('Error searching Japanese sets: $e');
+      LoggingService.debug('Error searching Japanese sets: $e');
       return {'data': []};
     }
   }

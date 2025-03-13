@@ -1,9 +1,10 @@
+import '../services/logging_service.dart';
 import 'dart:io';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';  // Add this import
 import '../services/tcg_api_service.dart';  // Add this import
-import '../models/tcg_card.dart';  // Add this import
+import '../models/tcg_card.dart';
 
 class ScannerService {
   final textRecognizer = TextRecognizer();
@@ -21,7 +22,7 @@ class ScannerService {
   }
 
   Future<Map<String, String?>> extractCardInfo(String text) async {
-    print('Raw text from image: $text');
+    LoggingService.debug('Raw text from image: $text');
     
     final lines = text.split('\n')
         .map((l) => l.trim())
@@ -45,7 +46,7 @@ class ScannerService {
       }
       
       name = cleanLine;
-      print('Found potential name: $name');
+      LoggingService.debug('Found potential name: $name');
       break;
     }
 
@@ -55,7 +56,7 @@ class ScannerService {
       var match = RegExp(r'(?:^|\D)0*(\d{1,3})/\d+(?:$|\D)').firstMatch(line);
       if (match != null) {
         number = match.group(1)!.padLeft(3, '0');
-        print('Found number pattern: $number');
+        LoggingService.debug('Found number pattern: $number');
         break;
       }
 
@@ -63,7 +64,7 @@ class ScannerService {
       match = RegExp(r'(?:^|\D)0*(\d{1,3})(?:$|\D)').firstMatch(line);
       if (match != null) {
         number = match.group(1)!.padLeft(3, '0');
-        print('Found isolated number: $number');
+        LoggingService.debug('Found isolated number: $number');
         break;
       }
     }
@@ -96,7 +97,7 @@ class ScannerService {
           .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('Error searching by name: $e');
+      LoggingService.debug('Error searching by name: $e');
       return [];
     }
   }
@@ -114,7 +115,7 @@ class ScannerService {
           .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('Error searching by number: $e');
+      LoggingService.debug('Error searching by number: $e');
       return [];
     }
   }
@@ -126,7 +127,7 @@ class ScannerService {
         // Remove 'BASIG' from name if present
         final cleanName = name.replaceAll('BASIG', '').trim();
         final nameQuery = 'name:"$cleanName"'; // Fixed quotes
-        print('Trying name search: $nameQuery');
+        LoggingService.debug('Trying name search: $nameQuery');
 
         final results = await _apiService.searchCards(
           query: 'name:"$cleanName"',
@@ -134,7 +135,7 @@ class ScannerService {
         );
         if (results['data'] != null && (results['data'] as List).isNotEmpty) {
           final card = results['data'][0];
-          print('Found by name: ${card['name']} #${card['number']}');
+          LoggingService.debug('Found by name: ${card['name']} #${card['number']}');
           return card;
         }
       }
@@ -143,7 +144,7 @@ class ScannerService {
       if (number != null) {
         // Try with both padded and unpadded numbers
         final numberQuery = 'number:"$number"'; // Fixed quotes
-        print('Trying number search: $numberQuery');
+        LoggingService.debug('Trying number search: $numberQuery');
 
         final results = await _apiService.searchCards(
           query: 'number:"$number"',
@@ -151,12 +152,12 @@ class ScannerService {
         );
         if (results['data'] != null && (results['data'] as List).isNotEmpty) {
           final card = results['data'][0];
-          print('Found by number: ${card['name']} #${card['number']}');
+          LoggingService.debug('Found by number: ${card['name']} #${card['number']}');
           return card;
         }
       }
     } catch (e) {
-      print('Error searching for card: $e');
+      LoggingService.debug('Error searching for card: $e');
     }
     return null;
   }
@@ -164,7 +165,7 @@ class ScannerService {
   Future<Map<String, dynamic>?> processCapturedImage(String imagePath) async {
     try {
       final rawText = await recognizeText(imagePath);
-      print('Raw text from image:\n$rawText');
+      LoggingService.debug('Raw text from image:\n$rawText');
       
       String? number;
       String? name;
@@ -185,7 +186,7 @@ class ScannerService {
             
         if (cleanLine.length > 2 && !_isCommonText(cleanLine)) {
           name = cleanLine.trim();  // Ensure clean trimming
-          print('Found name: $name');
+          LoggingService.debug('Found name: $name');
           break;
         }
       }
@@ -196,7 +197,7 @@ class ScannerService {
         if (fullMatch != null) {
           number = fullMatch.group(1)!;
           setNumber = fullMatch.group(2);
-          print('Found number: $number/$setNumber');
+          LoggingService.debug('Found number: $number/$setNumber');
           break;
         }
       }
@@ -204,7 +205,7 @@ class ScannerService {
       if (name != null || number != null) {
         // Try exact number search first as it's most reliable
         if (number != null) {
-          print('Trying number search: number:"$number"');
+          LoggingService.debug('Trying number search: number:"$number"');
           final results = await _apiService.searchCards(
             query: 'number:"$number"',
             pageSize: 5,
@@ -218,7 +219,7 @@ class ScannerService {
         if (name != null) {
           // Clean name for better matching
           final cleanName = name.replaceAll('Pokémon', '').trim();
-          print('Trying name search: name:"$cleanName"');
+          LoggingService.debug('Trying name search: name:"$cleanName"');
           final results = await _apiService.searchCards(
             query: 'name:"$cleanName"',
             pageSize: 5,
@@ -231,7 +232,7 @@ class ScannerService {
       
       return null;
     } catch (e) {
-      print('Error processing card: $e');
+      LoggingService.debug('Error processing card: $e');
       return null;
     }
   }

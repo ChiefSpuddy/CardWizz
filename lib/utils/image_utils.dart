@@ -1,6 +1,6 @@
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/tcg_card.dart';
 import '../widgets/mtg_set_icon.dart';
 
 class CardImageUtils {
@@ -148,7 +148,7 @@ class CardImageUtils {
     Widget? placeholder, // Add optional placeholder parameter
   }) {
     // Add debug logging
-    print('Loading image from URL: $url');
+    LoggingService.debug('Loading image from URL: $url');
     
     return CachedNetworkImage(
       imageUrl: url,
@@ -167,7 +167,7 @@ class CardImageUtils {
         ),
       ),
       errorWidget: (context, url, error) {
-        print('Error loading image: $url - $error');
+        LoggingService.debug('Error loading image: $url - $error');
         return Container(
           width: width,
           height: height,
@@ -192,7 +192,7 @@ class CardImageUtils {
         color: color,
       );
     } catch (e) {
-      print('Error building MTG set icon for $setCode: $e');
+      LoggingService.debug('Error building MTG set icon for $setCode: $e');
       // Return a clean fallback
       return Container(
         width: size ?? 30,

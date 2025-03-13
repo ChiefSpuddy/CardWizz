@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:math'; // Add this import for math functions like sin, pi, and Random
 import '../models/custom_collection.dart';
-import '../models/tcg_card.dart';
 import '../services/collection_service.dart';
 import '../services/storage_service.dart';
 import '../widgets/card_grid_item.dart';
@@ -12,6 +10,8 @@ import '../widgets/animated_background.dart';
 import '../screens/home_screen.dart';
 import '../screens/collections_screen.dart';
 import '../root_navigator.dart';  
+import 'dart:math';  // Add this import
+import '../models/tcg_card.dart';  // Add this import
 
 class CustomCollectionDetailScreen extends StatefulWidget {
   final CustomCollection collection;
@@ -399,7 +399,7 @@ class _CustomCollectionDetailScreenState extends State<CustomCollectionDetailScr
               // Card image
               Positioned.fill(
                 child: Image.network(
-                  card.imageUrl,
+                  card.imageUrl ?? '',
                   fit: BoxFit.cover,
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;

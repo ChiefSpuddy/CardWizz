@@ -1,155 +1,113 @@
 import 'package:flutter/material.dart';
+import '../utils/color_extensions.dart';
 
-class StyledButton extends StatefulWidget {
-  final VoidCallback onPressed;
+class StyledButton extends StatelessWidget {
   final String text;
-  final IconData? icon;
-  final Color? color;
-  final bool isOutlined;
-  final bool isWide;
-  final bool hasGlow;
+  final VoidCallback onPressed;
   final bool isLoading;
-
+  final Color? color;
+  final Color? textColor;
+  final double height;
+  final double? width;
+  final double borderRadius;
+  final IconData? icon;
+  final bool outlined;
+  final bool fullWidth;
+  final EdgeInsetsGeometry? padding;
+  final bool compact;
+  final bool disabled;
+  
   const StyledButton({
     Key? key,
-    required this.onPressed,
     required this.text,
-    this.icon,
-    this.color,
-    this.isOutlined = false,
-    this.isWide = false,
-    this.hasGlow = false,
+    required this.onPressed,
     this.isLoading = false,
+    this.color,
+    this.textColor,
+    this.height = 48,
+    this.width,
+    this.borderRadius = 8,
+    this.icon,
+    this.outlined = false,
+    this.fullWidth = false,
+    this.padding,
+    this.compact = false,
+    this.disabled = false,
   }) : super(key: key);
 
   @override
-  State<StyledButton> createState() => _StyledButtonState();
-}
-
-class _StyledButtonState extends State<StyledButton> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  bool _isPressed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeInOut,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _handleTapDown(TapDownDetails details) {
-    if (!widget.isLoading) {
-      _controller.forward();
-      setState(() {
-        _isPressed = true;
-      });
-    }
-  }
-
-  void _handleTapUp(TapUpDetails details) {
-    _controller.reverse();
-    setState(() {
-      _isPressed = false;
-    });
-  }
-
-  void _handleTapCancel() {
-    _controller.reverse();
-    setState(() {
-      _isPressed = false;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final buttonColor = widget.color ?? colorScheme.primary;
-    final textColor = widget.isOutlined ? buttonColor : Colors.white;
-
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _scaleAnimation.value,
-          child: GestureDetector(
-            onTapDown: _handleTapDown,
-            onTapUp: _handleTapUp,
-            onTapCancel: _handleTapCancel,
-            child: InkWell(
-              onTap: widget.isLoading ? null : widget.onPressed,
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                width: widget.isWide ? double.infinity : null,
-                height: 56,
-                padding: EdgeInsets.symmetric(
-                  horizontal: widget.isWide ? 24 : 32,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: widget.isOutlined ? Colors.transparent : buttonColor,
-                  borderRadius: BorderRadius.circular(20),
-                  border: widget.isOutlined
-                      ? Border.all(color: buttonColor, width: 2)
-                      : null,
-                  boxShadow: widget.hasGlow && !widget.isOutlined
-                      ? [
-                          BoxShadow(
-                            color: buttonColor.withOpacity(0.5),
-                            spreadRadius: _isPressed ? 1 : 2,
-                            blurRadius: _isPressed ? 5 : 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisSize: widget.isWide ? MainAxisSize.max : MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (widget.icon != null && !widget.isLoading) ...[
-                      Icon(widget.icon, color: textColor),
-                      const SizedBox(width: 12),
-                    ],
-                    if (widget.isLoading)
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.0,
-                          valueColor: AlwaysStoppedAnimation<Color>(textColor),
-                        ),
-                      )
-                    else
-                      Text(
-                        widget.text,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                  ],
+    final theme = Theme.of(context);
+    final buttonColor = color ?? theme.colorScheme.primary;
+    final buttonTextColor = textColor ?? (outlined ? buttonColor : Colors.white);
+    
+    final buttonStyle = outlined
+        ? OutlinedButton.styleFrom(
+            side: BorderSide(color: buttonColor),
+            foregroundColor: buttonTextColor,
+            backgroundColor: Colors.transparent,
+            padding: padding ?? (compact 
+                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 0)
+                : const EdgeInsets.symmetric(horizontal: 24)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(borderRadius),
+            ),
+          )
+        : ElevatedButton.styleFrom(
+            backgroundColor: buttonColor,
+            foregroundColor: buttonTextColor,
+            elevation: 0,
+            padding: padding ?? (compact
+                ? const EdgeInsets.symmetric(horizontal: 16, vertical: 0)
+                : const EdgeInsets.symmetric(horizontal: 24)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(borderRadius),
+            ),
+          );
+    
+    final buttonChild = isLoading
+        ? SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: buttonTextColor.withAlpha((0.8 * 255).round()), // Fixed: Using withAlpha
+              strokeCap: StrokeCap.round,
+            ),
+          )
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 18),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                text,
+                style: TextStyle(
+                  fontSize: compact ? 14 : 16,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            ),
-          ),
-        );
-      },
+            ],
+          );
+    
+    final button = outlined
+        ? OutlinedButton(
+            onPressed: disabled || isLoading ? null : onPressed,
+            style: buttonStyle,
+            child: buttonChild,
+          )
+        : ElevatedButton(
+            onPressed: disabled || isLoading ? null : onPressed,
+            style: buttonStyle,
+            child: buttonChild,
+          );
+    
+    return SizedBox(
+      width: fullWidth ? double.infinity : width,
+      height: height,
+      child: button,
     );
   }
 }

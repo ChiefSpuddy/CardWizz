@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
+import 'dart:math' as math;  // Add this import for math.Random
 
 class CardSkeletonGrid extends StatefulWidget {
   final int itemCount;
@@ -93,11 +93,12 @@ class _CardSkeleton extends StatelessWidget {
                       blendMode: BlendMode.srcATop,
                       shaderCallback: (bounds) {
                         return LinearGradient(
-                          colors: [baseColor, highlightColor, baseColor],
+                          colors: [
+                            baseColor,
+                            highlightColor,
+                            baseColor,
+                          ],
                           stops: const [0.0, 0.5, 1.0],
-                          begin: const Alignment(-1.0, -0.3),
-                          end: const Alignment(1.0, 0.3),
-                          tileMode: TileMode.clamp,
                           transform: _SlidingGradientTransform(controller.value),
                         ).createShader(bounds);
                       },
@@ -121,8 +122,8 @@ class _CardSkeleton extends StatelessWidget {
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
-                          Colors.black.withOpacity(0.7),
-                          Colors.transparent,
+                          baseColor.withOpacity(0.9),
+                          baseColor.withOpacity(0.0),
                         ],
                       ),
                     ),
@@ -130,19 +131,10 @@ class _CardSkeleton extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          height: 12,
-                          width: 70,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
+                          width: double.infinity,
                           height: 10,
-                          width: 40,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.3),
+                            color: highlightColor,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),

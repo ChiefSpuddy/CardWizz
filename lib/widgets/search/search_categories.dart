@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'dart:math' as math; // Add this import
+import 'package:flutter/services.dart';  // Add this import for HapticFeedback
+import '../../utils/image_utils.dart';
+import '../../services/logging_service.dart'; // Fix import path
 import '../../constants/sets.dart';
 import '../../constants/japanese_sets.dart';
 import '../../constants/mtg_sets.dart';
 import '../../screens/search_screen.dart';
-import '../../utils/image_utils.dart';
-import '../../constants/app_colors.dart';
 import '../../widgets/mtg_set_icon.dart';
+import '../../constants/app_colors.dart';  // Fix import path
 
 class SearchCategories extends StatefulWidget {
   final SearchMode searchMode;
@@ -632,27 +632,6 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
   }
 
   // Add the previously missing methods
-  Map<String, dynamic> _buildCategoryHeader(BuildContext context, String title) {
-    return {'title': title, 'type': 'header'};
-  }
-
-  Map<String, dynamic> _buildCategoryRow(BuildContext context, List<Map<String, dynamic>> sets) {
-    // Convert sets list to the format expected by the UI
-    final Map<String, Map<String, dynamic>> setsMap = {};
-    
-    for (final set in sets) {
-      setsMap[set['code']] = {
-        'name': set['name'],
-        'code': set['code'],
-        'year': set['year'] ?? '',
-        'logo': set['logo'],
-        'query': set['query'],
-      };
-    }
-    
-    return {'title': '', 'sets': setsMap, 'type': 'sets'};
-  }
-
   Color _getCategoryHeaderColor(SearchMode mode, bool isExpanded) {
     if (!isExpanded) return Colors.transparent;
     
@@ -693,7 +672,7 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
           widget.onQuickSearch(item);
           
           // Add debug log
-          debugPrint('Set card tapped: ${item['name']} with query: ${item['query']}');
+          LoggingService.debug('Set card tapped: ${item['name']} with query: ${item['query']}');
         },
         child: SizedBox(
           width: 100,
@@ -757,7 +736,7 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
         logoUrl,
         fit: BoxFit.contain,
         errorBuilder: (context, error, stack) {
-          print('Error loading set logo for ${item['name']}: $error');
+          LoggingService.debug('Error loading set logo for ${item['name']}: $error');
           return Text(
             item['icon'] ?? '📦',
             style: TextStyle(
@@ -776,39 +755,6 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
         fontSize: 20,
         color: colorScheme.primary.withOpacity(0.8)
       ),
-    );
-  }
-
-  // UPDATED: Return categories based on search mode (fixed)
-  List<Map<String, dynamic>> get _categories {
-    switch (widget.searchMode) {
-      case SearchMode.eng:
-        return _pokemonCategories;
-      case SearchMode.mtg:
-        return _mtgCategories;
-    }
-  }
-
-  // UPDATED: Return sets based on search mode (fixed)
-  List<Map<String, dynamic>> _getSetsForCategory(String category) {
-    switch (widget.searchMode) {
-      case SearchMode.eng:
-        return PokemonSets.getSetsForCategory(category);
-      case SearchMode.mtg:
-        return MtgSets.getSetsForCategory(category);
-    }
-  }
-
-  // UPDATED: Get logo based on search mode (fixed)
-  Widget _getCategoryLogo() {
-    final logoUrl = widget.searchMode == SearchMode.mtg
-        ? 'assets/icons/mtg_logo.png'
-        : 'assets/icons/pokemon_logo.png';
-        
-    return Image.asset(
-      logoUrl,
-      height: 40,
-      fit: BoxFit.contain,
     );
   }
 }

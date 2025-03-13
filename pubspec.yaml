@@ -1,6 +1,8 @@
 name: cardwizz
-description: A TCG card collection management app with powerful scanning and pricing features
-version: 1.1.2+23  # Format is {version}+{build_number}
+description: A card collection management app.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -10,111 +12,109 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  async: ^2.11.0  # Add this for StreamGroup
-  collection: ^1.17.0
-  sign_in_with_apple: ^5.0.0
-  crypto: ^3.0.3
-  provider: ^6.0.0
-  shared_preferences: ^2.2.2
-  http: ^1.1.0
-  fl_chart: ^0.66.0  # Update to latest version
-  lottie: ^2.7.0  # Make sure this is present
-  url_launcher: ^6.2.1
-  cupertino_icons: ^1.0.5
-  path_provider: ^2.1.1
-  image_picker: ^1.0.4
-  permission_handler: ^11.0.1
-  flutter_contacts: ^1.1.7
-  qr_flutter: ^4.1.0
-  share_plus: ^7.1.0
-  flutter_native_splash: ^2.3.2
-  flutter_launcher_icons: ^0.13.1
+  # Core functionality
   sqflite: ^2.3.0
+  shared_preferences: ^2.2.0
+  provider: ^6.0.5
   path: ^1.8.3
-  characters: ^1.3.0
-  shimmer: ^3.0.0  # Add this line
-  intl: ^0.19.0  # Update this line from ^0.18.0 to ^0.19.0
-  in_app_purchase: ^3.1.11
-  uni_links: ^0.5.1
-  workmanager: ^0.5.2
+  intl: ^0.19.0  # Updated to match flutter_localizations requirement
+  rxdart: ^0.27.7
+  
+  # UI components
+  fl_chart: ^0.63.0
+  shimmer: ^3.0.0 
+  lottie: ^2.6.0
+  flutter_svg: ^2.0.7
+  cupertino_icons: ^1.0.2
+  
+  # Network and API
+  dio: ^5.3.0
+  connectivity_plus: ^5.0.0
+  
+  # Image handling
+  image_picker: ^1.0.1
+  flutter_cache_manager: ^3.3.1
+  palette_generator: ^0.3.3+2
+  cached_network_image: ^3.2.3
+  
+  # Authentication
+  sign_in_with_apple: ^5.0.0
+  google_sign_in: ^6.1.5
+  
+  # Device functionality
+  camera: ^0.10.5+2
+  permission_handler: ^11.0.0
   background_fetch: ^1.2.1
-  cached_network_image: ^3.3.0
-  dio: ^5.3.3  # Add this line
+  workmanager: ^0.5.1
+  flutter_secure_storage: ^8.0.0
+  uni_links: ^0.5.1
+  share_plus: ^7.1.0
+  flutter_contacts: ^1.1.7+1
+  # Temporarily comment out problematic package
+  # cloud_kit: ^2.0.0
+  url_launcher: ^6.1.12
+  
+  # Barcode scanning
   google_mlkit_text_recognition: ^0.8.1
-  camera: ^0.10.5
-  rxdart: ^0.27.7  # Add this line
-  flutter_cache_manager: ^3.3.1  # Add this for better image caching
-  palette_generator: ^0.3.3+3  # Add this for Pokemon type color extraction
-  cloud_kit: ^1.0.0  # Add this line
-  synchronized: ^3.1.0  # Add this line
-  connectivity_plus: ^5.0.1  # Add this line
-  flutter_svg: ^2.0.5  # Add this line for SVG support
-  flutter_secure_storage: ^8.0.0  # Make sure this line is present
+  
+  # UI components
+  qr_flutter: ^4.1.0
+  
+  # In-app purchases
+  in_app_purchase: ^3.1.10
+  
+  # Additional utilities
+  yaml: ^3.1.2
+
+# Update dependency overrides to resolve CocoaPods conflict
+dependency_overrides:
+  google_sign_in_ios: 5.5.0  # Use an older version that doesn't require GTMSessionFetcher 3.4.0+
+  google_mlkit_text_recognition: 0.5.0
+  google_mlkit_commons: 0.2.0
+  camera: 0.10.5
+  # Fixed version combination for Google Sign In to work together
+  google_sign_in: 6.0.2
+  google_sign_in_platform_interface: 2.2.0
+  google_sign_in_web: 0.10.2
+  # Add this to fix the error with forceAccountName parameter
+  google_sign_in_android: 6.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.3
-  path: ^1.8.3
-  yaml: ^3.1.2
+  flutter_lints: ^2.0.0
+  dependency_validator: ^5.0.2
+  # Move these to dev_dependencies as suggested by dependency_validator
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.3.1
+  # Remove path from dev dependencies as it's already in regular dependencies
+  
+# Configurations for flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/app_icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false
 
 flutter:
   uses-material-design: true
-  
+  assets:
+    - assets/images/
+    - assets/animations/
+    - assets/avatars/
+    # Remove or create these directories
+    # - assets/lottie/
+    # - assets/logos/
   fonts:
     - family: Roboto
       fonts:
-        - asset: assets/fonts/Roboto-Thin.ttf
-          weight: 100
-        - asset: assets/fonts/Roboto-Light.ttf
-          weight: 300
         - asset: assets/fonts/Roboto-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Roboto-Medium.ttf
-          weight: 500
         - asset: assets/fonts/Roboto-Bold.ttf
           weight: 700
-        - asset: assets/fonts/Roboto-Black.ttf
-          weight: 900
-  
-  assets:
-    - assets/animations/
-    - assets/names.json
-    - assets/avatars/
-    - assets/animations/background.json
-    - assets/animations/SplashAnimation.json  # Add this specific file
-    - assets/animations/Loading.json
-    - assets/images/cardback.png
-    - assets/images/             # Add this line to include all images in the directory
-    - assets/images/mtgback.png  # Add this line to include the mtgback.png file
-    - assets/icons/
-    
-flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
-  image_path: "assets/icon/app_icon.png"
-  min_sdk_android: 21
-  remove_alpha_ios: true
-
-# Comment out the flutter_native_splash section to disable it completely
-# flutter_native_splash:
-#   color: "#FFFFFF"
-#   color_dark: "#121212"
-#   image: assets/animations/card_loading.json
-#   android_12:
-#     image: assets/animations/card_loading.json
-#     icon_background_color: "#FFFFFF"
-#     icon_background_color_dark: "#121212"
-#   branding: assets/animations/card_loading.json
-#   branding_mode: bottom
-#   fullscreen: false
-#   android_gravity: center
-#   ios_content_mode: center
-#   android: true
-#   ios: true
-#   web: false
-#   android_animation: true
-#   ios_animation: true
-#   animation_duration: 800
-#   fade_in: true
-#   fade_out: true

@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 import 'dart:async';
 import 'dart:convert'; // Add this import for jsonDecode
 import 'dart:io';
@@ -6,11 +7,12 @@ import 'package:sqflite/sqflite.dart';
 import 'package:flutter/material.dart';  // Add this import for Color
 import 'package:shared_preferences/shared_preferences.dart';  // Add this import
 import 'package:provider/provider.dart';  // Add this
+import 'package:flutter/foundation.dart';  // Add this import for kDebugMode
+import '../models/tcg_card.dart';  // Add this import for TcgCard
 import '../models/custom_collection.dart';
 import '../services/storage_service.dart';  // Add this import
 import '../providers/sort_provider.dart';  // Add this
 import '../services/purchase_service.dart';
-import 'package:flutter/foundation.dart';  // Add this import for kDebugMode
 
 class CollectionService {
   static const int _freeUserBinderLimit = 10;  // Add this constant
@@ -73,20 +75,20 @@ class CollectionService {
 
   Future<void> initialize() async {
     if (_isInitialized) {
-      print('Collection already initialized, skipping');
+      LoggingService.debug('Collection already initialized, skipping');
       return;
     }
     
     try {
-      print('Collection service initializing...');
+      LoggingService.debug('Collection service initializing...');
       await _refreshCollections();  // Load initial collections
       _isInitialized = true;
       
       // Use current collections length instead of non-existent _cards
       final collections = await getCustomCollections();
-      print('Collection service initialized with ${collections.length} collections');
+      LoggingService.debug('Collection service initialized with ${collections.length} collections');
     } catch (e) {
-      print('Error initializing collection service: $e');
+      LoggingService.debug('Error initializing collection service: $e');
       rethrow;
     }
   }
@@ -101,11 +103,11 @@ class CollectionService {
   Future<void> setCurrentUser(String? userId) async {
     // Add check to prevent duplicate initialization
     if (_currentUserId == userId) {
-      print('Collection service: Same user, skipping initialization');
+      LoggingService.debug('Collection service: Same user, skipping initialization');
       return;
     }
     
-    print('Setting collection service user: $userId');
+    LoggingService.debug('Setting collection service user: $userId');
     _currentUserId = userId;
     
     if (userId == null) {
@@ -148,9 +150,9 @@ class CollectionService {
       _collections = [];
       _collectionsController.add([]);
 
-      print('Cleared all collections for user: $userId');
+      LoggingService.debug('Cleared all collections for user: $userId');
     } catch (e) {
-      print('Error clearing collections: $e');
+      LoggingService.debug('Error clearing collections: $e');
       rethrow;
     }
   }
@@ -180,7 +182,7 @@ class CollectionService {
   // Add this method to control debug output
   void _debugLog(String message, {bool verbose = false}) {
     if (kDebugMode && !verbose) {
-      print(message);
+      LoggingService.debug(message);
     }
   }
 
@@ -442,9 +444,9 @@ class CollectionService {
 
       await clearSessionState();
       
-      print('Permanently deleted all collections for user: $userId');
+      LoggingService.debug('Permanently deleted all collections for user: $userId');
     } catch (e) {
-      print('Error deleting collections: $e');
+      LoggingService.debug('Error deleting collections: $e');
       rethrow;
     }
   }

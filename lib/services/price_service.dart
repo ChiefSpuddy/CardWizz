@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import '../models/tcg_card.dart';
 import '../services/ebay_api_service.dart';
 import '../services/ebay_search_service.dart';
 import '../services/logging_service.dart';
+import '../models/tcg_card.dart';  // Add this import for TcgCard
 
 class PriceService {
   final EbayApiService _ebayApi = EbayApiService();
@@ -17,6 +16,9 @@ class PriceService {
 
   // Add a property to cache the most recent price changes
   List<Map<String, dynamic>>? _lastRecentPriceChanges;
+
+  // Add this property to fix missing listings error
+  List<Map<String, dynamic>> listings = [];
   
   /// Get the most accurate price for a card with the following priority:
   /// 1. eBay sold listings (median price)
@@ -432,6 +434,24 @@ class PriceService {
     }
     
     return result;
+  }
+
+  Future<double?> _getEbayPrice(TcgCard card) async {
+    try {
+      // ... existing code ...
+      
+      if (listings.isEmpty) {
+        // Replace print with LoggingService
+        LoggingService.debug('No eBay listings found for ${card.name}', tag: 'Price');
+        return null;
+      }
+      
+      // ... existing code ...
+    } catch (e) {
+      // Replace print with LoggingService
+      LoggingService.error('Error fetching eBay price: $e', tag: 'Price');
+      return null;
+    }
   }
 }
 

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
 
 class CardSelectionSheet extends StatelessWidget {

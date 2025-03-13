@@ -2,170 +2,160 @@ import 'package:flutter/material.dart';
 import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
 import 'package:provider/provider.dart';
-import '../utils/card_details_router.dart';
-import '../constants/card_styles.dart';
+import '../widgets/network_card_image.dart';
+import 'package:flutter/services.dart';  // Add for HapticFeedback
+import '../services/storage_service.dart'; // Add for direct storage access
+import '../widgets/bottom_notification.dart'; // Add this import
 
 class CardGridItem extends StatelessWidget {
   final TcgCard card;
-  final VoidCallback? onTap;
-  final Image? cached;
-  final String? heroContext;
+  final VoidCallback onTap;
+  final VoidCallback onAddToCollection;
+  final bool isInCollection;
   final bool showPrice;
   final bool showName;
-  final bool highQuality; // Add this property for performance control
+  final bool highQuality;
+  final String heroContext;
+  final bool hideCheckmarkWhenInCollection; // Add this new property
 
   const CardGridItem({
-    Key? key,
+    super.key,
     required this.card,
-    this.onTap,
-    this.cached,
-    this.heroContext,
+    required this.onTap,
+    required this.onAddToCollection,
+    this.isInCollection = false,
     this.showPrice = true,
-    this.showName = false,
-    this.highQuality = true, // Default to high quality
-  }) : super(key: key);
+    this.showName = true,
+    this.highQuality = true,
+    this.heroContext = 'default',
+    this.hideCheckmarkWhenInCollection = false, // Default to showing checkmarks
+  });
 
   @override
   Widget build(BuildContext context) {
-    final currencyProvider = Provider.of<CurrencyProvider>(context);
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    return AspectRatio(
-      aspectRatio: 0.7,
-      child: Container(
-        // Increased padding to give more space around the card
-        padding: const EdgeInsets.all(2),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            // Eliminate the border radius completely to ensure no content is cut off
-            borderRadius: BorderRadius.circular(2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Card image with custom ClipRect to ensure no clipping at edges
-              ClipRect(
-                child: Hero(
-                  tag: 'card_${card.id}_${heroContext ?? "search"}',
-                  child: cached ?? Image.network(
-                    card.imageUrl,
-                    fit: BoxFit.contain, // Use contain instead of cover to avoid cropping
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
-                        child: Center(
-                          child: Icon(
-                            Icons.broken_image,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      );
-                    },
-                    // Performance optimization parameters
-                    filterQuality: highQuality ? FilterQuality.medium : FilterQuality.low,
-                    cacheWidth: highQuality ? null : 150,
-                    frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                      return frame != null 
-                        ? child 
-                        : Container(color: Theme.of(context).colorScheme.surfaceVariant);
-                    },
-                  ),
-                ),
-              ),
-              // Tap overlay
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onTap,
-                  splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-                  highlightColor: Colors.transparent,
-                ),
-              ),
-              // Optional name and price tag at bottom
-              if (showName || showPrice)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  left: 0,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          Colors.black.withOpacity(0.85), // Increased opacity for better contrast
-                          Colors.black.withOpacity(0.0),
-                        ],
-                        stops: const [0.0, 1.0],
+    final heroTag = 'card_${card.id}_${heroContext}_grid';
+    
+    return Stack(
+      children: [
+        // Card image and details
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Card image - REMOVED GREY BACKGROUND CONTAINER
+                  Expanded(
+                    child: Hero(
+                      tag: heroTag,
+                      child: NetworkCardImage(
+                        imageUrl: card.imageUrl,
+                        highQuality: highQuality,
+                        fit: BoxFit.contain,
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (showName && card.name.isNotEmpty)
-                          Text(
-                            card.name,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withOpacity(0.5),
-                                  blurRadius: 2,
-                                ),
-                              ],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        if (showPrice && card.price != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: FutureBuilder<double?>(
-                              future: CardDetailsRouter.getRawCardPrice(card),
-                              builder: (context, snapshot) {
-                                final displayPrice = snapshot.data ?? card.price;
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: isDarkMode 
-                                      ? Colors.green.shade700.withOpacity(0.85) 
-                                      : Colors.green.shade100.withOpacity(0.85),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    currencyProvider.formatValue(displayPrice!),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                      color: isDarkMode ? Colors.white : Colors.green.shade900,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
                   ),
-                ),
-            ],
+                  
+                  // Card info footer
+                  if (showName || (showPrice && card.price != null))
+                    Container(
+                      color: Theme.of(context).cardColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (showName)
+                            Text(
+                              card.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          if (showPrice && card.price != null)
+                            Consumer<CurrencyProvider>(
+                              builder: (context, currencyProvider, _) => Text(
+                                '${currencyProvider.symbol}${card.price!.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
-      ),
+        
+        // Add button or checkmark - only show if not in collection or if we don't want to hide the checkmark
+        if (!isInCollection || !hideCheckmarkWhenInCollection)
+          Positioned(
+            top: 2,
+            right: 2,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,  // CRITICAL: Prevents tap events from propagating
+              onTap: isInCollection ? null : () {
+                // Provide immediate feedback
+                HapticFeedback.lightImpact();
+                
+                // CRITICAL FIX: Instead of calling the callback which might
+                // trigger navigation, handle it directly here
+                if (!isInCollection) {
+                  // Get the StorageService directly
+                  final storage = Provider.of<StorageService>(context, listen: false);
+                  
+                  // Don't await - let it run in the background
+                  storage.saveCard(card).then((_) {
+                    // Show a styled notification instead of a basic SnackBar
+                    if (context.mounted) {
+                      BottomNotification.show(
+                        context: context,
+                        title: 'Added to Collection',
+                        message: card.name,
+                        icon: Icons.check_circle,
+                      );
+                    }
+                  });
+                }
+              },
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isInCollection
+                      ? Colors.green.withOpacity(0.9)
+                      : Theme.of(context).colorScheme.primary.withOpacity(0.9),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Icon(
+                    isInCollection ? Icons.check : Icons.add,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

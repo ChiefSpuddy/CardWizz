@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../services/ebay_api_service.dart';
-import '../models/tcg_card.dart';
 import '../services/logging_service.dart';
+import 'package:flutter/foundation.dart';  // Add this for ChangeNotifier
+import '../models/tcg_card.dart';  // Add this import for TcgCard
 
 class EbaySearchService extends ChangeNotifier {
   final EbayApiService _ebayApi = EbayApiService();

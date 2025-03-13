@@ -1,187 +1,193 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
-import '../constants/app_colors.dart';
+import '../utils/color_extensions.dart';
 
 class ThemeSwitcher extends StatelessWidget {
   final bool showLabel;
-  final bool useTile;
+  final bool useBigSize;
+  final bool useCompactSize;
+  final EdgeInsets? padding;
   
   const ThemeSwitcher({
-    Key? key, 
-    this.showLabel = true,
-    this.useTile = false,
+    Key? key,
+    this.showLabel = false,
+    this.useBigSize = false,
+    this.useCompactSize = false,
+    this.padding,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDarkMode = themeProvider.isDarkMode;
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
     
-    if (useTile) {
-      return ListTile(
-        leading: Icon(
-          isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-        title: const Text('Dark Mode'),
-        trailing: Switch(
-          value: isDarkMode,
-          activeColor: Theme.of(context).colorScheme.primary,
-          onChanged: (_) => themeProvider.toggleTheme(),
-        ),
-        onTap: () => themeProvider.toggleTheme(),
-      );
-    }
-
-    return GestureDetector(
+    // Determine icon size based on params
+    final double iconSize = useBigSize 
+        ? 24.0 
+        : (useCompactSize ? 16.0 : 20.0);
+    
+    return InkWell(
       onTap: () => themeProvider.toggleTheme(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                return RotationTransition(
-                  turns: animation,
-                  child: ScaleTransition(
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: padding ?? const EdgeInsets.all(8.0),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withAlpha((0.8 * 255).round()), // Fixed: Using extension method and withAlpha
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  return ScaleTransition(
                     scale: animation,
-                    child: child,
+                    child: FadeTransition(
+                      opacity: animation,
+                      child: child,
+                    ),
+                  );
+                },
+                child: isDarkMode
+                    ? Icon(
+                        Icons.dark_mode,
+                        key: const ValueKey('dark'),
+                        size: iconSize,
+                        color: colorScheme.primary,
+                      )
+                    : Icon(
+                        Icons.light_mode,
+                        key: const ValueKey('light'),
+                        size: iconSize,
+                        color: colorScheme.primary,
+                      ),
+              ),
+              if (showLabel) ...[
+                const SizedBox(width: 8),
+                Text(
+                  isDarkMode ? 'Dark Mode' : 'Light Mode',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface, // Fixed: Using onSurface instead of onBackground
                   ),
-                );
-              },
-              child: Icon(
-                isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                key: ValueKey<bool>(isDarkMode),
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            if (showLabel) ...[
-              const SizedBox(width: 8),
-              Text(
-                isDarkMode ? 'Dark Mode' : 'Light Mode',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.onBackground,
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-// A more advanced theme settings dialog
-class ThemeSettingsDialog extends StatelessWidget {
-  const ThemeSettingsDialog({Key? key}) : super(key: key);
+class ThemeModeSelector extends StatelessWidget {
+  const ThemeModeSelector({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
-    
-    return AlertDialog(
-      title: const Text('Appearance'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildThemeOption(
-            context,
-            title: 'Light',
-            icon: Icons.light_mode_rounded,
-            isSelected: themeProvider.themeMode == ThemeMode.light,
-            onTap: () => themeProvider.setLightMode(),
-          ),
-          const SizedBox(height: 8),
-          _buildThemeOption(
-            context,
-            title: 'Dark',
-            icon: Icons.dark_mode_rounded,
-            isSelected: themeProvider.themeMode == ThemeMode.dark,
-            onTap: () => themeProvider.setDarkMode(),
-          ),
-          const SizedBox(height: 8),
-          _buildThemeOption(
-            context,
-            title: 'System',
-            icon: Icons.brightness_auto,
-            isSelected: themeProvider.themeMode == ThemeMode.system,
-            onTap: () => themeProvider.setSystemMode(),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildThemeOption(
-    BuildContext context, {
-    required String title,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final currentThemeMode = themeProvider.themeMode;
     
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? colorScheme.primary.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? colorScheme.primary : colorScheme.outline.withOpacity(0.3),
+    // Get appropriate UI text for each theme mode
+    String getModeText(ThemeMode mode) {
+      switch (mode) {
+        case ThemeMode.system: return 'System';
+        case ThemeMode.light: return 'Light';
+        case ThemeMode.dark: return 'Dark';
+      }
+    }
+    
+    // Get appropriate icon for each theme mode
+    IconData getModeIcon(ThemeMode mode) {
+      switch (mode) {
+        case ThemeMode.system: return Icons.brightness_auto;
+        case ThemeMode.light: return Icons.light_mode;
+        case ThemeMode.dark: return Icons.dark_mode;
+      }
+    }
+    
+    // Create option for each theme mode
+    Widget buildThemeModeOption(ThemeMode mode) {
+      final isSelected = currentThemeMode == mode;
+      
+      return InkWell(
+        onTap: () => themeProvider.setThemeMode(mode),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? colorScheme.primary.withAlpha((0.2 * 255).round()) // Fixed: Using withAlpha
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected 
+                  ? colorScheme.primary 
+                  : colorScheme.primary.withAlpha((0.2 * 255).round()), // Fixed: Using withAlpha
+              width: 1.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                getModeIcon(mode),
+                color: isSelected ? colorScheme.primary : colorScheme.onSurface.withAlpha((0.7 * 255).round()),
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                getModeText(mode),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                ),
+              ),
+              if (isSelected) ...[
+                const Spacer(),
+                Icon(
+                  Icons.check_circle,
+                  color: colorScheme.primary,
+                  size: 20,
+                ),
+              ],
+            ],
           ),
         ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? colorScheme.primary : colorScheme.onSurface,
-            ),
-            const SizedBox(width: 16),
-            Text(
-              title,
+      );
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 12),
+            child: Text(
+              'Choose Theme',
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
               ),
             ),
-            const Spacer(),
-            if (isSelected)
-              Icon(
-                Icons.check_circle_rounded,
-                color: colorScheme.primary,
-              ),
-          ],
-        ),
+          ),
+          buildThemeModeOption(ThemeMode.system),
+          const SizedBox(height: 10),
+          buildThemeModeOption(ThemeMode.light),
+          const SizedBox(height: 10),
+          buildThemeModeOption(ThemeMode.dark),
+        ],
       ),
-    );
-  }
-
-  // Show the dialog
-  static Future<void> show(BuildContext context) async {
-    return showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return const ThemeSettingsDialog();
-      },
     );
   }
 }

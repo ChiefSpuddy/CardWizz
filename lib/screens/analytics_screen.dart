@@ -1,12 +1,12 @@
+import '../services/logging_service.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'dart:math' show max, min;
 import 'package:flutter/gestures.dart';
 import '../services/storage_service.dart';
-import '../models/tcg_card.dart';
 import '../widgets/animated_background.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/sign_in_view.dart';
@@ -25,7 +25,6 @@ import '../utils/hero_tags.dart';
 import '../services/chart_service.dart';
 import '../services/ebay_api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:math' as math;
 import '../widgets/empty_collection_view.dart';
 import '../widgets/portfolio_value_chart.dart';
 import '../widgets/styled_toast.dart';
@@ -36,6 +35,7 @@ import '../widgets/rarity_distribution_chart.dart';
 import '../widgets/price_update_button.dart';
 import '../widgets/standard_app_bar.dart';
 import '../services/analytics_cache_service.dart';
+import '../models/tcg_card.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -95,6 +95,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final double _topMoversCardHeight = 360.0;
 
   final _analyticsCacheService = AnalyticsCacheService();
+  DateTime? _cachedTopMoversTimestamp;
 
   @override
   void initState() {
@@ -102,6 +103,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     _updateLastRefreshTime();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       DialogManager.instance.setContext(context);
+      
+      // Try to load cached top movers from the service
+      final cachedMovers = _analyticsCacheService.getTopMovers();
+      if (cachedMovers != null && cachedMovers.isNotEmpty) {
+        setState(() {
+          _cachedTopMovers = cachedMovers;
+          _cachedTopMoversTimestamp = DateTime.now();
+        });
+      }
     });
     AnalyticsScreen._scrollController.addListener(_onScroll);
   }
@@ -313,7 +323,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       width: 28,
                       child: Hero(
                         tag: 'value_${card.id}',
-                        child: _buildCardImage(card.imageUrl),
+                        child: _buildCardImage(card.imageUrl ?? ''),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -675,7 +685,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
   }
 
-  final maxCount = distribution.reduce(max);
+  final maxCount = distribution.reduce(math.max);
 
   return Card(
     child: Stack(
@@ -808,18 +818,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final localizations = AppLocalizations.of(context);
   final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
+  LoggingService.debug('Building top movers with ${cards.length} cards, cached: ${_cachedTopMovers?.length ?? 0}');
+  
   return FutureBuilder<List<Map<String, dynamic>>>(
-    future: _isLoadingTopMovers ? Future.value(_cachedTopMovers) : _getRecentPriceChanges(cards),
+    future: _isLoadingTopMovers 
+            ? (_cachedTopMovers != null 
+                ? Future.value(_cachedTopMovers!) // Only use cached data if it's not null
+                : Future.value(<Map<String, dynamic>>[]))  // Return empty list instead of null
+            : _getRecentPriceChanges(cards),
     builder: (context, snapshot) {
+      // Determine card content based on state
       Widget cardContent;
 
-      if (_isLoadingTopMovers && _cachedTopMovers != null) {
-        cardContent = _buildTopMoversContent(_cachedTopMovers!, isLoading: true);
-      }
-      else if (snapshot.connectionState == ConnectionState.waiting) {
-        cardContent = _buildTopMoversLoading();
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        if (_cachedTopMovers != null && _cachedTopMovers!.isNotEmpty && _isLoadingTopMovers) {
+          // Show cached content with loading overlay during updates
+          LoggingService.debug('Showing cached top movers with loading overlay');
+          cardContent = _buildTopMoversContent(_cachedTopMovers!, isLoading: true);
+        } else {
+          // Initial loading with placeholder
+          LoggingService.debug('Showing top movers loading placeholder');
+          cardContent = _buildTopMoversLoading();
+        }
       }
       else if (snapshot.hasError) {
+        LoggingService.debug('Error loading top movers: ${snapshot.error}');
         cardContent = Center(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -836,18 +859,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       }
       else {
         final changes = snapshot.data ?? [];
+        LoggingService.debug('Got ${changes.length} top movers from future builder');
         
         if (changes.isNotEmpty) {
           _cachedTopMovers = changes;
+          _cachedTopMoversTimestamp = DateTime.now();
         }
         
         if (changes.isEmpty) {
+          LoggingService.debug('No top movers found, showing empty state');
           cardContent = _buildEmptyTopMovers();
         } else {
+          LoggingService.debug('Showing ${changes.length} top movers');
           cardContent = _buildTopMoversContent(changes);
         }
       }
 
+      // Wrap with a card of fixed height to prevent layout shifts
       return Card(
         color: isDarkMode 
             ? Theme.of(context).colorScheme.surface 
@@ -977,6 +1005,7 @@ Widget _buildTopMoversContent(List<Map<String, dynamic>> changes, {bool isLoadin
           final card = item['card'] as TcgCard;
           final change = item['change'] as double;
           final period = item['period'];
+          final changeAmount = item['changeAmount'] as double?;
           
           return InkWell(
             onTap: () => Navigator.push(
@@ -996,7 +1025,7 @@ Widget _buildTopMoversContent(List<Map<String, dynamic>> changes, {bool isLoadin
                     width: 28,
                     child: Hero(
                       tag: 'mover_${card.id}',
-                      child: _buildCardImage(card.imageUrl),
+                      child: _buildCardImage(card.imageUrl ?? ''),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1022,7 +1051,7 @@ Widget _buildTopMoversContent(List<Map<String, dynamic>> changes, {bool isLoadin
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      _buildChangeIndicator(change),
+                      _buildChangeIndicator(change, changeAmount, currencyProvider),
                       const SizedBox(height: 4),
                       Text(
                         _formatPricePeriod(period),
@@ -1068,86 +1097,124 @@ Widget _buildTopMoversContent(List<Map<String, dynamic>> changes, {bool isLoadin
 
 Future<List<Map<String, dynamic>>> _getRecentPriceChanges(List<TcgCard> cards) async {
   try {
-    if (_isLoadingTopMovers && _cachedTopMovers != null) {
-      return _cachedTopMovers!;
+    // Safely access cached data with null check
+    final now = DateTime.now();
+    if (_cachedTopMovers != null && 
+        _cachedTopMovers!.isNotEmpty &&
+        _cachedTopMoversTimestamp != null && 
+        now.difference(_cachedTopMoversTimestamp!) < const Duration(minutes: 5)) {
+      LoggingService.debug('Using cached top movers data from $_cachedTopMoversTimestamp');
+      if (_isLoadingTopMovers) {
+        return _cachedTopMovers!;
+      }
     }
     
-    print('Analyzing ${cards.length} cards for recent price changes');
+    LoggingService.debug('Analyzing ${cards.length} cards for recent price changes');
     
-    final cardsWithDirectChanges = <Map<String, dynamic>>[];
+    final cardsWithChanges = <Map<String, dynamic>>[];
+    
+    // Count how many cards have price history for debugging
+    int cardsWithHistory = 0;
     
     for (final card in cards) {
-      if (card.lastPriceChange != null && card.previousPrice != null && card.price != null) {
-        final change = ((card.price! - card.previousPrice!) / card.previousPrice!) * 100;
-        if (change.abs() > 0.01) {
-          print('Direct change detected for ${card.name}: ${card.previousPrice} -> ${card.price} (${change.toStringAsFixed(2)}%)');
-          cardsWithDirectChanges.add({
+      // Check if card has price history
+      if (card.priceHistory.isNotEmpty && card.price != null) {
+        cardsWithHistory++;
+        
+        // Try to find the most recent price change
+        double? percentChange;
+        double? changeAmount;
+        String period = '';
+        
+        // First check if there's a direct price change record
+        if (card.previousPrice != null && card.previousPrice! > 0) {
+          percentChange = ((card.price! - card.previousPrice!) / card.previousPrice!) * 100;
+          changeAmount = card.price! - card.previousPrice!;
+          period = 'Last update';
+        }
+        // Otherwise check historical price points
+        else {
+          // Look for price changes in different time periods
+          final periods = [
+            {'1d': const Duration(days: 1)},
+            {'7d': const Duration(days: 7)},
+            {'30d': const Duration(days: 30)},
+          ];
+          
+          for (final p in periods) {
+            final key = p.keys.first;
+            final duration = p.values.first;
+            
+            // Find historical price point
+            final historyPoint = card.priceHistory.where(
+              (entry) => now.difference(entry.timestamp) <= duration && 
+                        now.difference(entry.timestamp) > Duration.zero
+            ).toList();
+            
+            if (historyPoint.isNotEmpty) {
+              // Sort by timestamp to get the closest match
+              historyPoint.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+              final oldPrice = historyPoint.first.price;
+              
+              // Calculate percent change if we have valid prices
+              if (oldPrice > 0 && card.price! > 0) {
+                percentChange = ((card.price! - oldPrice) / oldPrice) * 100;
+                changeAmount = card.price! - oldPrice;
+                period = key;
+                break; // Use the first valid change we find
+              }
+            }
+          }
+        }
+        
+        // Add card to result if we found a price change (using a lower threshold of 0.1%)
+        if (percentChange != null && percentChange.abs() >= 0.1) {
+          cardsWithChanges.add({
             'card': card,
-            'change': change,
-            'period': 'Last update',
+            'change': percentChange,
+            'changeAmount': changeAmount,
+            'period': period,
           });
         }
       }
     }
     
-    final cardsWithHistoryChanges = cards
-        .where((card) => card.price != null && card.priceHistory.length >= 2)
-        .map((card) {
-          final change = card.getPriceChange(const Duration(days: 1)) ??
-                        card.getPriceChange(const Duration(days: 7)) ??
-                        card.getPriceChange(const Duration(days: 30));
-          
-          if (change == null || change.abs() < 0.01) return null;
-          print('History change detected for ${card.name}: ${change.toStringAsFixed(2)}%');
-          return {
-            'card': card,
-            'change': change,
-            'period': card.getPriceChangePeriod() ?? 'Recent',
-          };
-        })
-        .whereType<Map<String, dynamic>>()
-        .toList();
+    LoggingService.debug('Found ${cardsWithChanges.length} cards with price changes');
     
-    final seenCardIds = <String>{};
-    final allChanges = <Map<String, dynamic>>[];
+    // Sort by absolute percentage change (largest first)
+    cardsWithChanges.sort((a, b) => 
+      (b['change'] as double).abs().compareTo((a['change'] as double).abs()));
     
-    for (final item in cardsWithDirectChanges) {
-      allChanges.add(item);
-      seenCardIds.add((item['card'] as TcgCard).id);
+    // Take the top movers (up to 10)
+    final topMovers = cardsWithChanges.take(10).toList();
+    
+    // Store result in cache
+    if (topMovers.isNotEmpty) {
+      _cachedTopMovers = topMovers;
+      _cachedTopMoversTimestamp = now;
+      _analyticsCacheService.cacheTopMovers(topMovers);
     }
     
-    for (final item in cardsWithHistoryChanges) {
-      if (!seenCardIds.contains((item['card'] as TcgCard).id)) {
-        allChanges.add(item);
-        seenCardIds.add((item['card'] as TcgCard).id);
-      }
-    }
-
-    allChanges.sort((a, b) => (b['change'] as double).abs().compareTo((a['change'] as double).abs()));
-    
-    print('Found ${allChanges.length} cards with price changes');
-    
-    if (allChanges.isNotEmpty) {
-      _cachedTopMovers = allChanges;
-    } else if (_cachedTopMovers != null) {
-      return _cachedTopMovers!;
-    }
-    
-    return allChanges;
+    return topMovers;
   } catch (e) {
-    print('Error getting recent price changes: $e');
+    LoggingService.debug('Error calculating price changes: $e');
     
-    if (_cachedTopMovers != null) {
+    // Try to use cached data if available
+    if (_cachedTopMovers != null && _cachedTopMovers!.isNotEmpty) {
       return _cachedTopMovers!;
     }
     
-    rethrow;
+    // Return an empty list if no data available
+    return [];
   }
 }
 
 Future<void> _refreshPrices() async {
   if (!mounted || _isRefreshing) return;
   setState(() => _isRefreshing = true);
+  
+  // Only clear caches after we've saved a reference to them
+  final previousCachedTopMovers = _cachedTopMovers;
   
   try {
     final storage = Provider.of<StorageService>(context, listen: false);
@@ -1174,6 +1241,11 @@ Future<void> _refreshPrices() async {
     _completeSubscription = storage.priceUpdateComplete
         .listen((_) {
           if (mounted) {
+            // Now we can safely clear the caches
+            _analyticsCacheService.clearTopMoversCache();
+            _cachedTopMovers = null;
+            _cachedTopMoversTimestamp = null;
+            
             setState(() {
               _isRefreshing = false;
               _isLoadingTopMovers = false;
@@ -1191,10 +1263,13 @@ Future<void> _refreshPrices() async {
         });
 
     await service.refreshPrices();
-
   } catch (e) {
-    print('Error refreshing prices: $e');
+    LoggingService.debug('Error refreshing prices: $e');
     DialogService.instance.hideDialog();
+    
+    // Restore previous cached data on error
+    _cachedTopMovers = previousCachedTopMovers;
+    
     if (mounted) {
       setState(() {
         _isRefreshing = false;
@@ -1458,7 +1533,7 @@ Future<void> _refreshPrices() async {
         opportunities['overvalued']!.addAll(overvalued);
         
         if (mounted) {
-          setState(() => _loadingProgress = min(i + batchSize, cards.length));
+          setState(() => _loadingProgress = math.min(i + batchSize, cards.length));
         }
       }
 
@@ -1471,7 +1546,7 @@ Future<void> _refreshPrices() async {
         });
       }
     } catch (e) {
-      print('Error loading market data: $e');
+      LoggingService.debug('Error loading market data: $e');
       if (mounted) {
         setState(() {
           _marketDataError = 'Failed to load market data. Please try again.';
@@ -1933,7 +2008,7 @@ Future<void> _refreshPrices() async {
                           return _buildEmptyState();
                         }
 
-                        print('AnalyticsScreen: cards.length = ${cards.length}');
+                        LoggingService.debug('AnalyticsScreen: cards.length = ${cards.length}');
 
                         return CustomScrollView(
                           key: const ValueKey('analytics_scroll_view'),
@@ -2164,44 +2239,61 @@ Future<void> _refreshPrices() async {
   );
 }
 
-  Widget _buildChangeIndicator(double change) {
-    final isPositive = change >= 0;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: (isPositive ? Colors.green : Colors.red).withOpacity(0.3),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+  Widget _buildChangeIndicator(double change, double? changeAmount, CurrencyProvider currencyProvider) {
+  final isPositive = change >= 0;
+  final amountText = changeAmount != null ? '${isPositive ? '+' : ''}${currencyProvider.formatValue(changeAmount)}' : '';
+  
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: (isPositive ? Colors.green : Colors.red).withOpacity(0.3),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isPositive ? Icons.trending_up : Icons.trending_down,
-            size: 16,
-            color: isPositive ? Colors.green.shade600 : Colors.red.shade600,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '${isPositive ? '+' : ''}${change.toStringAsFixed(1)}%',
-            style: TextStyle(
+      boxShadow: [
+        BoxShadow(
+          color: (isPositive ? Colors.green : Colors.red).withOpacity(0.1),
+          blurRadius: 4,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        // Percentage change
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isPositive ? Icons.trending_up : Icons.trending_down,
+              size: 16,
               color: isPositive ? Colors.green.shade600 : Colors.red.shade600,
-              fontWeight: FontWeight.bold,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${isPositive ? '+' : ''}${change.toStringAsFixed(1)}%',
+              style: TextStyle(
+                color: isPositive ? Colors.green.shade600 : Colors.red.shade600,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        // Monetary change (if available)
+        if (changeAmount != null) 
+          Text(
+            amountText,
+            style: TextStyle(
+              fontSize: 11,
+              color: isPositive ? Colors.green.shade600 : Colors.red.shade600,
+              fontWeight: FontWeight.w500,
             ),
           ),
-        ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
 
   String _formatDateTime(DateTime dateTime) {
     final now = DateTime.now();
@@ -2220,7 +2312,14 @@ Future<void> _refreshPrices() async {
     }
   }
 
-  Widget _buildCardImage(String imageUrl) {
+  Widget _buildCardImage(String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return const SizedBox(
+        // Default placeholder for missing images
+        child: Icon(Icons.broken_image, color: Colors.grey),
+      );
+    }
+    
     return Image.network(
       imageUrl,
       height: 40,

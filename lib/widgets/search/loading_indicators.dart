@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../constants/app_colors.dart';
+import '../../constants/app_colors.dart';  // Add this import for AppColors
 
 class LoadingMoreIndicator extends StatelessWidget {
   const LoadingMoreIndicator({Key? key}) : super(key: key);

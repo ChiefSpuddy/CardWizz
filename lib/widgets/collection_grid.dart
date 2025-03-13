@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/tcg_card.dart';
 import '../services/storage_service.dart';
 import '../services/collection_service.dart';
 import '../screens/card_details_screen.dart';
@@ -15,6 +14,8 @@ import '../widgets/sign_in_view.dart';  // Add this import
 import '../providers/currency_provider.dart';  // Add this import for CurrencyProvider
 import '../utils/card_details_router.dart';  // Add this import for CardDetailsRouter
 import 'dart:async'; // Ensure this import is present
+import '../models/tcg_card.dart';  // Add this import
+import '../utils/hero_tags.dart';
 
 class CollectionGrid extends StatefulWidget {
   final bool keepAlive;  // Add this
@@ -583,12 +584,12 @@ class _CollectionGridState extends State<CollectionGrid>
           children: [
             GridView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(2), // Reduced padding from 8 to 2
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                childAspectRatio: 0.7,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
+                childAspectRatio: 0.68, // Adjusted from 0.7 to 0.68 for better proportions
+                crossAxisSpacing: 1, // Reduced from 8 to 1 for more space for cards
+                mainAxisSpacing: 2, // Reduced from 8 to 2
               ),
               itemCount: sortedCards.length,  // Use sortedCards instead of cards
               cacheExtent: 500, // Increase cache extent for smoother scrolling
@@ -636,12 +637,24 @@ class _CollectionGridState extends State<CollectionGrid>
                             child: CardGridItem(
                               key: ValueKey(card.id),
                               card: card,
-                              heroContext: 'collection',
+                              heroContext: 'collection_$index', // Add unique hero context based on index
                               showPrice: true, // Changed to true
                               showName: true,  // Added showName
                               // Always use high quality for initial rendering and non-scrolling
                               highQuality: !_lowQualityRendering || _initialRendering,
-                              onTap: () => _showCardDetails(context, card), // Add direct handler here
+                              onTap: () {
+                                Navigator.of(context).pushNamed(
+                                  '/card',
+                                  arguments: {
+                                    'card': card, 
+                                    'heroContext': 'collection_$index', // Pass the same hero context
+                                    'isFromCollection': true
+                                  },
+                                );
+                              },
+                              onAddToCollection: () => _addCardToBinder(card),
+                              isInCollection: true,
+                              hideCheckmarkWhenInCollection: true, // Add this line to hide checkmarks in collection view
                             ),
                           ),
                           if (_isMultiSelectMode)
@@ -991,6 +1004,85 @@ class _CollectionGridState extends State<CollectionGrid>
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // Add this method to handle adding a card to a binder
+  Future<void> _addCardToBinder(TcgCard card) async {
+    final service = await CollectionService.getInstance();
+    
+    if (!context.mounted) return;
+
+    final collections = await service.getCustomCollections();
+    
+    if (!context.mounted) return;
+    
+    if (collections.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('No Binders'),
+          content: const Text('Create a binder first to add cards to it.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Navigate to create binder screen
+                Navigator.pushNamed(context, '/binders/create');
+              },
+              child: const Text('Create Binder'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              child: Text(
+                'Add ${card.name} to binder',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            const Divider(),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: collections.map((collection) => ListTile(
+                    leading: const Icon(Icons.folder_outlined),
+                    title: Text(collection.name),
+                    subtitle: Text('${collection.cardIds.length} cards'),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await service.addCardToCollection(collection.id, card.id);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Added ${card.name} to ${collection.name}'),
+                          ),
+                        );
+                      }
+                    },
+                  )).toList(),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

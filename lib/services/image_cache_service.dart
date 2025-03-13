@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import '../services/logging_service.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
@@ -52,7 +52,7 @@ class ImageCacheService {
 
       return null;
     } catch (e) {
-      print('Error getting cached image: $e');
+      LoggingService.debug('Error getting cached image: $e');
       return null;
     }
   }
@@ -66,7 +66,7 @@ class ImageCacheService {
         await _copyToPermanentCache(file, url);
       }
     } catch (e) {
-      print('Error caching image: $e');
+      LoggingService.debug('Error caching image: $e');
     }
   }
 
@@ -89,7 +89,7 @@ class ImageCacheService {
         await file.copy(permanentPath);
       }
     } catch (e) {
-      print('Error copying to permanent cache: $e');
+      LoggingService.debug('Error copying to permanent cache: $e');
     }
   }
 
@@ -102,7 +102,7 @@ class ImageCacheService {
         await cacheDir.delete(recursive: true);
       }
     } catch (e) {
-      print('Error clearing cache: $e');
+      LoggingService.debug('Error clearing cache: $e');
     }
   }
 }

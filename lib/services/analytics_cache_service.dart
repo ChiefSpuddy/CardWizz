@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-import '../models/tcg_card.dart';
 
 /// Service for caching analytics data to prevent rebuilding data
 /// unnecessarily and maintain consistency across the app.

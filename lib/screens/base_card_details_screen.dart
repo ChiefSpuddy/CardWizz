@@ -1,11 +1,11 @@
-import 'dart:math' show pi;
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/tcg_card.dart';
 import '../services/storage_service.dart';
 import '../services/collection_service.dart';
 import '../widgets/styled_toast.dart';
 import '../widgets/create_binder_dialog.dart';
+import '../models/tcg_card.dart';  // Add this import
 
 abstract class BaseCardDetailsScreen extends StatefulWidget {
   final TcgCard card;
@@ -44,8 +44,8 @@ abstract class BaseCardDetailsScreenState<T extends BaseCardDetailsScreen>
     );
     
     // Debugging info about the card
-    print('Loading card details: ${widget.card.name} (ID: ${widget.card.id})');
-    print('Set: ${widget.card.setName} (${widget.card.set.id})');
+    LoggingService.debug('Loading card details: ${widget.card.name} (ID: ${widget.card.id})');
+    LoggingService.debug('Set: ${widget.card.setName} (${widget.card.set.id})');
     
     loadData();
   }
@@ -87,9 +87,8 @@ abstract class BaseCardDetailsScreenState<T extends BaseCardDetailsScreen>
           context: context,
           title: 'Added to Collection',
           subtitle: '${widget.card.name} has been added to your collection',
-          backgroundColor: Theme.of(context).colorScheme.secondary,
+          isError: false,
           icon: Icons.check_circle,
-          onTap: () => showAddToBinderDialog(context),
         );
       }
     } catch (e) {
@@ -169,7 +168,7 @@ abstract class BaseCardDetailsScreenState<T extends BaseCardDetailsScreen>
                           context: context,
                           title: 'Added to ${collection.name}',
                           subtitle: 'Card added to binder successfully',
-                          backgroundColor: Theme.of(context).colorScheme.secondary,
+                          isError: false,
                           icon: Icons.check_circle,
                         );
                       }
@@ -250,7 +249,7 @@ abstract class BaseCardDetailsScreenState<T extends BaseCardDetailsScreen>
           context: context,
           title: 'New Binder Created',
           subtitle: 'Added ${widget.card.name} to ${collection.name}',
-          backgroundColor: Theme.of(context).colorScheme.secondary,
+          isError: false,
           icon: Icons.check_circle,
         );
       }

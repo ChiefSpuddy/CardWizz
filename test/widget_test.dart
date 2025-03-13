@@ -1,30 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:card_wizz/main.dart';
-import 'package:card_wizz/services/storage_service.dart';
-import 'package:card_wizz/providers/app_state.dart';
+
+// Fix imports to use relative paths instead of package paths
+import '../lib/main.dart';
+import '../lib/services/storage_service.dart';
+import '../lib/providers/app_state.dart';
 
 void main() {
-  testWidgets('App smoke test', (WidgetTester tester) async {
-    // Set up SharedPreferences mock
-    SharedPreferences.setMockInitialValues({});
-    final storageService = await StorageService.init();
+  testWidgets('Smoke test - app launches without crashing', (WidgetTester tester) async {
+    // Build our app with mocked storage service
+    final storageService = StorageService();
     
-    // Build our app and trigger a frame
+    // Create app with mocked dependencies
     await tester.pumpWidget(
-      MaterialApp(
-        home: MultiProvider(
-          providers: [
-            ChangeNotifierProvider(create: (_) => AppState(storageService)),
-          ],
-          child: const CardWizzApp(),
-        ),
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AppState>(
+            create: (context) => AppState(storageService: storageService),
+          ),
+          Provider<StorageService>.value(value: storageService),
+        ],
+        child: const CardWizzApp(),
       ),
     );
 
-    // Verify that the app starts without crashing
+    // Simple verification that the app rendered something
     expect(find.byType(MaterialApp), findsOneWidget);
   });
 }

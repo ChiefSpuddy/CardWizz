@@ -1,99 +1,107 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class CurrencyProvider extends ChangeNotifier {
-  static const String _currencyKey = 'selected_currency';
-  String _currentCurrency = 'EUR';
+class Currency {
+  final String code;
+  final String symbol;
+  final String name;
+  final double conversionRate;
+
+  Currency({
+    required this.code,
+    required this.symbol,
+    required this.name,
+    required this.conversionRate,
+  });
+}
+
+class CurrencyProvider with ChangeNotifier {
+  static const String _currencyPreferenceKey = 'selected_currency';
   
-  final Map<String, (String, double)> _currencies = {
-    'EUR': ('€', 1.0),
-    'USD': ('\$', 1.09),
-    'GBP': ('£', 0.86),
-    'CAD': ('C\$', 1.47),
-    'AUD': ('A\$', 1.65),
-    'JPY': ('¥', 157.78),
+  // Default currency is USD
+  final Map<String, Currency> _availableCurrencies = {
+    'USD': Currency(code: 'USD', symbol: '\$', name: 'US Dollar', conversionRate: 1.0),
+    'EUR': Currency(code: 'EUR', symbol: '€', name: 'Euro', conversionRate: 0.92),
+    'GBP': Currency(code: 'GBP', symbol: '£', name: 'British Pound', conversionRate: 0.78),
+    'CAD': Currency(code: 'CAD', symbol: 'C\$', name: 'Canadian Dollar', conversionRate: 1.35),
+    'AUD': Currency(code: 'AUD', symbol: 'A\$', name: 'Australian Dollar', conversionRate: 1.48),
+    'JPY': Currency(code: 'JPY', symbol: '¥', name: 'Japanese Yen', conversionRate: 145.0),
   };
+  
+  String _selectedCurrencyCode = 'USD';
+  bool _isInitialized = false;
 
   CurrencyProvider() {
-    _loadSavedCurrency();
+    _loadSelectedCurrency();
   }
 
-  Future<void> _loadSavedCurrency() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedCurrency = prefs.getString(_currencyKey);
-    if (savedCurrency != null && _currencies.containsKey(savedCurrency)) {
-      _currentCurrency = savedCurrency;
-      notifyListeners();
-    }
+  // Current currency getters
+  Currency? get selectedCurrency => _availableCurrencies[_selectedCurrencyCode];
+  String get currencyCode => _selectedCurrencyCode;
+  String? get currencySymbol => selectedCurrency?.symbol;
+  double get conversionRate => selectedCurrency?.conversionRate ?? 1.0;
+
+  // Add missing getters and methods
+  String get symbol => selectedCurrency?.symbol ?? '\$';
+  Map<String, Currency> get currencies => _availableCurrencies;
+  String get currentCurrency => _selectedCurrencyCode;
+
+  // Status getter
+  bool get isInitialized => _isInitialized;
+
+  // Format methods
+  String formatValue(double? price) {
+    if (price == null) return '-';
+    final currencySymbol = selectedCurrency?.symbol ?? '\$';
+    return '$currencySymbol${(price * conversionRate).toStringAsFixed(2)}';
   }
 
-  Future<void> setCurrency(String currency) async {
-    if (_currencies.containsKey(currency)) {
-      _currentCurrency = currency;
+  String formatChartValue(double value) {
+    final formattedValue = value.toStringAsFixed(2);
+    return '$symbol$formattedValue';
+  }
+
+  double convertFromEur(double eurPrice) {
+    // Convert EUR price to selected currency
+    final eurToUsd = 1.09; // Hard-coded EUR to USD rate
+    final usdPrice = eurPrice * eurToUsd;
+    return usdPrice * conversionRate;
+  }
+
+  // Convert price from USD to selected currency
+  double convertPrice(double priceInUsd) {
+    return priceInUsd * conversionRate;
+  }
+
+  // Load saved currency preference
+  Future<void> _loadSelectedCurrency() async {
+    try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_currencyKey, currency);
+      final savedCurrency = prefs.getString(_currencyPreferenceKey);
+      
+      if (savedCurrency != null && _availableCurrencies.containsKey(savedCurrency)) {
+        _selectedCurrencyCode = savedCurrency;
+      }
+      
+      _isInitialized = true;
+      notifyListeners();
+    } catch (e) {
+      // Default to USD if there's an error
+      _selectedCurrencyCode = 'USD';
+      _isInitialized = true;
       notifyListeners();
     }
   }
 
-  String get currentCurrency => _currentCurrency;
-  String get symbol => _currencies[_currentCurrency]!.$1;
-  double get rate => _currencies[_currentCurrency]!.$2;
-  Map<String, (String, double)> get currencies => _currencies;
-
-  // Improve currency formatting consistency
-  String formatValue(double eurValue) {
-    if (eurValue == 0) return '$symbol 0';  // Fix: Added space between symbol and 0
-    
-    final convertedValue = eurValue * rate;
-    
-    // Use consistent formatting for values of different sizes
-    if (convertedValue >= 10000) {
-      return '$symbol${convertedValue.round()}'; // No decimal places for very large values
-    } else if (convertedValue >= 1000) {
-      return '$symbol${convertedValue.round()}'; // No decimal places for large values
-    } else if (convertedValue >= 100) {
-      return '$symbol${convertedValue.toStringAsFixed(0)}'; // No decimal places
-    } else if (convertedValue >= 10) {
-      return '$symbol${convertedValue.toStringAsFixed(1)}'; // One decimal place
-    } else {
-      return '$symbol${convertedValue.toStringAsFixed(2)}'; // Two decimal places for small values
+  // Change currency
+  Future<void> setCurrency(String currencyCode) async {
+    if (_availableCurrencies.containsKey(currencyCode)) {
+      _selectedCurrencyCode = currencyCode;
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_currencyPreferenceKey, currencyCode);
+      
+      notifyListeners();
     }
-  }
-
-  // Convert EUR to current currency
-  double convertFromEur(double eurValue) {
-    return eurValue * rate;
-  }
-  
-  // For chart axes (with K/M formatting)
-  String formatChartValue(double eurValue) {
-    final convertedValue = eurValue * rate;
-    if (convertedValue >= 1000000) {
-      return '$symbol${(convertedValue / 1000000).toStringAsFixed(1)}M';
-    } else if (convertedValue >= 1000) {
-      return '$symbol${(convertedValue / 1000).toStringAsFixed(1)}k';
-    }
-    return '$symbol${convertedValue.toInt()}';
-  }
-
-  // Add a short format option that's more concise for space-constrained UIs
-  String formatShortValue(double eurValue) {
-    final convertedValue = eurValue * rate;
-    
-    if (convertedValue >= 1000000) {
-      return '$symbol${(convertedValue / 1000000).toStringAsFixed(1)}M';
-    } else if (convertedValue >= 1000) {
-      return '$symbol${(convertedValue / 1000).toStringAsFixed(1)}k';
-    } else if (convertedValue >= 100) {
-      // No decimal places needed for larger values
-      return '$symbol${convertedValue.toInt()}';
-    } else if (convertedValue >= 10) {
-      // One decimal place for medium values
-      return '$symbol${convertedValue.toStringAsFixed(1)}';
-    }
-    
-    // Two decimal places for small values
-    return '$symbol${convertedValue.toStringAsFixed(2)}';
   }
 }

@@ -11,6 +11,7 @@ import '../l10n/app_localizations.dart';
 import '../screens/home_screen.dart';
 import '../screens/search_screen.dart'; 
 import '../services/navigation_service.dart';
+import '../services/logging_service.dart'; // Add this import
 
 class AppDrawer extends StatelessWidget {
   final GlobalKey<ScaffoldState>? scaffoldKey;
@@ -154,7 +155,7 @@ class AppDrawer extends StatelessWidget {
           const Divider(height: 1),
           ...currencyProvider.currencies.entries.map(
             (entry) => ListTile(
-              title: Text('${entry.key} (${entry.value.$1})'),
+              title: Text('${entry.key} (${entry.value.symbol})'),
               trailing: currencyProvider.currentCurrency == entry.key
                   ? Icon(
                       Icons.check,
@@ -214,7 +215,6 @@ class AppDrawer extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        // ...existing code...
                         Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
@@ -232,15 +232,20 @@ class AppDrawer extends StatelessWidget {
                               radius: 24,
                               backgroundColor: Colors.white.withOpacity(0.2),
                               child: appState.currentUser?.avatarPath != null
-                                  ? ClipOval(
-                                      child: Image.asset(
-                                        appState.currentUser!.avatarPath!,
-                                        width: 44,
-                                        height: 44,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : const Icon(Icons.person, size: 28, color: Colors.white),
+                                ? ClipOval(
+                                    child: Image.asset(
+                                      appState.currentUser!.avatarPath!,
+                                      width: 44,
+                                      height: 44,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        // Log the error and show fallback icon
+                                        LoggingService.debug('Error loading avatar image: $error');
+                                        return const Icon(Icons.person, size: 28, color: Colors.white);
+                                      },
+                                    ),
+                                  )
+                                : const Icon(Icons.person, size: 28, color: Colors.white),
                             ),
                           ),
                         ),

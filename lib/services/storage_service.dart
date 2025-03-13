@@ -1,9 +1,8 @@
+import '../services/logging_service.dart';
 import 'dart:convert';
 import 'dart:async';
-import 'package:flutter/foundation.dart';  // Add this for ValueNotifier
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
-import '../models/tcg_card.dart';
 import 'package:collection/collection.dart';
 import '../services/purchase_service.dart';
 import '../services/tcg_api_service.dart';
@@ -12,6 +11,10 @@ import 'package:path/path.dart' show join;
 import 'package:sqflite/sqflite.dart' show Database, openDatabase, getDatabasesPath;
 import '../services/background_price_update_service.dart';  // Add this import
 import '../utils/logger.dart';
+import 'package:flutter/foundation.dart'; // For kDebugMode and debugPrint
+import '../models/tcg_card.dart';  // For TcgCard model
+import '../models/tcg_set.dart';   // For TcgSet model
+import '../models/price_history_entry.dart'; // For PriceHistoryEntry
 
 class StorageService {
   static const int _freeUserCardLimit = 25;  // Changed from 10 to 25
@@ -598,7 +601,7 @@ class StorageService {
 
   void _debugLog(String message, {bool verbose = false}) {
     if (kDebugMode && !verbose) {
-      print(message);
+      LoggingService.debug(message);
     }
   }
 
@@ -701,44 +704,22 @@ class StorageService {
           // Store previous price before updating
           final previousPrice = existingCard.price;
           
-          // Create updated card with new price
+          // Create updated card with new price - DON'T use lastPriceUpdate in constructor
           final updatedCard = existingCard.copyWith(
             price: newPrice,
-            lastPriceUpdate: now,
           );
           
-          // Set the previous price tracking fields
-          final cardWithHistory = TcgCard(
-            id: updatedCard.id,
-            name: updatedCard.name,
-            imageUrl: updatedCard.imageUrl,
-            largeImageUrl: updatedCard.largeImageUrl,
-            number: updatedCard.number,
-            rarity: updatedCard.rarity,
-            set: updatedCard.set,
-            price: newPrice,
-            types: updatedCard.types,
-            subtypes: updatedCard.subtypes,
-            artist: updatedCard.artist,
-            cardmarket: updatedCard.cardmarket,
-            rawData: updatedCard.rawData,
-            dateAdded: updatedCard.dateAdded,
-            addedToCollection: updatedCard.addedToCollection,
-            priceHistory: updatedCard.priceHistory,
-            lastPriceUpdate: now,
-            isMtg: updatedCard.isMtg,
-          );
-          
-          // Set fields that can't be set through constructor
-          cardWithHistory.previousPrice = previousPrice;
-          cardWithHistory.lastPriceChange = now;
+          // Set the timestamp fields AFTER creating the card
+          updatedCard.lastPriceUpdate = now;
+          updatedCard.previousPrice = previousPrice;
+          updatedCard.lastPriceChange = now;
           
           // Add new price point to history
-          cardWithHistory.priceHistory.add(
+          updatedCard.priceHistory.add(
             PriceHistoryEntry(price: newPrice, timestamp: now)
           );
           
-          cards[index] = cardWithHistory;
+          cards[index] = updatedCard;
           
           // Save updated cards and portfolio value
           final cardsKey = _getUserKey('cards');

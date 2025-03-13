@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -63,7 +64,7 @@ class PokeApiService {
         return result;
       }
     } catch (e) {
-      print('Error fetching Pokemon #$identifier: $e');
+      LoggingService.debug('Error fetching Pokemon #$identifier: $e');
     }
     return null;
   }
@@ -90,7 +91,7 @@ class PokeApiService {
         return result;
       }
     } catch (e) {
-      print('Error fetching Pokemon #$identifier: $e');
+      LoggingService.debug('Error fetching Pokemon #$identifier: $e');
     }
     return null;
   }
@@ -106,7 +107,7 @@ class PokeApiService {
         return json.decode(response.body);
       }
     } catch (e) {
-      print('Error fetching Pokemon data: $e');
+      LoggingService.debug('Error fetching Pokemon data: $e');
     }
     return null;
   }
@@ -144,7 +145,7 @@ class PokeApiService {
         return result;
       }
     } catch (e) {
-      print('Error fetching species data for #$identifier: $e');
+      LoggingService.debug('Error fetching species data for #$identifier: $e');
     }
     return null;
   }
@@ -165,7 +166,7 @@ class PokeApiService {
       }
       return null;
     } catch (e) {
-      print('Error fetching card for $pokemonName: $e');
+      LoggingService.debug('Error fetching card for $pokemonName: $e');
       return null;
     }
   }

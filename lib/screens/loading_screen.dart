@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
-import '../constants/app_colors.dart';
+import 'dart:math' as math;  // Add this import for math operations
+import '../constants/app_colors.dart';  // Add this import for AppColors
 
 class LoadingScreen extends StatefulWidget {
   final double progress;

@@ -1,12 +1,14 @@
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/tcg_card.dart';
 import '../utils/card_details_router.dart';
 import '../services/storage_service.dart';
 import '../providers/app_state.dart';
 import '../utils/bottom_toast.dart';
 import '../widgets/bottom_notification.dart';
 import '../services/price_service.dart' as price_service;  // Import with namespace
+import '../models/tcg_card.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // This class is now just a router to the appropriate screen type
 class CardDetailsScreen extends StatefulWidget {
@@ -57,7 +59,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
         });
       }
     } catch (e) {
-      print('Error loading accurate price: $e');
+      LoggingService.debug('Error loading accurate price: $e');
       if (mounted) {
         setState(() => _isLoadingPrice = false);
       }
@@ -108,6 +110,65 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
     }
   }
 
+  Widget _buildMarketActionButtons(TcgCard card) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildMarketButton(
+              'Cardmarket',
+              Colors.blue.shade700,
+              Icons.shopping_cart_outlined,
+              () => _openCardmarket(card),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildMarketButton(
+              'eBay',
+              Colors.red.shade700,
+              Icons.gavel_outlined,
+              () => _openEbay(card),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMarketButton(String text, Color color, IconData icon, VoidCallback onPressed) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, color: Colors.white),
+      label: Text(text, style: const TextStyle(color: Colors.white)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  Future<void> _openCardmarket(TcgCard card) async {
+    final query = Uri.encodeComponent(card.name);
+    final url = Uri.parse('https://www.cardmarket.com/en/Pokemon/Products/Singles?searchString=$query');
+    await _launchUrl(url);
+  }
+
+  Future<void> _openEbay(TcgCard card) async {
+    final query = Uri.encodeComponent('${card.name} pokemon card');
+    final url = Uri.parse('https://www.ebay.com/sch/i.html?_nkw=$query');
+    await _launchUrl(url);
+  }
+
+  Future<void> _launchUrl(Uri url) async {
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      throw Exception('Could not launch $url');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Use the router to get the appropriate screen
@@ -116,6 +177,8 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
       heroContext: widget.heroContext,
       isFromBinder: widget.isFromBinder,
       isFromCollection: widget.isFromCollection,
+      // Remove this line as we've integrated the buttons directly into the screens
+      // marketActionButtons: _buildMarketActionButtons(widget.card),
     );
   }
 }

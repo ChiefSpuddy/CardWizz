@@ -1,25 +1,31 @@
-import 'dart:math' show pi;
+import 'dart:math';
+import '../constants/app_colors.dart';
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
-import '../models/tcg_card.dart';
 import '../services/tcg_api_service.dart';
 import '../services/ebay_api_service.dart';
 import '../services/collection_service.dart';
 import '../providers/currency_provider.dart';
 import '../utils/hero_tags.dart';
-import '../constants/app_colors.dart'; // Add this import for AppColors
 import 'base_card_details_screen.dart';
 import '../widgets/mtg_set_icon.dart';
+import '../models/tcg_card.dart';
+import '../widgets/network_card_image.dart'; // Add this import
+import '../widgets/zoomable_card_image.dart'; // Add this import
 
 class MtgCardDetailsScreen extends BaseCardDetailsScreen {
+  final Widget? marketActionButtons;  // Add this property
+
   const MtgCardDetailsScreen({
     super.key,
     required super.card,
     super.heroContext = 'details',
     super.isFromBinder = false,
     super.isFromCollection = false,
+    this.marketActionButtons,  // Add this parameter
   });
 
   @override
@@ -32,27 +38,63 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
   Map<String, dynamic>? _priceData;
   bool _isLoading = true;
 
-  @override
-  void loadData() {
-    _loadAdditionalData();
-  }
+  // Replace simple boolean with proper animation controller
+  late AnimationController _flipController;
+  late Animation<double> _flipAnimation;
+  bool get _showingCardBack => _flipAnimation.value >= 0.5;
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize flip animation controller
+    _flipController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _flipAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _flipController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
     // Preload the card back image to prevent flicker during animation
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _precacheCardBackImage();
     });
   }
 
+  @override
+  void dispose() {
+    _flipController.dispose();
+    super.dispose();
+  }
+
+  // Replace toggle method with animating method
+  void _flipCard() {
+    if (_flipController.isAnimating) return;
+    
+    if (_flipController.value == 0) {
+      _flipController.forward();
+    } else {
+      _flipController.reverse();
+    }
+  }
+
+  @override
+  void loadData() {
+    _loadAdditionalData();
+  }
+
   // Add a dedicated method to preload MTG card back with error handling
   Future<void> _precacheCardBackImage() async {
     try {
       await precacheImage(const AssetImage('assets/images/mtgback.png'), context);
-      print('MTG card back image precached successfully');
+      LoggingService.debug('MTG card back image precached successfully');
     } catch (e) {
-      print('Error precaching MTG card back image: $e');
+      LoggingService.debug('Error precaching MTG card back image: $e');
     }
   }
 
@@ -62,7 +104,7 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
       'assets/images/mtgback.png',
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {
-        print('Error loading MTG card back: $error');
+        LoggingService.debug('Error loading MTG card back: $error');
         // Provide a solid color fallback with MTG branding
         return Container(
           decoration: BoxDecoration(
@@ -143,7 +185,7 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
             });
           }
         } catch (e) {
-          print('Error loading card by set/number: $e');
+          LoggingService.debug('Error loading card by set/number: $e');
           if (mounted) {
             setState(() => _isLoading = false);
           }
@@ -154,7 +196,7 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
         }
       }
     } catch (e) {
-      print('Error loading additional data: $e');
+      LoggingService.debug('Error loading additional data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -190,6 +232,10 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Add marketplace buttons at the top with gradient styling
+          _buildMarketplaceButtons(),
+          const SizedBox(height: 20),
+          
           Text(
             'Current Prices',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -983,6 +1029,7 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
         break;
       case 'C':
         backgroundColor = Colors.brown.shade300;
+        textColor = Colors.black;
         break;
       default:
         // For colorless mana or other symbols
@@ -1194,184 +1241,77 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
     try {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (e) {
-      print('Could not launch URL: $e');
+      LoggingService.debug('Could not launch URL: $e');
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.card.name,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isDark ? AppColors.textDarkPrimary : null,
+  // Add the same marketplace buttons method 
+  Widget _buildMarketplaceButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildGradientMarketButton(
+            'Cardmarket',
+            [const Color(0xFF1E88E5), const Color(0xFF1565C0)],  // Blue gradient
+            Icons.shopping_cart_outlined,
+            () => _openCardmarket(widget.card),
           ),
         ),
-        backgroundColor: isDark ? AppColors.darkBackground : Colors.transparent,
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildGradientMarketButton(
+            'eBay',
+            [const Color(0xFFE53935), const Color(0xFFC62828)],  // Red gradient
+            Icons.gavel_outlined,
+            () => _openEbay(widget.card),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Method for styled gradient buttons
+  Widget _buildGradientMarketButton(
+    String text, 
+    List<Color> gradientColors, 
+    IconData icon, 
+    VoidCallback onPressed
+  ) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: gradientColors.last.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      body: Container(
-        color: isDark ? AppColors.darkBackground : null,
-        child: SingleChildScrollView(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(10),
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 80),
-            child: Column(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  color: isDark ? Colors.black : Colors.white,
-                  height: MediaQuery.of(context).size.width * 1.4, // MTG cards are taller
-                  child: Stack(
-                    children: [
-                      // Background gradient overlay
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                isDark ? Colors.black : Colors.white,
-                                isDark 
-                                  ? AppColors.darkBackground.withOpacity(0.98)  // Smoother transition
-                                  : Colors.grey[100]!,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Card image
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Container(
-                            width: MediaQuery.of(context).size.width * 0.75,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.3),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 8),
-                                ),
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: GestureDetector(
-                              onTap: flipCard,
-                              child: AnimatedBuilder(
-                                animation: flipController,
-                                builder: (context, child) {
-                                  final isFrontVisible = flipController.value < 0.5;
-                                  
-                                  return Transform(
-                                    transform: Matrix4.identity()
-                                      ..setEntry(3, 2, 0.001)
-                                      ..rotateY(flipController.value * pi),
-                                    alignment: Alignment.center,
-                                    child: isFrontVisible 
-                                      ? // Front of card - only build when visible
-                                        Hero(
-                                          tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(16),
-                                            child: CachedNetworkImage(
-                                              imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
-                                              fit: BoxFit.contain,
-                                              placeholder: (context, url) => Center(
-                                                child: CircularProgressIndicator(
-                                                  valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
-                                                ),
-                                              ),
-                                              errorWidget: (context, url, error) => Container(
-                                                color: Colors.grey[900],
-                                                child: const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 50)),
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                      : // Back of card - apply a second transform to maintain correct orientation
-                                        Transform(
-                                          transform: Matrix4.identity()..rotateY(pi),
-                                          alignment: Alignment.center,
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(16),
-                                            child: _buildCardBack(),
-                                          ),
-                                        ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.card.name,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      _buildPricingSection(),
-                      
-                      const SizedBox(height: 24),
-                      _buildCardInfo(),
-                      
-                      const SizedBox(height: 24),
-                      if (_additionalData != null && _additionalData!['related_uris'] != null) ...[
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isDark ? Colors.grey[900] : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Related Links',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              _buildRelatedLink(
-                                'Gatherer', 
-                                Icons.web, 
-                                _additionalData!['related_uris']?['gatherer'] ?? '',
-                              ),
-                              const Divider(),
-                              _buildRelatedLink(
-                                'Scryfall', 
-                                Icons.web, 
-                                _additionalData!['related_uris']?['scryfall'] ?? '',
-                              ),
-                              const Divider(),
-                              _buildRelatedLink(
-                                'EDHREC', 
-                                Icons.web, 
-                                _additionalData!['related_uris']?['edhrec'] ?? '',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
+                Icon(icon, color: Colors.white, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -1379,12 +1319,119 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
           ),
         ),
       ),
+    );
+  }
+
+  // Helper methods for opening marketplace links (adjusted for MTG)
+  Future<void> _openCardmarket(TcgCard card) async {
+    final query = Uri.encodeComponent(card.name);
+    final url = 'https://www.cardmarket.com/en/Magic/Products/Singles?searchString=$query';
+    await _launchUrl(url);
+  }
+
+  Future<void> _openEbay(TcgCard card) async {
+    final query = Uri.encodeComponent('${card.name} mtg card');
+    final url = 'https://www.ebay.com/sch/i.html?_nkw=$query';
+    await _launchUrl(url);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Calculate proper card dimensions for display
+    final screenSize = MediaQuery.of(context).size;
+    final cardWidth = screenSize.width * 0.7;
+    final cardHeight = cardWidth * 1.4; // Standard MTG card aspect ratio
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          widget.card.name,
+          style: TextStyle(
+            color: isDark ? AppColors.textDarkPrimary : null,
+          ),
+        ),
+        backgroundColor: isDark ? AppColors.darkBackground : Colors.transparent,
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Card display area with flip animation
+            Hero(
+              tag: 'card_${widget.card.id}_${widget.heroContext}',
+              child: Container(
+                color: isDark ? AppColors.darkBackground : Colors.grey[100],
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: GestureDetector(
+                  onTap: _flipCard,
+                  child: AnimatedBuilder(
+                    animation: _flipAnimation,
+                    builder: (context, child) {
+                      final value = _flipAnimation.value;
+                      final angle = value * pi;
+                      
+                      return Container(
+                        height: cardHeight,
+                        width: cardWidth,
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()
+                            ..setEntry(3, 2, 0.001) // Add perspective
+                            ..rotateY(angle),
+                          child: value >= 0.5
+                            ? Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.identity()..rotateY(pi),
+                                child: Image.asset(
+                                  'assets/images/mtgback.png',
+                                  height: cardHeight,
+                                  width: cardWidth,
+                                  fit: BoxFit.contain,
+                                ),
+                              )
+                            : ZoomableCardImage(
+                                imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
+                                height: cardHeight,
+                                width: cardWidth,
+                                onTap: _flipCard,
+                              ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            
+            // Card Info section
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildCardInfo(),
+            ),
+            
+            // Pricing section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildPricingSection(),
+            ),
+            
+            // Add the market action buttons if provided
+            if (widget.marketActionButtons != null)
+              widget.marketActionButtons!,
+            
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
       floatingActionButton: FutureBuilder<CollectionService>(
         future: CollectionService.getInstance(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const SizedBox.shrink();
 
-          return StreamBuilder<List<TcgCard>>(
+          return StreamBuilder<List<dynamic>>(
             stream: storage.watchCards(), // Use the storage property from the base class
             builder: (context, cardsSnapshot) {
               // If we're viewing from collection or binder, show "Add to Binder"
@@ -1398,7 +1445,7 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
 
               // Otherwise check if card is in collection
               final isInCollection = cardsSnapshot.data?.any(
-                (c) => c.id == widget.card.id
+                (c) => c is TcgCard && c.id == widget.card.id
               ) ?? false;
 
               return buildFAB(

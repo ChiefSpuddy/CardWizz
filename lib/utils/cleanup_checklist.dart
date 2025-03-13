@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 /**
  * Checklist for cleaning up CardWizz before launch
  * Run through these manually before submitting to the app store
@@ -39,9 +40,9 @@ class CleanupChecklist {
   ];
   
   static void printChecklist() {
-    print('\n🧹 CLEANUP CHECKLIST FOR LAUNCH:\n');
+    LoggingService.debug('\n🧹 CLEANUP CHECKLIST FOR LAUNCH:\n');
     for (var i = 0; i < filesToCheck.length; i++) {
-      print('${i+1}. ${filesToCheck[i]}');
+      LoggingService.debug('${i+1}. ${filesToCheck[i]}');
     }
   }
 }
@@ -50,19 +51,19 @@ class CleanupChecklist {
 void main() {
   CleanupChecklist.printChecklist();
   
-  print('\n⚙️ FINAL TECHNICAL CHECKS:\n');
-  print('1. Verify that all API keys are valid and secured');
-  print('2. Check that Firebase configurations are correct');
-  print('3. Ensure analytics are working properly');
-  print('4. Test deep links and URL schemes');
-  print('5. Verify proper error handling throughout the app');
+  LoggingService.debug('\n⚙️ FINAL TECHNICAL CHECKS:\n');
+  LoggingService.debug('1. Verify that all API keys are valid and secured');
+  LoggingService.debug('2. Check that Firebase configurations are correct');
+  LoggingService.debug('3. Ensure analytics are working properly');
+  LoggingService.debug('4. Test deep links and URL schemes');
+  LoggingService.debug('5. Verify proper error handling throughout the app');
   
-  print('\n📱 FINAL USER EXPERIENCE CHECKS:\n');
-  print('1. Test on multiple device sizes');
-  print('2. Check animations for smoothness');
-  print('3. Verify proper keyboard behavior');
-  print('4. Test with slow network connections');
-  print('5. Verify proper error messages are shown to users');
+  LoggingService.debug('\n📱 FINAL USER EXPERIENCE CHECKS:\n');
+  LoggingService.debug('1. Test on multiple device sizes');
+  LoggingService.debug('2. Check animations for smoothness');
+  LoggingService.debug('3. Verify proper keyboard behavior');
+  LoggingService.debug('4. Test with slow network connections');
+  LoggingService.debug('5. Verify proper error messages are shown to users');
   
-  print('\n🚀 Ready for launch when all items are addressed!');
+  LoggingService.debug('\n🚀 Ready for launch when all items are addressed!');
 }

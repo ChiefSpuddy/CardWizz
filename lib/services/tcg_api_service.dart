@@ -1,9 +1,11 @@
+import '../services/logging_service.dart';
 import 'package:dio/dio.dart';
 import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../models/tcg_card.dart';
 import './tcgdex_api_service.dart';
+import '../models/tcg_card.dart';
+import '../models/tcg_set.dart' as models; // Direct import, not aliased
 
 // Cache entry class
 class _CacheEntry {
@@ -77,7 +79,7 @@ class TcgApiService {
     try {
       final searchQuery = query.isEmpty ? '' : 'name:"*${query.trim()}*"';
       
-      print('Searching sets with query: $searchQuery');
+      LoggingService.debug('Searching sets with query: $searchQuery');
       
       final response = await _dio.get('/sets', queryParameters: {
         if (searchQuery.isNotEmpty) 'q': searchQuery,
@@ -86,10 +88,10 @@ class TcgApiService {
         'orderBy': '-releaseDate', // Latest sets first
       });
 
-      print('Found ${response.data['totalCount'] ?? 0} sets');
+      LoggingService.debug('Found ${response.data['totalCount'] ?? 0} sets');
       return response.data;
     } catch (e) {
-      print('Set search error: $e');
+      LoggingService.debug('Set search error: $e');
       return {'data': [], 'totalCount': 0, 'page': page};
     }
   }
@@ -126,24 +128,46 @@ class TcgApiService {
         cleanedQuery = _cleanupQuery(query);
       }
 
-      print('Searching with query: $cleanedQuery');
+      LoggingService.debug('Searching with query: $cleanedQuery');
+
+      // IMPORTANT: First debug print to see the API request
+      final request = {
+        'q': cleanedQuery,
+        'orderBy': orderByDesc ? '-$orderBy' : orderBy,
+        'pageSize': pageSize,
+        'page': page,
+        // IMPORTANT: Make sure we're requesting images
+        'select': 'id,name,number,rarity,images,cardmarket,set',
+      };
+      
+      LoggingService.debug('API Request params: $request');
 
       final response = await _makeRequestWithRetry(
         '/cards',
-        queryParameters: {
-          'q': cleanedQuery,
-          'orderBy': orderByDesc ? '-$orderBy' : orderBy,
-          'pageSize': pageSize,
-          'page': page,
-          'select': 'id,name,number,rarity,images,cardmarket,set',
-        },
+        queryParameters: request,
       );
 
+      // IMPORTANT: Log the first card to see its structure
+      if (response['data'] != null && (response['data'] as List).isNotEmpty) {
+        LoggingService.debug('First card sample: ${response['data'][0]}');
+        final firstCard = response['data'][0];
+        print('First card name: ${firstCard['name']}, images: ${firstCard['images']}');
+      }
+
       if (response['data'] != null) {
-        // Process the price data before returning
+        // Process the data and manually ensure images are extracted properly
         final processedData = response['data'].map((card) {
+          // IMPORTANT: Make sure image URLs are explicitly copied to prevent loss
+          final cardWithImages = <String, dynamic>{...card};
+          
+          // Log the image data for the first card
+          if (card == response['data'][0]) {
+            print('Processing first card: ${card['name']}');
+            print('Image data: ${card['images']}');
+          }
+          
+          // Process pricing data
           if (card['cardmarket'] != null) {
-            // Ensure the prices are converted to proper numbers
             final prices = card['cardmarket']['prices'];
             if (prices != null) {
               prices['averageSellPrice'] = _toDouble(prices['averageSellPrice']);
@@ -151,20 +175,25 @@ class TcgApiService {
               prices['trendPrice'] = _toDouble(prices['trendPrice']);
             }
           }
-          return card;
+          
+          return cardWithImages;
         }).toList();
 
-        return {
+        // Cache this result
+        final resultData = {
           'data': processedData,
           'totalCount': response['totalCount'] ?? 0,
           'page': page,
         };
+        
+        _cache[cacheKey] = _CacheEntry(resultData);
+        return resultData;
       }
 
       return {'data': [], 'totalCount': 0, 'page': page};
 
     } catch (e) {
-      print('Search error: $e');
+      LoggingService.debug('Search error: $e');
       rethrow;
     }
   }
@@ -260,7 +289,7 @@ class TcgApiService {
       if (e is DioException) {
         if (e.response?.statusCode == 429) {
           if (retryCount < _maxRetries) {
-            print('Rate limited, waiting ${_rateLimitDelay.inSeconds}s before retry...');
+            LoggingService.debug('Rate limited, waiting ${_rateLimitDelay.inSeconds}s before retry...');
             await Future.delayed(_rateLimitDelay * (retryCount + 1));
             return _makeRequestWithRetry(
               path,
@@ -305,13 +334,13 @@ class TcgApiService {
         // This is an MTG card - use Scryfall API directly with the UUID
         String scryId = cardId.replaceAll("mtg_", "");
         final url = 'https://api.scryfall.com/cards/$scryId';
-        print('Fetching MTG card details: $url');
+        LoggingService.debug('Fetching MTG card details: $url');
         
         final response = await _dio.get(url);
         if (response.statusCode == 200) {
           return response.data;
         } else {
-          print('Error fetching MTG card details: ${response.statusCode}');
+          LoggingService.debug('Error fetching MTG card details: ${response.statusCode}');
           return {};
         }
       } else {
@@ -325,7 +354,7 @@ class TcgApiService {
         }
       }
     } catch (e) {
-      print('Error getting card details: $e');
+      LoggingService.debug('Error getting card details: $e');
       return {};
     }
   }
@@ -342,7 +371,7 @@ class TcgApiService {
       final normalizedNumber = number.trim();
       
       // Log the request
-      print('Fetching MTG card details: https://api.scryfall.com/cards/$normalizedSetCode/$normalizedNumber');
+      LoggingService.debug('Fetching MTG card details: https://api.scryfall.com/cards/$normalizedSetCode/$normalizedNumber');
       
       // Make the API request
       final response = await _dio.get(
@@ -356,7 +385,7 @@ class TcgApiService {
         throw Exception('Failed to load card details. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error getting MTG card details: $e');
+      LoggingService.debug('Error getting MTG card details: $e');
       throw Exception('Failed to retrieve card details: $e');
     }
   }
@@ -377,7 +406,7 @@ class TcgApiService {
     
     // Log URL for debugging
     final url = 'https://www.ebay.com/sch/i.html?_nkw=$query&_sacat=2536&LH_Sold=1&LH_Complete=1&_sop=13';
-    print('eBay search URL: $url');
+    LoggingService.debug('eBay search URL: $url');
     
     return url;
   }
@@ -413,7 +442,7 @@ class TcgApiService {
     
     // Log URL for debugging
     final url = 'https://www.ebay.com/sch/i.html?_nkw=$query&_sacat=183454&LH_Sold=1&LH_Complete=1&_sop=13';
-    print('eBay search URL: $url');
+    LoggingService.debug('eBay search URL: $url');
     
     return url;
   }
@@ -587,7 +616,7 @@ class TcgApiService {
       
       return data;
     } catch (e) {
-      print('Error getting card by ID: $e');
+      LoggingService.debug('Error getting card by ID: $e');
       return null;
     }
   }
@@ -598,54 +627,98 @@ class TcgApiService {
       final data = await getCardById(cardId);
       return data?['cardmarket']?['prices']?['averageSellPrice'] as double?;
     } catch (e) {
-      print('Error getting card price: $e');
+      LoggingService.debug('Error getting card price: $e');
       return null;
     }
   }
 
   Future<double?> fetchCardPrice(String cardId) async {
     try {
-      print('🔍 Fetching price for card $cardId');
+      LoggingService.debug('🔍 Fetching price for card $cardId');
       final response = await _makeRequestWithRetry('/cards/$cardId');
       
       if (response == null) {
-        print('❌ No response for card $cardId');
+        LoggingService.debug('❌ No response for card $cardId');
         return null;
       }
 
       final price = response['data']?['cardmarket']?['prices']?['averageSellPrice'];
       if (price != null) {
-        print('✅ Found price $price for card $cardId');
+        LoggingService.debug('✅ Found price $price for card $cardId');
         return (price as num).toDouble();
       } else {
-        print('❌ No price data found for card $cardId');
+        LoggingService.debug('❌ No price data found for card $cardId');
         return null;
       }
     } catch (e) {
-      print('❌ Error fetching card price: $e');
+      LoggingService.debug('❌ Error fetching card price: $e');
       return null;
     }
   }
 
-  TcgCard _convertToTcgCard(Map<String, dynamic> data) {
-    return TcgCard(
-      id: data['id'] as String,
-      name: data['name'] as String,
-      number: data['number']?.toString() ?? '',
-      rarity: data['rarity'] as String?,
-      imageUrl: data['images']?['small'] as String? ?? '',
-      largeImageUrl: data['images']?['large'] as String? ?? '',
-      price: data['cardmarket']?['prices']?['averageSellPrice'] as double?,
-      set: data['set'] != null ? TcgSet(
-        id: data['set']['id'] ?? '',
-        name: data['set']['name'] ?? 'Unknown Set',
-        // Remove required parameters that might be null
-      ) : TcgSet(
-        id: '',
-        name: 'Unknown Set',
-      ),
-    );
+  // Modify the _convertToTcgCard method with better price extraction
+TcgCard _convertToTcgCard(Map<String, dynamic> data) {
+  // Create the set object
+  final set = models.TcgSet(
+    id: data['set']?['id'] ?? '',
+    name: data['set']?['name'] ?? '',
+    symbol: data['set']?['images']?['symbol'],
+    releaseDate: data['set']?['releaseDate'],
+    printedTotal: data['set']?['printedTotal'],
+    total: data['set']?['total'],
+  );
+  
+  // IMPORTANT: Extract the image URLs correctly from the data
+  String? imageUrl;
+  String? largeImageUrl;
+  
+  // Check the 'images' node which contains the card images
+  if (data['images'] != null) {
+    imageUrl = data['images']['small'];
+    largeImageUrl = data['images']['large'];
+    
+    // Fix URL format if needed
+    if (imageUrl != null && imageUrl.startsWith('//')) {
+      imageUrl = 'https:$imageUrl';
+    }
+    
+    if (largeImageUrl != null && largeImageUrl.startsWith('//')) {
+      largeImageUrl = 'https:$largeImageUrl';
+    }
   }
+  
+  // Extract price data more carefully
+  double? price;
+  if (data['cardmarket'] != null && data['cardmarket']['prices'] != null) {
+    final prices = data['cardmarket']['prices'];
+    price = _toDouble(prices['averageSellPrice']);
+    if (price == null || price == 0) {
+      // Try other price fields if averageSellPrice is missing
+      price = _toDouble(prices['trendPrice']) ?? 
+              _toDouble(prices['lowPrice']) ?? 
+              _toDouble(prices['avg1']) ??
+              _toDouble(prices['avg7']) ??
+              _toDouble(prices['avg30']);
+    }
+  }
+
+  print('Card: ${data['name']}, Image URL: $imageUrl, Price: $price');
+  
+  // Return the card with properly extracted image URLs and price
+  return TcgCard(
+    id: data['id'] ?? '',
+    name: data['name'] ?? '',
+    number: data['number']?.toString(),
+    imageUrl: imageUrl,
+    largeImageUrl: largeImageUrl,
+    set: set,
+    rarity: data['rarity']?.toString(),
+    setName: data['set']?['name'],
+    price: price, // Use the extracted price
+    cardmarket: data['cardmarket'], // Store the full cardmarket data
+    rawData: data, // Store the complete raw data for future reference
+  );
+}
 
   // Add new method to get most valuable cards
   Future<Map<String, dynamic>> searchMostValuableCards() async {
@@ -683,7 +756,7 @@ class TcgApiService {
 
       return response;
     } catch (e) {
-      print('API request failed: $e');
+      LoggingService.debug('API request failed: $e');
       rethrow;
     }
   }
@@ -733,7 +806,7 @@ class TcgApiService {
         throw Exception('Failed to load rarities: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching rarities: $e');
+      LoggingService.debug('Error fetching rarities: $e');
       return [];
     }
   }

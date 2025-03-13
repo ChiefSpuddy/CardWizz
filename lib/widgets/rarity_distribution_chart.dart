@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../models/tcg_card.dart';
 import 'package:collection/collection.dart';
+import '../models/tcg_card.dart';
 
 class RarityDistributionChart extends StatelessWidget {
   final List<TcgCard> cards;

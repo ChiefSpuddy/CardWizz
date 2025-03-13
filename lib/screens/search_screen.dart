@@ -1,17 +1,16 @@
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import '../services/tcg_api_service.dart';
 import '../services/tcgdex_api_service.dart';
 import '../services/search_history_service.dart';
 import '../services/mtg_api_service.dart';
-import '../models/tcg_card.dart';
 import '../constants/sets.dart';
 import '../constants/japanese_sets.dart';
 import '../constants/mtg_sets.dart';
 import '../utils/image_utils.dart';
 import 'card_details_screen.dart';
-
-// Import our extracted components
+import 'search_results_screen.dart';
 import '../widgets/search/search_app_bar.dart';
 import '../widgets/search/search_categories.dart';
 import '../widgets/search/search_categories_header.dart';
@@ -20,30 +19,30 @@ import '../widgets/search/loading_state.dart';
 import '../widgets/search/loading_indicators.dart';
 import '../widgets/search/card_grid.dart';
 import '../widgets/search/set_grid.dart';
-import 'dart:math' as math;
-import '../widgets/search/card_grid_item.dart';  // Add this import
-import '../services/navigation_service.dart'; // Add the missing import
+import '../widgets/search/card_grid_item.dart';
+import '../services/navigation_service.dart';
 import 'package:provider/provider.dart';
 import '../providers/currency_provider.dart';
-import '../providers/theme_provider.dart'; // Add this missing import
+import '../providers/theme_provider.dart';
 import '../services/storage_service.dart';
-// Add this import near the top of the file with other imports
 import '../providers/app_state.dart';
-// Add this import at the top with other imports
 import '../widgets/search/card_skeleton_grid.dart';
-// Add this import near the top
 import '../widgets/standard_app_bar.dart';
-// Add this missing import near the top with other imports
-import '../constants/app_colors.dart';
-// Add these missing imports at the top
-import 'package:flutter/services.dart';  // For HapticFeedback
-import '../widgets/app_drawer.dart';  // For AppDrawer
-// Add the missing import for StyledToast
+import 'package:flutter/services.dart';
+import '../widgets/app_drawer.dart';
 import '../widgets/styled_toast.dart';
-// Add this import at the top with other imports
 import '../utils/bottom_toast.dart';
-// Add this import at the top of the file
+import '../widgets/bottom_notification.dart'; // Moved this up with other imports
 import 'package:rxdart/rxdart.dart';
+import 'dart:math' as math;
+import '../models/tcg_card.dart';
+import '../models/tcg_set.dart' as models; // Fixed missing quote
+
+// Import TcgSet from models explicitly
+import '../models/tcg_set.dart'; // Fixed missing quote
+
+// Then create a typedef to disambiguate
+typedef ModelTcgSet = TcgSet;
 
 enum SearchMode { eng, mtg }
 
@@ -68,31 +67,31 @@ class SearchScreen extends StatefulWidget {
 
   // Improve the static setSearchMode method for more robust behavior
   static void setSearchMode(BuildContext context, SearchMode mode) {
-    print('SearchScreen.setSearchMode called with mode: ${mode.toString()}');
+    LoggingService.debug('SearchScreen.setSearchMode called with mode: ${mode.toString()}');
     
     // Try to find the state directly
     final state = context.findRootAncestorStateOfType<_SearchScreenState>();
     if (state != null) {
-      print('Found _SearchScreenState directly, calling setSearchMode()');
+      LoggingService.debug('Found _SearchScreenState directly, calling setSearchMode()');
       state.setSearchMode(mode);
       return;
     }
     
     // If direct state access fails, try to find through Navigator
-    print('Direct state access failed, trying alternate methods');
+    LoggingService.debug('Direct state access failed, trying alternate methods');
     final navigatorKey = NavigationService.navigatorKey;
     if (navigatorKey.currentContext != null) {
       final searchState = navigatorKey.currentContext!
           .findRootAncestorStateOfType<_SearchScreenState>();
       if (searchState != null) {
-        print('Found _SearchScreenState through NavigatorKey, calling setSearchMode()');
+        LoggingService.debug('Found _SearchScreenState through NavigatorKey, calling setSearchMode()');
         searchState.setSearchMode(mode);
         return;
       }
     }
     
     // Last resort - use a global method that will be picked up on next frame
-    print('Unable to find _SearchScreenState, using delayed approach');
+    LoggingService.debug('Unable to find _SearchScreenState, using delayed approach');
     _pendingSearchMode = mode;
     
     // Schedule a check after rendering
@@ -107,7 +106,7 @@ class SearchScreen extends StatefulWidget {
   // Add this helper method to check for pending mode changes
   static void _checkPendingSearchMode(BuildContext context) {
     if (_pendingSearchMode != null) {
-      print('Applying pending search mode: ${_pendingSearchMode.toString()}');
+      LoggingService.debug('Applying pending search mode: ${_pendingSearchMode.toString()}');
       
       // Try all methods to find the search screen state
       final state = context.findRootAncestorStateOfType<_SearchScreenState>();
@@ -273,7 +272,7 @@ class _SearchScreenState extends State<SearchScreen> {
         setState(() {}); // Trigger rebuild to show recent searches
       }
     } catch (e) {
-      print('Error initializing search history: $e');
+      LoggingService.debug('Error initializing search history: $e');
       if (mounted) {
         setState(() {
           _isHistoryLoading = false;
@@ -520,11 +519,13 @@ class _SearchScreenState extends State<SearchScreen> {
         // AGGRESSIVE IMAGE PRELOADING - Start loading ALL images IMMEDIATELY
         // This ensures images show up without requiring scrolling or interaction
         if (newCards.isNotEmpty) {
-          print("Starting aggressive image preloading for ${newCards.length} cards");
+          LoggingService.debug("Starting aggressive image preloading for ${newCards.length} cards");
           
           // Directly load the first 12 images synchronously (first 4 rows)
           for (int i = 0; i < math.min(12, newCards.length); i++) {
-            _loadImage(newCards[i].imageUrl);
+            if (newCards[i].imageUrl != null) {
+              _loadImage(newCards[i].imageUrl!);
+            }
           }
           
           // Update the state quickly to show cards while images are loading
@@ -544,11 +545,13 @@ class _SearchScreenState extends State<SearchScreen> {
           // Then queue the rest for loading after a tiny delay to not block UI
           Future.delayed(Duration.zero, () {
             for (int i = 12; i < newCards.length; i++) {
-              if (!_loadingRequestedUrls.contains(newCards[i].imageUrl)) {
-                if (_loadingImages.length < _maxConcurrentLoads) {
-                  _loadImage(newCards[i].imageUrl);
-                } else {
-                  _loadQueue.add(newCards[i].imageUrl);
+              if (newCards[i].imageUrl != null) {
+                if (!_loadingRequestedUrls.contains(newCards[i].imageUrl)) {
+                  if (_loadingImages.length < _maxConcurrentLoads) {
+                    _loadImage(newCards[i].imageUrl!);
+                  } else {
+                    _loadQueue.add(newCards[i].imageUrl!);
+                  }
                 }
               }
             }
@@ -563,7 +566,7 @@ class _SearchScreenState extends State<SearchScreen> {
         }
       }
     } catch (e) {
-      print('❌ Search error: $e');
+      LoggingService.debug('❌ Search error: $e');
       if (mounted) {
         setState(() {
           if (!isLoadingMore) {
@@ -603,9 +606,9 @@ class _SearchScreenState extends State<SearchScreen> {
       if (query.startsWith('set.id:')) {
         originalSetCode = query.substring(7).trim();
         searchQuery = 'e:$originalSetCode';
-        print('MTG search for set: "$originalSetCode" using query: "$searchQuery" (sorted by price high-to-low)');
+        LoggingService.debug('MTG search for set: "$originalSetCode" using query: "$searchQuery" (sorted by price high-to-low)');
       } else {
-        print('MTG general search: "$searchQuery" (sorted by price high-to-low)');
+        LoggingService.debug('MTG general search: "$searchQuery" (sorted by price high-to-low)');
       }
 
       final results = await _mtgApi.searchCards(
@@ -622,7 +625,7 @@ class _SearchScreenState extends State<SearchScreen> {
         final int totalCount = results['totalCount'] as int;
         final bool hasMore = results['hasMore'] ?? false;
         
-        print('MTG API returned ${cardsData.length} cards, total: $totalCount, hasMore: $hasMore');
+        LoggingService.debug('MTG API returned ${cardsData.length} cards, total: $totalCount, hasMore: $hasMore');
         
         if (cardsData.isEmpty) {
           setState(() {
@@ -646,7 +649,7 @@ class _SearchScreenState extends State<SearchScreen> {
             number: data['number'] as String? ?? '',
             rarity: data['rarity'] as String? ?? '',
             price: currencyProvider.convertFromEur(eurPrice),
-            set: TcgSet(
+            set: models.TcgSet( // Not models.TcgSet
               id: data['set']['id'] as String? ?? '',
               name: data['set']['name'] as String? ?? '',
             ),
@@ -668,7 +671,7 @@ class _SearchScreenState extends State<SearchScreen> {
         // Debug log the first few cards
         if (cards.isNotEmpty) {
           for (int i = 0; i < math.min(3, cards.length); i++) {
-            print('Card $i: ${cards[i].name} - ${cards[i].imageUrl}');
+            LoggingService.debug('Card $i: ${cards[i].name} - ${cards[i].imageUrl}');
           }
         }
         
@@ -692,8 +695,8 @@ class _SearchScreenState extends State<SearchScreen> {
         }
       }
     } catch (e, stack) {
-      print('MTG search error: $e');
-      print('Stack trace: $stack');
+      LoggingService.debug('MTG search error: $e');
+      LoggingService.debug('Stack trace: $stack');
       
       if (mounted) {
         setState(() {
@@ -759,7 +762,7 @@ class _SearchScreenState extends State<SearchScreen> {
             }
           }
         } catch (e) {
-          print('Error fetching MTG set details: $e');
+          LoggingService.debug('Error fetching MTG set details: $e');
           if (mounted) {
             setState(() {
               _isLoading = false;
@@ -769,7 +772,7 @@ class _SearchScreenState extends State<SearchScreen> {
         }
       }
     } catch (e) {
-      print('Set search error: $e');
+      LoggingService.debug('Set search error: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -915,7 +918,7 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       }
     } catch (e) {
-      print('Quick search error: $e');
+      LoggingService.debug('Quick search error: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -1183,7 +1186,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _loadingImages.add(url);
 
     } catch (e) {
-      print('Error requesting image: $e');
+      LoggingService.debug('Error requesting image: $e');
       _loadingRequestedUrls.remove(url);
       _loadingImages.remove(url);
       
@@ -1239,7 +1242,7 @@ class _SearchScreenState extends State<SearchScreen> {
         name: query,
         imageUrl: search['imageUrl']!,
         largeImageUrl: search['imageUrl']!.replaceAll('small', 'large'),  // Fix: use replaceAll instead of replace
-        set: TcgSet(id: '', name: ''),
+        set: models.TcgSet(id: '', name: ''),
       );
 
       Navigator.pushNamed(
@@ -1282,29 +1285,41 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // Fix the fundamental issue in _onCardAddToCollection - use our reliable bottom toast
+  // Fix the fundamental issue in _onCardAddToCollection
   Future<void> _onCardAddToCollection(TcgCard card) async {
     try {
-      // Get services without rebuilding UI
+      // Get services without context rebuilding
       final appState = Provider.of<AppState>(context, listen: false);
       final storageService = Provider.of<StorageService>(context, listen: false);
       
-      // Just save the card silently
+      // Update the collection card IDs to reflect the addition immediately
+      // This makes the UI update without waiting for the save
+      _collectionCardsSubject.add({..._collectionCardIds, card.id});
+      
+      // Save the card in the background
       await storageService.saveCard(card);
       
-      // Notify app state AFTER save is complete
+      // Notify app state AFTER save completes
       appState.notifyCardChange();
       
-      // Use our dedicated bottom toast implementation
-      showBottomToast(
+      // Provide tactile feedback
+      HapticFeedback.mediumImpact();
+      
+      // Use bottom notification instead of toast to prevent navigation issues
+      BottomNotification.show(
         context: context,
-        title: 'Card Added',
-        message: '${card.name} added to collection',
+        title: 'Added to Collection',
+        message: card.name,
         icon: Icons.check_circle,
       );
     } catch (e) {
-      // Show error with bottom toast
-      showBottomToast(
+      // If error occurs, remove from local collection
+      _collectionCardsSubject.add(
+        _collectionCardIds.where((id) => id != card.id).toSet()
+      );
+      
+      // Show error
+      BottomNotification.show(
         context: context,
         title: 'Error',
         message: 'Failed to add card: $e',
@@ -1497,8 +1512,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   // Update this method to be more robust and add debug logging
   void setSearchMode(SearchMode mode) {
-    print('_SearchScreenState.setSearchMode called with mode: ${mode.toString()}');
-    print('Current mode: $_searchMode');
+    LoggingService.debug('_SearchScreenState.setSearchMode called with mode: ${mode.toString()}');
+    LoggingService.debug('Current mode: $_searchMode');
     
     if (_searchMode != mode) {
       setState(() {
@@ -1514,16 +1529,29 @@ class _SearchScreenState extends State<SearchScreen> {
           _sortAscending = true;
         }
         
-        print('Mode changed to: $_searchMode');
+        LoggingService.debug('Mode changed to: $_searchMode');
       });
     } else {
-      print('No mode change needed - already in mode: $_searchMode');
+      LoggingService.debug('No mode change needed - already in mode: $_searchMode');
     }
   }
   
   // Update to use our single setSearchMode method
   void _onSearchModeChanged(List<SearchMode> modes) {
     setSearchMode(modes.first);
+  }
+
+  // In your search function, after getting results:
+  void _showSearchResults(List<TcgCard> results, String searchTerm) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchResultsScreen(
+          cards: results,
+          searchTerm: searchTerm,
+        ),
+      ),
+    );
   }
 }
 

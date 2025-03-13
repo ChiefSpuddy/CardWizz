@@ -1,9 +1,10 @@
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
-import '../models/tcg_card.dart';
 import '../services/price_service.dart' as price_service;
 import '../utils/card_details_router.dart';
 import '../providers/currency_provider.dart';
 import 'package:provider/provider.dart';
+import '../models/tcg_card.dart';
 
 class CardPriceDisplay extends StatefulWidget {
   final TcgCard card;
@@ -85,7 +86,7 @@ class _CardPriceDisplayState extends State<CardPriceDisplay> {
             });
           }
         } catch (e) {
-          print('Error loading comprehensive price data: $e');
+          LoggingService.debug('Error loading comprehensive price data: $e');
         }
       }
     } catch (e) {
@@ -95,7 +96,7 @@ class _CardPriceDisplayState extends State<CardPriceDisplay> {
           _isLoading = false;
         });
       }
-      print('Error loading card price: $e');
+      LoggingService.debug('Error loading card price: $e');
     }
   }
   

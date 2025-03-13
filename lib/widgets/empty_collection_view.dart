@@ -1,10 +1,11 @@
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
-import 'dart:math' as math;
 import '../services/tcg_api_service.dart';
-import '../models/tcg_card.dart';
 import '../screens/card_details_screen.dart';
 import 'package:provider/provider.dart';
+import 'dart:math' as math;  // Add this import for math.min
+import '../models/tcg_card.dart';  // Add this import for TcgCard
+import '../models/tcg_set.dart' as models;   // Import with alias
 
 class EmptyCollectionView extends StatefulWidget {
   final String title;
@@ -192,7 +193,7 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
         });
       }
     } catch (e) {
-      print('Error loading preview cards: $e');
+      LoggingService.debug('Error loading preview cards: $e');
       if (mounted) {
         setState(() => _isLoadingCards = false);
       }
@@ -269,14 +270,14 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
             itemBuilder: (context, index) {
               final card = _previewCards[index];
               final imageUrl = card['images']?['small'];
-              if (imageUrl == null) return const SizedBox.shrink();
+              if (imageUrl == null || imageUrl.isEmpty) return const SizedBox.shrink();
 
               final previewCard = TcgCard(
                 id: card['id'] ?? '',
                 name: card['name'] ?? '',
                 imageUrl: imageUrl,
                 largeImageUrl: card['images']?['large'] ?? imageUrl,
-                set: TcgSet(id: '', name: card['set']?['name'] ?? ''),
+                set: models.TcgSet(id: '', name: card['set']?['name'] ?? ''), // Use aliased version
                 price: card['cardmarket']?['prices']?['averageSellPrice'],
               );
 
@@ -308,11 +309,24 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
+                            child: imageUrl.isNotEmpty ? Image.network(
                               imageUrl,
                               fit: BoxFit.contain,
                               height: smallScreen ? 85 : 100,
                               width: smallScreen ? 75 : 85,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: smallScreen ? 85 : 100,
+                                  width: smallScreen ? 75 : 85,
+                                  color: Colors.grey[300],
+                                  child: const Icon(Icons.broken_image, color: Colors.grey),
+                                );
+                              },
+                            ) : Container(
+                              height: smallScreen ? 85 : 100,
+                              width: smallScreen ? 75 : 85,
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.image_not_supported, color: Colors.grey),
                             ),
                           ),
                           if (previewCard.price != null)

@@ -1,13 +1,10 @@
-import 'dart:math' as math show pow;
-import 'dart:math' show max, min;
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:lottie/lottie.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/storage_service.dart';
 import '../services/tcg_api_service.dart';
 import '../providers/app_state.dart';
-import '../models/tcg_card.dart';
 import '../screens/card_details_screen.dart';
 import '../providers/currency_provider.dart';
 import '../l10n/app_localizations.dart';
@@ -20,6 +17,11 @@ import '../widgets/empty_collection_view.dart';
 import '../widgets/portfolio_value_chart.dart';
 import '../widgets/standard_app_bar.dart'; // Add this import
 import '../utils/card_details_router.dart';
+import 'dart:math' as math;  // Add this import
+import '../models/tcg_card.dart';  // Add this import
+import 'package:lottie/lottie.dart';
+import 'package:lottie/src/frame_rate.dart'; // Import FrameRate class
+import '../models/tcg_set.dart' as models; // Use direct import without alias
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});
@@ -218,7 +220,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                               child: Hero(
                                 tag: 'home_topcard_${card.id}', // Update this line
                                 child: Image.network(
-                                  card.imageUrl,
+                                  card.imageUrl ?? '',
                                   fit: BoxFit.contain,
                                 ),
                               ),
@@ -391,17 +393,14 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                         id: card['id'],
                         name: card['name'],
                         number: card['number'],
-                        imageUrl: card['images']['small'],
+                        imageUrl: card['images']['small'] ?? '',
                         largeImageUrl: card['images']['large'],
                         rarity: card['rarity'],
-                        set: card['set'] != null ? TcgSet(
+                        set: card['set'] != null ? models.TcgSet(
                           id: card['set']['id'] ?? '',
-                          name: card['set']['name'] ?? 'Unknown Set',
-                          // Remove required parameters that might be null
-                        ) : TcgSet(
-                          id: '',
-                          name: 'Unknown Set',
-                        ),
+                          name: card['set']['name'] ?? '',
+                          // Add any other required properties
+                        ) : models.TcgSet(id: '', name: ''),
                         price: card['cardmarket']?['prices']?['averageSellPrice'],
                       );
                       
@@ -424,7 +423,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                                 child: Hero(
                                   tag: 'latest_${tcgCard.id}',
                                   child: Image.network(
-                                    tcgCard.imageUrl,
+                                    tcgCard.imageUrl ?? '',
                                     fit: BoxFit.contain,
                                   ),
                                 ),
@@ -475,7 +474,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
       
       return data;
     } catch (e) {
-      print('Error loading latest set cards: $e');
+      LoggingService.debug('Error loading latest set cards: $e');
       rethrow;
     }
   }
@@ -555,7 +554,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                   'assets/animations/background.json',
                   fit: BoxFit.cover,
                   repeat: true,
-                  frameRate: FrameRate(30),
+                  frameRate: FrameRate(30), // Use the proper class
                   controller: _animationController,
                 ),
               ),
@@ -691,7 +690,7 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
                                     child: Hero(
                                       tag: HeroTags.cardImage(card.id, context: 'home_recent'),
                                       child: Image.network(
-                                        card.imageUrl,
+                                        card.imageUrl ?? '',
                                         fit: BoxFit.contain,
                                       ),
                                     ),

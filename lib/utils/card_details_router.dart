@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/tcg_card.dart';
 import '../screens/mtg_card_details_screen.dart';
 import '../screens/pokemon_card_details_screen.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +7,8 @@ import '../providers/app_state.dart';
 import '../utils/bottom_toast.dart';
 import '../services/price_service.dart';
 import '../services/logging_service.dart';
-import 'dart:math' show min;
+import 'dart:math';  // Add this import for min
+import '../models/tcg_card.dart';  // Add this import for TcgCard
 
 class CardDetailsRouter {
   // Static instance of the price service
@@ -20,6 +20,7 @@ class CardDetailsRouter {
     String heroContext = 'details',
     bool isFromBinder = false,
     bool isFromCollection = false,
+    Widget? marketActionButtons, // Keep this parameter for backward compatibility
   }) {
     // Check if this is an MTG card with improved detection
     final isMtgCard = _isMtgCard(card);
@@ -165,14 +166,14 @@ class CardDetailsRouter {
     }
     
     // Check image URL for hints
-    if (card.imageUrl.contains('scryfall') || 
-        card.imageUrl.contains('gatherer.wizards.com')) {
+    if (card.imageUrl?.contains('scryfall') == true || 
+        card.imageUrl?.contains('gatherer.wizards.com') == true) {
       LoggingService.log("Image URL contains MTG source, detecting as MTG");
       return true;
     }
     
     // Check for Pokemon image URLs
-    if (card.imageUrl.toLowerCase().contains('pokemon')) {
+    if (card.imageUrl?.toLowerCase().contains('pokemon') == true) {
       LoggingService.log("Image URL contains 'pokemon', detecting as Pokemon");
       return false;
     }

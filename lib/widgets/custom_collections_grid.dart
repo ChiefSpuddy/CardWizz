@@ -1,29 +1,27 @@
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:math';
-import 'dart:math' as math;
-import 'dart:async';  // Add this import for StreamSubscription
-import 'package:async/async.dart' show StreamGroup;  // Add this import
+import 'dart:async';  
 import '../models/custom_collection.dart';
-import '../models/tcg_card.dart';  // Add this
 import '../services/collection_service.dart';
-import '../services/storage_service.dart';  // Add this
+import '../services/storage_service.dart';  
 import '../screens/custom_collection_detail_screen.dart';
 import '../widgets/animated_background.dart';
-import '../providers/currency_provider.dart';  // Add this import
-import '../providers/sort_provider.dart';  // Add this import
-import 'package:flutter/foundation.dart';  // Add this for listEquals
-import 'package:rxdart/rxdart.dart' as rx;  // Add this for Rx
+import '../providers/currency_provider.dart';  
+import '../providers/sort_provider.dart';  
+import 'package:rxdart/rxdart.dart' as rx;  
+import '../models/tcg_card.dart';  // Add this import
+import 'dart:math' as math;  // Add this import
 
 class BinderCard extends StatefulWidget {
   final CustomCollection collection;
-  final List<TcgCard> cards;  // Add this
+  final List<TcgCard> cards;  
   final VoidCallback onTap;
 
   const BinderCard({
     super.key,
     required this.collection,
-    required this.cards,  // Add this
+    required this.cards,  
     required this.onTap,
   });
 
@@ -112,7 +110,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('${widget.collection.name} deleted'),
-              duration: const Duration(seconds: 2), // Reduced from default 4
+              duration: const Duration(seconds: 2), 
               behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.all(8),
               shape: RoundedRectangleBorder(
@@ -121,7 +119,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
               action: SnackBarAction(
                 label: 'Undo',
                 onPressed: () {
-                  // TODO: Implement undo functionality
+                  
                 },
               ),
             ),
@@ -139,7 +137,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    // Match cards by ID
+    
     final binderCards = widget.cards.where(
       (card) => widget.collection.cardIds.contains(card.id.trim())
     ).toList();
@@ -155,7 +153,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
         final wobble = math.sin(_controller.value * math.pi * 2) * 0.025;
         return Transform(
           transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.002) // Increased perspective
+            ..setEntry(3, 2, 0.002) 
             ..rotateY(wobble)
             ..scale(_isPressed ? 0.95 : 1.0),
           alignment: Alignment.center,
@@ -197,7 +195,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
           ),
           child: Stack(
             children: [
-              // Improved pattern overlay - leather texture instead of lines
+              
               Positioned.fill(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
@@ -214,7 +212,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                 ),
               ),
               
-              // Add subtle highlight at the top
+              
               Positioned(
                 top: 0,
                 left: 0,
@@ -238,7 +236,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                 ),
               ),
               
-              // Enhanced spine with more realistic binding effect
+              
               Positioned(
                 left: 0,
                 top: 0,
@@ -260,7 +258,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                   ),
                   child: Stack(
                     children: [
-                      // Spine texture
+                      
                       Positioned.fill(
                         child: CustomPaint(
                           painter: BinderSpinePainter(
@@ -270,7 +268,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                           ),
                         ),
                       ),
-                      // Binding rings effect
+                      
                       Positioned(
                         top: 0,
                         bottom: 0,
@@ -291,7 +289,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                           ),
                         ),
                       ),
-                      // Title text
+                      
                       RotatedBox(
                         quarterTurns: 1,
                         child: Center(
@@ -319,8 +317,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                   ),
                 ),
               ),
-              // Content area - keep this as is since you like it
-              // ...existing content area code...
+              
               Padding(
                 padding: const EdgeInsets.fromLTRB(36, 16, 16, 16),
                 child: Column(
@@ -371,15 +368,15 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                           ),
                         ),
                       ),
-                    // CHANGE: Always include the SizedBox height placeholder, regardless of cards
+                    
                     SizedBox(
                       height: 63,
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
-                          // Only add card images when there are cards
+                          
                           if (binderCards.isNotEmpty)
-                            for (var i = 0; i < min(3, binderCards.length); i++)
+                            for (var i = 0; i < math.min(3, binderCards.length); i++)
                               Positioned(
                                 right: i * 12.0,
                                 child: Transform.rotate(
@@ -400,7 +397,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(6),
                                       child: Image.network(
-                                        binderCards[binderCards.length - 1 - i].imageUrl,
+                                        binderCards[binderCards.length - 1 - i].imageUrl ?? '',
                                         fit: BoxFit.cover,
                                       ),
                                     ),
@@ -408,7 +405,7 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
                                 ),
                               ),
                           
-                          // ADD: Show an empty placeholder when there are no cards
+                          
                           if (binderCards.isEmpty)
                             Positioned(
                               right: 0,
@@ -447,7 +444,6 @@ class _BinderCardState extends State<BinderCard> with SingleTickerProviderStateM
   }
 }
 
-// Replace the simple line painter with a more appealing texture painter
 class BinderTexturePainter extends CustomPainter {
   final Color color;
   final Color accentColor;
@@ -464,9 +460,8 @@ class BinderTexturePainter extends CustomPainter {
       ..color = accentColor
       ..strokeWidth = 1.0;
 
-    final random = math.Random(42); // Fixed seed for consistent pattern
+    final random = math.Random(42); 
     
-    // Create a leather-like texture with small dots and marks
     for (int i = 0; i < size.width * size.height / 120; i++) {
       final x = random.nextDouble() * size.width;
       final y = random.nextDouble() * size.height;
@@ -474,7 +469,6 @@ class BinderTexturePainter extends CustomPainter {
       
       canvas.drawCircle(Offset(x, y), radius, paint);
       
-      // Add some subtle line marks
       if (i % 5 == 0) {
         final startX = x - 2 + random.nextDouble() * 4;
         final startY = y - 2 + random.nextDouble() * 4;
@@ -489,7 +483,6 @@ class BinderTexturePainter extends CustomPainter {
       }
     }
     
-    // Add subtle grain texture
     for (int i = 0; i < size.width; i += 4) {
       for (int j = 0; j < size.height; j += 4) {
         if (random.nextDouble() < 0.2) {
@@ -505,7 +498,6 @@ class BinderTexturePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// Add a spine-specific texture painter
 class BinderSpinePainter extends CustomPainter {
   final Color color;
   
@@ -517,19 +509,15 @@ class BinderSpinePainter extends CustomPainter {
       ..color = color
       ..strokeWidth = 1;
       
-    // Create subtle horizontal ridges for the spine
     for (double y = 5.0; y < size.height - 5; y += 8.0) {
-      // Slightly randomize the spacing
       final offsetY = y + (y % 16 == 0 ? 1 : 0);
       
-      // Draw the ridge
       canvas.drawLine(
         Offset(2.0, offsetY),
         Offset(size.width - 2, offsetY),
         paint,
       );
       
-      // Add a highlight above the ridge
       final highlightPaint = Paint()
         ..color = Colors.white.withOpacity(0.15)
         ..strokeWidth = 0.5;
@@ -547,7 +535,7 @@ class BinderSpinePainter extends CustomPainter {
 }
 
 class CustomCollectionsGrid extends StatefulWidget {
-  final bool keepAlive;  // Add this
+  final bool keepAlive;  
   final Function(bool)? onMultiselectChange;
 
   const CustomCollectionsGrid({
@@ -564,17 +552,16 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
   late final CollectionService _collectionService;
   bool _isInitialized = false;
   
-  // Add these for multiselect functionality
+  
   Set<String> _selectedCollectionIds = {};
   bool _isMultiselect = false;
   
-  // Add a flag to control debug output
-  static const bool _enableDebugLogs = false;  // Set to false to disable verbose logging
+  static const bool _enableDebugLogs = false;  
 
-  // Add helper method for controlled debug logging
+  
   void _debugLog(String message) {
     if (_enableDebugLogs) {
-      print(message);
+      LoggingService.debug(message);
     }
   }
 
@@ -592,7 +579,6 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
     }
   }
   
-  // Add these methods to handle multiselect state
   
   void toggleMultiselect() {
     setState(() {
@@ -601,7 +587,6 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
         _selectedCollectionIds.clear();
       }
       
-      // Notify parent about multiselect state
       if (widget.onMultiselectChange != null) {
         widget.onMultiselectChange!(_isMultiselect);
       }
@@ -614,7 +599,6 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
         _isMultiselect = false;
         _selectedCollectionIds.clear();
         
-        // Notify parent about multiselect state change
         if (widget.onMultiselectChange != null) {
           widget.onMultiselectChange!(false);
         }
@@ -625,7 +609,7 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
   void removeSelected() async {
     if (_selectedCollectionIds.isEmpty) return;
     
-    // Implement actual removal logic
+    
     try {
       for (final id in _selectedCollectionIds) {
         await _collectionService.deleteCollection(id);
@@ -635,13 +619,12 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
         _isMultiselect = false;
         _selectedCollectionIds.clear();
         
-        // Notify parent
         if (widget.onMultiselectChange != null) {
           widget.onMultiselectChange!(false);
         }
       });
     } catch (e) {
-      print('Error removing collections: $e');
+      LoggingService.debug('Error removing collections: $e');
     }
   }
 
@@ -653,7 +636,7 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Single StreamBuilder for collections
+    
     return StreamBuilder<List<CustomCollection>>(
       stream: _collectionService.getCustomCollectionsStream(),
       builder: (context, collectionsSnapshot) {
@@ -662,7 +645,7 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
         }
 
         final collections = collectionsSnapshot.data ?? [];
-        // Replace debug print with controlled debug log
+        
         _debugLog('Rendering ${collections.length} binders');
 
         if (collections.isEmpty) {
@@ -680,18 +663,18 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
           );
         }
 
-        // Sort collections
+        
         final sortedCollections = _collectionService.sortCollections(
           collections,
           context.read<SortProvider>().currentSort
         );
 
-        // Single StreamBuilder for cards
+        
         return StreamBuilder<List<TcgCard>>(
           stream: Provider.of<StorageService>(context).watchCards(),
           builder: (context, cardsSnapshot) {
             final allCards = cardsSnapshot.data ?? [];
-            // Replace debug print with controlled debug log
+            
             _debugLog('DEBUG: Total available cards: ${allCards.length}');
             
             return GridView.builder(
@@ -707,7 +690,6 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
                 final collection = sortedCollections[index];
                 final isSelected = _selectedCollectionIds.contains(collection.id);
                 
-                // Replace debug print with controlled debug log
                 _debugLog('DEBUG: Collection ${collection.name} has IDs: ${collection.cardIds.join(', ')}');
                 
                 return GestureDetector(
@@ -717,7 +699,6 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
                         _isMultiselect = true;
                         _selectedCollectionIds.add(collection.id);
                         
-                        // Notify parent
                         if (widget.onMultiselectChange != null) {
                           widget.onMultiselectChange!(true);
                         }
@@ -740,7 +721,7 @@ class CustomCollectionsGridState extends State<CustomCollectionsGrid> with Autom
                         }
                       });
                     } else {
-                      // Regular navigation
+                      
                       Navigator.push(
                         context,
                         MaterialPageRoute(

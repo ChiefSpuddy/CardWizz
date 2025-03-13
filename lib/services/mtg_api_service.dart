@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:async';
@@ -63,7 +64,7 @@ class MtgApiService {
       return _processResponse(data, query);
       
     } catch (e, stack) {
-      print('MTG search exception: $e');
+      LoggingService.debug('MTG search exception: $e');
       return {'data': [], 'totalCount': 0, 'hasMore': false};
     }
   }

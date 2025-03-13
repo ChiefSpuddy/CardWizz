@@ -1,12 +1,11 @@
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 import '../widgets/empty_collection_view.dart';
 import '../l10n/app_localizations.dart';  
 import '../services/storage_service.dart';
 import '../services/collection_service.dart';
-import '../models/tcg_card.dart';
 import '../models/custom_collection.dart';
 import '../widgets/collection_grid.dart';
 import '../widgets/custom_collections_grid.dart';
@@ -24,9 +23,10 @@ import '../providers/app_state.dart';
 import '../providers/sort_provider.dart';
 import '../constants/layout.dart';
 import '../services/purchase_service.dart'; // Add this missing import
-import 'dart:math';
 import '../widgets/standard_app_bar.dart';
 import '../utils/card_details_router.dart';
+import 'dart:math';  // Add this import for Random, pi, etc.
+import '../models/tcg_card.dart';  // Add this import for TcgCard class
 
 class CollectionsScreen extends StatefulWidget {
   final bool _showEmptyState;
@@ -73,7 +73,7 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
   // Add helper method for controlled debug logging
   void _debugLog(String message) {
     if (_enableDebugLogs) {
-      print(message);
+      LoggingService.debug(message);
     }
   }
 
@@ -539,7 +539,7 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
               onPressed: () {
                 // Handle delete action for multiselect
                 // This is a placeholder - implement your action
-                print('Delete selected items');
+                LoggingService.debug('Delete selected items');
               },
             )
           else

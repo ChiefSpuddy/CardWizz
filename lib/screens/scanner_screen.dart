@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 import 'dart:io';  // Add this import
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -5,8 +6,8 @@ import 'package:flutter/services.dart';  // Add this import for DeviceOrientatio
 import 'package:provider/provider.dart';
 import '../services/scanner_service.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:math';
-import '../models/tcg_card.dart';  // Add this import
+import 'dart:math'; // Add this import for pi
+import '../models/tcg_card.dart';  // Add this import for TcgCard class
 
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
@@ -225,7 +226,7 @@ class _ScannerScreenState extends State<ScannerScreen> with WidgetsBindingObserv
           _isSearching = false;
           if (cardData != null) {
             _scannedCard = TcgCard.fromJson(cardData);
-            print('Found card: ${_scannedCard!.name} #${_scannedCard!.number}');
+            LoggingService.debug('Found card: ${_scannedCard!.name} #${_scannedCard!.number}');
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(

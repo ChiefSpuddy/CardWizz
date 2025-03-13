@@ -1,6 +1,6 @@
-import '../models/tcg_card.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart'; // Import for SHA-1 function if not already imported
+import '../models/tcg_card.dart';  // Add this import
 
 /// Utility class for managing hero tags in a consistent way throughout the app.
 /// 

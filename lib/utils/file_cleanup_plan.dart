@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 /**
  * Plan for removing unused files in CardWizz.
  * Files are grouped by priority level for removal.
@@ -90,24 +91,24 @@ class FileCleanupPlan {
 
 // Run this method to log recommendations
 void logRecommendations() {
-  print("\n===== HIGH CONFIDENCE REMOVAL CANDIDATES =====");
+  LoggingService.debug("\n===== HIGH CONFIDENCE REMOVAL CANDIDATES =====");
   for (final file in FileCleanupPlan.highConfidenceRemoval) {
-    print("- $file");
+    LoggingService.debug("- $file");
   }
   
-  print("\n===== REVIEW BEFORE REMOVAL =====");
+  LoggingService.debug("\n===== REVIEW BEFORE REMOVAL =====");
   for (final file in FileCleanupPlan.mediumConfidenceRemoval) {
-    print("- $file");
+    LoggingService.debug("- $file");
   }
   
-  print("\n===== LARGE FILES TO REFACTOR =====");
+  LoggingService.debug("\n===== LARGE FILES TO REFACTOR =====");
   for (final file in FileCleanupPlan.largeFilesToRefactor) {
-    print("- $file");
+    LoggingService.debug("- $file");
   }
   
-  print("\n===== CONSIDER MERGING THESE FILES =====");
+  LoggingService.debug("\n===== CONSIDER MERGING THESE FILES =====");
   for (final file in FileCleanupPlan.singleImportFiles) {
-    print("- $file");
+    LoggingService.debug("- $file");
   }
 }
 
@@ -115,11 +116,11 @@ void logRecommendations() {
 void main() {
   logRecommendations();
   
-  print("\n===== CLEANUP PROCESS =====");
-  print("1. Start with HIGH CONFIDENCE files");
-  print("2. Test app thoroughly after each removal");
-  print("3. Move to MEDIUM CONFIDENCE files with caution");
-  print("4. Refactor large files last");
+  LoggingService.debug("\n===== CLEANUP PROCESS =====");
+  LoggingService.debug("1. Start with HIGH CONFIDENCE files");
+  LoggingService.debug("2. Test app thoroughly after each removal");
+  LoggingService.debug("3. Move to MEDIUM CONFIDENCE files with caution");
+  LoggingService.debug("4. Refactor large files last");
   
-  print("\nThis methodical approach ensures you don't break functionality while cleaning up.");
+  LoggingService.debug("\nThis methodical approach ensures you don't break functionality while cleaning up.");
 }

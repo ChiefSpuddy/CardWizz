@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'dart:math' as math;
-import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
 import 'package:provider/provider.dart';
+import '../models/tcg_card.dart';
 
 class AcquisitionTimelineChart extends StatelessWidget {
   final List<TcgCard> cards;

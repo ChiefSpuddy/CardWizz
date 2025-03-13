@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../models/tcg_card.dart';
 import '../services/storage_service.dart';
 import 'package:provider/provider.dart';
+import '../models/tcg_card.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // Use this directly
 
 class AddToCollectionScreen extends StatefulWidget {
   final TcgCard card;
@@ -54,9 +55,24 @@ class _AddToCollectionScreenState extends State<AddToCollectionScreen> {
           children: [
             AspectRatio(
               aspectRatio: 0.7,
-              child: Image.network(
-                widget.card.imageUrl,
+              child: CachedNetworkImage(
+                imageUrl: widget.card.imageUrl ?? '',
                 fit: BoxFit.contain,
+                placeholder: (context, url) => Container(
+                  color: Colors.grey[800],
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: Colors.grey[800],
+                  child: const Center(
+                    child: Icon(Icons.broken_image, color: Colors.white60),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 16),

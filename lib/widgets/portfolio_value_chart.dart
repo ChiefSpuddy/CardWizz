@@ -1,13 +1,15 @@
 import 'dart:async';
-import 'dart:math' show min, max, pow, log;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
 import '../services/storage_service.dart';
-import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
 import '../utils/card_details_router.dart';
+import '../services/logging_service.dart';
+import '../models/tcg_card.dart';  // Add this import
+import 'dart:math' as math;  // Add this import
+import 'dart:math';  // Add this import for min, max, log, pow
 
 class PortfolioValueChart extends StatefulWidget {
   final bool useFullWidth;
@@ -304,7 +306,7 @@ class _PortfolioValueChartState extends State<PortfolioValueChart> {
         ),
       );
     } catch (e) {
-      print('Error building chart: $e');
+      LoggingService.error('Error building chart: $e', tag: 'Chart');
       return _buildEmptyState(context);
     }
   }

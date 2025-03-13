@@ -1,10 +1,10 @@
-import 'dart:math' show pi;
+import 'dart:math';  // Add this import for pi
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../models/tcg_card.dart';
 import '../services/tcg_api_service.dart';
 import '../services/ebay_api_service.dart';
 import '../services/collection_service.dart';
@@ -18,27 +18,39 @@ import '../providers/app_state.dart';
 import '../services/storage_service.dart';
 import '../widgets/bottom_notification.dart';
 import '../widgets/card_price_display.dart';
+import '../models/tcg_card.dart'; // Add this import
+import '../widgets/network_card_image.dart'; // Add this import
+import '../constants/app_colors.dart';
+import '../widgets/zoomable_card_image.dart'; // Update import
 
 class PokemonCardDetailsScreen extends BaseCardDetailsScreen {
+  final Widget? marketActionButtons;  // Add this property
+
   const PokemonCardDetailsScreen({
     super.key,
     required super.card,
     super.heroContext = 'details',
     super.isFromBinder = false,
     super.isFromCollection = false,
+    this.marketActionButtons,  // Add this parameter
   });
 
   @override
   State<PokemonCardDetailsScreen> createState() => _PokemonCardDetailsScreenState();
 }
 
-class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonCardDetailsScreen> {
+class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonCardDetailsScreen> with TickerProviderStateMixin {
   final _apiService = TcgApiService();
   final _ebayService = EbayApiService();
   Map<String, dynamic>? _additionalData;
   Map<String, List<Map<String, dynamic>>>? _salesByCategory;
   bool _isAddingToCollection = false;
   bool _includeGradedPrices = false;
+
+  // Add animation controller for card flip
+  late AnimationController _flipController;
+  late Animation<double> _flipAnimation;
+  bool get _showingCardBack => _flipAnimation.value >= 0.5;
 
   @override
   void loadData() {
@@ -55,10 +67,10 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
         data = await _apiService.getCardDetails(widget.card.id);
         
         if (data.isEmpty) {
-          print("Received empty data from API for Pokemon card ${widget.card.id}");
+          LoggingService.debug("Received empty data from API for Pokemon card ${widget.card.id}");
           // Try alternate endpoint if available
           if (widget.card.set.id.isNotEmpty && widget.card.number != null) {
-            print("Trying to fetch by set and number: ${widget.card.set.id}/${widget.card.number}");
+            LoggingService.debug("Trying to fetch by set and number: ${widget.card.set.id}/${widget.card.number}");
             // Search by set and number
             final searchData = await _apiService.searchCards(
               query: 'set.id:${widget.card.set.id} number:${widget.card.number}',
@@ -71,7 +83,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
           }
         }
       } catch (e) {
-        print("Error fetching Pokemon card from API: $e");
+        LoggingService.debug("Error fetching Pokemon card from API: $e");
       }
       
       if (mounted) {
@@ -81,7 +93,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
           
           // For Pokemon cards, try to restore price data from the card itself
           if (data.isEmpty && widget.card.price != null) {
-            print("Restoring price data from card object");
+            LoggingService.debug("Restoring price data from card object");
             final cardPrice = widget.card.price ?? 0.0;
             _additionalData = {
               'cardmarket': {
@@ -99,7 +111,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
         });
       }
     } catch (e) {
-      print("Error loading additional data: $e");
+      LoggingService.debug("Error loading additional data: $e");
       if (mounted) {
         setState(() => isLoading = false);
       }
@@ -123,7 +135,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
         setState(() => _salesByCategory = sales);
       }
     } catch (e) {
-      print('Error loading recent sales: $e');
+      LoggingService.debug('Error loading recent sales: $e');
     }
   }
 
@@ -137,11 +149,11 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
     
     try {
       // Pokemon price handling
-      print('Processing Pokemon card price data for ${widget.card.name}');
+      LoggingService.debug('Processing Pokemon card price data for ${widget.card.name}');
       
       // Always include the card's price data as baseline if available
       if (widget.card.price != null && widget.card.price! > 0) {
-        print('Using card object price: ${widget.card.price}');
+        LoggingService.debug('Using card object price: ${widget.card.price}');
         final cardPrice = widget.card.price!;
         prices = {
           'market': cardPrice,
@@ -169,7 +181,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
           prices['low'] = _parsePrice(normalPrices['low']);
           prices['high'] = _parsePrice(normalPrices['high']);
           prices['mid'] = _parsePrice(normalPrices['mid']);
-          print('Using TCGPlayer prices: $prices');
+          LoggingService.debug('Using TCGPlayer prices: $prices');
         }
       }
       
@@ -183,10 +195,10 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
         prices['avg1'] = _parsePrice(cmPrices['avg1']);
         prices['avg7'] = _parsePrice(cmPrices['avg7']);
         prices['avg30'] = _parsePrice(cmPrices['avg30']);
-        print('Using CardMarket prices: $prices');
+        LoggingService.debug('Using CardMarket prices: $prices');
       }
     } catch (e) {
-      print('Error processing price data: $e');
+      LoggingService.debug('Error processing price data: $e');
     }
 
     // Early validation of price data
@@ -205,6 +217,10 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Add marketplace buttons at the top with gradient styling
+          _buildMarketplaceButtons(),
+          const SizedBox(height: 20),
+          
           if (prices.isNotEmpty) ...[
             // Show chart if we have historical data
             if (prices.containsKey('avg1') || prices.containsKey('avg7') || prices.containsKey('avg30')) 
@@ -213,40 +229,110 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
               _buildCurrentPrice(prices),  
             const SizedBox(height: 24),
           ],
-          
-          Row(
-            children: [
-              Expanded(
-                child: _buildMarketplaceButton(
-                  title: 'Cardmarket',
-                  icon: Icons.shopping_cart,
-                  color: isDark ? const Color(0xFF007D41).withOpacity(0.8) : const Color(0xFF007D41),
-                  onTap: () {
-                    final url = _additionalData?['cardmarket']?['url'] ?? 
-                      'https://www.cardmarket.com/en/Pokemon/Products/Search?searchString=${Uri.encodeComponent(widget.card.name)}';
-                    _launchUrl(url);
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildMarketplaceButton(
-                  title: 'eBay',
-                  icon: Icons.search,
-                  color: isDark ? const Color(0xFF0064D2).withOpacity(0.8) : const Color(0xFF0064D2),
-                  onTap: () => _launchUrl(_apiService.getEbaySearchUrl(
-                    widget.card.name,
-                    setName: widget.card.setName,
-                  )),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
-  
+
+  // New method to build marketplace buttons with gradient styling
+  Widget _buildMarketplaceButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildGradientMarketButton(
+            'Cardmarket',
+            [const Color(0xFF1E88E5), const Color(0xFF1565C0)],  // Blue gradient
+            Icons.shopping_cart_outlined,
+            () => _openCardmarket(widget.card),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildGradientMarketButton(
+            'eBay',
+            [const Color(0xFFE53935), const Color(0xFFC62828)],  // Red gradient
+            Icons.gavel_outlined,
+            () => _openEbay(widget.card),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Method for styled gradient buttons
+  Widget _buildGradientMarketButton(
+    String text, 
+    List<Color> gradientColors, 
+    IconData icon, 
+    VoidCallback onPressed
+  ) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: gradientColors.last.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: Colors.white, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper methods for opening marketplace links
+  Future<void> _openCardmarket(TcgCard card) async {
+    final query = Uri.encodeComponent(card.name);
+    final url = Uri.parse('https://www.cardmarket.com/en/Pokemon/Products/Singles?searchString=$query');
+    await _launchUrl(url.toString());
+  }
+
+  Future<void> _openEbay(TcgCard card) async {
+    final query = Uri.encodeComponent('${card.name} pokemon card');
+    final url = Uri.parse('https://www.ebay.com/sch/i.html?_nkw=$query');
+    await _launchUrl(url.toString());
+  }
+
+  // Keep only this single implementation of _launchUrl that takes a String
+  Future<void> _launchUrl(String url) async {
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      LoggingService.debug('Could not launch URL: $e');
+    }
+  }
+
   Widget _buildMarketplaceButton({
     required String title,
     required IconData icon,
@@ -1444,12 +1530,12 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
           final parsed = double.parse(cleaned);
           if (parsed >= 0 && parsed < 1000000) return parsed;
         } catch (e) {
-          print('Error parsing price string: $cleaned');
+          LoggingService.debug('Error parsing price string: $cleaned');
         }
       }
       return null;
     } catch (e) {
-      print('Error in _parsePrice: $e');
+      LoggingService.debug('Error in _parsePrice: $e');
       return null;
     }
   }
@@ -1466,12 +1552,6 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
       return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     } catch (e) {
       return dateStr.split('T')[0].split('-').reversed.join('/');
-    }
-  }
-
-  Future<void> _launchUrl(String url) async {
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }
   }
 
@@ -1674,8 +1754,16 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    // Get screen size to calculate card dimensions
+    final screenSize = MediaQuery.of(context).size;
+    
+    // Calculate proper card dimensions - use a consistent aspect ratio of 1:1.4
+    // and make the card take up a good portion of screen width
+    final cardWidth = screenSize.width * 0.7;
+    final cardHeight = cardWidth * 1.4; // Standard Pokemon card aspect ratio
+    
     // Extract additional Pokemon-specific data to decide whether to show attacks button
     final attacks = _additionalData?['attacks'] as List<dynamic>? ?? [];
     final abilities = _additionalData?['abilities'] as List<dynamic>? ?? [];
@@ -1684,171 +1772,120 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
     return Scaffold(
       appBar: AppBar(title: Text(widget.card.name)),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 80),
-          child: Column(
-            children: [
-              Container(
-                color: isDark ? Colors.black : Colors.white,
-                height: MediaQuery.of(context).size.width * 1.0,
-                child: Stack(
-                  children: [
-                    // Background gradient overlay
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              isDark ? Colors.black : Colors.white,
-                              isDark ? Colors.black.withOpacity(0.7) : Colors.grey[100]!,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Card image
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Container(
-                          width: MediaQuery.of(context).size.width * 0.75,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Hero(
+              tag: 'card_${widget.card.id}_${widget.heroContext}',
+              child: Container(
+                color: isDark ? AppColors.darkBackground : Colors.grey[100],
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: GestureDetector(
+                  onTap: _flipCard,
+                  child: AnimatedBuilder(
+                    animation: _flipAnimation,
+                    builder: (context, child) {
+                      final value = _flipAnimation.value;
+                      final angle = value * pi;
+                      
+                      return Container(
+                        height: cardHeight,
+                        width: cardWidth,
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()
+                            ..setEntry(3, 2, 0.001) // Add perspective
+                            ..rotateY(angle),
+                          child: value >= 0.5
+                            ? Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.identity()..rotateY(pi),
+                                child: _buildCardBack(),
+                              )
+                            : ZoomableCardImage(
+                                imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
+                                height: cardHeight,
+                                width: cardWidth,
+                                onTap: _flipCard,
                               ),
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: GestureDetector(
-                            onTap: flipCard,
-                            child: AnimatedBuilder(
-                              animation: flipController,
-                              builder: (context, child) {
-                                final isFrontVisible = flipController.value < 0.5;
-                                
-                                return Transform(
-                                  transform: Matrix4.identity()
-                                    ..setEntry(3, 2, 0.001)
-                                    ..rotateY(flipController.value * pi),
-                                  alignment: Alignment.center,
-                                  child: isFrontVisible 
-                                    ? // Front of card - only build when visible
-                                      Hero(
-                                        tag: HeroTags.cardImage(widget.card.id, context: widget.heroContext),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(16),
-                                          child: CachedNetworkImage(
-                                            imageUrl: widget.card.largeImageUrl ?? widget.card.imageUrl,
-                                            fit: BoxFit.contain,
-                                            placeholder: (context, url) => Center(
-                                              child: CircularProgressIndicator(
-                                                valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
-                                              ),
-                                            ),
-                                            errorWidget: (context, url, error) => Container(
-                                              color: Colors.grey[900],
-                                              child: const Center(child: Icon(Icons.broken_image, color: Colors.white, size: 50)),
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                    : // Back of card - apply a second transform to maintain correct orientation
-                                      Transform(
-                                        transform: Matrix4.identity()..rotateY(pi),
-                                        alignment: Alignment.center,
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(16),
-                                          child: _buildCardBack(),
-                                        ),
-                                      ),
-                                );
-                              },
-                            ),
-                          ),
                         ),
-                      ),
-                    ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Card title and set icon in a row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.card.name,
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Card title and set icon in a row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.card.name,
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (widget.card.set.id.isNotEmpty) 
-                          PokemonSetIcon(
-                            setId: widget.card.set.id,
-                            size: 32,
-                            color: Theme.of(context).brightness == Brightness.dark
-                              ? Colors.white
-                              : null,
-                          ),
-                      ],
-                    ),
-                    if (widget.card.setName != null && widget.card.setName!.isNotEmpty)
-                      Text(
-                        widget.card.setName!,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                          fontWeight: FontWeight.w500,
-                        ),
                       ),
-                    const SizedBox(height: 24),
-                    _buildEnhancedPriceDisplay(),
-                    const SizedBox(height: 24),
-                    _buildCardInfo(),
-                    
-                    // Add attacks & abilities button when available
-                    if (hasAttacksOrAbilities) ...[
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _showAttacksAndAbilities,
-                        icon: const Icon(Icons.bolt),
-                        label: const Text('View Attacks & Abilities'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.amber.shade600,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(double.infinity, 48),
+                      if (widget.card.set.id.isNotEmpty) 
+                        PokemonSetIcon(
+                          setId: widget.card.set.id,
+                          size: 32,
+                          color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : null,
                         ),
-                      ),
                     ],
-                    
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.grey[900] : Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12),
+                  ),
+                  if (widget.card.setName != null && widget.card.setName!.isNotEmpty)
+                    Text(
+                      widget.card.setName!,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        fontWeight: FontWeight.w500,
                       ),
-                      child: _buildRecentSales(),
+                    ),
+                  const SizedBox(height: 24),
+                  _buildEnhancedPriceDisplay(),
+                  const SizedBox(height: 24),
+                  _buildCardInfo(),
+                  
+                  // Add attacks & abilities button when available
+                  if (hasAttacksOrAbilities) ...[
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _showAttacksAndAbilities,
+                      icon: const Icon(Icons.bolt),
+                      label: const Text('View Attacks & Abilities'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber.shade600,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                      ),
                     ),
                   ],
-                ),
+                  
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[900] : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _buildRecentSales(),
+                  ),
+                  // Add the market action buttons if provided
+                  if (widget.marketActionButtons != null)
+                    widget.marketActionButtons!,
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: FutureBuilder<CollectionService>(
@@ -1856,7 +1893,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const SizedBox.shrink();
 
-          return StreamBuilder<List<TcgCard>>(
+          return StreamBuilder<List<dynamic>>(
             stream: storage.watchCards(), // Use the storage property from the base class
             builder: (context, cardsSnapshot) {
               // If we're viewing from collection or binder, show "Add to Binder"
@@ -1870,7 +1907,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
 
               // Otherwise check if card is in collection
               final isInCollection = cardsSnapshot.data?.any(
-                (c) => c.id == widget.card.id
+                (c) => c is TcgCard && c.id == widget.card.id
               ) ?? false;
 
               return buildFAB(
@@ -1890,19 +1927,38 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
   @override
   void initState() {
     super.initState();
+    // Initialize flip animation controller
+    _flipController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _flipAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _flipController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
     // Preload the card back image to prevent flicker during animation
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _precacheCardBackImage();
     });
   }
 
+  @override
+  void dispose() {
+    _flipController.dispose();
+    super.dispose();
+  }
+
   // Add a dedicated method to preload card back with error handling
   Future<void> _precacheCardBackImage() async {
     try {
       await precacheImage(const AssetImage('assets/images/cardback.png'), context);
-      print('Card back image precached successfully');
+      LoggingService.debug('Card back image precached successfully');
     } catch (e) {
-      print('Error precaching card back image: $e');
+      LoggingService.debug('Error precaching card back image: $e');
     }
   }
 
@@ -1912,7 +1968,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
       'assets/images/cardback.png',
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {
-        print('Error loading card back: $error');
+        LoggingService.debug('Error loading card back: $error');
         // Provide a solid color fallback with Pokemon branding
         return Container(
           decoration: BoxDecoration(
@@ -2509,5 +2565,21 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
         ],
       ),
     );
+  }
+
+  void _toggleCardFlip() {
+    // Use the _flipCard method that already exists and properly handles the animation
+    _flipCard();
+  }
+
+  // Method to handle card flip
+  void _flipCard() {
+    if (_flipController.isAnimating) return;
+    
+    if (_flipController.value == 0) {
+      _flipController.forward();
+    } else {
+      _flipController.reverse();
+    }
   }
 }

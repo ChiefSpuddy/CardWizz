@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
+import '../services/logging_service.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:async';  // Add this for StreamSubscription
 
 class PurchaseService extends ChangeNotifier {
@@ -46,7 +47,7 @@ class PurchaseService extends ChangeNotifier {
 
       // For development/testing
       if (kDebugMode) {
-        print('Store is available');
+        LoggingService.debug('Store is available');
         // Uncomment to test premium features
         // _isPremium = true;
         // notifyListeners();
@@ -166,7 +167,7 @@ class PurchaseService extends ChangeNotifier {
     if (kDebugMode) {
       debugForcePremium = true;
       notifyListeners();
-      print('DEBUG: Premium test mode enabled');
+      LoggingService.debug('DEBUG: Premium test mode enabled');
     }
   }
 
@@ -174,7 +175,7 @@ class PurchaseService extends ChangeNotifier {
     if (kDebugMode) {
       debugForcePremium = false;
       notifyListeners();
-      print('DEBUG: Premium test mode disabled');
+      LoggingService.debug('DEBUG: Premium test mode disabled');
     }
   }
 }

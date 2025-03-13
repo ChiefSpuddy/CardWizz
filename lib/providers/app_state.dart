@@ -1,3 +1,4 @@
+import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';  // Add this import
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,7 +40,7 @@ class AppState with ChangeNotifier {
       // Initialize storage in a separate microtask to avoid blocking UI
       if (_authService.isAuthenticated && _authService.currentUser != null) {
         final userId = _authService.currentUser!.id;
-        print('AppState: Initializing with authenticated user: $userId');
+        LoggingService.debug('AppState: Initializing with authenticated user: $userId');
         
         // Set user ID in storage service
         _storageService.setCurrentUser(userId);
@@ -47,13 +48,13 @@ class AppState with ChangeNotifier {
         // Load collection service in background
         _initializeCollectionServiceAsync(userId);
       } else {
-        print('AppState: No authenticated user found');
+        LoggingService.debug('AppState: No authenticated user found');
       }
       
       // Initialize these settings in background
       Future.microtask(() => _initializePrivacySettings());
     } catch (e) {
-      print('AppState initialization error: $e');
+      LoggingService.debug('AppState initialization error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -75,9 +76,9 @@ class AppState with ChangeNotifier {
         () => _storageService.refreshState(),
       );
       
-      print('AppState: Collection service initialized successfully');
+      LoggingService.debug('AppState: Collection service initialized successfully');
     } catch (e) {
-      print('AppState: Error initializing collection service: $e');
+      LoggingService.debug('AppState: Error initializing collection service: $e');
     }
   }
 
@@ -121,7 +122,7 @@ class AppState with ChangeNotifier {
       if (_collectionService != null) {
         _collectionService!.setCurrentUser(user.id);
       }
-      print('Signed in user: ${user.id}');
+      LoggingService.debug('Signed in user: ${user.id}');
     }
     notifyListeners();
     return user;
@@ -130,7 +131,7 @@ class AppState with ChangeNotifier {
   Future<void> signOut() async {
     final userId = _authService.currentUser?.id;
     if (userId != null) {
-      print('Signing out user: $userId');
+      LoggingService.debug('Signing out user: $userId');
       // Just clear session state without deleting data
       await _storageService.clearSessionState();
       await _collectionService?.clearSessionState();
@@ -194,7 +195,7 @@ class AppState with ChangeNotifier {
       await _storageService.permanentlyDeleteUserData();
       notifyListeners();
     } catch (e) {
-      print('Error deleting account: $e');
+      LoggingService.debug('Error deleting account: $e');
       rethrow;
     }
   }

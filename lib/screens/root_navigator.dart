@@ -6,7 +6,6 @@ import './collections_screen.dart';
 import './search_screen.dart';
 import './analytics_screen.dart';
 import './profile_screen.dart';
-import '../constants/app_colors.dart';
 import '../providers/app_state.dart';
 import '../widgets/sign_in_view.dart';
 import '../widgets/styled_toast.dart'; // Add this import for showToast function

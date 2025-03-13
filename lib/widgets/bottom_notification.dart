@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:ui';
 
 class BottomNotification {
-  /// Shows a notification from the bottom of the screen
-  /// 
-  /// You can customize the appearance with title, message, icon, and whether it's an error.
+  static OverlayEntry? _currentNotification;
+  static Timer? _dismissTimer;
+
   static void show({
     required BuildContext context,
     required String title,
@@ -12,83 +14,142 @@ class BottomNotification {
     bool isError = false,
     Duration duration = const Duration(seconds: 3),
   }) {
-    final overlayState = Overlay.of(context);
-    final theme = Theme.of(context);
-    
-    // Create the overlay entry
-    final overlayEntry = OverlayEntry(
-      builder: (context) {
-        return Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(12),
-                color: isError
-                    ? Colors.red.shade700
-                    : theme.colorScheme.primary,
+    try {
+      hide();
+      
+      final overlay = Overlay.of(context);
+      if (overlay == null) return;
+      
+      final navigator = Navigator.of(context);
+      if (!navigator.mounted) return;
+      
+      final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+      _currentNotification = OverlayEntry(
+        builder: (overlayContext) {
+          final mediaQuery = MediaQuery.of(overlayContext);
+          final bottomPadding = mediaQuery.padding.bottom;
+          final bottomInset = mediaQuery.viewInsets.bottom;
+          final screenWidth = mediaQuery.size.width;
+          
+          return Positioned(
+            bottom: bottomPadding + 8 + (bottomInset > 0 ? bottomInset : 0),
+            width: screenWidth,
+            child: Center(
+              child: IgnorePointer(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12, 
-                    horizontal: 16,
-                  ),
-                  child: Row(
-                    children: [
-                      if (icon != null) ...[
-                        Icon(
-                          icon,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                      ],
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            if (message != null) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                message,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 14,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ],
-                        ),
+                  width: screenWidth * 0.9,
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isError
+                          ? [Colors.red.shade800, Colors.red.shade900]
+                          : isDarkMode
+                              ? [Colors.grey.shade900, Colors.black]
+                              : [Colors.grey.shade900, Colors.grey.shade800],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                        spreadRadius: 1,
                       ),
                     ],
+                    border: Border.all(
+                      color: isError
+                          ? Colors.red.shade700.withOpacity(0.5)
+                          : Colors.white.withOpacity(0.1),
+                      width: 0.5,
+                    ),
+                  ),
+                  // REMOVED BackdropFilter that was causing yellow underlines
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        if (icon != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isError
+                                  ? Colors.red.shade600.withOpacity(0.2)
+                                  : Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              icon,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (message != null && message.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  message,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (overlay.mounted) {
+          overlay.insert(_currentNotification!);
+        }
+      });
+
+      _dismissTimer = Timer(duration, () {
+        hide();
+      });
+    } catch (e) {
+      debugPrint('Error showing bottom notification: $e');
+    }
+  }
+
+  static void hide() {
+    _dismissTimer?.cancel();
+    _dismissTimer = null;
     
-    // Add to overlay and auto-remove after duration
-    overlayState.insert(overlayEntry);
-    
-    Future.delayed(duration, () {
-      overlayEntry.remove();
-    });
+    try {
+      _currentNotification?.remove();
+    } catch (e) {
+      debugPrint('Error hiding notification: $e');
+    } finally {
+      _currentNotification = null;
+    }
   }
 }
