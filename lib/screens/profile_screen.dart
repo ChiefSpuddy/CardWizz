@@ -19,6 +19,7 @@ import '../providers/theme_provider.dart'; // Add this import
 import '../widgets/app_drawer.dart'; // Add this import
 import '../widgets/standard_app_bar.dart'; // Add this import
 import 'package:lottie/lottie.dart'; // Add this import
+import '../services/premium_service.dart'; // Add this import
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -37,6 +38,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   bool _notificationsEnabled = false;
   bool _showPremiumInfo = false;
   Timer? _syncCheckTimer;
+  int _devModeCounter = 0;  // Counter for dev mode activation
+  bool _devModeEnabled = false;  // Flag for dev mode
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
@@ -576,33 +579,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       setState(() {});
                     },
                   ),
-                  if (storageService.isSyncEnabled) ...[
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.sync_rounded),
-                      title: const Text('Sync Now'),
-                      onTap: () async {
-                        final storage = context.read<StorageService>();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Updating your collection'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        final wasSuccessful = await storage.syncNow();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                wasSuccessful ? 'Your collection is up to date' : 'Please try again later'
-                              ),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      },
-                    ),
-                  ],
                   const Divider(height: 1),
                   // 3. Notifications (disabled for now)
                   ListTile(
@@ -693,38 +669,32 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                   ),
                   const Divider(height: 1),
-                  Container( // Add container for consistent padding
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: _buildPremiumTile(context),
+                  ListTile(
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16), // Add horizontal padding here
+                    title: _buildPremiumTile(context), // Remove the Padding that was wrapping this
                   ),
                   if (_showPremiumInfo) ...[
                     const Divider(height: 1),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: _buildPremiumInfoSection(context, purchaseService.isPremium),
-                    ),
+                    _buildPremiumInfoSection(context, purchaseService.isPremium),
                   ] else
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: TextButton(
-                        onPressed: () => setState(() => _showPremiumInfo = true),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'View Subscription Details',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.w500,
+                    SizedBox(
+                      width: double.infinity, // Full width
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: TextButton(
+                          onPressed: () => setState(() => _showPremiumInfo = true),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Show subscription details (£1.99/month)', // Updated to show price
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.expand_more,
-                              size: 20,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ],
+                              const Icon(Icons.expand_more, size: 20),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -752,90 +722,233 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget _buildPremiumTile(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final purchaseService = context.watch<PurchaseService>();
+    
+    // Use a safer approach to get PremiumService
+    PremiumService? premiumService;
+    bool isDebugMode = false;
+    bool isPremium = purchaseService.isPremium;
+    
+    try {
+      premiumService = Provider.of<PremiumService>(context, listen: true);
+      isDebugMode = premiumService.isDebugOverrideEnabled;
+      isPremium = premiumService.isPremium;
+    } catch (e) {
+      // If PremiumService is not available yet, use the PurchaseService's premium status
+      debugPrint('PremiumService not available yet: $e');
+    }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Material(
-        color: Colors.transparent,
+    // Define colors based on app theme
+    final nonPremiumPrimaryColor = colorScheme.secondary;
+    final premiumPrimaryColor = colorScheme.primary;
+
+    return Card(
+      elevation: 2,
+      margin: EdgeInsets.zero, // Remove margin for full width
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          // Dev mode activation on multiple taps
+          _devModeCounter++;
+          if (_devModeCounter >= 7) {
+            _devModeCounter = 0;
+            _devModeEnabled = true;
+            if (premiumService != null) {
+              _showDevModeDialog(context);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Developer mode not available (PremiumService not initialized)')),
+              );
+            }
+          } else {
+            // Regular behavior
+            if (isPremium) {
+              _showPremiumInfoDialog(context);
+            } else {
+              _initiatePremiumPurchase(context);
+            }
+            
+            // Reset counter after a delay
+            Future.delayed(const Duration(seconds: 3), () {
+              if (mounted) {
+                _devModeCounter = 0;
+              }
+            });
+          }
+        },
+        onLongPress: _devModeEnabled && premiumService != null 
+            ? () => _showDevModeDialog(context) 
+            : null,
         child: Container(
+          width: double.infinity, // Ensure full width
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: purchaseService.isPremium 
-                  ? [
-                      colorScheme.primaryContainer,
-                      colorScheme.primary.withOpacity(0.2),
-                    ]
-                  : [
-                      Colors.amber.shade200,
-                      Colors.amber.shade100,
-                    ],
+              colors: isPremium 
+                ? [
+                    premiumPrimaryColor.withOpacity(0.9),
+                    premiumPrimaryColor.withOpacity(0.5),
+                  ]
+                : [
+                    nonPremiumPrimaryColor.withOpacity(0.85),
+                    nonPremiumPrimaryColor.withOpacity(0.5),
+                  ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: (purchaseService.isPremium
-                        ? colorScheme.primary
-                        : Colors.amber.shade300)
-                    .withOpacity(0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: purchaseService.isPremium
-                ? () => _showPremiumInfoDialog(context)
-                : () => _initiatePremiumPurchase(context),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: purchaseService.isPremium
-                          ? colorScheme.primary
-                          : Colors.amber.shade400,
-                      shape: BoxShape.circle,
-                    ),
+          child: Stack(
+            children: [
+              // Sparkle effect in the background (for non-premium only)
+              if (!isPremium)
+                Positioned(
+                  right: -10,
+                  top: -15,
+                  child: ShaderMask(
+                    shaderCallback: (Rect bounds) {
+                      return LinearGradient(
+                        colors: [
+                          Colors.white.withOpacity(0.2),
+                          Colors.white.withOpacity(0.05),
+                        ],
+                      ).createShader(bounds);
+                    },
                     child: Icon(
-                      Icons.workspace_premium,
+                      Icons.star,
+                      size: 80,
                       color: Colors.white,
-                      size: 24,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          purchaseService.isPremium ? 'Premium Active' : 'Upgrade to Premium',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        Text(
-                          purchaseService.isPremium
-                              ? 'All features unlocked'
-                              : 'Unlock unlimited collections & more',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface.withOpacity(0.7),
-                              ),
-                        ),
-                      ],
+                ),
+                
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween, // Ensure proper spacing
+                  children: [
+                    // Premium icon
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isPremium ? premiumPrimaryColor : nonPremiumPrimaryColor).withOpacity(0.3),
+                            blurRadius: 8,
+                            spreadRadius: 0,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.workspace_premium,
+                        color: isPremium ? premiumPrimaryColor : nonPremiumPrimaryColor,
+                        size: 24,
+                      ),
                     ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: colorScheme.onSurface.withOpacity(0.7),
-                  ),
-                ],
+                    const SizedBox(width: 16),
+                    
+                    // Text content
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isPremium ? 'Premium Active' : 'Upgrade to Premium',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isPremium
+                                ? 'All premium features unlocked'
+                                : 'Unlock unlimited collections & more',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withOpacity(0.85),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Action button/indicator
+                    isPremium
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            'Active',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: premiumPrimaryColor,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'Upgrade',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 10,
+                                color: nonPremiumPrimaryColor,
+                              ),
+                            ],
+                          ),
+                        ),
+                  ],
+                ),
               ),
-            ),
+              
+              // Show debug indicator if overriding
+              if (isDebugMode)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'DEBUG',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -843,18 +956,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   Widget _buildPremiumInfoSection(BuildContext context, bool isPremium) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),  // Reduced horizontal margin
-      child: AnimatedCrossFade(
-        duration: const Duration(milliseconds: 300),
-        crossFadeState: _showPremiumInfo ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-        firstChild: TextButton(
+    return AnimatedCrossFade(
+      duration: const Duration(milliseconds: 300),
+      crossFadeState: _showPremiumInfo ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+      firstChild: SizedBox(
+        width: double.infinity, // Full width
+        child: TextButton(
           onPressed: () => setState(() => _showPremiumInfo = true),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Show subscription details',
+                'Show subscription details (£1.99/month)', // Updated to show price
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                 ),
@@ -863,12 +976,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ],
           ),
         ),
-        secondChild: Card(
+      ),
+      secondChild: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8), // Reduced horizontal padding
+        child: Card(
+          margin: EdgeInsets.zero, // Remove margin for full width
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,  // Add this
+            crossAxisAlignment: CrossAxisAlignment.stretch,  // Full width
             children: [
               ListTile(
-                title: const Text('Subscription Details'),
+                title: const Text('Subscription Details (£1.99/month)'), // Updated to include price
                 trailing: IconButton(
                   icon: const Icon(Icons.expand_less),
                   onPressed: () => setState(() => _showPremiumInfo = false),
@@ -889,6 +1006,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     ),
                     const SizedBox(height: 8),
                     Container(
+                      width: double.infinity, // Full width
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.surfaceVariant,
@@ -917,6 +1035,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     _buildFeatureComparison(),
                     const SizedBox(height: 16),
                     Container(
+                      width: double.infinity, // Full width
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
@@ -953,15 +1072,30 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           children: const [
             Padding(
               padding: EdgeInsets.all(8),
-              child: Text('Feature', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('Feature', 
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10, // Further reduced from 11 to 10
+                ),
+              ),
             ),
             Padding(
               padding: EdgeInsets.all(8),
-              child: Text('Free', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('Free', 
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10, // Further reduced from 11 to 10
+                ),
+              ),
             ),
             Padding(
               padding: EdgeInsets.all(8),
-              child: Text('Premium', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('Premium', 
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10, // Further reduced from 11 to 10
+                ),
+              ),
             ),
           ],
         ),
@@ -1058,7 +1192,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   children: [
                     Text(
                       '• Monthly subscription\n'
-                      '• \$1.99 USD per month\n'
+                      '• £1.99 per month\n' // Updated from $1.99 to £1.99
                       '• Auto-renews unless cancelled\n'
                       '• Cancel anytime in App Store',
                       style: TextStyle(fontSize: 13),
@@ -1671,6 +1805,102 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Show developer mode dialog
+  void _showDevModeDialog(BuildContext context) {
+    PremiumService? premiumService;
+    try {
+      premiumService = Provider.of<PremiumService>(context, listen: false);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Developer mode not available (PremiumService not initialized)')),
+      );
+      return;
+    }
+    
+    // Return early if premiumService is null
+    if (premiumService == null) return;
+    
+    final isPremium = premiumService.isPremium;
+    final isDebugMode = premiumService.isDebugOverrideEnabled;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.developer_mode, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('Developer Settings'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Premium Status Override:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceVariant,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Current actual status: ${isPremium && !isDebugMode ? "Premium" : "Free"}'),
+                  const SizedBox(height: 8),
+                  Text('Debug override enabled: ${isDebugMode ? "Yes" : "No"}'),
+                  const SizedBox(height: 8),
+                  Text('Current simulated status: ${isPremium ? "Premium" : "Free"}'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Override premium status to test both subscription states:',
+              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              premiumService?.resetDebugOverride();  // Use ?. operator for null safety
+              Navigator.of(context).pop();
+              setState(() {}); // Refresh UI
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Reset to actual subscription state')),
+              );
+            },
+            child: const Text('Reset Override'),
+          ),
+          FilledButton(
+            onPressed: () {
+              premiumService?.setDebugOverride(true, premiumStatus: false);  // Use ?. operator for null safety
+              Navigator.of(context).pop();
+              setState(() {}); // Refresh UI
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Simulating FREE user state')),
+              );
+            },
+            child: const Text('Simulate FREE'),
+          ),
+          FilledButton(
+            onPressed: () {
+              premiumService?.setDebugOverride(true, premiumStatus: true);  // Use ?. operator for null safety
+              Navigator.of(context).pop();
+              setState(() {}); // Refresh UI
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Simulating PREMIUM user state')),
+              );
+            },
+            child: const Text('Simulate PREMIUM'),
+          ),
+        ],
       ),
     );
   }

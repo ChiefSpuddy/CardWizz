@@ -84,34 +84,40 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     // Initialize animation controllers
     _fadeInController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 400), // Reduced from 600ms for faster visibility
     );
     
     _slideController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600), // Reduced from 800ms
     );
     
     _valueController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 800), // Reduced from 1200ms
     );
     
     _toggleController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 300), // Reduced from 400ms
     );
 
-    // Start animations
+    // Start animations with slight delay to ensure content is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() => _pageViewReady = true);
-      _fadeInController.forward();
-      _slideController.forward();
-      _valueController.forward();
-      _toggleController.forward();
-      
-      // Initialize background particles with fewer particles
-      _initializeParticles();
+      // Preload collection data
+      final storageService = Provider.of<StorageService>(context, listen: false);
+      storageService.watchCards().first.then((_) {
+        if (mounted) {
+          setState(() => _pageViewReady = true);
+          _fadeInController.forward(from: 0.3); // Start from 0.3 instead of 0 for faster visibility
+          _slideController.forward();
+          _valueController.forward();
+          _toggleController.forward();
+          
+          // Initialize background particles with fewer particles
+          _initializeParticles();
+        }
+      });
     });
   }
 
@@ -650,22 +656,28 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
                                   // Wrap PageView in Expanded to ensure it gets a definite size
                                   Expanded(
                                     child: _pageViewReady 
-                                      ? AnimatedOpacity(
-                                          duration: const Duration(milliseconds: 500),
-                                          opacity: _fadeInController.value,
+                                      ? FadeTransition(
+                                          opacity: Tween(begin: 1.0, end: 1.0).animate(_fadeInController), // Force full opacity
                                           child: PageView(
                                             controller: _pageController,
                                             onPageChanged: _onPageChanged,
                                             physics: const ClampingScrollPhysics(),
                                             children: [
-                                              // Pass callbacks to both child widgets
-                                              CollectionGrid(
-                                                key: const PageStorageKey('main_collection'),
-                                                onMultiselectChange: setMultiselectActive,
+                                              // Pass callbacks to both child widgets with explicit opacity
+                                              Opacity(
+                                                opacity: 1.0, // Force full opacity
+                                                child: CollectionGrid(
+                                                  key: const PageStorageKey('main_collection'),
+                                                  onMultiselectChange: setMultiselectActive,
+                                                  scrollController: ScrollController(), // Add the required scrollController parameter here
+                                                ),
                                               ),
-                                              CustomCollectionsGrid(
-                                                key: const PageStorageKey('custom_collections'),
-                                                onMultiselectChange: setMultiselectActive,
+                                              Opacity(
+                                                opacity: 1.0, // Force full opacity
+                                                child: CustomCollectionsGrid(
+                                                  key: const PageStorageKey('custom_collections'),
+                                                  onMultiselectChange: setMultiselectActive,
+                                                ),
                                               ),
                                             ],
                                           ),

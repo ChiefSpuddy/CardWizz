@@ -1,83 +1,96 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import './home_screen.dart';
-import './collections_screen.dart';
-import './search_screen.dart';
-import './analytics_screen.dart';
-import './profile_screen.dart';
-import '../providers/app_state.dart';
-import '../widgets/sign_in_view.dart';
-import '../widgets/styled_toast.dart'; // Add this import for showToast function
+import '../screens/home_screen.dart';
+import '../screens/collections_screen.dart'; // Change this from collection_screen.dart to collections_screen.dart
+import '../screens/search_screen.dart';
+import '../screens/analytics_screen.dart';
+import '../screens/profile_screen.dart';
+import '../constants/app_colors.dart';
 
 class RootNavigator extends StatefulWidget {
   final int initialTab;
   
-  const RootNavigator({
-    super.key,
-    this.initialTab = 0,
-  });
+  // Add a static instance to track the current navigator state
+  static _RootNavigatorState? _instance;
+  
+  const RootNavigator({Key? key, this.initialTab = 0}) : super(key: key);
+
+  // Add a public static method to switch tabs
+  static void switchToTab(BuildContext context, int index) {
+    if (_instance != null) {
+      _instance!.setCurrentIndex(index);
+    } else {
+      // Use Navigator to push a new RootNavigator with desired tab if no instance exists
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => RootNavigator(initialTab: index),
+        ),
+        (route) => false,
+      );
+    }
+  }
 
   @override
-  State<RootNavigator> createState() => RootNavigatorState();
+  State<RootNavigator> createState() => _RootNavigatorState();
 }
 
-class RootNavigatorState extends State<RootNavigator> {
-  int _currentIndex = 0;
-  
+class _RootNavigatorState extends State<RootNavigator> {
+  late int _currentIndex;
+  final List<Widget> _screens = [
+    const HomeScreen(),
+    const CollectionsScreen(showEmptyState: true), // Update to use CollectionsScreen with the required parameter
+    const SearchScreen(),
+    const AnalyticsScreen(),
+    const ProfileScreen(),
+  ];
+
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialTab;
+    // Store instance for static access
+    RootNavigator._instance = this;
   }
-
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    CollectionsScreen(),
-    SearchScreen(),
-    AnalyticsScreen(),
-    ProfileScreen(),     // Now at index 4
-  ];
-
-  void _onNavigationItemTapped(int index) {
+  
+  @override
+  void dispose() {
+    // Remove instance reference when disposed
+    if (RootNavigator._instance == this) {
+      RootNavigator._instance = null;
+    }
+    super.dispose();
+  }
+  
+  // Public method to change the current tab index
+  void setCurrentIndex(int index) {
     setState(() {
       _currentIndex = index;
     });
   }
 
-  // Add this public method
-  void switchToTab(int index) {
-    if (index >= 0 && index < _screens.length) {
-      setState(() => _currentIndex = index);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Check for initialTab argument
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final initialTab = args?['initialTab'] as int?;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    // Update selected index if initialTab is provided via arguments
-    if (initialTab != null && initialTab != _currentIndex) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        setState(() => _currentIndex = initialTab);
-      });
-    }
-
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,
+        onTap: (index) {
+          setCurrentIndex(index);
+        },
+        type: BottomNavigationBarType.fixed,
         selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Colors.grey,
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        onTap: _onNavigationItemTapped,
+        unselectedItemColor: isDark 
+            ? Colors.white.withOpacity(0.6) 
+            : Colors.black54,
+        backgroundColor: isDark 
+            ? AppColors.darkCardBackground 
+            : Colors.white,
+        elevation: 8,
+        // Make navigation bar more compact
+        selectedFontSize: 11.0, // Reduced from default 14
+        unselectedFontSize: 11.0, // Reduced from default 12
+        iconSize: 22.0, // Reduced from default 24
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
@@ -85,8 +98,8 @@ class RootNavigatorState extends State<RootNavigator> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.style_outlined),
-            activeIcon: Icon(Icons.style),
+            icon: Icon(Icons.grid_view_outlined),
+            activeIcon: Icon(Icons.grid_view),
             label: 'Collection',
           ),
           BottomNavigationBarItem(
@@ -95,8 +108,8 @@ class RootNavigatorState extends State<RootNavigator> {
             label: 'Search',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.analytics_outlined),
-            activeIcon: Icon(Icons.analytics),
+            icon: Icon(Icons.insights_outlined),
+            activeIcon: Icon(Icons.insights),
             label: 'Analytics',
           ),
           BottomNavigationBarItem(

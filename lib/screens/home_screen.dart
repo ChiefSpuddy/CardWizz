@@ -7,6 +7,7 @@ import 'home_overview.dart';
 import 'search_screen.dart';
 import 'root_navigator.dart';
 import '../widgets/standard_app_bar.dart';
+import './collections_screen.dart';  // Update this import
 
 class HomeScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -43,17 +44,14 @@ class HomeScreenState extends State<HomeScreen> {
     HomeScreen._scrollController.addListener(_onScroll);
   }
   
-  // Update this method to use the public switchToTab method instead of private _onNavigationItemTapped
+  // Update this method to use the public switchToTab method instead of private _RootNavigatorState
   void setSelectedIndex(int index) {
-    // Find RootNavigator and set its index
-    final rootNavigator = context.findRootAncestorStateOfType<RootNavigatorState>();
-    if (rootNavigator != null) {
-      rootNavigator.switchToTab(index);
-    }
+    // Use the public static method instead of trying to access the private state
+    RootNavigator.switchToTab(context, index);
   }
 
   void goToSearchWithQuery(String query) {
-    setSelectedIndex(2); // Switch to search tab
+    RootNavigator.switchToTab(context, 2); // 2 is the index for Search tab
     
     // Small delay to ensure the search screen is initialized
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -173,10 +171,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _navigateToTab(int index) {
-    final rootNavigator = context.findRootAncestorStateOfType<RootNavigatorState>();
-    if (rootNavigator != null) {
-      rootNavigator.switchToTab(index);
-    }
+    RootNavigator.switchToTab(context, index);
   }
 
   @override

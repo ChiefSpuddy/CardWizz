@@ -64,7 +64,7 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
                   controller: searchController,
                   onChanged: onSearchChanged,
                   decoration: InputDecoration(
-                    hintText: 'Search..',
+                    hintText: 'Search...',
                     isDense: true, // More compact height
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,

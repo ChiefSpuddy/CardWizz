@@ -96,6 +96,18 @@ class AppColors {
           onPrimary: Colors.white,
           onSecondary: Colors.white,
         ),
+        // Fix the bottom navigation bar theme
+        bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          selectedItemColor: darkAccentPrimary,
+          unselectedItemColor: Colors.white.withOpacity(0.6),
+          backgroundColor: darkCardBackground,
+          elevation: 8,
+          // Remove these parameters as they don't exist
+          // selectedFontSize: 11.0,
+          // unselectedFontSize: 11.0,
+          // iconSize: 22.0,
+          type: BottomNavigationBarType.fixed,
+        ),
       );
     } else {
       return ThemeData.light().copyWith(
@@ -107,6 +119,18 @@ class AppColors {
           background: background,
           onPrimary: Colors.white,
           onSecondary: Colors.white,
+        ),
+        // Fix the bottom navigation bar theme
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          selectedItemColor: primary,
+          unselectedItemColor: Colors.black54,
+          backgroundColor: Colors.white,
+          elevation: 8,
+          // Remove these parameters as they don't exist
+          // selectedFontSize: 11.0,
+          // unselectedFontSize: 11.0,
+          // iconSize: 22.0,
+          type: BottomNavigationBarType.fixed,
         ),
       );
     }

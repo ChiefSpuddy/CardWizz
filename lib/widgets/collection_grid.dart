@@ -18,13 +18,17 @@ import '../models/tcg_card.dart';  // Add this import
 import '../utils/hero_tags.dart';
 
 class CollectionGrid extends StatefulWidget {
-  final bool keepAlive;  // Add this
+  final bool keepAlive;
   final Function(bool)? onMultiselectChange;
+  final String query; // Add this parameter
+  final ScrollController? scrollController;
 
   const CollectionGrid({
     super.key,
-    this.keepAlive = false,  // Add this
+    this.keepAlive = false,
     this.onMultiselectChange,
+    this.query = '', // Default to empty string
+    this.scrollController,
   });
 
   @override
@@ -76,7 +80,8 @@ class _CollectionGridState extends State<CollectionGrid>
     _slideController.forward();
     _valueController.forward();
     
-    _scrollController = ScrollController();
+    // Use the provided scroll controller instead of creating a new one
+    _scrollController = widget.scrollController ?? ScrollController();
     _scrollController.addListener(_scrollListener);
     
     // Reset initial rendering after frame is drawn
@@ -95,7 +100,9 @@ class _CollectionGridState extends State<CollectionGrid>
     _slideController.dispose();
     _valueController.dispose();
     _scrollController.removeListener(_scrollListener);
-    _scrollController.dispose();
+    if (widget.scrollController == null) {
+      _scrollController.dispose();
+    }
     super.dispose();
   }
 
@@ -571,12 +578,18 @@ class _CollectionGridState extends State<CollectionGrid>
 
         // Sort the cards based on selected option
         final sortedCards = _getSortedCards(cards, sortOption);
+        
+        // Apply query filtering if provided
+        final filteredCards = widget.query.isNotEmpty
+            ? sortedCards.where((card) => 
+                card.name.toLowerCase().contains(widget.query.toLowerCase())).toList()
+            : sortedCards;
 
-        if (sortedCards.isEmpty) {
+        if (filteredCards.isEmpty) {
           return const EmptyCollectionView(
-            title: 'Your Collection is Empty',
-            message: 'Start building your collection by searching for cards you own',
-            icon: Icons.style_outlined,
+            title: 'No Matching Cards Found',
+            message: 'Try another search term or clear your filter',
+            icon: Icons.search_off_outlined,
           );
         }
 
@@ -591,7 +604,7 @@ class _CollectionGridState extends State<CollectionGrid>
                 crossAxisSpacing: 1, // Reduced from 8 to 1 for more space for cards
                 mainAxisSpacing: 2, // Reduced from 8 to 2
               ),
-              itemCount: sortedCards.length,  // Use sortedCards instead of cards
+              itemCount: filteredCards.length,  // Use filteredCards instead
               cacheExtent: 500, // Increase cache extent for smoother scrolling
               itemBuilder: (context, index) {
                 // Modify this condition to never use empty placeholders during initial load
@@ -599,7 +612,7 @@ class _CollectionGridState extends State<CollectionGrid>
                   return const SizedBox();
                 }
 
-                final card = sortedCards[index];  // Use sortedCards instead of cards
+                final card = filteredCards[index];
                 final isSelected = _selectedCards.contains(card.id);
                 
                 return RepaintBoundary(
@@ -629,79 +642,83 @@ class _CollectionGridState extends State<CollectionGrid>
                           color: Theme.of(context).colorScheme.primary,
                           width: 2,
                         ) : null,
+                        color: Colors.transparent, // Ensure transparent background
                       ),
-                      child: Stack(
-                        children: [
-                          Opacity(
-                            opacity: isSelected ? 0.8 : 1.0,
-                            child: CardGridItem(
-                              key: ValueKey(card.id),
-                              card: card,
-                              heroContext: 'collection_$index', // Add unique hero context based on index
-                              showPrice: true, // Changed to true
-                              showName: true,  // Added showName
-                              // Always use high quality for initial rendering and non-scrolling
-                              highQuality: !_lowQualityRendering || _initialRendering,
-                              onTap: () {
-                                Navigator.of(context).pushNamed(
-                                  '/card',
-                                  arguments: {
-                                    'card': card, 
-                                    'heroContext': 'collection_$index', // Pass the same hero context
-                                    'isFromCollection': true
-                                  },
-                                );
-                              },
-                              onAddToCollection: () => _addCardToBinder(card),
-                              isInCollection: true,
-                              hideCheckmarkWhenInCollection: true, // Add this line to hide checkmarks in collection view
+                      child: Opacity(
+                        opacity: 1.0, // Force full opacity for card displays
+                        child: Stack(
+                          children: [
+                            Opacity(
+                              opacity: isSelected ? 0.8 : 1.0,
+                              child: CardGridItem(
+                                key: ValueKey(card.id),
+                                card: card,
+                                heroContext: 'collection_$index', // Add unique hero context based on index
+                                showPrice: true, // Changed to true
+                                showName: true,  // Added showName
+                                // Always use high quality for initial rendering and non-scrolling
+                                highQuality: !_lowQualityRendering || _initialRendering,
+                                onTap: () {
+                                  Navigator.of(context).pushNamed(
+                                    '/card',
+                                    arguments: {
+                                      'card': card, 
+                                      'heroContext': 'collection_$index', // Pass the same hero context
+                                      'isFromCollection': true
+                                    },
+                                  );
+                                },
+                                onAddToCollection: () => _addCardToBinder(card),
+                                isInCollection: true,
+                                hideCheckmarkWhenInCollection: true, // Add this line to hide checkmarks in collection view
+                              ),
                             ),
-                          ),
-                          if (_isMultiSelectMode)
-                            Positioned.fill(
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                decoration: BoxDecoration(
-                                  color: isSelected 
-                                    ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-                                    : Colors.transparent,
-                                ),
-                                child: Center(
-                                  child: AnimatedScale(
-                                    scale: _isMultiSelectMode ? 1.0 : 0.0,
-                                    duration: const Duration(milliseconds: 200),
-                                    child: Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: isSelected 
-                                          ? Theme.of(context).colorScheme.primary
-                                          : Theme.of(context).colorScheme.surface.withOpacity(0.8),
-                                        border: Border.all(
-                                          color: isSelected
-                                            ? Colors.transparent
-                                            : Theme.of(context).colorScheme.primary,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: AnimatedScale(
-                                        scale: isSelected ? 1.0 : 0.8,
-                                        duration: const Duration(milliseconds: 200),
-                                        child: Icon(
-                                          isSelected ? Icons.check : Icons.add,
+                            if (_isMultiSelectMode)
+                              Positioned.fill(
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  decoration: BoxDecoration(
+                                    color: isSelected 
+                                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                                      : Colors.transparent,
+                                  ),
+                                  child: Center(
+                                    child: AnimatedScale(
+                                      scale: _isMultiSelectMode ? 1.0 : 0.0,
+                                      duration: const Duration(milliseconds: 200),
+                                      child: Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
                                           color: isSelected 
-                                            ? Colors.white
-                                            : Theme.of(context).colorScheme.primary,
-                                          size: 24,
+                                            ? Theme.of(context).colorScheme.primary
+                                            : Theme.of(context).colorScheme.surface.withOpacity(0.8),
+                                          border: Border.all(
+                                            color: isSelected
+                                              ? Colors.transparent
+                                              : Theme.of(context).colorScheme.primary,
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: AnimatedScale(
+                                          scale: isSelected ? 1.0 : 0.8,
+                                          duration: const Duration(milliseconds: 200),
+                                          child: Icon(
+                                            isSelected ? Icons.check : Icons.add,
+                                            color: isSelected 
+                                              ? Colors.white
+                                              : Theme.of(context).colorScheme.primary,
+                                            size: 24,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

@@ -7,5 +7,6 @@ class AppRoutes {
   static const String profile = '/profile';
   static const String addToCollection = '/add-to-collection';
   static const String cardDetails = '/card-details';
-  static const String collection = '/collection'; // Add this missing route
+  static const String collection = '/collection';
+  static const String binders = '/binders'; // Add the missing binders route
 }
