@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../screens/search_screen.dart';
+import '../../constants/app_colors.dart';
 
 class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
   final TextEditingController searchController;
@@ -28,115 +29,324 @@ class SearchAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => const Size.fromHeight(120); // Increased height for the expanded design
 
   @override
   Widget build(BuildContext context) {
-    return AppBar(
-      title: Container(
-        height: 40,
-        // IMPROVED LAYOUT: Use a Row with better spacing
-        child: Row(
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppColors.darkCardBackground : colorScheme.surface;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Column(
           children: [
-            // Dropdown now has a fixed width
-            Container(
-              width: 72, // Fixed width for dropdown
-              alignment: Alignment.center,
-              margin: const EdgeInsets.only(right: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.grey[850]
-                    : Colors.grey[200],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: _buildModeDropdown(context),
-            ),
-            // Expanded search field takes remaining space
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.grey[850]
-                      : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8),
+            // App bar with back button and title
+            Row(
+              children: [
+                // Menu or back button
+                IconButton(
+                  icon: Icon(
+                    hasResults ? Icons.arrow_back : Icons.menu,
+                    color: colorScheme.onSurface,
+                  ),
+                  onPressed: hasResults ? onClearSearch : () {
+                    Scaffold.of(context).openDrawer();
+                  },
                 ),
-                child: TextField(
-                  controller: searchController,
-                  onChanged: onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: 'Search...',
-                    isDense: true, // More compact height
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    border: InputBorder.none,
-                    suffixIcon: searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              searchController.clear();
-                              onClearSearch();
-                            },
-                          )
-                        : null,
-                    prefixIcon: const Icon(Icons.search, size: 20),
+                
+                // Title and optional subtitle
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Search',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      if (hasResults)
+                        Text(
+                          '${searchController.text} (${_getCurrentSortText()})',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
                   ),
                 ),
+                
+                // Action buttons - separate for better spacing
+                IconButton(
+                  icon: Icon(
+                    Icons.sort,
+                    color: colorScheme.primary,
+                  ),
+                  onPressed: onSortOptionsPressed,
+                  tooltip: 'Sort Results',
+                ),
+                
+                IconButton(
+                  icon: Icon(
+                    Icons.camera_alt_outlined,
+                    color: colorScheme.primary,
+                  ),
+                  onPressed: onCameraPressed,
+                  tooltip: 'Scan Card',
+                ),
+              ],
+            ),
+            
+            // Beautiful search bar design
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Row(
+                children: [
+                  // Expanded search field with modern design
+                  Expanded(
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isDark 
+                            ? colorScheme.surfaceVariant.withOpacity(0.4)
+                            : colorScheme.surfaceVariant.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: colorScheme.outline.withOpacity(0.2),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.search,
+                            color: colorScheme.primary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: searchController,
+                              onChanged: onSearchChanged,
+                              style: TextStyle(color: colorScheme.onSurface),
+                              decoration: InputDecoration(
+                                hintText: 'Search for cards...',
+                                hintStyle: TextStyle(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontSize: 15,
+                                ),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                          if (searchController.text.isNotEmpty)
+                            IconButton(
+                              icon: Icon(
+                                Icons.clear,
+                                color: colorScheme.onSurfaceVariant,
+                                size: 18,
+                              ),
+                              onPressed: onClearSearch,
+                              visualDensity: VisualDensity.compact,
+                              splashRadius: 20,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  // Separate database selection button with modern design
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: _buildModeSelector(context, colorScheme, isDark),
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
-      actions: [
-        if (hasResults)
-          IconButton(
-            icon: const Icon(Icons.sort),
-            onPressed: onSortOptionsPressed,
-          ),
-        IconButton(
-          icon: const Icon(Icons.camera_alt),
-          onPressed: onCameraPressed,
-        ),
-      ],
     );
   }
 
-  Widget _buildModeDropdown(BuildContext context) {
-    final items = [SearchMode.eng, SearchMode.mtg];
-    final labels = {'eng': 'PKM', 'mtg': 'MTG'};
-    
-    return DropdownButton<SearchMode>(
-      value: searchMode,
-      underline: Container(), // No underline
-      icon: const Icon(Icons.arrow_drop_down, size: 20),
-      iconSize: 20, // Smaller icon
-      isDense: true, // Reduces the overall button size
-      padding: EdgeInsets.zero, // No extra padding
-      style: TextStyle(
-        fontWeight: FontWeight.bold,
-        color: Theme.of(context).colorScheme.primary,
-      ),
-      items: items.map((mode) {
-        return DropdownMenuItem<SearchMode>(
-          value: mode,
-          child: Text(
-            labels[mode.toString().split('.').last.toLowerCase()] ?? 'PKM',
-            style: TextStyle(
-              fontSize: 13, // Smaller text size
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : Theme.of(context).colorScheme.primary,
+  Widget _buildModeSelector(BuildContext context, ColorScheme colorScheme, bool isDark) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _showModeSelection(context),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: colorScheme.primary.withOpacity(0.2),
+              width: 1.0,
             ),
           ),
-        );
-      }).toList(),
-      onChanged: (value) {
-        if (value != null) {
-          onSearchModeChanged([value]);
-        }
-      },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _getModeIcon(),
+              const SizedBox(width: 4),
+              Text(
+                _getModeText(),
+                style: TextStyle(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(width: 2),
+              Icon(
+                Icons.arrow_drop_down,
+                color: colorScheme.primary,
+                size: 18,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
+  }
+
+  String _getModeText() {
+    switch (searchMode) {
+      case SearchMode.eng:
+        return 'PKM';
+      case SearchMode.mtg:
+        return 'MTG';
+      default:
+        return 'PKM';
+    }
+  }
+
+  Widget _getModeIcon() {
+    IconData iconData;
+    switch (searchMode) {
+      case SearchMode.eng:
+        iconData = Icons.catching_pokemon;
+        break;
+      case SearchMode.mtg:
+        iconData = Icons.auto_awesome;
+        break;
+      default:
+        iconData = Icons.catching_pokemon;
+    }
+    
+    return Icon(
+      iconData,
+      size: 16,
+      color: Colors.blue.shade700,
+    );
+  }
+
+  void _showModeSelection(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.search, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                Text(
+                  'Select Database',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.catching_pokemon),
+            ),
+            title: const Text('Pokémon TCG'),
+            subtitle: const Text('Search English Pokémon cards'),
+            selected: searchMode == SearchMode.eng,
+            trailing: searchMode == SearchMode.eng ? 
+              Icon(Icons.check_circle, color: colorScheme.primary) : null,
+            onTap: () {
+              Navigator.pop(context);
+              onSearchModeChanged([SearchMode.eng]);
+            },
+          ),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.auto_awesome),
+            ),
+            title: const Text('Magic: The Gathering'),
+            subtitle: const Text('Search MTG cards'),
+            selected: searchMode == SearchMode.mtg,
+            trailing: searchMode == SearchMode.mtg ? 
+              Icon(Icons.check_circle, color: colorScheme.primary) : null,
+            onTap: () {
+              Navigator.pop(context);
+              onSearchModeChanged([SearchMode.mtg]);
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  String _getCurrentSortText() {
+    String sortText = '';
+    
+    if (currentSort == 'cardmarket.prices.averageSellPrice') {
+      sortText = sortAscending ? 'Price ▲' : 'Price ▼';
+    } else if (currentSort == 'name') {
+      sortText = sortAscending ? 'Name A-Z' : 'Name Z-A';
+    } else if (currentSort == 'number') {
+      sortText = sortAscending ? 'Number ▲' : 'Number ▼';
+    } else {
+      sortText = 'Sorted';
+    }
+
+    return sortText;
   }
 }
