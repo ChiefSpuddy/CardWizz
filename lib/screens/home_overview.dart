@@ -30,8 +30,11 @@ class HomeOverview extends StatefulWidget {
   State<HomeOverview> createState() => _HomeOverviewState();
 }
 
-class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderStateMixin {
+class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMixin {  // Change from SingleTickerProviderStateMixin to TickerProviderStateMixin
   late final AnimationController _animationController;
+  late final AnimationController _fadeInController;
+  late final AnimationController _slideController;
+  late final AnimationController _valueController;
 
   // Add these variables at the top of the class
   static const int cardsPerPage = 20;
@@ -50,8 +53,38 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
       vsync: this,
       duration: const Duration(seconds: 8),
     );
+    
+    // Enhanced animation controllers with staggered durations
+    _fadeInController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),  // Longer fade for smoother entrance
+    );
+    
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),  // Slightly longer slide
+    );
+    
+    _valueController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),  // Longer value animation
+    );
+    
     _animationController.forward();
     _animationController.repeat(reverse: true);
+    
+    // Start animations with staggered delays for a more dynamic entry
+    _fadeInController.forward();
+    
+    // Delay the slide animation slightly
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) _slideController.forward();
+    });
+    
+    // Delay the value animation even more
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _valueController.forward();
+    });
     
     _latestSetScrollController.addListener(_onLatestSetScroll);
   }
@@ -61,6 +94,9 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
     _latestSetScrollController.removeListener(_onLatestSetScroll);
     _latestSetScrollController.dispose();
     _animationController.dispose();
+    _fadeInController.dispose();
+    _slideController.dispose();
+    _valueController.dispose();
     super.dispose();
   }
 
@@ -544,187 +580,286 @@ class _HomeOverviewState extends State<HomeOverview> with SingleTickerProviderSt
           return _buildEmptyState();
         }
 
-        return Stack(
-          children: [
-            // Background animation
-            Positioned.fill(
-              child: Opacity(
-                opacity: 0.3,
-                child: Lottie.asset( 
-                  'assets/animations/background.json',
-                  fit: BoxFit.cover,
-                  repeat: true,
-                  frameRate: FrameRate(30), // Use the proper class
-                  controller: _animationController,
+        // Wrap the entire content in an animated container for a subtle entry effect
+        return AnimatedBuilder(
+          animation: _fadeInController,
+          builder: (context, child) {
+            return FadeTransition(
+              opacity: _fadeInController,
+              child: child,
+            );
+          },
+          child: Stack(
+            children: [
+              // Background animation
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.3,
+                  child: Lottie.asset( 
+                    'assets/animations/background.json',
+                    fit: BoxFit.cover,
+                    repeat: true,
+                    frameRate: FrameRate(30),
+                    controller: _animationController,
+                  ),
                 ),
               ),
-            ),
-            
-            // Main content
-            SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Welcome message - moved from AppBar to a Padding
-                  if (user?.username != null) 
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: RichText(
-                        text: TextSpan(
-                          style: Theme.of(context).textTheme.titleMedium,
-                          children: [
-                            TextSpan(
-                              text: '${localizations.translate('welcome')} ',
+              
+              // Main content - use SingleChildScrollView to allow all content to be scrollable
+              SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Welcome message with slide-in animation
+                    if (user?.username != null) 
+                      SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, -0.2),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: _slideController,
+                          curve: Curves.easeOutQuart,
+                        )),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                          child: RichText(
+                            text: TextSpan(
+                              style: Theme.of(context).textTheme.titleMedium,
+                              children: [
+                                TextSpan(
+                                  text: '${localizations.translate('welcome')} ',
+                                ),
+                                TextSpan(
+                                  text: '@${user?.username ?? 'Guest'}',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            TextSpan(
-                              text: '@${user?.username ?? 'Guest'}',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
 
-                  // Summary Cards
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _buildSummaryCard(
-                            context,
-                            'Total Cards',
-                            cards.length.toString(),
-                            Icons.style,
-                          ),
+                    // Summary Cards with staggered entrance animation
+                    SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.3),
+                        end: Offset.zero,
+                      ).animate(CurvedAnimation(
+                        parent: _slideController,
+                        curve: const Interval(0.1, 1.0, curve: Curves.easeOutQuart),
+                      )),
+                      child: FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: _fadeInController,
+                          curve: const Interval(0.1, 1.0),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildSummaryCard(
-                            context,
-                            'Collection Value',
-                            displayValue,
-                            Icons.currency_exchange,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Price Trend Chart
-                  if (cards.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8), // Reduced padding from 16 to 8
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 24),
-                          Provider<List<TcgCard>>.value(
-                            value: cards,
-                            child: const PortfolioValueChart(
-                              useFullWidth: true, // Set to true to use full width
-                              chartPadding: 16, // Add padding for better appearance
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  // Most Valuable Cards
-                  if (cards.isNotEmpty) ...[
-                    _buildTopCards(cards),
-                    const SizedBox(height: 8),
-                    _buildLatestSetCards(context),
-                    const SizedBox(height: 8),
-                  ],
-
-                  // Recent Cards
-                  if (cards.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: Row(
-                        children: [
-                          Text(
-                            localizations.translate('recentAdditions'),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: _navigateToCollection,
-                            child: Text(localizations.translate('viewAll')),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      height: 200,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: reversedCards.length.clamp(0, 10),
-                        itemBuilder: (context, index) {
-                          final card = reversedCards[index];
-                          return GestureDetector(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CardDetailsScreen(
-                                  card: card,
-                                  heroContext: 'home_recent',
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _buildSummaryCard(
+                                  context,
+                                  'Total Cards',
+                                  cards.length.toString(),
+                                  Icons.style,
                                 ),
                               ),
-                            ),
-                            child: Container(
-                              width: 140,
-                              margin: const EdgeInsets.only(right: 4),
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: Hero(
-                                      tag: HeroTags.cardImage(card.id, context: 'home_recent'),
-                                      child: Image.network(
-                                        card.imageUrl ?? '',
-                                        fit: BoxFit.contain,
-                                      ),
-                                    ),
-                                  ),
-                                  if (card.price != null)
-                                    Padding(
-                                      padding: const EdgeInsets.all(4),
-                                      // Use FutureBuilder to get and display raw price
-                                      child: FutureBuilder<double?>(
-                                        future: CardDetailsRouter.getRawCardPrice(card),
-                                        builder: (context, snapshot) {
-                                          final displayPrice = snapshot.data ?? card.price;
-                                          return Text(
-                                            currencyProvider.formatValue(displayPrice!),
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.green.shade700,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                ],
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildSummaryCard(
+                                  context,
+                                  'Collection Value',
+                                  displayValue,
+                                  Icons.currency_exchange,
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            ],
+                          ),
+                        ),
                       ),
                     ),
+                    
+                    // Price Trend Chart
+                    if (cards.isNotEmpty)
+                      SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.3),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: _slideController,
+                          curve: const Interval(0.2, 1.0, curve: Curves.easeOutQuart),
+                        )),
+                        child: FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: _fadeInController,
+                            curve: const Interval(0.2, 1.0),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 24),
+                                Provider<List<TcgCard>>.value(
+                                  value: cards,
+                                  child: const PortfolioValueChart(
+                                    useFullWidth: true,
+                                    chartPadding: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // Most Valuable Cards - Add animation wrapper
+                    if (cards.isNotEmpty)
+                      SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.3),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: _slideController,
+                          curve: const Interval(0.3, 1.0, curve: Curves.easeOutQuart),
+                        )),
+                        child: FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: _fadeInController,
+                            curve: const Interval(0.3, 1.0),
+                          ),
+                          child: _buildTopCards(cards),
+                        ),
+                      ),
+                    
+                    // Latest Set Cards - Add animation wrapper
+                    if (cards.isNotEmpty)
+                      SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.3),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: _slideController,
+                          curve: const Interval(0.4, 1.0, curve: Curves.easeOutQuart),
+                        )),
+                        child: FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: _fadeInController,
+                            curve: const Interval(0.4, 1.0),
+                          ),
+                          child: _buildLatestSetCards(context),
+                        ),
+                      ),
+
+                    // Recent Additions - Add animation wrapper
+                    if (cards.isNotEmpty)
+                      SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0, 0.3),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: _slideController,
+                          curve: const Interval(0.5, 1.0, curve: Curves.easeOutQuart),
+                        )),
+                        child: FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: _fadeInController,
+                            curve: const Interval(0.5, 1.0),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      localizations.translate('recentAdditions'),
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    TextButton(
+                                      onPressed: _navigateToCollection,
+                                      child: Text(localizations.translate('viewAll')),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(
+                                height: 200,
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  itemCount: reversedCards.length.clamp(0, 10),
+                                  itemBuilder: (context, index) {
+                                    final card = reversedCards[index];
+                                    return GestureDetector(
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => CardDetailsScreen(
+                                            card: card,
+                                            heroContext: 'home_recent',
+                                          ),
+                                        ),
+                                      ),
+                                      child: Container(
+                                        width: 140,
+                                        margin: const EdgeInsets.only(right: 4),
+                                        child: Column(
+                                          children: [
+                                            Expanded(
+                                              child: Hero(
+                                                tag: HeroTags.cardImage(card.id, context: 'home_recent'),
+                                                child: Image.network(
+                                                  card.imageUrl ?? '',
+                                                  fit: BoxFit.contain,
+                                                ),
+                                              ),
+                                            ),
+                                            if (card.price != null)
+                                              Padding(
+                                                padding: const EdgeInsets.all(4),
+                                                child: FutureBuilder<double?>(
+                                                  future: CardDetailsRouter.getRawCardPrice(card),
+                                                  builder: (context, snapshot) {
+                                                    final displayPrice = snapshot.data ?? card.price;
+                                                    return Text(
+                                                      currencyProvider.formatValue(displayPrice!),
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.green.shade700,
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                    // Add bottom padding to ensure all content is visible
+                    const SizedBox(height: 24),
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
