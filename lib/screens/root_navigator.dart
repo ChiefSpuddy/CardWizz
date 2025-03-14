@@ -71,6 +71,7 @@ class _RootNavigatorState extends State<RootNavigator> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
+    // No app bar defined here - let each screen handle its own app bar
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(

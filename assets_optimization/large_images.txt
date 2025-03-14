@@ -1,4 +1,0 @@
-/assets/images/mtgback.png (1756.17 KB)
-/assets/images/card_placeholder.png (904.90 KB)
-/assets/images/cardback.png (904.90 KB)
-/assets/animations/images/logo.png (296.83 KB)

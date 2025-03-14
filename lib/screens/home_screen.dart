@@ -177,7 +177,10 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     // Check authentication status before building HomeScreen
-    final isSignedIn = Provider.of<AppState>(context).isAuthenticated;
+    final appState = Provider.of<AppState>(context);
+    final isSignedIn = appState.isAuthenticated;
+    final user = appState.currentUser; // Get the current user
+    final userName = user?.username; // Extract username for app bar
     
     // If not signed in, return the SignInView directly
     if (!isSignedIn) {
@@ -188,7 +191,7 @@ class HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: StandardAppBar(
-        title: 'CardWizz', // Keep app name instead of 'Home'
+        title: userName?.isNotEmpty == true ? 'Welcome, @$userName' : 'CardWizz', // Add welcome message to app bar
         onLeadingPressed: () => _scaffoldKey.currentState?.openDrawer(),
       ),
       drawer: const AppDrawer(),

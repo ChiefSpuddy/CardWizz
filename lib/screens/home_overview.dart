@@ -558,8 +558,7 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
     }
 
     // User is signed in - do NOT wrap with another Scaffold since the parent HomeScreen already provides one
-    final user = appState.currentUser;
-    final localizations = AppLocalizations.of(context);
+    final localizations = AppLocalizations.of(context); // Removed user variable since it's not needed anymore
 
     return StreamBuilder<List<TcgCard>>(
       stream: Provider.of<StorageService>(context).watchCards(),
@@ -610,38 +609,6 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Welcome message with slide-in animation
-                    if (user?.username != null) 
-                      SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, -0.2),
-                          end: Offset.zero,
-                        ).animate(CurvedAnimation(
-                          parent: _slideController,
-                          curve: Curves.easeOutQuart,
-                        )),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                          child: RichText(
-                            text: TextSpan(
-                              style: Theme.of(context).textTheme.titleMedium,
-                              children: [
-                                TextSpan(
-                                  text: '${localizations.translate('welcome')} ',
-                                ),
-                                TextSpan(
-                                  text: '@${user?.username ?? 'Guest'}',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
                     // Summary Cards with staggered entrance animation
                     SlideTransition(
                       position: Tween<Offset>(
