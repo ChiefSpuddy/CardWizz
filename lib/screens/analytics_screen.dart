@@ -33,9 +33,10 @@ import '../widgets/market_scan_button.dart';
 import '../widgets/acquisition_timeline_chart.dart';
 import '../widgets/rarity_distribution_chart.dart';
 import '../widgets/price_update_button.dart';
-import '../widgets/standard_app_bar.dart';
-import '../services/analytics_cache_service.dart';
-import '../models/tcg_card.dart';
+import '../services/premium_features_helper.dart';
+import '../models/tcg_card.dart';  // Add this import for TcgCard class
+import '../widgets/standard_app_bar.dart';  // Add this import for StandardAppBar
+import '../services/analytics_cache_service.dart';  // Add this import for AnalyticsCacheService
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -546,7 +547,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               ),
             ),
           ] else
-            _buildPremiumOverlay(purchaseService),
+            _buildPremiumOverlay(context, purchaseService),
         ],
       ),
     );
@@ -688,8 +689,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final maxCount = distribution.reduce(math.max);
 
   return Card(
+    clipBehavior: Clip.antiAlias, // Important: Add clipBehavior to ensure overlay is properly clipped
     child: Stack(
       children: [
+        // Show the content in both cases, but with low opacity when not premium
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -702,118 +705,124 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              ...List.generate(ranges.length, (index) {
-                final count = distribution[index];
-                if (count == 0) return const SizedBox.shrink();
+              // Wrap this content in an Opacity widget
+              Opacity(
+                opacity: purchaseService.isPremium ? 1.0 : 0.1, // Very faint when not premium
+                child: Column(
+                  children: List.generate(ranges.length, (index) {
+                    final count = distribution[index];
+                    if (count == 0) return const SizedBox.shrink();
 
-                final percentage = count / cards.length * 100;
-                final range = ranges[index];
-                final color = [
-                  Colors.grey,
-                  Colors.green,
-                  Colors.blue,
-                  Colors.purple,
-                  Colors.orange,
-                  Colors.red,
-                ][index];
+                    final percentage = count / cards.length * 100;
+                    final range = ranges[index];
+                    final color = [
+                      Colors.grey,
+                      Colors.green,
+                      Colors.blue,
+                      Colors.purple,
+                      Colors.orange,
+                      Colors.red,
+                    ][index];
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              range.$3,
-                              style: const TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              '$count cards',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                                fontSize: 13,
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: Text(
+                                  range.$3,
+                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                ),
                               ),
-                              textAlign: TextAlign.right,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    height: 8,
-                                    color: Theme.of(context).colorScheme.surfaceVariant,
+                              Expanded(
+                                child: Text(
+                                  '$count cards',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                    fontSize: 13,
                                   ),
-                                  FractionallySizedBox(
-                                    widthFactor: count / maxCount,
-                                    child: Container(
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            color.withOpacity(0.7),
-                                            color,
-                                          ],
+                                  textAlign: TextAlign.right,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        height: 8,
+                                        color: Theme.of(context).colorScheme.surfaceVariant,
+                                      ),
+                                      FractionallySizedBox(
+                                        widthFactor: count / maxCount,
+                                        child: Container(
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                color.withOpacity(0.7),
+                                                color,
+                                              ],
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 48,
+                                child: Text(
+                                  '${percentage.toStringAsFixed(1)}%',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: color,
+                                  ),
+                                  textAlign: TextAlign.right,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            width: 48,
-                            child: Text(
-                              '${percentage.toStringAsFixed(1)}%',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: color,
-                              ),
-                              textAlign: TextAlign.right,
+                          const SizedBox(height: 4),
+                          Text(
+                            '${currencyProvider.symbol}${range.$1.toStringAsFixed(0)}'
+                            '${range.$2 < double.infinity ? ' - ${currencyProvider.symbol}${range.$2.toStringAsFixed(0)}' : '+'}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${currencyProvider.symbol}${range.$1.toStringAsFixed(0)}'
-                        '${range.$2 < double.infinity ? ' - ${currencyProvider.symbol}${range.$2.toStringAsFixed(0)}' : '+'}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
+                    );
+                  }),
+                ),
+              ),
             ],
           ),
         ),
+        
+        // Show premium overlay with blur if not premium
         if (!purchaseService.isPremium)
-          Positioned.fill(
-            child: _buildPremiumOverlay(purchaseService),
-          ),
+          _buildPremiumOverlay(context, purchaseService),
       ],
     ),
   );
 }
 
-  Widget _buildTopMovers(List<TcgCard> cards) {
+Widget _buildTopMovers(List<TcgCard> cards) {
   final currencyProvider = context.watch<CurrencyProvider>();
   final localizations = AppLocalizations.of(context);
   final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -882,17 +891,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             : null,
         child: SizedBox(
           height: _topMoversCardHeight,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack( // Use Stack instead of Column to avoid overflow issues
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  localizations.translate('topMovers'),
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    localizations.translate('topMovers'),
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
-              Expanded(
+              Positioned(
+                top: 52, // Adjust this value to position below the header
+                left: 0,
+                right: 0,
+                bottom: 0,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
                   child: cardContent,
@@ -1957,6 +1974,7 @@ Future<void> _refreshPrices() async {
     final isSignedIn = context.watch<AppState>().isAuthenticated;
     final localizations = AppLocalizations.of(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final purchaseService = context.watch<PurchaseService>();
 
     return Scaffold(
       key: _scaffoldKey,
@@ -2044,9 +2062,9 @@ Future<void> _refreshPrices() async {
                                     const SizedBox(height: 16),
                                     _buildPriceRangeDistribution(cards),
                                     const SizedBox(height: 16),
-                                    AcquisitionTimelineChart(cards: cards),
+                                    _buildRarityDistributionCard(cards, purchaseService),
                                     const SizedBox(height: 16),
-                                    RarityDistributionChart(cards: cards),
+                                    _buildAcquisitionTimelineCard(cards, purchaseService),
                                     const SizedBox(height: 32),
                                   ],
                                 ),
@@ -2357,73 +2375,96 @@ Future<void> _refreshPrices() async {
     );
   }
 
-  Widget _buildPremiumOverlay(PurchaseService purchaseService) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => purchaseService.purchasePremium(),
-            child: SingleChildScrollView(
-              child: Center(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 300),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-                  margin: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(16),
+  Widget _buildPremiumOverlay(BuildContext context, PurchaseService purchaseService) {
+  return ClipRect(
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+      child: Container(
+        color: Colors.black45,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min, // Keep this as min
+          children: [
+            const Icon(
+              Icons.lock,
+              color: Colors.white,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Premium Analytics Feature',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center, // Center align text for better appearance
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Unlock advanced analytics insights',
+              style: TextStyle(color: Colors.white70),
+              textAlign: TextAlign.center, // Center align text for better appearance
+            ),
+            const SizedBox(height: 16),
+            // Enhanced button with gradient
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.bar_chart_rounded,
-                        size: 48,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Premium Analytics',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Unlock detailed collection insights\nand advanced analytics',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () => purchaseService.purchasePremium(),
-                          icon: const Text('✨'),
-                          label: const Text('Upgrade to Premium'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => PremiumFeaturesHelper.showPremiumDialog(context),
+                  splashColor: Colors.white.withOpacity(0.2),
+                  highlightColor: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min, // Set to min to ensure button is not too wide
+                      children: const [
+                        Icon(Icons.lock_open, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'Upgrade to Premium',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+Future<void> _showPremiumDialog(BuildContext context) async {
+  await PremiumFeaturesHelper.showPremiumDialog(context);
+}
 
   double _calculateNiceInterval(double range) {
     final magnitude = range.toString().split('.')[0].length;
@@ -2441,6 +2482,96 @@ Future<void> _refreshPrices() async {
   }
 
   void _onScroll() {
+  }
+
+  Widget _buildRarityDistributionCard(List<TcgCard> cards, PurchaseService purchaseService) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Rarity Distribution',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'See how your collection breaks down by rarity',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 220,
+                  child: purchaseService.isPremium
+                    ? RarityDistributionChart(cards: cards)  // Updated to use 'cards' parameter
+                    : Container(), // Empty container when premium check is shown
+                ),
+              ],
+            ),
+          ),
+          // Show premium overlay if not premium
+          if (!purchaseService.isPremium)
+            Positioned.fill(
+              child: _buildPremiumOverlay(context, purchaseService),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcquisitionTimelineCard(List<TcgCard> cards, PurchaseService purchaseService) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Card Acquisition Timeline',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Track how your collection has grown over time',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 220,
+                  child: purchaseService.isPremium
+                    ? AcquisitionTimelineChart(cards: cards)  // Parameter name is correct
+                    : Container(), // Empty container when premium check is shown
+                ),
+              ],
+            ),
+          ),
+          // Show premium overlay if not premium
+          if (!purchaseService.isPremium)
+            Positioned.fill(
+              child: _buildPremiumOverlay(context, purchaseService),
+            ),
+        ],
+      ),
+    );
   }
 }
 

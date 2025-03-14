@@ -27,6 +27,7 @@ import '../widgets/standard_app_bar.dart';
 import '../utils/card_details_router.dart';
 import 'dart:math';  // Add this import for Random, pi, etc.
 import '../models/tcg_card.dart';  // Add this import for TcgCard class
+import '../services/premium_features_helper.dart'; // Add this import to fix the error
 
 class CollectionsScreen extends StatefulWidget {
   final bool _showEmptyState;
@@ -833,40 +834,45 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
   
   // Add premium overlay method inside the class
   Widget _buildPremiumOverlay(PurchaseService purchaseService) {
-    return Container(
-      color: Colors.black45,
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.lock,
+  return Container(
+    color: Colors.black45,
+    alignment: Alignment.center,
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(
+          Icons.lock,
+          color: Colors.white,
+          size: 48,
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Premium Feature',
+          style: TextStyle(
             color: Colors.white,
-            size: 48,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Premium Feature',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Unlock detailed set analytics',
+          style: TextStyle(color: Colors.white70),
+        ),
+        const SizedBox(height: 16),
+        ElevatedButton(
+          onPressed: () => PremiumFeaturesHelper.showPremiumDialog(context),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Colors.white,
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Unlock detailed set analytics',
-            style: TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => purchaseService.purchasePremium(),
-            child: const Text('Upgrade Now'),
-          ),
-        ],
-      ),
-    );
-  }
+          child: const Text('Upgrade Now'),
+        ),
+      ],
+    ),
+  );
+}
 }
 
 // Helper class for background animation

@@ -20,6 +20,7 @@ import '../widgets/app_drawer.dart'; // Add this import
 import '../widgets/standard_app_bar.dart'; // Add this import
 import 'package:lottie/lottie.dart'; // Add this import
 import '../services/premium_service.dart'; // Add this import
+import '../services/premium_features_helper.dart'; // Add this import
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -687,7 +688,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Show subscription details (£1.99/month)', // Updated to show price
+                                'Show subscription details (£0.99/month)', // Updated price from £1.99 to £0.99
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
@@ -967,7 +968,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Show subscription details (£1.99/month)', // Updated to show price
+                'Show subscription details (£0.99/month)', // Updated price from £1.99 to £0.99
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                 ),
@@ -985,7 +986,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             crossAxisAlignment: CrossAxisAlignment.stretch,  // Full width
             children: [
               ListTile(
-                title: const Text('Subscription Details (£1.99/month)'), // Updated to include price
+                title: const Text('Subscription Details (£0.99/month)'), // Updated price from £1.99 to £0.99
                 trailing: IconButton(
                   icon: const Icon(Icons.expand_less),
                   onPressed: () => setState(() => _showPremiumInfo = false),
@@ -1192,7 +1193,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   children: [
                     Text(
                       '• Monthly subscription\n'
-                      '• £1.99 per month\n' // Updated from $1.99 to £1.99
+                      '• £0.99 per month\n' // Updated from £1.99 to £0.99
                       '• Auto-renews unless cancelled\n'
                       '• Cancel anytime in App Store',
                       style: TextStyle(fontSize: 13),

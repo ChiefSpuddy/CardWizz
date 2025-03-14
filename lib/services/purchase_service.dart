@@ -4,8 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';  // Add this for StreamSubscription
 
+typedef PurchaseStatusCallback = void Function(bool isPurchaseInProgress);
+
 class PurchaseService extends ChangeNotifier {
   static const _kProductId = '1Month';  // Updated product ID
+  static const kDisplayPrice = '\$0.99'; // Updated from $1.99 to $0.99
+  static const kDisplayPriceGBP = '£0.99'; // Updated from £1.99 to £0.99
   static bool debugForcePremium = false;  // Add this flag
   
   final _inAppPurchase = InAppPurchase.instance;
@@ -13,6 +17,9 @@ class PurchaseService extends ChangeNotifier {
   String? _error;
   bool _isPremium = false;
   late StreamSubscription<List<PurchaseDetails>> _subscription;
+
+  bool _isPurchaseInProgress = false;
+  final List<PurchaseStatusCallback> _purchaseListeners = [];
 
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -22,6 +29,8 @@ class PurchaseService extends ChangeNotifier {
     }
     return _isPremium;
   }
+
+  bool get isPurchaseInProgress => _isPurchaseInProgress;
 
   Future<void> initialize() async {
     try {
@@ -70,30 +79,47 @@ class PurchaseService extends ChangeNotifier {
     }
   }
 
+  // Improved handler for purchase updates with explicit purchase in progress state management
   void _handlePurchaseUpdate(List<PurchaseDetails> purchaseDetailsList) async {
     for (var purchaseDetails in purchaseDetailsList) {
       if (purchaseDetails.status == PurchaseStatus.pending) {
         _isLoading = true;
+        _isPurchaseInProgress = true;
+        _notifyPurchaseListeners();
         notifyListeners();
       } else {
+        // Purchase is no longer pending, clear states
         _isLoading = false;
+        _isPurchaseInProgress = false;
+        
         if (purchaseDetails.status == PurchaseStatus.error) {
           _error = purchaseDetails.error?.message ?? 'Purchase failed';
+          LoggingService.debug('Purchase error: ${_error}');
         } else if (purchaseDetails.status == PurchaseStatus.purchased ||
-                   purchaseDetails.status == PurchaseStatus.restored) {
+                 purchaseDetails.status == PurchaseStatus.restored) {
           // Verify purchase
           final valid = await _verifyPurchase(purchaseDetails);
           if (valid) {
             _isPremium = true;
             final prefs = await SharedPreferences.getInstance();
             await prefs.setBool('is_premium', true);
+            LoggingService.debug('Premium status activated: $_isPremium');
+          }
+        } else if (purchaseDetails.status == PurchaseStatus.canceled) {
+          LoggingService.debug('Purchase was canceled by user');
+        }
+        
+        // Always complete purchases to avoid orphaned transactions
+        if (purchaseDetails.pendingCompletePurchase) {
+          try {
+            await _inAppPurchase.completePurchase(purchaseDetails);
+            LoggingService.debug('Purchase completed: ${purchaseDetails.productID}');
+          } catch (e) {
+            LoggingService.debug('Error completing purchase: $e');
           }
         }
         
-        if (purchaseDetails.pendingCompletePurchase) {
-          await _inAppPurchase.completePurchase(purchaseDetails);
-        }
-        
+        _notifyPurchaseListeners();
         notifyListeners();
       }
     }
@@ -105,12 +131,15 @@ class PurchaseService extends ChangeNotifier {
     return purchaseDetails.productID == _kProductId;
   }
 
-  Future<void> purchasePremium() async {
-    if (_isLoading) return;
+  // Merged the two purchasePremium methods into one implementation
+  Future<bool?> purchasePremium() async {
+    if (_isLoading) return false;
 
     try {
       _isLoading = true;
       _error = null;
+      _isPurchaseInProgress = true;
+      _notifyPurchaseListeners();
       notifyListeners();
 
       final available = await _inAppPurchase.isAvailable();
@@ -131,19 +160,53 @@ class PurchaseService extends ChangeNotifier {
       );
 
       // Use buyNonConsumable for subscriptions
-      final bool success = await _inAppPurchase.buyNonConsumable(
+      final bool purchaseStarted = await _inAppPurchase.buyNonConsumable(
         purchaseParam: purchaseParam,
       );
 
-      if (!success) {
+      if (!purchaseStarted) {
+        // Update purchase status when purchase fails to start
+        _isPurchaseInProgress = false;
+        _notifyPurchaseListeners();
         throw 'Purchase failed to initialize';
       }
+      
+      // Add a timeout to automatically clear purchase in progress state after a few seconds
+      // This helps handle cases where the purchase stream doesn't emit an event
+      Timer(const Duration(seconds: 30), () {
+        if (_isPurchaseInProgress) {
+          _isPurchaseInProgress = false;
+          _isLoading = false;
+          _notifyPurchaseListeners();
+          notifyListeners();
+          LoggingService.debug('Purchase in progress state automatically cleared after timeout');
+        }
+      });
+      
+      // Return null for now - actual success/failure will be determined by the purchase stream
+      return null;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
+      _isPurchaseInProgress = false;
+      _notifyPurchaseListeners();
       notifyListeners();
-      throw _error!;
+      return false;
     }
+  }
+
+  void _notifyPurchaseListeners() {
+    for (final listener in _purchaseListeners) {
+      listener(_isPurchaseInProgress);
+    }
+  }
+
+  void addPurchaseListener(PurchaseStatusCallback listener) {
+    _purchaseListeners.add(listener);
+  }
+
+  void removePurchaseListener(PurchaseStatusCallback listener) {
+    _purchaseListeners.remove(listener);
   }
 
   @override

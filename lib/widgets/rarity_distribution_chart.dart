@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:collection/collection.dart';
+import 'dart:math' as math;
 import '../models/tcg_card.dart';
 
-class RarityDistributionChart extends StatelessWidget {
+class RarityDistributionChart extends StatefulWidget {
   final List<TcgCard> cards;
 
   const RarityDistributionChart({
@@ -12,22 +13,29 @@ class RarityDistributionChart extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<RarityDistributionChart> createState() => _RarityDistributionChartState();
+}
+
+class _RarityDistributionChartState extends State<RarityDistributionChart> {
+  int touchedIndex = -1;
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Calculate rarity distribution
     final rarityMap = _getRarityDistribution();
-    
+
     // If there's no rarity data, show empty state
     if (rarityMap.isEmpty) {
       return _buildEmptyState(context);
     }
-    
+
     // Create sorted list of rarity types
     final rarityData = rarityMap.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-      
+
     // Color map for common rarities
     final rarityColors = {
       'Common': Colors.grey.shade500,
@@ -42,10 +50,10 @@ class RarityDistributionChart extends StatelessWidget {
       'Hyper Rare': Colors.deepOrange.shade500,
       'Amazing Rare': Colors.indigo.shade500,
     };
-    
+
     // Calculate total for percentages
     final total = rarityMap.values.fold<int>(0, (sum, val) => sum + val);
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -78,7 +86,7 @@ class RarityDistributionChart extends StatelessWidget {
                     final rarity = entry.key;
                     final count = entry.value;
                     final percent = (count / total * 100).toStringAsFixed(1);
-                    
+
                     return PieChartSectionData(
                       value: count.toDouble(),
                       title: '$percent%',
@@ -94,7 +102,7 @@ class RarityDistributionChart extends StatelessWidget {
                           ),
                         ],
                       ),
-                      color: rarityColors[rarity] ?? 
+                      color: rarityColors[rarity] ??
                         Color.fromARGB(
                           255,
                           150 + (index * 20) % 105,
@@ -111,14 +119,14 @@ class RarityDistributionChart extends StatelessWidget {
               children: rarityData.take(8).mapIndexed((index, entry) {
                 final rarity = entry.key;
                 final count = entry.value;
-                final color = rarityColors[rarity] ?? 
+                final color = rarityColors[rarity] ??
                   Color.fromARGB(
                     255,
                     150 + (index * 20) % 105,
                     100 + (index * 30) % 155,
                     200 - (index * 25) % 100,
                   );
-                
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
@@ -173,19 +181,19 @@ class RarityDistributionChart extends StatelessWidget {
   }
 
   Widget _buildRarityInsights(
-    BuildContext context, 
+    BuildContext context,
     List<MapEntry<String, int>> rarityData,
     int total,
   ) {
     final mostCommonRarity = rarityData.first;
     final mostCommonPercent = (mostCommonRarity.value / total * 100).toStringAsFixed(1);
-    
+
     final rarityCount = rarityData.length;
     final rareCardCount = rarityData
       .where((e) => !['Common', 'Uncommon', 'Energy'].contains(e.key))
       .fold<int>(0, (sum, e) => sum + e.value);
     final rareCardPercent = (rareCardCount / total * 100).toStringAsFixed(1);
-    
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -276,14 +284,14 @@ class RarityDistributionChart extends StatelessWidget {
 
   Map<String, int> _getRarityDistribution() {
     final rarityMap = <String, int>{};
-    
-    for (final card in cards) {
+
+    for (final card in widget.cards) {
       if (card.rarity != null && card.rarity!.isNotEmpty) {
         final rarity = card.rarity!;
         rarityMap[rarity] = (rarityMap[rarity] ?? 0) + 1;
       }
     }
-    
+
     return rarityMap;
   }
 }
