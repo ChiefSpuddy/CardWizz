@@ -221,12 +221,14 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
                         decoration: BoxDecoration(
                           gradient: !_showCustomCollections
                               ? LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                   colors: isDark ? [
                                     colorScheme.primary.withOpacity(0.8),
-                                    colorScheme.primary,
+                                    colorScheme.secondary,
                                   ] : [
                                     colorScheme.primary.withOpacity(0.9),
-                                    colorScheme.primary,
+                                    colorScheme.secondary,
                                   ],
                                 )
                               : null,
@@ -285,12 +287,14 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
                         decoration: BoxDecoration(
                           gradient: _showCustomCollections
                               ? LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                   colors: isDark ? [
                                     colorScheme.primary.withOpacity(0.8),
-                                    colorScheme.primary,
+                                    colorScheme.secondary,
                                   ] : [
                                     colorScheme.primary.withOpacity(0.9),
-                                    colorScheme.primary,
+                                    colorScheme.secondary,
                                   ],
                                 )
                               : null,
@@ -724,26 +728,63 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
                         parent: _fadeInController,
                         curve: Curves.easeOutBack,
                       )),
-                      child: FloatingActionButton(
-                        onPressed: () {
-                          if (_showCustomCollections) {
-                            _showCreateBinderDialog(context);
-                          } else {
-                            // Update this navigation logic to ensure it goes to the search screen
-                            final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                            if (homeState != null) {
-                              homeState.setSelectedIndex(2); // Index 2 is the Search tab
-                            } else {
-                              // Alternative navigation if not inside HomeScreen
-                              Navigator.of(context).pushNamed('/search');
-                            }
-                          }
-                        },
-                        backgroundColor: colorScheme.primary,
-                        elevation: 4,
-                        child: Icon(
-                          _showCustomCollections ? Icons.create_new_folder : Icons.add,
-                          color: Colors.white,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              _showCustomCollections 
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : Theme.of(context).colorScheme.primary,
+                              _showCustomCollections 
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.secondary,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_showCustomCollections 
+                                  ? Theme.of(context).colorScheme.secondary
+                                  : Theme.of(context).colorScheme.primary).withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              if (_showCustomCollections) {
+                                _showCreateBinderDialog(context);
+                              } else {
+                                // Update this navigation logic to ensure it goes to the search screen
+                                final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                                if (homeState != null) {
+                                  homeState.setSelectedIndex(2); // Index 2 is the Search tab
+                                } else {
+                                  // Alternative navigation if not inside HomeScreen
+                                  Navigator.of(context).pushNamed('/search');
+                                }
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(28),
+                            splashColor: Colors.white.withOpacity(0.1),
+                            highlightColor: Colors.white.withOpacity(0.2),
+                            child: Container(
+                              width: 56,
+                              height: 56,
+                              alignment: Alignment.center,
+                              child: Icon(
+                                _showCustomCollections ? Icons.create_new_folder : Icons.add,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     );
