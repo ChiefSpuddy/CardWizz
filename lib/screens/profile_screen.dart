@@ -39,7 +39,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   bool _notificationsEnabled = false;
   bool _showPremiumInfo = false;
   Timer? _syncCheckTimer;
-  int _devModeCounter = 0;  // Counter for dev mode activation
   bool _devModeEnabled = false;  // Flag for dev mode
 
   Future<void> _launchUrl(String url) async {
@@ -749,37 +748,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // Dev mode activation on multiple taps
-          _devModeCounter++;
-          if (_devModeCounter >= 7) {
-            _devModeCounter = 0;
-            _devModeEnabled = true;
-            if (premiumService != null) {
-              _showDevModeDialog(context);
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Developer mode not available (PremiumService not initialized)')),
-              );
-            }
+          // Remove the dev mode tap counter logic and just handle the normal premium actions
+          if (isPremium) {
+            _showPremiumInfoDialog(context);
           } else {
-            // Regular behavior
-            if (isPremium) {
-              _showPremiumInfoDialog(context);
-            } else {
-              _initiatePremiumPurchase(context);
-            }
-            
-            // Reset counter after a delay
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) {
-                _devModeCounter = 0;
-              }
-            });
+            _initiatePremiumPurchase(context);
           }
         },
-        onLongPress: _devModeEnabled && premiumService != null 
-            ? () => _showDevModeDialog(context) 
-            : null,
         child: Container(
           width: double.infinity, // Ensure full width
           decoration: BoxDecoration(
