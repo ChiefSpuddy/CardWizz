@@ -258,9 +258,19 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
                     },
                     child: Container(
                       decoration: BoxDecoration(
-                        color: isExpanded 
-                            ? _getCategoryHeaderColor(widget.searchMode, true) 
-                            : Colors.transparent,
+                        // Replace solid color with gradient when expanded
+                        gradient: isExpanded 
+                            ? LinearGradient(
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                                colors: [
+                                  Theme.of(context).colorScheme.primary,
+                                  Theme.of(context).colorScheme.secondary,
+                                  Theme.of(context).colorScheme.tertiary,
+                                ],
+                              ) 
+                            : null,
+                        color: isExpanded ? null : Colors.transparent,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -411,9 +421,19 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
           borderRadius: BorderRadius.circular(16),
           child: Container(
             decoration: BoxDecoration(
-              color: isExpanded 
-                  ? _getCategoryHeaderColor(widget.searchMode, true) 
-                  : Colors.transparent,
+              // Replace solid color with gradient when expanded
+              gradient: isExpanded
+                  ? LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        colorScheme.primary,
+                        colorScheme.secondary,
+                        colorScheme.tertiary,
+                      ],
+                    )
+                  : null,
+              color: isExpanded ? null : Colors.transparent,
               borderRadius: BorderRadius.circular(16),
             ),
             margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -754,6 +774,115 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
       style: TextStyle(
         fontSize: 20,
         color: colorScheme.primary.withOpacity(0.8)
+      ),
+    );
+  }
+
+  Widget _buildCategoryItem(BuildContext context, Map<String, dynamic> category) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        // Replace the regular container with subtle gradient background
+        gradient: isDark 
+          ? AppColors.getDarkModeGradient(0.3) 
+          : AppColors.getLightModeGradient(0.3),
+        border: Border.all(
+          color: colorScheme.primary.withAlpha((0.1 * 255).round()),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withAlpha((0.05 * 255).round()),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => widget.onQuickSearch(category), // Fix: Use widget.onQuickSearch instead of onQuickSearch
+            child: Stack(
+              children: [
+                // Category indicator - Replace red color with gradient
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 4,
+                    height: double.infinity,
+                    decoration: BoxDecoration(
+                      // Replace the solid red color with a nice gradient
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          colorScheme.primary,
+                          colorScheme.secondary,
+                          colorScheme.tertiary,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Category content
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Category name
+                            Text(
+                              category['name'] ?? '',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: colorScheme.onBackground,
+                              ),
+                            ),
+                            if (category['subtitle'] != null)
+                              Text(
+                                category['subtitle'] as String,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      
+                      // Arrow icon with subtle container
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: colorScheme.primary.withOpacity(0.1),
+                        ),
+                        child: Icon(
+                          Icons.arrow_forward_ios,
+                          size: 12,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
