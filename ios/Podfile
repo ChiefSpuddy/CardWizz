@@ -1,4 +1,4 @@
-platform :ios, '13.0'
+platform :ios, '12.0'
 
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
@@ -29,41 +29,70 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
+  # Pin Firebase dependencies to exact versions for stability
+  pod 'Firebase/Core', '10.18.0'
+  pod 'Firebase/Auth', '10.18.0'
+  
+  # Install Flutter plugins
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-  
-  # Force compatible version for MLKit (this version satisfies the ~> 1.1 constraint)
-  pod 'GTMSessionFetcher/Core', '1.7.2'
-  
-  # Add this line to force GTMSessionFetcher version to 1.7.2 which is compatible with older google_sign_in_ios
-  pod 'GTMSessionFetcher', '1.7.2'
 end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
-    target.build_configurations.each do |config|
-      config.build_settings['ENABLE_BITCODE'] = 'NO'
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
-      
-      # Fix iOS 15 development issue
-      config.build_settings['EXPANDED_CODE_SIGN_IDENTITY'] = ""
-      config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
-      config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
-      
-      # Add privacy permissions descriptions
-      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
-        '$(inherited)',
-        'PERMISSION_CAMERA=1',
-        'PERMISSION_PHOTOS=1',
-        'PERMISSION_CONTACTS=1',
-      ]
-    end
     
-    # Fix for Google SignIn dependencies - don't force build settings for GTMSessionFetcher
-    if target.name == 'GoogleSignIn'
-      target.build_configurations.each do |config|
-        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+      
+      # These settings allow all frameworks to use non-modular headers
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      
+      # Specific fixes for firebase_auth target
+      if target.name == 'firebase_auth'
+        puts "➡️ Applying special config for firebase_auth target"
+        
+        # Add Common Crypto import needed by the plugin
+        if config.build_settings['OTHER_CFLAGS'].nil?
+          config.build_settings['OTHER_CFLAGS'] = ['-include CommonCrypto/CommonCrypto.h']
+        else
+          config.build_settings['OTHER_CFLAGS'] << '-include CommonCrypto/CommonCrypto.h'
+        end
+        
+        # Keep modules enabled but modify import paths
+        config.build_settings['HEADER_SEARCH_PATHS'] = [
+          '$(inherited)',
+          '${PODS_ROOT}/Firebase/CoreOnly/Sources',
+          '${PODS_ROOT}/Headers/Public',
+          '${PODS_ROOT}/Headers/Public/Firebase'
+        ]
       end
     end
+  end
+  
+  # Get the actual PODS_ROOT path
+  pods_root = Pod::Config.instance.installation_root.to_s + '/Pods'
+  firebase_dir = File.join(pods_root, 'Headers', 'Public', 'Firebase')
+  
+  # Important: Remove any duplicate module maps to avoid conflicts
+  system("find \"#{pods_root}\" -name \"module.modulemap\" -path \"*/Firebase/CoreOnly/Sources/*\" -delete")
+  
+  # Create directory if it doesn't exist
+  FileUtils.mkdir_p(firebase_dir)
+  
+  # Create a consistent Firebase module map after cleaning up duplicates
+  module_map_path = File.join(firebase_dir, 'module.modulemap')
+  File.open(module_map_path, "w") do |file|
+    file.puts "module Firebase {"
+    file.puts "  umbrella header \"Firebase.h\""
+    file.puts "  export *"
+    file.puts "}"
+  end
+  
+  # Ensure Firebase.h is available
+  firebase_header_dest = File.join(firebase_dir, 'Firebase.h')
+  firebase_header_src = File.join(pods_root, 'Firebase', 'CoreOnly', 'Sources', 'Firebase.h')
+  if !File.exist?(firebase_header_dest) && File.exist?(firebase_header_src)
+    FileUtils.cp(firebase_header_src, firebase_header_dest)
   end
 end

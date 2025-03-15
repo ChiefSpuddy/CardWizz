@@ -4,10 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 import '../services/collection_service.dart';
-import '../services/storage_service.dart';  // Add this import
+import '../services/storage_service.dart';
 import 'package:characters/characters.dart';
 // Add import for Random
 import 'dart:math';
+import '../services/google_auth_service.dart';
+import 'dart:async'; // Add this for StreamController
 
 class AuthService {
   static const defaultUsername = 'Pokemon Trainer';
@@ -15,9 +17,18 @@ class AuthService {
   bool _isAuthenticated = false;
   AuthUser? _currentUser;
   SharedPreferences? _prefs;
+  late GoogleAuthService _googleAuthService;
+  
+  // Add stream controllers for auth state changes and errors
+  final StreamController<AuthUser?> _authStateController = StreamController<AuthUser?>.broadcast();
+  final StreamController<String> _errorController = StreamController<String>.broadcast();
 
   bool get isAuthenticated => _isAuthenticated;
   AuthUser? get currentUser => _currentUser;
+
+  AuthService() {
+    _googleAuthService = GoogleAuthService();
+  }
 
   Future<void> initialize() async {
     if (_isInitialized) return;
@@ -31,8 +42,9 @@ class AuthService {
         email: prefs.getString('${savedUserId}_email'),
         name: prefs.getString('${savedUserId}_name'),
         avatarPath: prefs.getString('${savedUserId}_avatar'),
-        locale: prefs.getString('${savedUserId}_locale') ?? 'en',  // Add this
-        username: prefs.getString('${savedUserId}_username'),  // Add this
+        locale: prefs.getString('${savedUserId}_locale') ?? 'en',
+        username: prefs.getString('${savedUserId}_username'),
+        authProvider: prefs.getString('${savedUserId}_authProvider') ?? 'apple', // Add default authProvider
       );
       
       // Initialize CollectionService with saved user ID
@@ -50,6 +62,7 @@ class AuthService {
     await prefs.setString('${user.id}_email', user.email ?? '');
     await prefs.setString('${user.id}_name', user.name ?? '');
     await prefs.setString('${user.id}_locale', user.locale ?? 'en');
+    await prefs.setString('${user.id}_authProvider', user.authProvider ?? 'apple'); // Save authProvider
     
     // Save the full JSON data for easier restoration
     await prefs.setString('${user.id}_data', jsonEncode(user.toJson()));
@@ -171,21 +184,73 @@ class AuthService {
     }
   }
 
+  Future<AuthUser?> signInWithGoogle() async {
+    try {
+      final user = await _googleAuthService.signInWithGoogle();
+      
+      if (user == null) return null;
+      
+      // Create or update user in your system
+      final authUser = AuthUser(
+        id: user.uid,
+        email: user.email,
+        name: user.displayName,
+        // Set username from email initially or null
+        username: user.displayName ?? user.email?.split('@')[0],
+        // Use Google profile photo if available
+        avatarPath: user.photoURL,
+        authProvider: 'google', // Specify auth provider
+      );
+      
+      // Save user data
+      await _saveUserData(authUser);
+      
+      // Set as current user
+      _currentUser = authUser;
+      _isAuthenticated = true;
+      
+      // Emit user changed event
+      _authStateController.add(authUser);
+      
+      return authUser;
+    } catch (e) {
+      _errorController.add('Failed to sign in with Google: ${e.toString()}');
+      return null;
+    }
+  }
+
   Future<void> signOut() async {
-    if (_currentUser != null) {
-      final prefs = await SharedPreferences.getInstance();
-      // Only remove the active session marker
-      await prefs.remove('user_id');
+    try {
+      // Check if the current user is signed in with Google
+      final currentUser = _currentUser;
+      if (currentUser?.authProvider == 'google') {
+        await _googleAuthService.signOut();
+      } else {
+        // Handle other sign out methods
+        if (_currentUser != null) {
+          final prefs = await SharedPreferences.getInstance();
+          // Only remove the active session marker
+          await prefs.remove('user_id');
 
-      // Just clear current session state without deleting any data
-      final collectionService = await CollectionService.getInstance();
-      await collectionService.clearSessionState();  // This only clears in-memory state
+          // Just clear current session state without deleting any data
+          final collectionService = await CollectionService.getInstance();
+          await collectionService.clearSessionState();  // This only clears in-memory state
 
-      final storage = await StorageService.init(null);
-      await storage.clearSessionState();  // This only clears in-memory state
+          final storage = await StorageService.init(null);
+          await storage.clearSessionState();  // This only clears in-memory state
 
-      _isAuthenticated = false;
+          _isAuthenticated = false;
+          _currentUser = null;
+        }
+      }
+      
+      // Clear current user
       _currentUser = null;
+      _authStateController.add(null);
+      
+    } catch (e) {
+      _errorController.add('Failed to sign out: ${e.toString()}');
+      rethrow;
     }
   }
 
@@ -236,6 +301,7 @@ class AuthService {
             locale: _prefs!.getString('${savedUserId}_locale') ?? 'en',
             username: _prefs!.getString('${savedUserId}_username'),
             token: _prefs!.getString('auth_token'),
+            authProvider: _prefs!.getString('${savedUserId}_authProvider') ?? 'apple', // Add authProvider with default
           );
           _isAuthenticated = true;
           
@@ -252,6 +318,20 @@ class AuthService {
       LoggingService.debug('No saved user ID found during auth restore');
     }
   }
+  
+  // Make sure to close controllers when not needed
+  void dispose() {
+    _authStateController.close();
+    _errorController.close();
+  }
+  
+  // Add method to help with saving user to database (referenced but not implemented)
+  Future<void> _saveUserToDatabase(AuthUser user) async {
+    // This would typically connect to a database service
+    // For now, we'll just use local storage via _saveUserData
+    await _saveUserData(user);
+    LoggingService.debug('User saved to local database: ${user.id}');
+  }
 }
 
 class AuthUser {
@@ -259,18 +339,20 @@ class AuthUser {
   final String? email;
   final String? name;
   final String? avatarPath;
-  final String locale;  // Add this
-  final String? username;  // Add this
-  final String? token; // Add this property
+  final String? locale;
+  final String? username;
+  final String? token;
+  final String? authProvider; // Add this new field
 
   AuthUser({
     required this.id,
     this.email,
     this.name,
     this.avatarPath,
-    this.locale = 'en',  // Default to English
-    this.username,  // Add this
-    this.token, // Add this parameter
+    this.locale = 'en',
+    this.username,
+    this.token,
+    this.authProvider, // Add to constructor
   });
 
   AuthUser copyWith({
@@ -279,8 +361,9 @@ class AuthUser {
     String? name,
     String? avatarPath,
     String? locale,
-    String? username,  // Add this
-    String? token, // Add this parameter
+    String? username,
+    String? token,
+    String? authProvider, // Add to copyWith
   }) {
     return AuthUser(
       id: id ?? this.id,
@@ -288,8 +371,9 @@ class AuthUser {
       name: name ?? this.name,
       avatarPath: avatarPath ?? this.avatarPath,
       locale: locale ?? this.locale,
-      username: username ?? this.username,  // Add this
-      token: token ?? this.token, // Add this field
+      username: username ?? this.username,
+      token: token ?? this.token,
+      authProvider: authProvider ?? this.authProvider, // Include in copyWith
     );
   }
 
@@ -301,7 +385,8 @@ class AuthUser {
       'avatarPath': avatarPath,
       'locale': locale,
       'username': username,
-      'token': token, // Add this field
+      'token': token,
+      'authProvider': authProvider, // Include in JSON
     };
   }
 
@@ -313,7 +398,8 @@ class AuthUser {
       avatarPath: json['avatarPath'],
       locale: json['locale'] ?? 'en',
       username: json['username'],
-      token: json['token'], // Add this field
+      token: json['token'],
+      authProvider: json['authProvider'], // Include in fromJson
     );
   }
 }

@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 class AnimatedGradientButton extends StatefulWidget {
   final String text;
   final IconData? icon;
+  final Widget? customContent; // Add this parameter
   final VoidCallback onPressed;
   final bool isLoading;
   final List<Color> gradientColors;
@@ -16,6 +17,7 @@ class AnimatedGradientButton extends StatefulWidget {
     Key? key,
     required this.text,
     this.icon,
+    this.customContent, // Add this parameter
     required this.onPressed,
     this.isLoading = false,
     this.gradientColors = const [
@@ -141,35 +143,37 @@ class _AnimatedGradientButtonState extends State<AnimatedGradientButton> with Si
                               strokeWidth: 2,
                             ),
                           )
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (widget.icon != null) ...[
-                                Icon(
-                                  widget.icon,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 10),
-                              ],
-                              Text(
-                                widget.text,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                  shadows: [
-                                    Shadow(
-                                      color: Colors.black26,
-                                      offset: Offset(0, 1),
-                                      blurRadius: 2,
-                                    )
-                                  ]
-                                ),
+                        : widget.customContent != null 
+                            ? widget.customContent! // Use custom content if provided
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (widget.icon != null) ...[
+                                    Icon(
+                                      widget.icon,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 10),
+                                  ],
+                                  Text(
+                                    widget.text,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black26,
+                                          offset: Offset(0, 1),
+                                          blurRadius: 2,
+                                        )
+                                      ]
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
                   ),
                 ),
               ),

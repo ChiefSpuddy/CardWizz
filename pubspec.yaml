@@ -39,7 +39,11 @@ dependencies:
   
   # Authentication
   sign_in_with_apple: ^5.0.0
-  google_sign_in: ^6.1.5
+  google_sign_in: ^6.1.6
+  
+  # Firebase packages - update to compatible versions
+  firebase_core: ^2.24.0
+  firebase_auth: ^4.15.0  # Downgrade to a version compatible with the TotpSecretPlatform issue
   
   # Device functionality
   camera: ^0.10.5+2
@@ -55,30 +59,36 @@ dependencies:
   url_launcher: ^6.1.12
   
   # Barcode scanning
-  google_mlkit_text_recognition: ^0.8.1
+  # Temporarily comment out problematic package until dependency issue is resolved
+  # google_mlkit_text_recognition: ^0.8.1
   
   # UI components
   qr_flutter: ^4.1.0
+  
+  # Cryptography (needed for auth)
+  crypto: ^3.0.3
   
   # In-app purchases
   in_app_purchase: ^3.1.10
   
   # Additional utilities
   yaml: ^3.1.2
+  characters: ^1.3.0
 
 # Update dependency overrides to resolve CocoaPods conflict
 dependency_overrides:
-  google_sign_in_ios: 5.5.0  # Use an older version that doesn't require GTMSessionFetcher 3.4.0+
-  google_mlkit_text_recognition: 0.5.0
-  google_mlkit_commons: 0.2.0
-  camera: 0.10.5
-  # Fixed version combination for Google Sign In to work together
-  google_sign_in: 6.0.2
+  google_sign_in_ios: 5.4.0
+  google_sign_in_android: 6.1.0
+  google_sign_in: 5.4.0
   google_sign_in_platform_interface: 2.2.0
   google_sign_in_web: 0.10.2
-  # Add this to fix the error with forceAccountName parameter
-  google_sign_in_android: 6.1.0
-
+  # Override Firebase Auth to a specific version known to work
+  firebase_auth: 4.15.0
+  firebase_auth_platform_interface: 7.0.6
+  firebase_core: 2.24.0
+  firebase_core_platform_interface: 4.8.0
+  camera: 0.10.5
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -87,7 +97,6 @@ dev_dependencies:
   # Move these to dev_dependencies as suggested by dependency_validator
   flutter_launcher_icons: ^0.13.1
   flutter_native_splash: ^2.3.1
-  # Remove path from dev dependencies as it's already in regular dependencies
   
 # Configurations for flutter_launcher_icons
 flutter_launcher_icons:

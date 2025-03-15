@@ -1,19 +1,19 @@
 import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';  // Add this import
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/storage_service.dart';
 import '../services/auth_service.dart';
 import '../services/collection_service.dart';
-import '../services/navigation_service.dart';  // Add this import
-import 'theme_provider.dart';  // Import our theme provider
-import 'dart:async'; // Add this for Timer
+import '../services/navigation_service.dart';
+import 'theme_provider.dart';
+import 'dart:async';
 
 class AppState with ChangeNotifier {
   final StorageService _storageService;
   final AuthService _authService;
   CollectionService? _collectionService;
-  SharedPreferences? _prefs;  // Add this
+  SharedPreferences? _prefs;
   bool _isLoading = true;
   Locale _locale = const Locale('en');
   bool _analyticsEnabled = true;
@@ -22,6 +22,12 @@ class AppState with ChangeNotifier {
   bool _showPrices = true;
   DateTime? _lastCardChangeTime;
   Timer? _debounceTimer;
+  
+  final StreamController<AuthUser?> _authStateController = StreamController<AuthUser?>.broadcast();
+  final StreamController<String> _errorController = StreamController<String>.broadcast();
+  
+  Stream<AuthUser?> get authStateChanges => _authStateController.stream;
+  Stream<String> get errorStream => _errorController.stream;
 
   AppState(this._storageService, this._authService);
 
@@ -126,6 +132,56 @@ class AppState with ChangeNotifier {
     }
     notifyListeners();
     return user;
+  }
+
+  // Add method to handle Google Sign-In
+  Future<AuthUser?> signInWithGoogle() async {
+    try {
+      final user = await _authService.signInWithGoogle();
+      if (user != null) {
+        await _handleSuccessfulSignIn(user);
+      }
+      return user;
+    } catch (e) {
+      _handleAuthError('Google Sign-In failed: $e');
+      return null;
+    }
+  }
+
+  // Add the missing method to handle successful sign-in
+  Future<void> _handleSuccessfulSignIn(AuthUser user) async {
+    try {
+      // Wait a moment to allow system to process
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Set the current user in storage service
+      _storageService.setCurrentUser(user.id);
+      
+      // Set user in collection service if available
+      if (_collectionService != null) {
+        await _collectionService!.setCurrentUser(user.id);
+      } else {
+        _collectionService = await CollectionService.getInstance();
+        await _collectionService?.setCurrentUser(user.id);
+      }
+      
+      // Notify listeners about authentication change
+      _authStateController.add(user);
+      notifyListeners();
+      
+      LoggingService.debug('Successfully signed in user: ${user.id}');
+    } catch (e) {
+      _handleAuthError('Failed to complete sign-in process: $e');
+    }
+  }
+  
+  // Fix this method to use the correct LoggingService.error signature
+  void _handleAuthError(String errorMessage) {
+    // The error is here - LoggingService.error only accepts one argument
+    // or uses named parameter 'error:' - check the implementation
+    LoggingService.error('Authentication error: $errorMessage');
+    _errorController.add(errorMessage);
+    notifyListeners();
   }
 
   Future<void> signOut() async {
@@ -257,6 +313,8 @@ class AppState with ChangeNotifier {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _authStateController.close();
+    _errorController.close();
     super.dispose();
   }
 }

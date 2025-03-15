@@ -35,6 +35,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   late final AnimationController _pulseController;
   
   bool _isSigningIn = false;
+  bool _isLoading = false; // Add the missing _isLoading field
   
   final List<Map<String, dynamic>> _showcaseCards = [];
   bool _isLoadingCards = true;
@@ -159,6 +160,34 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     }
   }
 
+  // Add method to handle Google sign-in
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = await context.read<AppState>().signInWithGoogle();
+      
+      if (user != null && mounted) {
+        // Sign-in successful
+        // No need to navigate, AppState will handle this
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to sign in with Google: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -192,17 +221,21 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                           children: [
                             _buildAnimatedLogo(colorScheme, isDark),
                             
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 24), // Reduced from 32
                             
                             _buildAnimatedHeadline(colorScheme),
                             
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 20), // Reduced from 32
                             
                             _buildFeatureCards(context, colorScheme),
                             
-                            const SizedBox(height: 40),
+                            const SizedBox(height: 24), // Reduced from 40
                             
                             _buildSignInButton(context, colorScheme),
+
+                            const SizedBox(height: 12), // Reduced from 16
+                            
+                            _buildGoogleSignInButton(context, colorScheme),
                           ],
                         ),
                       ),
@@ -469,8 +502,8 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
               child: Opacity(
                 opacity: progress,
                 child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 8), // Reduced from 12
+                  padding: const EdgeInsets.all(10), // Reduced from 12
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     color: colorScheme.surface.withAlpha((0.7 * 255).round()),
@@ -489,7 +522,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(8), // Reduced from 10
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -502,7 +535,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                         child: Icon(
                           features[index].$3,
                           color: Colors.white,
-                          size: 20,
+                          size: 18, // Reduced from 20
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -539,39 +572,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     );
   }
   
-  Widget _buildSignInButton(BuildContext context, ColorScheme colorScheme) {
-    return AnimatedBuilder(
-      animation: _contentController,
-      builder: (context, child) {
-        final delay = 0.3;
-        final animationProgress = (_contentController.value - delay) / (1 - delay);
-        final progress = animationProgress.clamp(0.0, 1.0);
-        
-        return Transform.translate(
-          offset: Offset(
-            0,
-            30 * (1 - progress),
-          ),
-          child: Opacity(
-            opacity: progress,
-            child: AnimatedGradientButton(
-              text: 'Sign in with Apple',
-              icon: Icons.apple,
-              isLoading: _isSigningIn,
-              gradientColors: [
-                colorScheme.primary,
-                colorScheme.secondary,
-              ],
-              onPressed: () => _handleSignIn(context),
-              height: 55,
-              borderRadius: 16,
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildFooter(ColorScheme colorScheme) {
     return AnimatedBuilder(
       animation: _contentController,
@@ -584,7 +584,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
           opacity: progress,
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12), // Reduced from 16
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -694,6 +694,174 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                       Container(color: colorScheme.primary.withAlpha((0.05 * 255).round())),
                 ),
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Helper method to build social sign-in buttons
+  Widget _buildSocialSignInButton({
+    required VoidCallback onPressed,
+    required String icon,
+    required String label,
+    required Color backgroundColor,
+    required Color textColor,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : onPressed, // Add isLoading check
+        style: ElevatedButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: textColor,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          elevation: 1,
+        ),
+        child: _isLoading ? // Show loading indicator if loading
+          const SizedBox(
+            height: 24,
+            width: 24,
+            child: CircularProgressIndicator(),
+          ) :
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Use Icon widget as a temporary placeholder if the asset is missing
+              icon == 'assets/icons/google_icon.png'
+                  ? Container(
+                      height: 24,
+                      width: 24,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                      child: Center(
+                        child: Text(
+                          'G',
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Image.asset(icon, height: 24, width: 24),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+      ),
+    );
+  }
+
+  Widget _buildSignInButton(BuildContext context, ColorScheme colorScheme) {
+    return AnimatedBuilder(
+      animation: _contentController,
+      builder: (context, child) {
+        final delay = 0.3;
+        final animationProgress = (_contentController.value - delay) / (1 - delay);
+        final progress = animationProgress.clamp(0.0, 1.0);
+        
+        return Transform.translate(
+          offset: Offset(
+            0,
+            30 * (1 - progress),
+          ),
+          child: Opacity(
+            opacity: progress,
+            child: AnimatedGradientButton(
+              text: 'Sign in with Apple',
+              icon: Icons.apple,
+              isLoading: _isSigningIn,
+              // Updated colors to match Apple's branding - black with slight gradient
+              gradientColors: [
+                Colors.black,
+                Colors.black87,
+              ],
+              onPressed: () => _handleSignIn(context),
+              height: 50, // Reduced from 55
+              borderRadius: 16,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Add Google Sign-In button with matching style
+  Widget _buildGoogleSignInButton(BuildContext context, ColorScheme colorScheme) {
+    return AnimatedBuilder(
+      animation: _contentController,
+      builder: (context, child) {
+        final delay = 0.4; // Slightly delayed animation compared to Apple button
+        final animationProgress = (_contentController.value - delay) / (1 - delay);
+        final progress = animationProgress.clamp(0.0, 1.0);
+        
+        return Transform.translate(
+          offset: Offset(
+            0,
+            30 * (1 - progress),
+          ),
+          child: Opacity(
+            opacity: progress,
+            child: AnimatedGradientButton(
+              text: 'Sign in with Google',
+              // Custom content to include Google logo
+              customContent: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    height: 22, // Reduced from 24
+                    width: 22, // Reduced from 24
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                    child: Center(
+                      child: Text(
+                        'G',
+                        style: TextStyle(
+                          color: Colors.blue[700],
+                          fontSize: 14, // Reduced from 16
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10), // Reduced from 12
+                  Text(
+                    'Sign in with Google',
+                    style: TextStyle(
+                      fontSize: 15, // Reduced from 16
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              isLoading: _isLoading,
+              // Google brand color gradient
+              gradientColors: [
+                Colors.blue.shade700,
+                Colors.lightBlue.shade500,
+              ],
+              onPressed: _handleGoogleSignIn,
+              height: 50, // Reduced from 55
+              borderRadius: 16,
             ),
           ),
         );

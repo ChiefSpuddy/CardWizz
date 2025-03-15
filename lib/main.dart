@@ -36,6 +36,7 @@ import 'package:flutter/animation.dart';
 import 'services/premium_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/collections_screen.dart'; // Add this import for CollectionsScreen
+import 'services/firebase_service.dart'; // Add this import
 
 // The simplest possible main function
 void main() async {
@@ -55,6 +56,9 @@ Future<void> _initializeAppInBackground(SharedPreferences prefs) async {
   try {
     // Shorter initial delay
     await Future.delayed(const Duration(milliseconds: 300));
+    
+    // Initialize Firebase first
+    await FirebaseService.initialize();
     
     // Initialize services
     final storageService = await StorageService.init(null);
@@ -85,7 +89,7 @@ Future<void> _initializeAppInBackground(SharedPreferences prefs) async {
         Provider<AuthService>.value(value: authService),
         Provider<TcgApiService>.value(value: tcgApiService),
         Provider<CollectionService>.value(value: collectionService),
-        Provider<ScannerService>.value(value: scannerService),
+        ChangeNotifierProvider<ScannerService>.value(value: scannerService),
         Provider<EbayApiService>.value(value: ebayApiService),
         ChangeNotifierProvider<AppState>.value(value: appState),
         ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),

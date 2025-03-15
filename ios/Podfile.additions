@@ -1,0 +1,18 @@
+
+# Added for Firebase compatibility
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      # Enable non-modular headers for all targets
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      
+      # Add symbol visibility setting
+      config.build_settings['GCC_SYMBOLS_PRIVATE_EXTERN'] = 'YES'
+      
+      # Explicitly set DEFINES_MODULE for firebase_auth
+      if target.name == 'firebase_auth'
+        config.build_settings['DEFINES_MODULE'] = 'YES'
+      end
+    end
+  end
+end

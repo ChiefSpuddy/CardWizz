@@ -86,6 +86,24 @@
 				<key>CFBundleURLName</key>
 				<string>com.cardwizz.app</string>
 			</dict>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<!-- Replace with REVERSED_CLIENT_ID from GoogleService-Info.plist -->
+					<string>com.googleusercontent.apps.335432222368-YOUR-REVERSED-CLIENT-ID-SUFFIX</string>
+				</array>
+			</dict>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<!-- Replace YOUR-REVERSED-CLIENT-ID with the actual value from GoogleService-Info.plist -->
+					<string>YOUR-REVERSED-CLIENT-ID</string>
+				</array>
+			</dict>
 		</array>
 		<key>CFBundleLocalizations</key>
 		<array>
