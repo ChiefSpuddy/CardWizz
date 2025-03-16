@@ -1,6 +1,5 @@
 import UIKit
 import Flutter
-import GoogleSignIn
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -13,10 +12,8 @@ import GoogleSignIn
     // Debug log to check if AppDelegate is initializing
     NSLog("CardWizz: AppDelegate initializing")
     
-    // Register Flutter plugins
+    // SIMPLIFIED: Just register Flutter plugins and let them handle initialization
     GeneratedPluginRegistrant.register(with: self)
-    
-    // Remove native GoogleSignIn setup - we'll handle this differently
     
     // Setup method channel for testing
     setupMethodChannel()
@@ -86,17 +83,5 @@ import GoogleSignIn
     
     // Always return success to allow app to continue
     result(["status": "Google Sign-In properly configured"])
-  }
-  
-  // Handle URL scheme callbacks - This is the CRITICAL part for Google Sign-In
-  override func application(
-    _ app: UIApplication,
-    open url: URL,
-    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
-  ) -> Bool {
-    NSLog("CardWizz: Received URL callback: \(url.absoluteString)")
-    
-    // Let super implementation handle this - Flutter plugins will pick this up
-    return super.application(app, open: url, options: options)
   }
 }

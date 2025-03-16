@@ -13,7 +13,6 @@ import '../widgets/animated_gradient_button.dart';
 import '../widgets/styled_toast.dart';
 import '../services/tcg_api_service.dart';  // Add this import
 import 'package:google_sign_in/google_sign_in.dart'; // Add this import for GoogleSignIn
-import '../services/native_google_sign_in.dart'; // Add this missing import
 
 class SignInView extends StatefulWidget {
   final bool showNavigationBar;
@@ -173,36 +172,49 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     
     setState(() {
       _isLoading = true;
-      _debugStepInfo = 'Starting native Google Sign-In';
+      _debugStepInfo = 'Starting Google Sign-In';
     });
     
     try {
-      // Use our new native implementation
-      final userInfo = await NativeGoogleSignIn.signIn();
+      LoggingService.debug('🔍 Starting standard Google Sign-In flow');
       
-      if (userInfo != null && mounted) {
-        _debugStepInfo = 'Processing Google Sign-In result';
+      // Use the built-in google_sign_in plugin directly
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email'],
+        clientId: '335432222368-is4qnf4cj3bhmp8jr6098dr82de76h8q.apps.googleusercontent.com',
+      );
+      
+      // Sign in with Google
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      
+      if (googleUser != null && mounted) {
+        _debugStepInfo = 'Getting authentication details';
         
-        // Map the native result to the format expected by AppState
+        // Get authentication details
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        
+        _debugStepInfo = 'Processing Google Sign-In result';
+        LoggingService.debug('🔍 Google Sign-In successful: ${googleUser.email}');
+        
+        // Pass credentials to AppState
         final user = await context.read<AppState>().signInWithGoogleCredentials(
-          userInfo['email'] ?? '',
-          userInfo['id'] ?? '',
-          userInfo['displayName'] ?? 'Google User',
-          userInfo['photoUrl'] ?? '',
-          userInfo['accessToken'] ?? '',
-          userInfo['idToken'] ?? '',
+          googleUser.email,
+          googleUser.id,
+          googleUser.displayName ?? 'Google User',
+          googleUser.photoUrl ?? '',
+          googleAuth.accessToken ?? '',
+          googleAuth.idToken ?? '',
         );
         
         _debugStepInfo = 'Sign-in completed';
-        LoggingService.debug('🔍 Native sign-in successful: ${user?.id}');
       } else if (mounted) {
-        LoggingService.debug('🔍 Native sign-in cancelled or failed');
+        LoggingService.debug('🔍 Google Sign-In was cancelled');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Sign-in was cancelled'))
         );
       }
     } catch (e) {
-      LoggingService.error('🔍 Error in native sign-in: $e');
+      LoggingService.error('🔍 Error in Google Sign-In: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Sign-in error: $e'))
