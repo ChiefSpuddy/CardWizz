@@ -76,6 +76,10 @@
 		<!-- Optional: Add this if you want to use Sign in with Apple in your entitlements -->
 		<key>com.apple.developer.accounts.authentication-services.autofill-credential-provider</key>
 		<true/>
+		<!-- Update with ACTUAL client ID from GoogleService-Info.plist -->
+		<key>GIDClientID</key>
+		<string>335432222368-is4qnf4cj3bhmp8jr6098dr82de76h8q.apps.googleusercontent.com</string>
+		<!-- Clean up URL types to have just ONE correct entry for Google Sign-In -->
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>
@@ -84,26 +88,24 @@
 					<string>cardwizz</string>
 				</array>
 				<key>CFBundleURLName</key>
-				<string>com.cardwizz.app</string>
+				<string>com.sammay.cardwizz</string>
 			</dict>
+				<!-- Update with ACTUAL REVERSED_CLIENT_ID from GoogleService-Info.plist -->
 			<dict>
 				<key>CFBundleTypeRole</key>
 				<string>Editor</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<!-- Replace with REVERSED_CLIENT_ID from GoogleService-Info.plist -->
-					<string>com.googleusercontent.apps.335432222368-YOUR-REVERSED-CLIENT-ID-SUFFIX</string>
+					<!-- This should match the REVERSED_CLIENT_ID from GoogleService-Info.plist -->
+					<string>com.googleusercontent.apps.335432222368-is4qnf4cj3bhmp8jr6098dr82de76h8q</string>
 				</array>
 			</dict>
-			<dict>
-				<key>CFBundleTypeRole</key>
-				<string>Editor</string>
-				<key>CFBundleURLSchemes</key>
-				<array>
-					<!-- Replace YOUR-REVERSED-CLIENT-ID with the actual value from GoogleService-Info.plist -->
-					<string>YOUR-REVERSED-CLIENT-ID</string>
-				</array>
-			</dict>
+		</array>
+		<!-- Add these keys for iOS 9+ support -->
+		<key>LSApplicationQueriesSchemes</key>
+		<array>
+			<string>googlechromes</string>
+			<string>comgooglemaps</string>
 		</array>
 		<key>CFBundleLocalizations</key>
 		<array>

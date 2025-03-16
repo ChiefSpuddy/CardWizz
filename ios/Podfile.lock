@@ -178,6 +178,7 @@ DEPENDENCIES:
   - flutter_native_splash (from `.symlinks/plugins/flutter_native_splash/ios`)
   - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
   - google_sign_in_ios (from `.symlinks/plugins/google_sign_in_ios/ios`)
+  - GoogleSignIn (= 6.2.4)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - in_app_purchase_storekit (from `.symlinks/plugins/in_app_purchase_storekit/darwin`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
@@ -294,6 +295,6 @@ SPEC CHECKSUMS:
   url_launcher_ios: 694010445543906933d732453a59da0a173ae33d
   workmanager: 01be2de7f184bd15de93a1812936a2b7f42ef07e
 
-PODFILE CHECKSUM: 73b06f2b58112a815ba1de90bf12699b9747bf09
+PODFILE CHECKSUM: 7ac78a8c013d605cf5e8eb14ea8a3b54a4216b93
 
 COCOAPODS: 1.16.2

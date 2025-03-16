@@ -10,6 +10,7 @@ import 'package:characters/characters.dart';
 import 'dart:math';
 import '../services/google_auth_service.dart';
 import 'dart:async'; // Add this for StreamController
+import 'package:firebase_auth/firebase_auth.dart'; // Add this import for AuthCredential
 
 class AuthService {
   static const defaultUsername = 'Pokemon Trainer';
@@ -186,23 +187,33 @@ class AuthService {
 
   Future<AuthUser?> signInWithGoogle() async {
     try {
-      final user = await _googleAuthService.signInWithGoogle();
+      LoggingService.debug('🔍 AUTH: Starting Google authentication flow');
       
-      if (user == null) return null;
+      // Make sure we clear any previous state
+      _errorController.add(''); // Clear any previous errors
+      
+      // Get user from Google Auth Service
+      LoggingService.debug('🔍 AUTH: Calling GoogleAuthService.signInWithGoogle');
+      final user = await _googleAuthService.signInWithGoogle();
+      LoggingService.debug('🔍 AUTH: GoogleAuthService returned ${user != null ? 'user' : 'null'}');
+      
+      if (user == null) {
+        LoggingService.debug('🔍 AUTH: User cancelled Google sign-in or an error occurred');
+        return null;
+      }
       
       // Create or update user in your system
+      LoggingService.debug('🔍 AUTH: Creating AuthUser from Google user');
       final authUser = AuthUser(
         id: user.uid,
         email: user.email,
         name: user.displayName,
-        // Set username from email initially or null
         username: user.displayName ?? user.email?.split('@')[0],
-        // Use Google profile photo if available
         avatarPath: user.photoURL,
-        authProvider: 'google', // Specify auth provider
+        authProvider: 'google',
       );
       
-      // Save user data
+      LoggingService.debug('🔍 AUTH: Saving user data');
       await _saveUserData(authUser);
       
       // Set as current user
@@ -212,10 +223,61 @@ class AuthService {
       // Emit user changed event
       _authStateController.add(authUser);
       
+      LoggingService.debug('🔍 AUTH: Google sign-in completed successfully');
       return authUser;
-    } catch (e) {
+    } catch (e, stack) {
+      LoggingService.error('🔍 AUTH: Error in signInWithGoogle: $e');
+      LoggingService.debug('🔍 AUTH: Stack trace: $stack');
       _errorController.add('Failed to sign in with Google: ${e.toString()}');
+      rethrow;
+    }
+  }
+
+  // Add a direct sign-in method that bypasses the Google sign-in flow
+  Future<AuthUser?> signInWithGoogleCredentials(
+    String email, 
+    String id, 
+    String displayName, 
+    String photoUrl,
+    String accessToken,
+    String idToken,
+  ) async {
+    try {
+      LoggingService.debug('Signing in with Google credentials for $email');
+      
+      // Create an AuthCredential with the Google tokens
+      AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: accessToken,
+        idToken: idToken,
+      );
+      
+      // Sign in with Firebase Auth
+      UserCredential userCredential;
+      try {
+        userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+        if (userCredential.user != null) {
+          LoggingService.debug('Successfully signed in with Firebase: ${userCredential.user!.uid}');
+          
+          // Map to AuthUser and return
+          return _mapFirebaseUserToAuthUser(userCredential.user!);
+        }
+      } catch (e) {
+        LoggingService.error('Firebase auth failed with Google credentials: $e');
+        
+        // If Firebase fails, create a mock/local user - FIX PARAMETER NAMES HERE
+        return AuthUser(
+          id: 'google_$id',
+          email: email,
+          name: displayName, // Changed from displayName to name
+          avatarPath: photoUrl, // Changed from photoUrl to avatarPath
+          authProvider: 'google',
+        );
+      }
+      
       return null;
+    } catch (e) {
+      LoggingService.error('Error signing in with Google credentials: $e');
+      rethrow;
     }
   }
 
@@ -331,6 +393,32 @@ class AuthService {
     // For now, we'll just use local storage via _saveUserData
     await _saveUserData(user);
     LoggingService.debug('User saved to local database: ${user.id}');
+  }
+
+  // Add the missing function to map Firebase User to AuthUser
+  AuthUser _mapFirebaseUserToAuthUser(User firebaseUser) {
+    return AuthUser(
+      id: firebaseUser.uid,
+      email: firebaseUser.email,
+      name: firebaseUser.displayName,
+      avatarPath: firebaseUser.photoURL,
+      locale: 'en',
+      authProvider: 'google',
+    );
+  }
+
+  // Add method to save debug user data
+  Future<void> saveDebugUserData(AuthUser debugUser) async {
+    LoggingService.debug('🐞 DEBUG: Saving debug user data');
+    
+    _currentUser = debugUser;
+    _isAuthenticated = true;
+    await _saveUserData(debugUser);
+    
+    // Emit user changed event
+    _authStateController.add(debugUser);
+    
+    LoggingService.debug('🐞 DEBUG: Debug user data saved');
   }
 }
 

@@ -2,9 +2,10 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../services/logging_service.dart';
+import 'package:flutter/services.dart';
 
 class GoogleAuthService {
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  GoogleSignIn? _googleSignIn;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   
   // Stream to listen for auth state changes
@@ -15,42 +16,88 @@ class GoogleAuthService {
   
   // Get current user
   User? get currentUser => _auth.currentUser;
-
-  // Sign in with Google
+  
+  // Completely rewritten sign-in method with step-by-step debug logging
   Future<User?> signInWithGoogle() async {
     try {
-      // Begin interactive sign-in process
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      LoggingService.debug('🔍 GSVC: Step 1 - Starting Google sign-in process');
       
-      // If user canceled the sign-in flow
-      if (googleUser == null) return null;
-
-      // Obtain auth details from the request
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
-      LoggingService.debug('Google Sign-In successful for: ${googleUser.displayName}');
-      
+      // CRITICAL FIX: Force native configuration test and wait for result
       try {
-        // Try to use Firebase Auth if available
-        final credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-
-        // Sign in to Firebase with credential
-        final UserCredential userCredential = await _auth.signInWithCredential(credential);
+        const platform = MethodChannel('com.cardwizz.app/auth');
+        final result = await platform.invokeMethod('testGoogleSignIn');
+        LoggingService.debug('🔍 GSVC: Native configuration test: $result');
         
-        LoggingService.debug('Successfully signed in with Google via Firebase: ${userCredential.user?.displayName}');
-        return userCredential.user;
+        // Add a small delay after configuration to ensure it propagates
+        await Future.delayed(const Duration(milliseconds: 100));
       } catch (e) {
-        LoggingService.warning('Firebase auth failed, using mock user: $e');
-        // Fall back to mock user if Firebase auth fails
-        return _createMockUser(googleUser, googleAuth);
+        LoggingService.debug('🔍 GSVC: Native pre-test failed: $e');
+        // Continue anyway, as it might still work
       }
+      
+      // Initialize GoogleSignIn if not already done
+      _googleSignIn ??= GoogleSignIn();
+      
+      // Try a silent sign-in first to avoid unnecessary UI
+      LoggingService.debug('🔍 GSVC: Step 2 - Attempting silent sign-in');
+      try {
+        final silentUser = await _googleSignIn!.signInSilently();
+        if (silentUser != null) {
+          LoggingService.debug('🔍 GSVC: Silent sign-in succeeded');
+          // Get authentication data and continue with Firebase auth
+          final googleAuth = await silentUser.authentication;
+          return _processGoogleAuthentication(silentUser, googleAuth);
+        }
+      } catch (e) {
+        LoggingService.debug('🔍 GSVC: Silent sign-in failed: $e');
+      }
+      
+      // Fall back to interactive sign-in
+      LoggingService.debug('🔍 GSVC: Step 3 - Attempting interactive sign-in');
+      final googleUser = await _googleSignIn!.signIn();
+      
+      if (googleUser == null) {
+        LoggingService.debug('🔍 GSVC: Interactive sign-in cancelled by user');
+        return null;
+      }
+      
+      // Get authentication data
+      LoggingService.debug('🔍 GSVC: Step 4 - Getting authentication tokens');
+      final googleAuth = await googleUser.authentication;
+      
+      // Process authentication
+      return _processGoogleAuthentication(googleUser, googleAuth);
+    } catch (e, stack) {
+      LoggingService.error('🔍 GSVC: Error signing in with Google: $e');
+      LoggingService.debug('🔍 GSVC: Stack trace: $stack');
+      rethrow;
+    }
+  }
+  
+  // Add helper method to process Google authentication 
+  Future<User?> _processGoogleAuthentication(
+    GoogleSignInAccount account, 
+    GoogleSignInAuthentication auth
+  ) async {
+    LoggingService.debug('🔍 GSVC: Processing authentication for ${account.email}');
+    
+    try {
+      // Create credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: auth.accessToken,
+        idToken: auth.idToken,
+      );
+      
+      // Sign in with Firebase
+      LoggingService.debug('🔍 GSVC: Signing in with Firebase');
+      final userCredential = await _auth.signInWithCredential(credential);
+      LoggingService.debug('🔍 GSVC: Firebase sign-in successful');
+      
+      return userCredential.user;
     } catch (e) {
-      // Fix: Change error method call to use the correct format
-      LoggingService.error('Error signing in with Google: $e');
-      return null;
+      LoggingService.debug('🔍 GSVC: Firebase auth failed: $e');
+      // Create mock user only in development
+      return _createMockUser(account, auth);
     }
   }
   
@@ -68,7 +115,7 @@ class GoogleAuthService {
   // Sign out
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
+      await _googleSignIn!.signOut();
       await _auth.signOut();
       LoggingService.debug('Successfully signed out from Google');
     } catch (e) {

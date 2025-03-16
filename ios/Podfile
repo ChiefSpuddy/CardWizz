@@ -33,6 +33,9 @@ target 'Runner' do
   pod 'Firebase/Core', '10.18.0'
   pod 'Firebase/Auth', '10.18.0'
   
+  # CRITICAL FIX: Use exact version to resolve conflicts
+  pod 'GoogleSignIn', '6.2.4'
+  
   # Install Flutter plugins
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end

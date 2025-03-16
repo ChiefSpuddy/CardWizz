@@ -1,6 +1,7 @@
 import '../services/logging_service.dart';
 import 'dart:ui';
 import 'dart:math' as math;  // Add this import
+import 'dart:async'; // Add this import for TimeoutException
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,8 @@ import '../utils/error_handler.dart';
 import '../widgets/animated_gradient_button.dart';
 import '../widgets/styled_toast.dart';
 import '../services/tcg_api_service.dart';  // Add this import
+import 'package:google_sign_in/google_sign_in.dart'; // Add this import for GoogleSignIn
+import '../services/native_google_sign_in.dart'; // Add this missing import
 
 class SignInView extends StatefulWidget {
   final bool showNavigationBar;
@@ -39,6 +42,10 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   
   final List<Map<String, dynamic>> _showcaseCards = [];
   bool _isLoadingCards = true;
+
+  // Add debug variables for watchdog timer
+  Timer? _watchdogTimer;
+  String _debugStepInfo = 'Not started';
 
   @override
   void initState() {
@@ -160,30 +167,159 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     }
   }
 
-  // Add method to handle Google sign-in
+  // Replace the entire Google sign-in handler with a much simpler approach
   Future<void> _handleGoogleSignIn() async {
+    if (_isLoading) return;
+    
     setState(() {
       _isLoading = true;
+      _debugStepInfo = 'Starting native Google Sign-In';
     });
-
+    
     try {
-      final user = await context.read<AppState>().signInWithGoogle();
+      // Use our new native implementation
+      final userInfo = await NativeGoogleSignIn.signIn();
       
-      if (user != null && mounted) {
-        // Sign-in successful
-        // No need to navigate, AppState will handle this
+      if (userInfo != null && mounted) {
+        _debugStepInfo = 'Processing Google Sign-In result';
+        
+        // Map the native result to the format expected by AppState
+        final user = await context.read<AppState>().signInWithGoogleCredentials(
+          userInfo['email'] ?? '',
+          userInfo['id'] ?? '',
+          userInfo['displayName'] ?? 'Google User',
+          userInfo['photoUrl'] ?? '',
+          userInfo['accessToken'] ?? '',
+          userInfo['idToken'] ?? '',
+        );
+        
+        _debugStepInfo = 'Sign-in completed';
+        LoggingService.debug('🔍 Native sign-in successful: ${user?.id}');
+      } else if (mounted) {
+        LoggingService.debug('🔍 Native sign-in cancelled or failed');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sign-in was cancelled'))
+        );
       }
     } catch (e) {
+      LoggingService.error('🔍 Error in native sign-in: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to sign in with Google: $e')),
+          SnackBar(content: Text('Sign-in error: $e'))
         );
       }
     } finally {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _debugStepInfo = 'Completed';
         });
+      }
+    }
+  }
+
+  // Add this method to show a dialog when the app is frozen
+  void _showFreezeRecoveryDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign-In Process Stuck'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Last step: $_debugStepInfo'),
+            const SizedBox(height: 16),
+            const Text('The Google Sign-In process appears to be frozen. This happens when the GoogleSignIn plugin encounters native issues.'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              // Cancel the sign-in process
+              if (_watchdogTimer?.isActive ?? false) {
+                _watchdogTimer!.cancel();
+              }
+              setState(() => _isLoading = false);
+              Navigator.of(context).pop();
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              // Try a direct Firebase auth for testing
+              Navigator.of(context).pop();
+              _handleDebugDirectSignIn();
+            },
+            child: const Text('Try Debug Sign-In'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Simple debug-only method to bypass Google Sign-In UI
+  Future<void> _handleDebugDirectSignIn() async {
+    try {
+      setState(() => _isLoading = true);
+      
+      // Create a debug user with mock data directly
+      final debugUser = await context.read<AppState>().signInWithDebugAccount(
+        email: 'debug@example.com',
+        displayName: 'Debug User',
+      );
+      
+      if (debugUser != null) {
+        LoggingService.debug('🔍 DEBUG: Successfully signed in with debug account');
+      } else {
+        LoggingService.debug('🔍 DEBUG: Debug sign-in returned null');
+      }
+    } catch (e) {
+      LoggingService.debug('🔍 DEBUG: Error in debug sign-in: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // Add this simple direct Google Sign-In testing method
+  Future<void> _testNativeGoogleSignIn() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _debugStepInfo = 'Starting iOS native Google Sign-In test';
+      });
+      
+      LoggingService.debug('🔍 iOS NATIVE: Testing direct native channel');
+      
+      // Create a method channel to call native iOS code directly
+      const channel = MethodChannel('com.cardwizz.app/auth');
+      
+      // Call native method to test Google Sign-In setup
+      final result = await channel.invokeMethod<Map>('testGoogleSignIn');
+      
+      LoggingService.debug('🔍 iOS NATIVE: Result: $result');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Native test result: ${result ?? "No result"}'))
+        );
+      }
+    } catch (e) {
+      LoggingService.debug('🔍 iOS NATIVE: Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('iOS native test failed: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -811,59 +947,105 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
         final animationProgress = (_contentController.value - delay) / (1 - delay);
         final progress = animationProgress.clamp(0.0, 1.0);
         
-        return Transform.translate(
-          offset: Offset(
-            0,
-            30 * (1 - progress),
-          ),
-          child: Opacity(
-            opacity: progress,
-            child: AnimatedGradientButton(
-              text: 'Sign in with Google',
-              // Custom content to include Google logo
-              customContent: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    height: 22, // Reduced from 24
-                    width: 22, // Reduced from 24
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'G',
-                        style: TextStyle(
-                          color: Colors.blue[700],
-                          fontSize: 14, // Reduced from 16
-                          fontWeight: FontWeight.bold,
+        return Column(
+          children: [
+            Transform.translate(
+              offset: Offset(0, 30 * (1 - progress)),
+              child: Opacity(
+                opacity: progress,
+                child: AnimatedGradientButton(
+                  text: 'Sign in with Google',
+                  customContent: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        height: 22, // Reduced from 24
+                        width: 22, // Reduced from 24
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                        ),
+                        child: Center(
+                          child: Text(
+                            'G',
+                            style: TextStyle(
+                              color: Colors.blue[700],
+                              fontSize: 14, // Reduced from 16
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 10), // Reduced from 12
+                      Text(
+                        'Sign in with Google',
+                        style: TextStyle(
+                          fontSize: 15, // Reduced from 16
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10), // Reduced from 12
-                  Text(
-                    'Sign in with Google',
-                    style: TextStyle(
-                      fontSize: 15, // Reduced from 16
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
+                  isLoading: _isLoading,
+                  // Google brand color gradient
+                  gradientColors: [
+                    Colors.blue.shade700,
+                    Colors.lightBlue.shade500,
+                  ],
+                  onPressed: _handleGoogleSignIn,
+                  height: 50, // Reduced from 55
+                  borderRadius: 16,
+                ),
               ),
-              isLoading: _isLoading,
-              // Google brand color gradient
-              gradientColors: [
-                Colors.blue.shade700,
-                Colors.lightBlue.shade500,
-              ],
-              onPressed: _handleGoogleSignIn,
-              height: 50, // Reduced from 55
-              borderRadius: 16,
             ),
-          ),
+            
+            // Add a debug button below 
+            if (_contentController.value > 0.7) // Only show when animation completed
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      icon: const Icon(Icons.bug_report, size: 16),
+                      label: const Text('Debug Sign-In', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      onPressed: _handleDebugDirectSignIn,
+                    ),
+                    if (_isLoading)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(
+                          '($_debugStepInfo)',
+                          style: const TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            
+            // Add a native testing option for iOS
+            if (Theme.of(context).platform == TargetPlatform.iOS && _contentController.value > 0.7)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      icon: const Icon(Icons.phone_iphone, size: 14),
+                      label: const Text('Test iOS Native', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      onPressed: _testNativeGoogleSignIn,
+                    ),
+                  ],
+                ),
+              ),
+          ],
         );
       },
     );

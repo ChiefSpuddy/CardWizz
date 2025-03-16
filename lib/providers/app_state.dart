@@ -134,17 +134,31 @@ class AppState with ChangeNotifier {
     return user;
   }
 
-  // Add method to handle Google Sign-In
+  // Update the signInWithGoogle method to be more robust
   Future<AuthUser?> signInWithGoogle() async {
     try {
+      LoggingService.debug('🔍 GOOGLE: Starting Google Sign-In flow');
+      
+      // Simply call the auth service method
       final user = await _authService.signInWithGoogle();
+      LoggingService.debug('🔍 GOOGLE: Auth service returned user: ${user != null}');
+      
       if (user != null) {
+        LoggingService.debug('🔍 GOOGLE: Processing successful sign-in');
         await _handleSuccessfulSignIn(user);
+        await _storageService.setString('auth_provider', 'google');
+        LoggingService.debug('🔍 GOOGLE: Sign-in process complete');
+      } else {
+        LoggingService.debug('🔍 GOOGLE: Sign-in cancelled or returned null');
       }
+      
       return user;
-    } catch (e) {
+    } catch (e, stack) {
+      // Log with stack trace
+      LoggingService.error('🔍 GOOGLE: Error in signInWithGoogle: $e');
+      LoggingService.debug('🔍 GOOGLE: Stack trace: $stack');
       _handleAuthError('Google Sign-In failed: $e');
-      return null;
+      rethrow;
     }
   }
 
@@ -308,6 +322,77 @@ class AppState with ChangeNotifier {
     
     // Create new timer with the callback
     _cardChangeDebouncer = Timer(const Duration(milliseconds: 300), callback);
+  }
+
+  // Add a direct sign-in method that bypasses the regular flow
+  Future<AuthUser?> signInWithGoogleCredentials(
+    String email, 
+    String id, 
+    String displayName, 
+    String photoUrl,
+    String accessToken,
+    String idToken,
+  ) async {
+    try {
+      // Use the auth service to sign in with the provided credentials
+      final user = await _authService.signInWithGoogleCredentials(
+        email, 
+        id, 
+        displayName, 
+        photoUrl,
+        accessToken,
+        idToken,
+      );
+      
+      if (user != null) {
+        // Handle successful sign-in (proper way - no direct _currentUser field)
+        // Use the existing method that handles all the logic correctly
+        await _handleSuccessfulSignIn(user);
+        
+        // Save provider info using standard method instead of non-existent saveLastSignInProvider
+        await _storageService.setString('auth_provider', 'google');
+        
+        return user;
+      }
+      return null;
+    } catch (e) {
+      LoggingService.error('Error in signInWithGoogleCredentials: $e');
+      rethrow;
+    }
+  }
+
+  // Add a debug method for testing authentication without Google Sign-In
+  Future<AuthUser?> signInWithDebugAccount({
+    required String email,
+    required String displayName,
+  }) async {
+    try {
+      LoggingService.debug('🐞 DEBUG: Creating debug user account');
+      
+      // Generate a unique ID for this debug session
+      final uniqueId = 'debug_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Create a mock AuthUser
+      final debugUser = AuthUser(
+        id: uniqueId,
+        email: email,
+        name: displayName,
+        username: displayName.split(' ').first.toLowerCase(),
+        authProvider: 'debug',
+      );
+      
+      // Save the user data
+      await _authService.saveDebugUserData(debugUser);
+      
+      // Handle sign-in process
+      await _handleSuccessfulSignIn(debugUser);
+      
+      LoggingService.debug('🐞 DEBUG: Successfully created debug user: $uniqueId');
+      return debugUser;
+    } catch (e) {
+      LoggingService.error('🐞 DEBUG: Error creating debug user: $e');
+      return null;
+    }
   }
 
   @override
