@@ -231,7 +231,7 @@ class AppDrawer extends StatelessWidget {
                             child: CircleAvatar(
                               radius: 24,
                               backgroundColor: Colors.white.withOpacity(0.2),
-                              child: appState.currentUser?.avatarPath != null
+                              child: appState.currentUser?.avatarPath != null && appState.currentUser!.avatarPath!.isNotEmpty
                                 ? ClipOval(
                                     child: Image.asset(
                                       appState.currentUser!.avatarPath!,
@@ -239,13 +239,27 @@ class AppDrawer extends StatelessWidget {
                                       height: 44,
                                       fit: BoxFit.cover,
                                       errorBuilder: (context, error, stackTrace) {
-                                        // Log the error and show fallback icon
+                                        // Log the error and show default avatar
                                         LoggingService.debug('Error loading avatar image: $error');
-                                        return const Icon(Icons.person, size: 28, color: Colors.white);
+                                        return ClipOval(
+                                          child: Image.asset(
+                                            'assets/avatars/avatar1.png',
+                                            width: 44,
+                                            height: 44,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        );
                                       },
                                     ),
                                   )
-                                : const Icon(Icons.person, size: 28, color: Colors.white),
+                                : ClipOval(
+                                    child: Image.asset(
+                                      'assets/avatars/avatar1.png', // Default avatar
+                                      width: 44,
+                                      height: 44,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
                             ),
                           ),
                         ),
@@ -262,14 +276,6 @@ class AppDrawer extends StatelessWidget {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              if (appState.currentUser?.email != null)
-                                Text(
-                                  appState.currentUser!.email!,
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontSize: 13,
-                                  ),
-                                ),
                             ],
                           ),
                         ),

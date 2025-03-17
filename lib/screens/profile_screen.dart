@@ -1,26 +1,27 @@
-import 'dart:async';  // Add this import
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:convert';  // Add this import
+import 'dart:convert';
 import '../providers/app_state.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../providers/currency_provider.dart';
 import '../widgets/avatar_picker_dialog.dart';
-import '../l10n/app_localizations.dart';  // Fix this import path
+import '../l10n/app_localizations.dart';
 import '../screens/privacy_settings_screen.dart';
-import '../services/purchase_service.dart';  // Make sure this is added
+import '../services/purchase_service.dart';
 import '../widgets/sign_in_view.dart';
 import '../services/collection_service.dart';
-import '../widgets/styled_toast.dart';  // Add this import
-import '../providers/theme_provider.dart'; // Add this import
-import '../widgets/app_drawer.dart'; // Add this import
-import '../widgets/standard_app_bar.dart'; // Add this import
-import 'package:lottie/lottie.dart'; // Add this import
-import '../services/premium_service.dart'; // Add this import
-import '../services/premium_features_helper.dart'; // Add this import
+import '../widgets/styled_toast.dart';
+import '../providers/theme_provider.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/standard_app_bar.dart';
+import 'package:lottie/lottie.dart';
+import '../services/premium_service.dart';
+import '../services/premium_features_helper.dart';
+import '../services/logging_service.dart'; // Add this import for LoggingService
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -323,41 +324,88 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: () => _selectAvatar(context),
-                  child: Hero(
-                    tag: 'profileAvatar',
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.primary.withOpacity(0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: CircleAvatar(
-                        radius: 40,
-                        backgroundColor: colorScheme.primary.withOpacity(0.1),
-                        child: user.avatarPath != null
-                            ? ClipOval(
-                                child: Image.asset(
-                                  user.avatarPath!,
-                                  width: 80,
-                                  height: 80,
-                                  fit: BoxFit.cover,
-                                ),
-                              )
-                            : Icon(
-                                Icons.person,
-                                size: 40,
-                                color: colorScheme.primary,
+                // Avatar with edit button overlay
+                Stack(
+                  children: [
+                    GestureDetector(
+                      onTap: () => _selectAvatar(context),
+                      child: Hero(
+                        tag: 'profileAvatar',
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: colorScheme.primary.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
+                            ],
+                          ),
+                          child: CircleAvatar(
+                            radius: 40,
+                            backgroundColor: colorScheme.primary.withOpacity(0.1),
+                            child: user.avatarPath != null && user.avatarPath!.isNotEmpty
+                                ? ClipOval(
+                                    child: Image.asset(
+                                      user.avatarPath!,
+                                      width: 80,
+                                      height: 80,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        LoggingService.debug('Error loading avatar in profile: $error');
+                                        return ClipOval(
+                                          child: Image.asset(
+                                            'assets/avatars/avatar1.png',
+                                            width: 80,
+                                            height: 80,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.account_circle,
+                                    size: 80,
+                                    color: colorScheme.onPrimaryContainer.withOpacity(0.6),
+                                  ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    // Edit button overlay
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: () => _selectAvatar(context),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: colorScheme.secondaryContainer,
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.edit,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(width: 16),
                 Expanded(
