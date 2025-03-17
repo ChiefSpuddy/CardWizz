@@ -115,13 +115,32 @@ class GoogleAuthService {
   // Sign out
   Future<void> signOut() async {
     try {
-      await _googleSignIn!.signOut();
-      await _auth.signOut();
-      LoggingService.debug('Successfully signed out from Google');
+      LoggingService.debug('GoogleAuthService: Signing out');
+      
+      // Check if GoogleSignIn is initialized before calling signOut
+      if (_googleSignIn != null) {
+        // Try to sign out from Google, but don't fail if it doesn't work
+        try {
+          await _googleSignIn!.signOut();
+          LoggingService.debug('GoogleAuthService: Signed out from Google');
+        } catch (e) {
+          LoggingService.debug('GoogleAuthService: Error signing out from Google: $e');
+          // Continue despite error - we still want to sign out from Firebase
+        }
+      } else {
+        LoggingService.debug('GoogleAuthService: GoogleSignIn was null, skipping Google sign-out');
+      }
+      
+      // Always try to sign out from Firebase
+      try {
+        await _auth.signOut();
+        LoggingService.debug('GoogleAuthService: Signed out from Firebase');
+      } catch (e) {
+        LoggingService.debug('GoogleAuthService: Error signing out from Firebase: $e');
+      }
     } catch (e) {
-      // Fix: Change error method call to use the correct format
-      LoggingService.error('Error signing out from Google: $e');
-      rethrow;
+      LoggingService.debug('GoogleAuthService: Error in signOut: $e');
+      // Don't rethrow - we want the app to continue functioning even if sign-out fails
     }
   }
 }

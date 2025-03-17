@@ -110,7 +110,19 @@ Future<void> _initializeAppInBackground(SharedPreferences prefs) async {
             previous ?? PremiumService(purchaseService, prefs),
         ),
       ],
-      child: const MyApp(),
+      child: Builder(
+        builder: (context) {
+          // Add a post-frame callback to check auth state once app is built
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final appState = Provider.of<AppState>(context, listen: false);
+            LoggingService.debug('App started with auth state: isAuthenticated=${appState.isAuthenticated}');
+            if (appState.isAuthenticated && appState.currentUser != null) {
+              LoggingService.debug('User is authenticated: ${appState.currentUser?.id}');
+            }
+          });
+          return const MyApp();
+        },
+      ),
     );
     
     // Run the full app with a beautiful transition

@@ -180,6 +180,7 @@ class _SearchScreenState extends State<SearchScreen> {
   // Add this field to store cards in memory
   final _collectionCardsSubject = BehaviorSubject<Set<String>>.seeded({});
   Set<String> get _collectionCardIds => _collectionCardsSubject.value;
+  StreamSubscription? _cardsSubscription;
 
   @override
   void initState() {
@@ -246,7 +247,15 @@ class _SearchScreenState extends State<SearchScreen> {
     _scrollController.dispose();
     _searchController.dispose();
     _searchDebounce?.cancel();
-    _collectionCardsSubject.close();
+    
+    // CRITICAL FIX: Cancel subscription before closing stream
+    _cardsSubscription?.cancel();
+    
+    // Only close if not already closed
+    if (!_collectionCardsSubject.isClosed) {
+      _collectionCardsSubject.close();
+    }
+    
     super.dispose();
   }
   
@@ -1499,9 +1508,14 @@ class _SearchScreenState extends State<SearchScreen> {
   // Add this method to watch collection changes
   void _setupCollectionWatcher() {
     final storageService = Provider.of<StorageService>(context, listen: false);
-    storageService.watchCards().listen((cards) {
-      final cardIds = cards.map((c) => c.id).toSet();
-      _collectionCardsSubject.add(cardIds);
+    
+    // Store the subscription for later cleanup
+    _cardsSubscription = storageService.watchCards().listen((cards) {
+      // Only add to stream if it's not closed and the widget is mounted
+      if (!_collectionCardsSubject.isClosed && mounted) {
+        final cardIds = cards.map((c) => c.id).toSet();
+        _collectionCardsSubject.add(cardIds);
+      }
     });
   }
 

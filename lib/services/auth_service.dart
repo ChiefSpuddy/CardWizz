@@ -233,7 +233,7 @@ class AuthService {
     }
   }
 
-  // Add a direct sign-in method that bypasses the Google sign-in flow
+  // Update the direct sign-in method with Google credentials
   Future<AuthUser?> signInWithGoogleCredentials(
     String email, 
     String id, 
@@ -243,76 +243,142 @@ class AuthService {
     String idToken,
   ) async {
     try {
-      LoggingService.debug('Signing in with Google credentials for $email');
+      LoggingService.debug('AuthService: Signing in with Google credentials for $email');
       
       // Create an AuthCredential with the Google tokens
-      AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: accessToken,
-        idToken: idToken,
-      );
-      
-      // Sign in with Firebase Auth
-      UserCredential userCredential;
+      AuthCredential credential;
       try {
-        userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-        if (userCredential.user != null) {
-          LoggingService.debug('Successfully signed in with Firebase: ${userCredential.user!.uid}');
-          
-          // Map to AuthUser and return
-          return _mapFirebaseUserToAuthUser(userCredential.user!);
-        }
-      } catch (e) {
-        LoggingService.error('Firebase auth failed with Google credentials: $e');
-        
-        // If Firebase fails, create a mock/local user - FIX PARAMETER NAMES HERE
-        return AuthUser(
-          id: 'google_$id',
-          email: email,
-          name: displayName, // Changed from displayName to name
-          avatarPath: photoUrl, // Changed from photoUrl to avatarPath
-          authProvider: 'google',
+        credential = GoogleAuthProvider.credential(
+          accessToken: accessToken,
+          idToken: idToken,
         );
+      } catch (e) {
+        LoggingService.debug('AuthService: Error creating credential: $e');
+        // Continue with local auth as fallback
       }
       
-      return null;
+      // Try Firebase Auth if credentials are available
+      try {
+        UserCredential? userCredential;
+        try {
+          userCredential = await FirebaseAuth.instance.signInWithCredential(
+            GoogleAuthProvider.credential(
+              accessToken: accessToken,
+              idToken: idToken,
+            )
+          );
+        } catch (e) {
+          LoggingService.debug('AuthService: Firebase auth failed: $e');
+        }
+        
+        if (userCredential?.user != null) {
+          LoggingService.debug('AuthService: Firebase sign-in successful: ${userCredential!.user!.uid}');
+          // Map to AuthUser
+          final authUser = _mapFirebaseUserToAuthUser(userCredential.user!);
+          
+          // Set as current user and save
+          _currentUser = authUser;
+          _isAuthenticated = true;
+          await _saveUserData(authUser);
+          
+          // Emit event
+          _authStateController.add(authUser);
+          
+          return authUser;
+        }
+      } catch (e) {
+        LoggingService.debug('AuthService: Error with Firebase auth: $e');
+        // Continue with local auth
+      }
+      
+      // Create local user as fallback
+      LoggingService.debug('AuthService: Creating local user for Google account');
+      final localUser = AuthUser(
+        id: 'google_$id',
+        email: email,
+        name: displayName,
+        avatarPath: photoUrl,
+        locale: 'en',
+        username: email.split('@').first,
+        authProvider: 'google',
+      );
+      
+      // Set as current user
+      _currentUser = localUser;
+      _isAuthenticated = true;
+      
+      // Save user data
+      await _saveUserData(localUser);
+      
+      // Emit event
+      _authStateController.add(localUser);
+      
+      LoggingService.debug('AuthService: Local Google user created successfully');
+      return localUser;
     } catch (e) {
-      LoggingService.error('Error signing in with Google credentials: $e');
+      LoggingService.error('AuthService: Error signing in with Google credentials: $e');
       rethrow;
     }
   }
 
   Future<void> signOut() async {
     try {
-      // Check if the current user is signed in with Google
-      final currentUser = _currentUser;
-      if (currentUser?.authProvider == 'google') {
-        await _googleAuthService.signOut();
-      } else {
-        // Handle other sign out methods
-        if (_currentUser != null) {
-          final prefs = await SharedPreferences.getInstance();
-          // Only remove the active session marker
-          await prefs.remove('user_id');
-
-          // Just clear current session state without deleting any data
-          final collectionService = await CollectionService.getInstance();
-          await collectionService.clearSessionState();  // This only clears in-memory state
-
-          final storage = await StorageService.init(null);
-          await storage.clearSessionState();  // This only clears in-memory state
-
-          _isAuthenticated = false;
-          _currentUser = null;
+      LoggingService.debug('AuthService: Starting sign-out process');
+      final userId = _currentUser?.id;
+      final authProvider = _currentUser?.authProvider;
+      
+      if (userId != null) {
+        LoggingService.debug('AuthService: Signing out user: $userId with provider: $authProvider');
+        
+        // Clear user data from memory first
+        _isAuthenticated = false;
+        _currentUser = null;
+        
+        // Clear session state from services
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('user_id');
+        
+        try {
+          // Handle provider-specific sign-out
+          if (authProvider == 'google') {
+            LoggingService.debug('AuthService: Performing Google sign-out');
+            await _googleAuthService.signOut();
+          } 
+          // You can add other providers here if needed
+        } catch (e) {
+          // Log but don't fail - we want to continue with the rest of sign-out
+          LoggingService.debug('AuthService: Error in provider-specific sign-out: $e');
         }
+        
+        // Always try to clear session state in services
+        try {
+          // Get collection service but don't fail if not available
+          final collectionService = await CollectionService.getInstance();
+          await collectionService?.clearSessionState();
+          LoggingService.debug('AuthService: Cleared collection service session state');
+        } catch (e) {
+          LoggingService.debug('AuthService: Error clearing collection service state: $e');
+        }
+        
+        try {
+          // Get storage service but don't fail if not available
+          final storage = await StorageService.init(null);
+          await storage.clearSessionState();
+          LoggingService.debug('AuthService: Cleared storage service session state');
+        } catch (e) {
+          LoggingService.debug('AuthService: Error clearing storage service session state: $e');
+        }
+        
+        // Emit auth state change event
+        _authStateController.add(null);
+        
+        LoggingService.debug('AuthService: Sign-out completed successfully');
+      } else {
+        LoggingService.debug('AuthService: No current user to sign out');
       }
-      
-      // Clear current user
-      _currentUser = null;
-      _authStateController.add(null);
-      
     } catch (e) {
-      _errorController.add('Failed to sign out: ${e.toString()}');
-      rethrow;
+      LoggingService.debug('AuthService: Error during sign-out: $e');
+      // Don't rethrow - we want the app to continue functioning even if sign-out fails
     }
   }
 

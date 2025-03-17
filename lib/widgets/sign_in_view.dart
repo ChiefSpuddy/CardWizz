@@ -46,6 +46,11 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   Timer? _watchdogTimer;
   String _debugStepInfo = 'Not started';
 
+  // Add a flag to track if the widget is still mounted
+  bool _isMounted = true;
+  // Add a flag to cancel delayed animations
+  Timer? _animationTimer;
+
   @override
   void initState() {
     super.initState();
@@ -89,6 +94,13 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    // Cancel timer to prevent callbacks after dispose
+    _animationTimer?.cancel();
+    
+    // Set flag to prevent future animation updates
+    _isMounted = false;
+    
+    // Dispose controllers
     _backgroundController.dispose();
     _logoController.dispose();
     _headlineController.dispose();
@@ -166,7 +178,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     }
   }
 
-  // Replace the entire Google sign-in handler with a much simpler approach
+  // Replace the entire Google sign-in handler with a more robust approach
   Future<void> _handleGoogleSignIn() async {
     if (_isLoading) return;
     
@@ -207,6 +219,27 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
         );
         
         _debugStepInfo = 'Sign-in completed';
+        
+        // CRITICAL FIX: Check if the user is authenticated and navigate to home
+        // Wait a moment to allow the state to update
+        await Future.delayed(const Duration(milliseconds: 100));
+        
+        if (mounted) {
+          final appState = Provider.of<AppState>(context, listen: false);
+          LoggingService.debug('🔍 Post sign-in check: isAuthenticated = ${appState.isAuthenticated}');
+          
+          if (appState.isAuthenticated && user != null) {
+            LoggingService.debug('🔍 Authentication successful, navigating to home');
+            
+            // Force navigation to home screen
+            Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/', (route) => false);
+          } else {
+            LoggingService.debug('🔍 Authentication failed, remaining on sign-in screen');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Sign-in was not completed successfully'))
+            );
+          }
+        }
       } else if (mounted) {
         LoggingService.debug('🔍 Google Sign-In was cancelled');
         ScaffoldMessenger.of(context).showSnackBar(

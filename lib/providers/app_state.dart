@@ -199,15 +199,54 @@ class AppState with ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    final userId = _authService.currentUser?.id;
-    if (userId != null) {
-      LoggingService.debug('Signing out user: $userId');
-      // Just clear session state without deleting data
-      await _storageService.clearSessionState();
-      await _collectionService?.clearSessionState();
+    try {
+      LoggingService.debug('AppState: Starting sign-out process');
+      
+      // Cancel any pending operations that might trigger callbacks
+      _debounceTimer?.cancel();
+      
+      // Notify listeners BEFORE sign-out to update UI
+      notifyListeners();
+      
+      // Attempt to sign out regardless of current state
       await _authService.signOut();
+      
+      // Clear local state
+      await _storageService.clearSessionState();
+      
+      // Navigation must happen AFTER all state is cleared
+      final context = NavigationService.navigatorKey.currentContext;
+      if (context != null) {
+        LoggingService.debug('AppState: Navigating to sign-in screen');
+        
+        // Use a slight delay to ensure all cleanup is complete before navigation
+        await Future.delayed(const Duration(milliseconds: 50));
+        
+        // Check if context is still valid after the delay
+        if (NavigationService.navigatorKey.currentContext != null) {
+          // Clear navigation stack and go to root/home screen
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        } else {
+          LoggingService.debug('AppState: Context is no longer valid after delay');
+        }
+      } else {
+        LoggingService.debug('AppState: Could not navigate - no current context');
+      }
+      
+      LoggingService.debug('AppState: Sign-out completed');
+    } catch (e) {
+      LoggingService.debug('AppState: Error during sign-out: $e');
+      
+      // Try to navigate anyway if there was an error
+      try {
+        final context = NavigationService.navigatorKey.currentContext;
+        if (context != null) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+        }
+      } catch (navError) {
+        LoggingService.debug('AppState: Error during navigation after sign-out: $navError');
+      }
     }
-    notifyListeners();
   }
 
   Future<void> updateAvatar(String avatarPath) async {
@@ -324,7 +363,7 @@ class AppState with ChangeNotifier {
     _cardChangeDebouncer = Timer(const Duration(milliseconds: 300), callback);
   }
 
-  // Add a direct sign-in method that bypasses the regular flow
+  // Enhance the signInWithGoogleCredentials method - fixed duplicate method and references to _isAuthenticated
   Future<AuthUser?> signInWithGoogleCredentials(
     String email, 
     String id, 
@@ -334,6 +373,8 @@ class AppState with ChangeNotifier {
     String idToken,
   ) async {
     try {
+      LoggingService.debug('🔍 GOOGLE CREDS: Processing Google credentials for $email');
+      
       // Use the auth service to sign in with the provided credentials
       final user = await _authService.signInWithGoogleCredentials(
         email, 
@@ -345,18 +386,33 @@ class AppState with ChangeNotifier {
       );
       
       if (user != null) {
-        // Handle successful sign-in (proper way - no direct _currentUser field)
-        // Use the existing method that handles all the logic correctly
+        LoggingService.debug('🔍 GOOGLE CREDS: Auth service returned valid user: ${user.id}');
+        
+        // Handle successful sign-in
         await _handleSuccessfulSignIn(user);
         
-        // Save provider info using standard method instead of non-existent saveLastSignInProvider
+        // Save provider info
         await _storageService.setString('auth_provider', 'google');
         
+        // CRITICAL FIX: Make sure authentication state is properly detected
+        LoggingService.debug('🔍 GOOGLE CREDS: Authentication state - isAuthenticated: ${_authService.isAuthenticated}');
+        
+        // Force authentication check if it's not set
+        if (!_authService.isAuthenticated) {
+          LoggingService.debug('🔍 GOOGLE CREDS: Auth service shows not authenticated, but we have a user');
+          // No need to manually set isAuthenticated as it's managed by AuthService
+          // Just notify listeners to update UI
+          notifyListeners();
+        }
+        
         return user;
+      } else {
+        LoggingService.debug('🔍 GOOGLE CREDS: Auth service returned null user');
+        return null;
       }
-      return null;
-    } catch (e) {
-      LoggingService.error('Error in signInWithGoogleCredentials: $e');
+    } catch (e, stack) {
+      LoggingService.error('🔍 GOOGLE CREDS: Error in signInWithGoogleCredentials: $e');
+      LoggingService.debug('🔍 GOOGLE CREDS: Stack trace: $stack');
       rethrow;
     }
   }
