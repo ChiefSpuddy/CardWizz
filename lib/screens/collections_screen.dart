@@ -28,6 +28,7 @@ import '../utils/card_details_router.dart';
 import 'dart:math';  // Add this import for Random, pi, etc.
 import '../models/tcg_card.dart';  // Add this import for TcgCard class
 import '../services/premium_features_helper.dart'; // Add this import to fix the error
+import '../screens/root_navigator.dart';
 
 class CollectionsScreen extends StatefulWidget {
   final bool _showEmptyState;
@@ -532,6 +533,28 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
         'card': card,
         'heroContext': 'collection_$index',
       },
+    );
+  }
+
+  // Add this method to handle navigation from empty state to search screen
+  void _navigateToSearch(BuildContext context) {
+    LoggingService.debug('CollectionsScreen: Navigating to search from empty state');
+    
+    // Simplify: just use direct navigation instead of RootNavigator.switchToTab
+    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+      '/search',
+      (route) => false,
+    );
+  }
+
+  // Replace the build method for showing empty state
+  Widget _buildEmptyState() {
+    return EmptyCollectionView(
+      title: 'Your Collection Is Empty', 
+      message: 'Start tracking your cards by adding them to your collection.',
+      buttonText: 'Add Your First Card',
+      onActionPressed: () => _navigateToSearch(context),
+      showHeader: true,
     );
   }
 

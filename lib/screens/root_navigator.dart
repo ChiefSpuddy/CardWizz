@@ -8,7 +8,9 @@ import '../screens/home_screen.dart';
 import 'package:intl/intl.dart';
 import '../providers/currency_provider.dart';
 import 'package:provider/provider.dart';
-import '../constants/app_colors.dart'; // Add this import for AppColors
+import '../constants/app_colors.dart';
+import '../services/navigation_service.dart'; // Add missing import
+import '../services/logging_service.dart'; // Add missing import
 
 class RootNavigator extends StatefulWidget {
   const RootNavigator({
@@ -40,6 +42,24 @@ class RootNavigatorState extends State<RootNavigator> {
     _selectedIndex = widget.initialTab;
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // Handle initial tab from route arguments if provided
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    if (args != null && args.containsKey('initialTab')) {
+      final requestedTab = args['initialTab'] as int;
+      if (_selectedIndex != requestedTab) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() => _selectedIndex = requestedTab);
+          }
+        });
+      }
+    }
+  }
+
   // Make this method public and static
   void setSelectedIndex(int index) {
     setState(() {
@@ -52,12 +72,64 @@ class RootNavigatorState extends State<RootNavigator> {
     setSelectedIndex(index);
   }
 
-  // Static method to find and switch tabs from anywhere
+  // Improve the static method to find and switch tabs from anywhere
   static void switchToTab(BuildContext context, int index) {
+    LoggingService.debug('RootNavigator: Attempting to switch to tab $index');
+    
+    // Try multiple approaches to find the RootNavigatorState
+    
+    // First approach: Direct ancestor state lookup
     final state = context.findAncestorStateOfType<RootNavigatorState>();
     if (state != null) {
+      LoggingService.debug('RootNavigator: Found state via findAncestorStateOfType');
       state.setSelectedIndex(index);
+      return;
     }
+    
+    // Second approach: Navigate to route with specified tab
+    try {
+      LoggingService.debug('RootNavigator: Trying navigation to route with tab param');
+      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+        '/',
+        (route) => false,
+        arguments: {'initialTab': index}
+      );
+      return;
+    } catch (e) {
+      LoggingService.debug('RootNavigator: Navigation error: $e');
+    }
+    
+    // Third approach: Get global navigator context and try again
+    try {
+      final navigatorContext = NavigationService.navigatorKey.currentContext;
+      if (navigatorContext != null) {
+        final rootState = navigatorContext.findAncestorStateOfType<RootNavigatorState>();
+        if (rootState != null) {
+          LoggingService.debug('RootNavigator: Found state via NavigationService');
+          rootState.setSelectedIndex(index);
+          return;
+        }
+      }
+    } catch (e) {
+      LoggingService.debug('RootNavigator: NavigationService error: $e');
+    }
+    
+    // Last resort: Schedule a callback after the frame
+    LoggingService.debug('RootNavigator: Using post-frame callback');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final navigatorContext = NavigationService.navigatorKey.currentContext;
+        if (navigatorContext != null) {
+          Navigator.of(navigatorContext, rootNavigator: true).pushNamedAndRemoveUntil(
+            '/',
+            (route) => false,
+            arguments: {'initialTab': index}
+          );
+        }
+      } catch (e) {
+        LoggingService.debug('RootNavigator: Post-frame callback error: $e');
+      }
+    });
   }
 
   @override

@@ -206,11 +206,15 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
       return;
     }
 
-    // Simply navigate without showing any toasts
-    Navigator.of(context).pushNamedAndRemoveUntil(
+    // CRITICAL FIX: Use rootNavigator to ensure we're navigating at the app level
+    // rather than within a nested navigator that might be causing the issue
+    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
       '/search',
       (route) => false,
     );
+    
+    // Add a debug log to track navigation
+    LoggingService.debug('EmptyCollectionView: Navigating to search screen from empty state');
   }
 
   String _getShortDescription(String fullDescription) {
