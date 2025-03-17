@@ -9,6 +9,7 @@ import '../constants/sets.dart';
 import '../constants/japanese_sets.dart';
 import '../constants/mtg_sets.dart';
 import '../utils/image_utils.dart';
+import '../utils/card_navigation_helper.dart'; // Moved this import up with other imports
 import 'card_details_screen.dart';
 import 'search_results_screen.dart';
 import '../widgets/search/search_app_bar.dart';
@@ -1271,17 +1272,11 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onCardTap(TcgCard card) {
-    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
-    
-    _wasSearchActive = true;
-    _lastActiveSearch = _searchController.text;
-
-    Navigator.of(context).pushNamed(
-      '/card',
-      arguments: {
-        'card': card,
-        'currencySymbol': currencyProvider.symbol,
-      },
+    // FIXED: Use the CardNavigationHelper for consistent navigation
+    CardNavigationHelper.navigateToCardDetails(
+      context, 
+      card,
+      heroContext: 'search_${card.id}'
     );
   }
 

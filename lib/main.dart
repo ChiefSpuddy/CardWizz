@@ -35,10 +35,11 @@ import 'utils/create_card_back.dart';
 import 'package:flutter/animation.dart';
 import 'services/premium_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'screens/collections_screen.dart'; // Add this import for CollectionsScreen
-import 'services/firebase_service.dart'; // Add this import
-import 'screens/profile_screen.dart'; // Add this import
-import 'screens/analytics_screen.dart'; // Add this import
+import 'screens/collections_screen.dart';
+import 'services/firebase_service.dart';
+import 'screens/profile_screen.dart';
+import 'screens/analytics_screen.dart';
+import 'services/logging_service.dart'; // Add this import for LoggingService
 
 // The simplest possible main function
 void main() async {
@@ -341,6 +342,15 @@ class MyApp extends StatelessWidget {
           return CardDetailsScreen(
             card: card,
             heroContext: args?['heroContext'] ?? 'search',
+          );
+        },
+        // Add an explicit route for card-details
+        '/card-details': (context) {
+          final card = ModalRoute.of(context)?.settings.arguments as TcgCard;
+          LoggingService.debug('Direct card-details route activated for: ${card.name}');
+          return CardDetailsScreen(
+            card: card,
+            heroContext: 'direct',
           );
         },
         '/add-to-collection': (context) => AddToCollectionScreen(

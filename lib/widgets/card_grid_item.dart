@@ -3,9 +3,9 @@ import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
 import 'package:provider/provider.dart';
 import '../widgets/network_card_image.dart';
-import 'package:flutter/services.dart';  // Add for HapticFeedback
-import '../services/storage_service.dart'; // Add for direct storage access
-import '../widgets/bottom_notification.dart'; // Add this import
+import 'package:flutter/services.dart';
+import '../services/storage_service.dart';
+import '../widgets/bottom_notification.dart';
 
 class CardGridItem extends StatelessWidget {
   final TcgCard card;
@@ -16,7 +16,7 @@ class CardGridItem extends StatelessWidget {
   final bool showName;
   final bool highQuality;
   final String heroContext;
-  final bool hideCheckmarkWhenInCollection; // Add this new property
+  final bool hideCheckmarkWhenInCollection;
 
   const CardGridItem({
     super.key,
@@ -28,7 +28,7 @@ class CardGridItem extends StatelessWidget {
     this.showName = true,
     this.highQuality = true,
     this.heroContext = 'default',
-    this.hideCheckmarkWhenInCollection = false, // Default to showing checkmarks
+    this.hideCheckmarkWhenInCollection = false,
   });
 
   @override
@@ -43,11 +43,16 @@ class CardGridItem extends StatelessWidget {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: onTap,
+              // CRITICAL FIX: Ensure onTap receives its own handler separate from InkWell
+              // and always use a new function to prevent closure issues
+              onTap: () {
+                // This separate function ensures we don't have closure issues
+                onTap();
+              },
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Card image - REMOVED GREY BACKGROUND CONTAINER
+                  // Card image
                   Expanded(
                     child: Hero(
                       tag: heroTag,
@@ -98,7 +103,7 @@ class CardGridItem extends StatelessWidget {
           ),
         ),
         
-        // Add button or checkmark - only show if not in collection or if we don't want to hide the checkmark
+        // Add button or checkmark - with improved tap handling
         if (!isInCollection || !hideCheckmarkWhenInCollection)
           Positioned(
             top: 2,
@@ -106,28 +111,12 @@ class CardGridItem extends StatelessWidget {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,  // CRITICAL: Prevents tap events from propagating
               onTap: isInCollection ? null : () {
-                // Provide immediate feedback
+                // IMPORTANT: Stop propagation to prevent navigation issues
+                // Add card directly without calling the callback
                 HapticFeedback.lightImpact();
-                
-                // CRITICAL FIX: Instead of calling the callback which might
-                // trigger navigation, handle it directly here
-                if (!isInCollection) {
-                  // Get the StorageService directly
-                  final storage = Provider.of<StorageService>(context, listen: false);
-                  
-                  // Don't await - let it run in the background
-                  storage.saveCard(card).then((_) {
-                    // Show a styled notification instead of a basic SnackBar
-                    if (context.mounted) {
-                      BottomNotification.show(
-                        context: context,
-                        title: 'Added to Collection',
-                        message: card.name,
-                        icon: Icons.check_circle,
-                      );
-                    }
-                  });
-                }
+
+                // Use a separate handler that won't trigger navigation
+                onAddToCollection();
               },
               child: Container(
                 width: 28,

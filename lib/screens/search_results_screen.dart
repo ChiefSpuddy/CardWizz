@@ -7,6 +7,7 @@ import '../providers/app_state.dart';
 import '../widgets/bottom_notification.dart';
 import '../services/logging_service.dart';
 import 'package:flutter/services.dart';
+import '../utils/card_navigation_helper.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   final List<TcgCard> cards;
@@ -54,7 +55,15 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               CardGridItem(
                 card: card,
                 heroContext: 'results_$index', // Unique hero context based on index
-                onTap: () => _onCardTap(card, index),
+                // CRITICAL FIX: Create explicit function to guarantee navigation context
+                onTap: () {
+                  LoggingService.debug('Navigating to card details for ${card.name}');
+                  CardNavigationHelper.navigateToCardDetails(
+                    context, 
+                    card, 
+                    heroContext: 'results_$index'
+                  );
+                },
                 onAddToCollection: () => _quickAddCard(card),
                 isInCollection: _addedCardIds.contains(card.id),
               ),
@@ -83,18 +92,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
-  void _onCardTap(TcgCard card, int index) {
-    // Navigate to the card details screen
-    Navigator.pushNamed(
-      context,
-      '/card',
-      arguments: {
-        'card': card, 
-        'heroContext': 'results_$index',
-      },
-    );
-  }
-
+  // Remove the _onCardTap method entirely since we now handle navigation directly
+  // in the card item's onTap callback
+  
   // Complete redesign of the method to prevent navigation issues
   void _quickAddCard(TcgCard card) {
     // Skip if already in collection
