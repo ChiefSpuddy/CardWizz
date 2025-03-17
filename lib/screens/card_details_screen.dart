@@ -4,8 +4,7 @@ import 'package:provider/provider.dart';
 import '../utils/card_details_router.dart';
 import '../services/storage_service.dart';
 import '../providers/app_state.dart';
-import '../utils/bottom_toast.dart';
-import '../widgets/bottom_notification.dart';
+import '../utils/notification_manager.dart'; // Keep this import
 import '../services/price_service.dart' as price_service;  // Import with namespace
 import '../models/tcg_card.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -86,25 +85,22 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
       if (mounted) {
         setState(() => _isAddingToCollection = false);
         
-        // Use our new bottom notification implementation
-        BottomNotification.show(
-          context: context,
-          title: 'Added to Collection',
-          message: widget.card.name,
-          icon: Icons.check_circle,
+        // Use the unified notification system
+        NotificationManager.success(
+          context,
+          message: 'Card added to collection',
+          position: NotificationPosition.bottom,
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isAddingToCollection = false);
         
-        // Show errors with the new implementation too
-        BottomNotification.show(
-          context: context,
-          title: 'Error',
+        // Use the unified notification system for errors
+        NotificationManager.error(
+          context,
           message: 'Failed to add card: $e',
-          icon: Icons.error_outline,
-          isError: true,
+          position: NotificationPosition.bottom,
         );
       }
     }

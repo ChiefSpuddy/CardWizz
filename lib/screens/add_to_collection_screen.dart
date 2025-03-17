@@ -3,6 +3,7 @@ import '../services/storage_service.dart';
 import 'package:provider/provider.dart';
 import '../models/tcg_card.dart';
 import 'package:cached_network_image/cached_network_image.dart'; // Use this directly
+import '../utils/notification_manager.dart'; // Add this import for NotificationManager
 
 class AddToCollectionScreen extends StatefulWidget {
   final TcgCard card;
@@ -24,15 +25,19 @@ class _AddToCollectionScreenState extends State<AddToCollectionScreen> {
       await storage.addCard(widget.card);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Card added to collection')),
+        // REPLACE with NotificationManager
+        NotificationManager.success(
+          context,
+          message: 'Card added to collection'
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+        // REPLACE with NotificationManager
+        NotificationManager.error(
+          context,
+          message: e.toString()
         );
       }
     } finally {

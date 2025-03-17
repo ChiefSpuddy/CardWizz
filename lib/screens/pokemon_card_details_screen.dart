@@ -13,15 +13,19 @@ import '../utils/hero_tags.dart';
 import 'base_card_details_screen.dart';
 import '../widgets/pokemon_set_icon.dart';
 import '../widgets/card_back_fallback.dart';
-import '../utils/bottom_toast.dart';
 import '../providers/app_state.dart';
 import '../services/storage_service.dart';
-import '../widgets/bottom_notification.dart';
 import '../widgets/card_price_display.dart';
-import '../models/tcg_card.dart'; // Add this import
-import '../widgets/network_card_image.dart'; // Add this import
+import '../models/tcg_card.dart'; 
+import '../widgets/network_card_image.dart'; 
 import '../constants/app_colors.dart';
-import '../widgets/zoomable_card_image.dart'; // Update import
+import '../widgets/zoomable_card_image.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
+import '../services/tcgdex_api_service.dart';
+import '../services/mtg_api_service.dart';
+import '../services/ebay_search_service.dart';
+import '../utils/notification_manager.dart'; // Keep this import
 
 class PokemonCardDetailsScreen extends BaseCardDetailsScreen {
   final Widget? marketActionButtons;  // Add this property
@@ -324,12 +328,20 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
     await _launchUrl(url.toString());
   }
 
-  // Keep only this single implementation of _launchUrl that takes a String
-  Future<void> _launchUrl(String url) async {
+  // Replace all _launchUrl implementations with this single flexible version
+  Future<void> _launchUrl(dynamic url) async {
     try {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      final Uri uri = url is String ? Uri.parse(url) : url as Uri;
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       LoggingService.debug('Could not launch URL: $e');
+      if (mounted) {
+        NotificationManager.error(
+          context,
+          message: 'Could not open URL',
+          icon: Icons.error_outline,
+        );
+      }
     }
   }
 
@@ -2017,21 +2029,18 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
       // Notify app state about the change
       appState.notifyCardChange();
       
-      // Use our custom notification that shows from the bottom
-      BottomNotification.show(
-        context: context,
-        title: 'Added to Collection',
-        message: widget.card.name,
+      // Use NotificationManager instead of BottomNotification
+      NotificationManager.success(
+        context,
+        message: 'Added to Collection: ${widget.card.name}',
         icon: Icons.check_circle,
       );
     } catch (e) {
       if (mounted) {
-        BottomNotification.show(
-          context: context,
-          title: 'Error',
+        NotificationManager.error(
+          context,
           message: 'Failed to add card: $e',
           icon: Icons.error_outline,
-          isError: true,
         );
       }
     }
@@ -2050,23 +2059,20 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
       if (mounted) {
         setState(() => _isAddingToCollection = false);
         
-        // Use our new bottom notification
-        BottomNotification.show(
-          context: context,
-          title: 'Added to Collection',
-          message: widget.card.name,
+        // Use NotificationManager instead of BottomNotification
+        NotificationManager.success(
+          context,
+          message: 'Added to Collection: ${widget.card.name}',
           icon: Icons.check_circle,
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isAddingToCollection = false);
-        BottomNotification.show(
-          context: context,
-          title: 'Error',
+        NotificationManager.error(
+          context,
           message: 'Failed to add card: $e',
           icon: Icons.error_outline,
-          isError: true,
         );
       }
     }
@@ -2581,5 +2587,46 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
     } else {
       _flipController.reverse();
     }
+  }
+
+  Future<void> _quickAddToCollection() async {
+    try {
+      final storage = Provider.of<StorageService>(context, listen: false);
+      await storage.saveCard(widget.card, preventNavigation: true);
+      
+      if (mounted) {
+        // Replace with NotificationManager
+        NotificationManager.success(
+          context,
+          message: 'Added to collection',
+          icon: Icons.add_circle_outline,
+          preventNavigation: true,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        // Replace with NotificationManager
+        NotificationManager.error(
+          context,
+          message: 'Error adding to collection: $e',
+          icon: Icons.error_outline,
+        );
+      }
+    }
+  }
+
+  Future<void> _showShareOptionsBottomSheet(BuildContext context) async {
+    // ...existing code...
+    
+    // Update the share failed notification
+    if (mounted) {
+      NotificationManager.error(
+        context,
+        message: 'Failed to share: $e',
+        icon: Icons.error_outline,
+      );
+    }
+    
+    // ...existing code...
   }
 }

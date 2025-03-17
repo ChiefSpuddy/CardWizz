@@ -13,6 +13,7 @@ import '../models/custom_collection.dart';
 import '../services/storage_service.dart';  // Add this import
 import '../providers/sort_provider.dart';  // Add this
 import '../services/purchase_service.dart';
+import '../utils/notification_manager.dart';
 
 class CollectionService {
   static const int _freeUserBinderLimit = 10;  // Add this constant

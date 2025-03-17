@@ -10,7 +10,7 @@ import '../services/storage_service.dart';
 import '../utils/hero_tags.dart';
 import '../utils/error_handler.dart';
 import '../widgets/animated_gradient_button.dart';
-import '../widgets/styled_toast.dart';
+import '../utils/notification_manager.dart';
 import '../services/tcg_api_service.dart';  // Add this import
 import 'package:google_sign_in/google_sign_in.dart'; // Add this import for GoogleSignIn
 
@@ -466,13 +466,12 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       selectedFontSize: 12,
       unselectedFontSize: 12,
       onTap: (_) {
-        showToast(
-          context: context,
+        NotificationManager.show(
+          context,
           title: 'Sign In Required',
-          subtitle: 'Please sign in to continue',
+          message: 'Please sign in to continue',
           icon: Icons.login_rounded,
           isError: false,
-          compact: true,
           duration: const Duration(seconds: 2),
         );
       },
@@ -1201,7 +1200,7 @@ class ParticlePainter extends CustomPainter {
             random.nextDouble() * 2000,
           ),
           size: 1.0 + random.nextDouble() * 2.5,
-          opacity: 0.1 + random.nextDouble() * 0.3,
+          opacity: 0.1 + random.nextDouble() * 3.0,
           speed: 0.2 + random.nextDouble() * 0.6,
         ));
       }

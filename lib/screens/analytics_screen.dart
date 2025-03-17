@@ -27,7 +27,7 @@ import '../services/ebay_api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/empty_collection_view.dart';
 import '../widgets/portfolio_value_chart.dart';
-import '../widgets/styled_toast.dart';
+import '../utils/notification_manager.dart';
 import 'package:rxdart/rxdart.dart';
 import '../widgets/market_scan_button.dart';
 import '../widgets/acquisition_timeline_chart.dart';

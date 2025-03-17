@@ -4,7 +4,7 @@ import '../screens/pokemon_card_details_screen.dart';
 import 'package:provider/provider.dart';
 import '../services/storage_service.dart';
 import '../providers/app_state.dart';
-import '../utils/bottom_toast.dart';
+import '../utils/notification_manager.dart';
 import '../services/price_service.dart';
 import '../services/logging_service.dart';
 import 'dart:math';  // Add this import for min
@@ -289,21 +289,23 @@ Future<void> onAddToCollection(BuildContext context, TcgCard card) async {
     // Notify app state about the change
     appState.notifyCardChange();
     
-    // Use the bottom toast implementation
-    showBottomToast(
-      context: context,
+    // Set position to bottom for the notification
+    NotificationManager.show(
+      context,
       title: 'Added to Collection',
       message: '${card.name}',
       icon: Icons.check_circle,
+      position: NotificationPosition.bottom,
     );
   } catch (e) {
-    // Show error toast from bottom
-    showBottomToast(
-      context: context,
+    // Set position to bottom for the notification
+    NotificationManager.show(
+      context,
       title: 'Error',
       message: 'Failed to add card: $e',
       icon: Icons.error_outline,
       isError: true,
+      position: NotificationPosition.bottom,
     );
   }
 }

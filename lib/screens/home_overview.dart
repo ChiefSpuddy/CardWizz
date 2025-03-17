@@ -22,6 +22,7 @@ import '../models/tcg_card.dart';  // Add this import
 import 'package:lottie/lottie.dart';
 import 'package:lottie/src/frame_rate.dart'; // Import FrameRate class
 import '../models/tcg_set.dart' as models; // Use direct import without alias
+import '../utils/notification_manager.dart';
 
 class HomeOverview extends StatefulWidget {
   const HomeOverview({super.key});

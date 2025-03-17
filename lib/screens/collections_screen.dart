@@ -25,6 +25,7 @@ import '../constants/layout.dart';
 import '../services/purchase_service.dart'; // Add this missing import
 import '../widgets/standard_app_bar.dart';
 import '../utils/card_details_router.dart';
+import '../utils/notification_manager.dart'; // Add this import if not already present
 import 'dart:math';  // Add this import for Random, pi, etc.
 import '../models/tcg_card.dart';  // Add this import for TcgCard class
 import '../services/premium_features_helper.dart'; // Add this import to fix the error
@@ -1110,59 +1111,12 @@ Future<void> _showCreateBinderDialog(BuildContext context) async {
   );
 
   if (collectionId != null && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 2),
-        backgroundColor: Theme.of(context).colorScheme.secondary,
-        behavior: SnackBarBehavior.floating,
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 16,
-          left: 16,
-          right: 16,
-        ),
-        content: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.check_circle_outline,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Binder Created',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Text(
-                    'Add cards to get started',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    // REPLACE with NotificationManager
+    NotificationManager.success(
+      context,
+      title: 'Binder Created',
+      message: 'Add cards to get started',
+      icon: Icons.check_circle_outline,
     );
   }
 }

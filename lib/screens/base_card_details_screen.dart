@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/storage_service.dart';
 import '../services/collection_service.dart';
-import '../widgets/styled_toast.dart';
+import '../utils/notification_manager.dart';
 import '../widgets/create_binder_dialog.dart';
 import '../models/tcg_card.dart';  // Add this import
 
@@ -82,24 +82,20 @@ abstract class BaseCardDetailsScreenState<T extends BaseCardDetailsScreen>
       final service = Provider.of<StorageService>(context, listen: false);
       await service.saveCard(widget.card);
       if (mounted) {
-        // Use the improved toast helper
-        showToast(
-          context: context,
-          title: 'Added to Collection',
-          subtitle: '${widget.card.name} has been added to your collection',
-          isError: false,
-          icon: Icons.check_circle,
+        // Set position to bottom for the notification
+        NotificationManager.success(
+          context,
+          message: '${widget.card.name} has been added to your collection',
+          position: NotificationPosition.bottom,
         );
       }
     } catch (e) {
       if (mounted) {
-        // Use the improved toast helper for errors
-        showToast(
-          context: context,
-          title: 'Failed to Add Card',
-          subtitle: 'There was an error adding the card to your collection',
-          icon: Icons.error_outline,
-          isError: true,
+        // Set position to bottom for the notification
+        NotificationManager.error(
+          context,
+          message: 'There was an error adding the card to your collection',
+          position: NotificationPosition.bottom,
         );
       }
     }
@@ -163,13 +159,11 @@ abstract class BaseCardDetailsScreenState<T extends BaseCardDetailsScreen>
                       Navigator.pop(context);
                       await service.addCardToCollection(collection.id, widget.card.id);
                       if (context.mounted) {
-                        // Use the improved toast helper
-                        showToast(
-                          context: context,
-                          title: 'Added to ${collection.name}',
-                          subtitle: 'Card added to binder successfully',
-                          isError: false,
-                          icon: Icons.check_circle,
+                        // Set position to bottom for the notification
+                        NotificationManager.success(
+                          context,
+                          message: 'Card added to binder successfully',
+                          position: NotificationPosition.bottom,
                         );
                       }
                     },
@@ -244,13 +238,11 @@ abstract class BaseCardDetailsScreenState<T extends BaseCardDetailsScreen>
       }
       
       if (context.mounted && collection != null) {
-        // Use the improved toast helper
-        showToast(
-          context: context,
-          title: 'New Binder Created',
-          subtitle: 'Added ${widget.card.name} to ${collection.name}',
-          isError: false,
-          icon: Icons.check_circle,
+        // Set position to bottom for the notification
+        NotificationManager.success(
+          context,
+          message: 'Added ${widget.card.name} to ${collection.name}',
+          position: NotificationPosition.bottom,
         );
       }
     }

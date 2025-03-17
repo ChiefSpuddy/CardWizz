@@ -5,8 +5,8 @@ import '../../providers/currency_provider.dart';
 import '../../models/tcg_card.dart';
 import 'package:flutter/services.dart'; // For HapticFeedback
 import '../../providers/app_state.dart';
-import '../../widgets/bottom_notification.dart'; // Import BottomNotification
 import '../../widgets/card_grid_item.dart';
+// Remove unified notification system import as we'll delegate notification to parent
 
 class CardSearchGrid extends StatelessWidget {
   final List<TcgCard> cards;
@@ -76,72 +76,20 @@ class CardSearchGrid extends StatelessWidget {
   void _handleAddToCollection(BuildContext context, TcgCard card, bool isAlreadyInCollection) {
     if (isAlreadyInCollection) return;
     
-    // FIX: Use a more direct approach without any navigation
-    try {
-      // Provide tactile feedback immediately for responsive feel
-      HapticFeedback.mediumImpact();
-      
-      // Access the services directly without delays
-      final appState = Provider.of<AppState>(context, listen: false);
-      final storageService = Provider.of<StorageService>(context, listen: false);
-      
-      // Don't use .then or async/await here - keep it synchronous
-      // But schedule the actual saving outside the current frame
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        // This runs after the current frame completes
-        storageService.saveCard(card).then((_) {
-          // Only notify state and show notification after successful save
-          appState.notifyCardChange();
-          
-          if (context.mounted) {
-            // Simple notification without overlay or animations
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${card.name} added to collection'))
-            );
-          }
-          // Don't call any callbacks that might cause navigation
-        });
-      });
-    } catch (e) {
-      // Show error directly without complex overlay
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'))
-      );
-    }
-  }
-
-  // Handle the actual saving in background
-  Future<void> _saveCardInBackground(BuildContext context, TcgCard card) async {
-    try {
-      // Get services
-      final appState = Provider.of<AppState>(context, listen: false);
-      final storageService = Provider.of<StorageService>(context, listen: false);
-      
-      // Save the card without awaiting to avoid UI blockage
-      storageService.saveCard(card).then((_) {
-        // Notify app state after save completes
-        appState.notifyCardChange();
-        
-        // Show feedback notification
-        BottomNotification.show(
-          context: context,
-          title: 'Added to Collection',
-          message: card.name,
-          icon: Icons.check_circle,
-        );
-        
-        // Call the callback to update UI if needed
-        onAddToCollection(card);
-      });
-    } catch (e) {
-      // Show error notification
-      BottomNotification.show(
-        context: context,
-        title: 'Error',
-        message: 'Failed to add card: $e',
-        icon: Icons.error_outline,
-        isError: true,
-      );
-    }
+    // Provide immediate feedback
+    HapticFeedback.lightImpact();
+    
+    // CRITICAL FIX: Just delegate to the parent callback
+    // This prevents double notifications
+    onAddToCollection(card);
+    
+    // Remove the following code:
+    // final storageService = Provider.of<StorageService>(context, listen: false);
+    // storageService.saveCard(card, preventNavigation: true).then((_) {
+    //   NotificationManager.success(...);
+    //   onAddToCollection(card);  <-- This was calling the callback after showing notification
+    // }).catchError((e) {
+    //   NotificationManager.error(...);
+    // });
   }
 }

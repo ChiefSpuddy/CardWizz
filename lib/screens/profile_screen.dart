@@ -1,3 +1,4 @@
+import '../utils/notification_manager.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +15,6 @@ import '../screens/privacy_settings_screen.dart';
 import '../services/purchase_service.dart';
 import '../widgets/sign_in_view.dart';
 import '../services/collection_service.dart';
-import '../widgets/styled_toast.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/standard_app_bar.dart';
@@ -105,19 +105,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         await context.read<AppState>().updateAvatar(avatarPath);
         
         if (context.mounted) {
-          showToast(
-            context: context,
+          NotificationManager.success(
+            context,
             title: 'Profile updated',
-            subtitle: 'Your profile picture has been changed successfully',
+            message: 'Your profile picture has been changed successfully',
             icon: Icons.check,
           );
         }
       } catch (e) {
         if (context.mounted) {
-          showToast(
-            context: context,
+          NotificationManager.error(
+            context,
             title: 'Error',
-            subtitle: 'Could not update avatar',
+            message: 'Could not update avatar',
             icon: Icons.error,
           );
         }
@@ -210,19 +210,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         await context.read<AppState>().updateUsername(newUsername);
         
         if (context.mounted) {
-          showToast(
-            context: context,
+          NotificationManager.success(
+            context,
             title: 'Profile updated',
-            subtitle: 'Your username has been changed successfully',
+            message: 'Your username has been changed successfully',
             icon: Icons.check,
           );
         }
       } catch (e) {
         if (context.mounted) {
-          showToast(
-            context: context,
+          NotificationManager.error(
+            context,
             title: 'Error',
-            subtitle: 'Could not update username',
+            message: 'Could not update username',
             icon: Icons.error,
           );
         }
@@ -283,10 +283,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         }
       } catch (e) {
         if (mounted) {
-          showToast(
-            context: context,
+          NotificationManager.error(
+            context,
             title: 'Error',
-            subtitle: 'Could not delete account',
+            message: 'Could not delete account',
             icon: Icons.error,
           );
         }
@@ -347,23 +347,43 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             backgroundColor: colorScheme.primary.withOpacity(0.1),
                             child: user.avatarPath != null && user.avatarPath!.isNotEmpty
                                 ? ClipOval(
-                                    child: Image.asset(
-                                      user.avatarPath!,
-                                      width: 80,
-                                      height: 80,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        LoggingService.debug('Error loading avatar in profile: $error');
-                                        return ClipOval(
-                                          child: Image.asset(
-                                            'assets/avatars/avatar1.png',
+                                    child: user.avatarPath!.startsWith('http') 
+                                        // If it's a URL, use Image.network instead of Image.asset
+                                        ? Image.network(
+                                            user.avatarPath!,
                                             width: 80,
                                             height: 80,
                                             fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              LoggingService.debug('Error loading avatar in profile: $error');
+                                              return ClipOval(
+                                                child: Image.asset(
+                                                  'assets/avatars/avatar1.png',
+                                                  width: 80,
+                                                  height: 80,
+                                                  fit: BoxFit.cover,
+                                                ),
+                                              );
+                                            },
+                                          )
+                                        // Otherwise use asset as before
+                                        : Image.asset(
+                                            user.avatarPath!,
+                                            width: 80,
+                                            height: 80,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              LoggingService.debug('Error loading avatar in profile: $error');
+                                              return ClipOval(
+                                                child: Image.asset(
+                                                  'assets/avatars/avatar1.png',
+                                                  width: 80,
+                                                  height: 80,
+                                                  fit: BoxFit.cover,
+                                                ),
+                                              );
+                                            },
                                           ),
-                                        );
-                                      },
-                                    ),
                                   )
                                 : Icon(
                                     Icons.account_circle,

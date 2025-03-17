@@ -10,6 +10,7 @@ import '../constants/japanese_sets.dart';
 import '../constants/mtg_sets.dart';
 import '../utils/image_utils.dart';
 import '../utils/card_navigation_helper.dart'; // Moved this import up with other imports
+import '../utils/notification_manager.dart';  // Moved up before any declarations
 import 'card_details_screen.dart';
 import 'search_results_screen.dart';
 import '../widgets/search/search_app_bar.dart';
@@ -31,9 +32,6 @@ import '../widgets/search/card_skeleton_grid.dart';
 import '../widgets/standard_app_bar.dart';
 import 'package:flutter/services.dart';
 import '../widgets/app_drawer.dart';
-import '../widgets/styled_toast.dart';
-import '../utils/bottom_toast.dart';
-import '../widgets/bottom_notification.dart'; // Moved this up with other imports
 import 'package:rxdart/rxdart.dart';
 import 'dart:math' as math;
 import '../models/tcg_card.dart';
@@ -1301,7 +1299,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _collectionCardsSubject.add({..._collectionCardIds, card.id});
       
       // Save the card in the background
-      await storageService.saveCard(card);
+      await storageService.saveCard(card, preventNavigation: true);
       
       // Notify app state AFTER save completes
       appState.notifyCardChange();
@@ -1309,12 +1307,13 @@ class _SearchScreenState extends State<SearchScreen> {
       // Provide tactile feedback
       HapticFeedback.mediumImpact();
       
-      // Use bottom notification instead of toast to prevent navigation issues
-      BottomNotification.show(
-        context: context,
-        title: 'Added to Collection',
-        message: card.name,
-        icon: Icons.check_circle,
+      // CRITICAL FIX: Use NotificationManager instead of BottomNotification
+      NotificationManager.success(
+        context,
+        message: 'Added ${card.name} to collection',
+        icon: Icons.add_circle_outline,
+        preventNavigation: true,
+        position: NotificationPosition.bottom,
       );
     } catch (e) {
       // If error occurs, remove from local collection
@@ -1322,13 +1321,11 @@ class _SearchScreenState extends State<SearchScreen> {
         _collectionCardIds.where((id) => id != card.id).toSet()
       );
       
-      // Show error
-      BottomNotification.show(
-        context: context,
-        title: 'Error',
+      // CRITICAL FIX: Use NotificationManager for consistency
+      NotificationManager.error(
+        context,
         message: 'Failed to add card: $e',
         icon: Icons.error_outline,
-        isError: true,
       );
     }
   }

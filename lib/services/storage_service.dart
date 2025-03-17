@@ -301,7 +301,8 @@ class StorageService {
   Timer? _syncDebounceTimer;
   static const _syncDebounceTime = Duration(seconds: 3);
 
-  Future<void> saveCard(TcgCard card) async {
+  // Enhanced version of saveCard with better preventNavigation handling
+  Future<void> saveCard(TcgCard card, {bool preventNavigation = false}) async {
     if (_currentUserId == null) return;
 
     try {
@@ -335,10 +336,20 @@ class StorageService {
       );
       await savePortfolioValue(totalValue);
 
-      // Update the stream and notify listeners
-      _cardsController.add(currentCards);  // First notify card stream
-      _notifyCardChange();  // Then notify change listeners
-      AppLogger.d('Card saved and notifications sent', tag: 'Storage');
+      // Update the stream - all listeners will still get this
+      _cardsController.add(currentCards);
+      
+      // CRITICAL FIX: Don't call notifyCardChange when preventNavigation is true
+      // Instead just use the direct stream notification that has no navigation logic
+      if (preventNavigation) {
+        // Just notify simple subscribers without app-level navigation triggers
+        _cardChangeController.add(null);
+        LoggingService.debug('Card saved with navigation prevention');
+      } else {
+        // Normal path with potential navigation
+        _notifyCardChange();
+        LoggingService.debug('Card saved with standard notification');
+      }
 
     } catch (e) {
       AppLogger.e('Error saving card', tag: 'Storage', error: e);

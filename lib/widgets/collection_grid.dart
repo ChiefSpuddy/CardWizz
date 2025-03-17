@@ -257,6 +257,7 @@ class _CollectionGridState extends State<CollectionGrid>
                         NotificationManager.show(
                           context,
                           message: 'Added ${_selectedCards.length} cards to ${collection.name}',
+                          position: NotificationPosition.bottom, // Force bottom position
                         );
                         _exitMultiSelectMode();
                       }
@@ -297,21 +298,20 @@ class _CollectionGridState extends State<CollectionGrid>
     if (confirmed == true && context.mounted) {
       await storage.removeCard(card.id);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Removed ${card.name} from collection'),
-            action: SnackBarAction(
-              label: 'UNDO',
-              onPressed: () async {
-                await storage.undoRemoveCard(card.id);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Restored ${card.name} to collection')),
-                  );
-                }
-              },
-            ),
-          ),
+        // REPLACE with NotificationManager
+        NotificationManager.show(
+          context,
+          message: 'Removed ${card.name} from collection',
+          actionLabel: 'UNDO',
+          onAction: () async {
+            await storage.undoRemoveCard(card.id);
+            if (context.mounted) {
+              NotificationManager.success(
+                context, 
+                message: 'Restored ${card.name} to collection'
+              );
+            }
+          }
         );
       }
     }
@@ -448,18 +448,18 @@ class _CollectionGridState extends State<CollectionGrid>
                       try {
                         await service.addCardToCollection(collection.id, card.id);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Added ${card.name} to ${collection.name}'),
-                            ),
+                          // REPLACE with NotificationManager
+                          NotificationManager.success(
+                            context,
+                            message: 'Added ${card.name} to ${collection.name}'
                           );
                         }
                       } catch (e) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Failed to add card to collection'),
-                            ),
+                          // REPLACE with NotificationManager
+                          NotificationManager.error(
+                            context,
+                            message: 'Failed to add card to collection'
                           );
                         }
                       }
@@ -1108,10 +1108,10 @@ class _CollectionGridState extends State<CollectionGrid>
                       Navigator.pop(context);
                       await service.addCardToCollection(collection.id, card.id);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Added ${card.name} to ${collection.name}'),
-                          ),
+                        // REPLACE with NotificationManager
+                        NotificationManager.success(
+                          context,
+                          message: 'Added ${card.name} to ${collection.name}'
                         );
                       }
                     },
