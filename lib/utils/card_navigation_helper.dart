@@ -6,25 +6,48 @@ import '../services/logging_service.dart';
 /// A helper class that provides consistent card navigation throughout the app.
 class CardNavigationHelper {
   /// Navigates to card details screen with consistent behavior across the app.
-  /// This bypasses named routes which can sometimes have issues with nested navigators.
   static void navigateToCardDetails(
     BuildContext context, 
     TcgCard card, 
     {String heroContext = 'default'}
   ) {
-    LoggingService.debug('CardNavigationHelper: Navigating to details for ${card.name} with heroContext: $heroContext');
+    LoggingService.debug('CardNavigationHelper: Navigating to details for ${card.name}');
     
-    // Create the destination screen first to ensure it's initialized properly
+    // Create the destination screen
     final detailsScreen = CardDetailsScreen(
       card: card,
       heroContext: heroContext,
     );
     
-    // Push with maximum reliability using basic MaterialPageRoute
-    // This is the most direct and reliable navigation method
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => detailsScreen,
+    // CRITICAL FIX: Use Navigator.of().push() with rootNavigator:true 
+    // This ensures we're pushing to the root navigator, bypassing any nested navigators
+    // that might be causing the back navigation issue
+    Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder(
+        // Use PageRouteBuilder for more control over the transition
+        pageBuilder: (context, animation, secondaryAnimation) => detailsScreen,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          // Use a simple fade + slide transition
+          const begin = Offset(0.0, 0.05);
+          const end = Offset.zero;
+          const curve = Curves.easeOutCubic;
+          
+          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          var offsetAnimation = animation.drive(tween);
+          
+          return SlideTransition(
+            position: offsetAnimation,
+            child: FadeTransition(
+              opacity: animation,
+              child: child,
+            ),
+          );
+        },
+        // Force maintain state to prevent premature disposal
+        maintainState: true,
+        // Ensure nested navigation contexts are properly handled
+        fullscreenDialog: false,
+        opaque: true,
       ),
     );
   }
