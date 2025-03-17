@@ -22,6 +22,7 @@ class CollectionGrid extends StatefulWidget {
   final Function(bool)? onMultiselectChange;
   final String query; // Add this parameter
   final ScrollController? scrollController;
+  final Function(TcgCard, int)? onCardTap; // Add this field
 
   const CollectionGrid({
     super.key,
@@ -29,6 +30,7 @@ class CollectionGrid extends StatefulWidget {
     this.onMultiselectChange,
     this.query = '', // Default to empty string
     this.scrollController,
+    this.onCardTap, // Add this parameter
   });
 
   @override
@@ -621,7 +623,20 @@ class _CollectionGridState extends State<CollectionGrid>
                       if (_isMultiSelectMode) {
                         _toggleCardSelection(card.id);
                       } else {
-                        _showCardDetails(context, card);
+                        // Use the onCardTap callback if provided
+                        if (widget.onCardTap != null) {
+                          widget.onCardTap!(card, index);
+                        } else {
+                          // Fix the navigation issue by using rootNavigator
+                          Navigator.of(context, rootNavigator: true).pushNamed(
+                            '/card',
+                            arguments: {
+                              'card': card,
+                              'heroContext': 'collection_$index',
+                              'isFromCollection': true
+                            },
+                          );
+                        }
                       }
                     },
                     onLongPress: () {
@@ -659,14 +674,19 @@ class _CollectionGridState extends State<CollectionGrid>
                                 // Always use high quality for initial rendering and non-scrolling
                                 highQuality: !_lowQualityRendering || _initialRendering,
                                 onTap: () {
-                                  Navigator.of(context).pushNamed(
-                                    '/card',
-                                    arguments: {
-                                      'card': card, 
-                                      'heroContext': 'collection_$index', // Pass the same hero context
-                                      'isFromCollection': true
-                                    },
-                                  );
+                                  // Fix the navigation by using rootNavigator
+                                  if (_isMultiSelectMode) {
+                                    _toggleCardSelection(card.id);
+                                  } else {
+                                    Navigator.of(context, rootNavigator: true).pushNamed(
+                                      '/card',
+                                      arguments: {
+                                        'card': card, 
+                                        'heroContext': 'collection_$index',
+                                        'isFromCollection': true
+                                      },
+                                    );
+                                  }
                                 },
                                 onAddToCollection: () => _addCardToBinder(card),
                                 isInCollection: true,

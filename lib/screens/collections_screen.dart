@@ -523,6 +523,18 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     return sortedSets;
   }
 
+  // Add this method to the CollectionsScreenState class
+  void _navigateToCardDetails(TcgCard card, int index) {
+    // Use rootNavigator to ensure we don't push onto a nested navigator
+    Navigator.of(context, rootNavigator: true).pushNamed(
+      '/card',
+      arguments: {
+        'card': card,
+        'heroContext': 'collection_$index',
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -675,6 +687,7 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
                                                   key: const PageStorageKey('main_collection'),
                                                   onMultiselectChange: setMultiselectActive,
                                                   scrollController: ScrollController(), // Add the required scrollController parameter here
+                                                  onCardTap: _navigateToCardDetails, // Pass the callback
                                                 ),
                                               ),
                                               Opacity(
