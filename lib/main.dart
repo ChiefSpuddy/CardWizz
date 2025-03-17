@@ -37,6 +37,8 @@ import 'services/premium_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/collections_screen.dart'; // Add this import for CollectionsScreen
 import 'services/firebase_service.dart'; // Add this import
+import 'screens/profile_screen.dart'; // Add this import
+import 'screens/analytics_screen.dart'; // Add this import
 
 // The simplest possible main function
 void main() async {
@@ -329,8 +331,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const RootNavigator(),
-        // For '/search', we should return RootNavigator with initialTab set to 2
-        '/search': (context) => const RootNavigator(initialTab: 2), // Update this to use named parameter
+        '/search': (context) => const RootNavigator(initialTab: 2),
         '/card': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
           final card = args?['card'] as TcgCard?;
@@ -348,6 +349,8 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/scanner': (context) => const ScannerScreen(),
         '/collection': (context) => const CollectionsScreen(showEmptyState: true),
+        '/profile': (context) => const ProfileScreen(), 
+        '/analytics': (context) => const AnalyticsScreen(), // Add the analytics route
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/card-details') {

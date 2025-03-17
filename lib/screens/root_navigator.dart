@@ -1,125 +1,166 @@
 import 'package:flutter/material.dart';
-import '../screens/home_screen.dart';
-import '../screens/collections_screen.dart'; // Change this from collection_screen.dart to collections_screen.dart
-import '../screens/search_screen.dart';
-import '../screens/analytics_screen.dart';
 import '../screens/profile_screen.dart';
-import '../constants/app_colors.dart';
+import '../screens/analytics_screen.dart';
+import '../screens/scanner_screen.dart';
+import '../screens/search_screen.dart';
+import '../screens/collections_screen.dart';
+import '../screens/home_screen.dart';
+import 'package:intl/intl.dart';
+import '../providers/currency_provider.dart';
+import 'package:provider/provider.dart';
+import '../constants/app_colors.dart'; // Add this import for AppColors
 
 class RootNavigator extends StatefulWidget {
-  final int initialTab;
-  
-  // Add a static instance to track the current navigator state
-  static _RootNavigatorState? _instance;
-  
-  const RootNavigator({Key? key, this.initialTab = 0}) : super(key: key);
+  const RootNavigator({
+    Key? key,
+    this.initialTab = 0,
+  }) : super(key: key);
 
-  // Add a public static method to switch tabs
-  static void switchToTab(BuildContext context, int index) {
-    if (_instance != null) {
-      _instance!.setCurrentIndex(index);
-    } else {
-      // Use Navigator to push a new RootNavigator with desired tab if no instance exists
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => RootNavigator(initialTab: index),
-        ),
-        (route) => false,
-      );
-    }
-  }
+  final int initialTab;
 
   @override
-  State<RootNavigator> createState() => _RootNavigatorState();
+  State<RootNavigator> createState() => RootNavigatorState();
 }
 
-class _RootNavigatorState extends State<RootNavigator> {
-  late int _currentIndex;
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const CollectionsScreen(showEmptyState: true), // Update to use CollectionsScreen with the required parameter
-    const SearchScreen(),
-    const AnalyticsScreen(),
-    const ProfileScreen(),
+class RootNavigatorState extends State<RootNavigator> {
+  late int _selectedIndex;
+  
+  // Remove one key since we're removing Scanner from the nav bar
+  final List<GlobalKey<NavigatorState>> _navigatorKeys = [
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
   ];
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialTab;
-    // Store instance for static access
-    RootNavigator._instance = this;
+    _selectedIndex = widget.initialTab;
   }
-  
-  @override
-  void dispose() {
-    // Remove instance reference when disposed
-    if (RootNavigator._instance == this) {
-      RootNavigator._instance = null;
-    }
-    super.dispose();
-  }
-  
-  // Public method to change the current tab index
-  void setCurrentIndex(int index) {
+
+  // Make this method public and static
+  void setSelectedIndex(int index) {
     setState(() {
-      _currentIndex = index;
+      _selectedIndex = index;
     });
+  }
+
+  // Keep this method in case there are direct calls to it
+  void _onNavigationItemTapped(int index) {
+    setSelectedIndex(index);
+  }
+
+  // Static method to find and switch tabs from anywhere
+  static void switchToTab(BuildContext context, int index) {
+    final state = context.findAncestorStateOfType<RootNavigatorState>();
+    if (state != null) {
+      state.setSelectedIndex(index);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    // No app bar defined here - let each screen handle its own app bar
-    return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setCurrentIndex(index);
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: isDark 
-            ? Colors.white.withOpacity(0.6) 
-            : Colors.black54,
-        backgroundColor: isDark 
-            ? AppColors.darkCardBackground 
-            : Colors.white,
-        elevation: 8,
-        // Make navigation bar more compact
-        selectedFontSize: 11.0, // Reduced from default 14
-        unselectedFontSize: 11.0, // Reduced from default 12
-        iconSize: 22.0, // Reduced from default 24
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.grid_view_outlined),
-            activeIcon: Icon(Icons.grid_view),
-            label: 'Collection',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search_outlined),
-            activeIcon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.insights_outlined),
-            activeIcon: Icon(Icons.insights),
-            label: 'Analytics',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+    return WillPopScope(
+      onWillPop: () async {
+        final isFirstRouteInCurrentTab =
+            !await _navigatorKeys[_selectedIndex].currentState!.maybePop();
+        if (isFirstRouteInCurrentTab) {
+          if (_selectedIndex != 0) {
+            _onNavigationItemTapped(0);
+            return false;
+          }
+        }
+        return isFirstRouteInCurrentTab;
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            _buildOffstageNavigator(0),
+            _buildOffstageNavigator(1),
+            _buildOffstageNavigator(2),
+            _buildOffstageNavigator(3),
+            _buildOffstageNavigator(4),
+          ],
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            _onNavigationItemTapped(index);
+          },
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: Theme.of(context).colorScheme.primary,
+          unselectedItemColor: Theme.of(context).brightness == Brightness.dark 
+              ? Colors.white.withOpacity(0.6) 
+              : Colors.black54,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark 
+              ? AppColors.darkCardBackground 
+              : Colors.white,
+          elevation: 8,
+          selectedFontSize: 11.0, // Reduced from default 14
+          unselectedFontSize: 11.0, // Reduced from default 12
+          iconSize: 22.0, // Reduced from default 24
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.grid_view_outlined),
+              activeIcon: Icon(Icons.grid_view),
+              label: 'Collection',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.search_outlined),
+              activeIcon: Icon(Icons.search),
+              label: 'Search',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.insights_outlined),
+              activeIcon: Icon(Icons.insights),
+              label: 'Analytics',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildOffstageNavigator(int index) {
+    return Offstage(
+      offstage: _selectedIndex != index,
+      child: Navigator(
+        key: _navigatorKeys[index],
+        onGenerateRoute: (routeSettings) {
+          return MaterialPageRoute(
+            builder: (context) => _getScreenForIndex(index),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _getScreenForIndex(int index) {
+    switch (index) {
+      case 0:
+        return const HomeScreen();
+      case 1:
+        return const CollectionsScreen(showEmptyState: true);
+      case 2:
+        return const SearchScreen();
+      case 3:
+        return const AnalyticsScreen();
+      case 4:
+        return const ProfileScreen();
+      default:
+        return const HomeScreen();
+    }
   }
 }

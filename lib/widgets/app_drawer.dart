@@ -41,7 +41,7 @@ class AppDrawer extends StatelessWidget {
         case AppRoutes.analytics:
           homeState.setSelectedIndex(3);
           break;
-        case '/profile':
+        case AppRoutes.profile:
           homeState.setSelectedIndex(4);
           break;
         default:
@@ -293,18 +293,6 @@ class AppDrawer extends StatelessWidget {
                           title: 'Collection',
                           onTap: () => _navigateAndClose(context, AppRoutes.collection),
                         ),
-                        _buildMenuItem(
-                          context,
-                          icon: Icons.collections_bookmark_outlined,
-                          title: localizations.translate('binders'),
-                          onTap: () => _navigateAndClose(context, AppRoutes.collection),
-                        ),
-                        _buildMenuItem(
-                          context,
-                          icon: Icons.analytics_outlined,
-                          title: localizations.translate('analytics'),
-                          onTap: () => _navigateAndClose(context, AppRoutes.analytics),
-                        ),
                         // Simplified Search option - no mode specification
                         _buildMenuItem(
                           context,
@@ -312,7 +300,20 @@ class AppDrawer extends StatelessWidget {
                           title: 'Search',
                           onTap: () => _navigateAndClose(context, AppRoutes.search),
                         ),
-                        // MTG option removed
+                        // Analytics comes before Profile
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.analytics_outlined,
+                          title: localizations.translate('analytics'),
+                          onTap: () => _navigateAndClose(context, AppRoutes.analytics),
+                        ),
+                        // Profile comes after Analytics
+                        _buildMenuItem(
+                          context,
+                          icon: Icons.account_circle,
+                          title: 'Profile',
+                          onTap: () => _navigateAndClose(context, AppRoutes.profile),
+                        ),
                         
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),

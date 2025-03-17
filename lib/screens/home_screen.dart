@@ -44,14 +44,20 @@ class HomeScreenState extends State<HomeScreen> {
     HomeScreen._scrollController.addListener(_onScroll);
   }
   
-  // Update this method to use the public switchToTab method instead of private _RootNavigatorState
   void setSelectedIndex(int index) {
-    // Use the public static method instead of trying to access the private state
-    RootNavigator.switchToTab(context, index);
+    // Find the parent RootNavigator state and call its method directly
+    final rootNavigatorState = context.findAncestorStateOfType<RootNavigatorState>();
+    if (rootNavigatorState != null) {
+      rootNavigatorState.setSelectedIndex(index);
+    }
   }
 
   void goToSearchWithQuery(String query) {
-    RootNavigator.switchToTab(context, 2); // 2 is the index for Search tab
+    // Find the parent RootNavigator state and call its method directly
+    final rootNavigatorState = context.findAncestorStateOfType<RootNavigatorState>();
+    if (rootNavigatorState != null) {
+      rootNavigatorState.setSelectedIndex(2); // 2 is the index for Search tab
+    }
     
     // Small delay to ensure the search screen is initialized
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -171,7 +177,11 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _navigateToTab(int index) {
-    RootNavigator.switchToTab(context, index);
+    // Find the parent RootNavigator state and call its method directly
+    final rootNavigatorState = context.findAncestorStateOfType<RootNavigatorState>();
+    if (rootNavigatorState != null) {
+      rootNavigatorState.setSelectedIndex(index);
+    }
   }
 
   @override
