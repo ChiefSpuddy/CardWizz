@@ -205,32 +205,29 @@ class AppState with ChangeNotifier {
       // Cancel any pending operations that might trigger callbacks
       _debounceTimer?.cancel();
       
+      // IMPORTANT: Capture context before any async operations
+      final context = NavigationService.navigatorKey.currentContext;
+      if (context == null) {
+        LoggingService.debug('AppState: No context available for navigation');
+      }
+      
       // Notify listeners BEFORE sign-out to update UI
       notifyListeners();
       
-      // Attempt to sign out regardless of current state
-      await _authService.signOut();
+      // OPTIMIZATION: Run auth service signOut and storage clearSession in parallel
+      await Future.wait([
+        _authService.signOut(),
+        _storageService.clearSessionState(),
+      ]);
       
-      // Clear local state
-      await _storageService.clearSessionState();
-      
-      // Navigation must happen AFTER all state is cleared
-      final context = NavigationService.navigatorKey.currentContext;
-      if (context != null) {
+      // Navigate only after all cleanup is complete
+      if (context != null && NavigationService.navigatorKey.currentContext != null) {
         LoggingService.debug('AppState: Navigating to sign-in screen');
         
-        // Use a slight delay to ensure all cleanup is complete before navigation
-        await Future.delayed(const Duration(milliseconds: 50));
-        
-        // Check if context is still valid after the delay
-        if (NavigationService.navigatorKey.currentContext != null) {
-          // Clear navigation stack and go to root/home screen
-          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
-        } else {
-          LoggingService.debug('AppState: Context is no longer valid after delay');
-        }
+        // CRITICAL FIX: Use pushReplacement instead of pushNamedAndRemoveUntil for smoother transition
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       } else {
-        LoggingService.debug('AppState: Could not navigate - no current context');
+        LoggingService.debug('AppState: Context is no longer valid');
       }
       
       LoggingService.debug('AppState: Sign-out completed');

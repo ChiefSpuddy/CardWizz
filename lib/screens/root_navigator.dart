@@ -163,4 +163,17 @@ class RootNavigatorState extends State<RootNavigator> {
         return const HomeScreen();
     }
   }
+  
+  // Add a helper method to reset the navigator state when needed
+  void resetToRoot(int index) {
+    if (index >= 0 && index < _navigatorKeys.length) {
+      final navigatorState = _navigatorKeys[index].currentState;
+      if (navigatorState != null) {
+        // Pop to first route
+        while (navigatorState.canPop()) {
+          navigatorState.pop();
+        }
+      }
+    }
+  }
 }

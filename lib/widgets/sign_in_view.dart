@@ -51,10 +51,14 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
   // Add a flag to cancel delayed animations
   Timer? _animationTimer;
 
+  // Add this field to store all animation timers
+  final List<Timer> _animationTimers = [];
+
   @override
   void initState() {
     super.initState();
     
+    // Initialize animation controllers
     _backgroundController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 30),
@@ -85,17 +89,35 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
     
-    Future.delayed(const Duration(milliseconds: 100), () => _logoController.forward());
-    Future.delayed(const Duration(milliseconds: 400), () => _headlineController.forward());
-    Future.delayed(const Duration(milliseconds: 700), () => _contentController.forward());
+    // CRITICAL FIX: Store timers in the list for later cleanup
+    _logoController.forward(); // Start immediately instead of delayed
+    
+    _animationTimers.add(Timer(const Duration(milliseconds: 400), () {
+      if (_isMounted && mounted) {
+        _headlineController.forward();
+      }
+    }));
+    
+    _animationTimers.add(Timer(const Duration(milliseconds: 700), () {
+      if (_isMounted && mounted) {
+        _contentController.forward();
+      }
+    }));
     
     _loadShowcaseCards();
   }
 
   @override
   void dispose() {
-    // Cancel timer to prevent callbacks after dispose
+    // CRITICAL FIX: Cancel all animation timers
+    for (final timer in _animationTimers) {
+      timer.cancel();
+    }
+    _animationTimers.clear();
+    
+    // Cancel any other timers
     _animationTimer?.cancel();
+    _watchdogTimer?.cancel();
     
     // Set flag to prevent future animation updates
     _isMounted = false;
@@ -107,6 +129,7 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
     _contentController.dispose();
     _particleController.dispose();
     _pulseController.dispose();
+    
     super.dispose();
   }
 
