@@ -182,10 +182,10 @@ class CardGridItem extends StatelessWidget {
                     final cards = snapshot.data ?? [];
                     final isInCollection = cards.any((c) => c is TcgCard && c.id == card.id);
                     
-                    // Position in the top-right corner
+                    // Move higher up to the true top-right corner
                     return Positioned(
-                      top: 6,
-                      right: 6,
+                      top: 2,  // Reduced from 6
+                      right: 2, // Reduced from 6
                       child: _buildQuickAddButton(context, isInCollection),
                     );
                   },

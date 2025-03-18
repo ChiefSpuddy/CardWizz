@@ -664,9 +664,8 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
   }
 
   Widget _buildPriceRow(String label, double price, CurrencyProvider currencyProvider, {String currency = '\$'}) {
-    final formattedPrice = currency.isEmpty 
-        ? price.toStringAsFixed(2) 
-        : '$currency${price.toStringAsFixed(2)}';
+    // Replace with standard currency formatting
+    final formattedPrice = currencyProvider.formatValue(price);
     
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -678,7 +677,7 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           Text(
-            formattedPrice,
+            formattedPrice, // Use the properly formatted value
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.bold,
               color: Colors.green.shade600,

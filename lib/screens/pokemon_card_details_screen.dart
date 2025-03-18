@@ -660,13 +660,7 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
                     tooltipHorizontalAlignment: FLHorizontalAlignment.center,
                     getTooltipItems: (spots) {
                       return spots.map((spot) {
-                        return LineTooltipItem(
-                          currencyProvider.formatValue(spot.y),
-                          TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        );
+                        return _buildPriceTooltip(spot, currencyProvider);
                       }).toList();
                     },
                     fitInsideHorizontally: true,
@@ -2720,5 +2714,15 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
     }
     
     // ...existing code...
+  }
+
+  LineTooltipItem _buildPriceTooltip(LineBarSpot spot, CurrencyProvider currencyProvider) {
+    return LineTooltipItem(
+      currencyProvider.formatValue(spot.y),
+      TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
+        fontWeight: FontWeight.w500,
+      ),
+    );
   }
 }

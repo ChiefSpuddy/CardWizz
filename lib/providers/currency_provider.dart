@@ -38,22 +38,32 @@ class CurrencyProvider with ChangeNotifier {
   // Current currency getters
   Currency? get selectedCurrency => _availableCurrencies[_selectedCurrencyCode];
   String get currencyCode => _selectedCurrencyCode;
-  String? get currencySymbol => selectedCurrency?.symbol;
+  String get currentCurrency => _selectedCurrencyCode;
+  String get currencySymbol => selectedCurrency?.symbol ?? '\$';
   double get conversionRate => selectedCurrency?.conversionRate ?? 1.0;
 
   // Add missing getters and methods
   String get symbol => selectedCurrency?.symbol ?? '\$';
   Map<String, Currency> get currencies => _availableCurrencies;
-  String get currentCurrency => _selectedCurrencyCode;
 
   // Status getter
   bool get isInitialized => _isInitialized;
 
   // Format methods
   String formatValue(double? price) {
-    if (price == null) return '-';
-    final currencySymbol = selectedCurrency?.symbol ?? '\$';
-    return '$currencySymbol${(price * conversionRate).toStringAsFixed(2)}';
+    if (price == null || price == 0) return '$currencySymbol${0.00}';
+    
+    // Convert the value to the selected currency
+    final convertedValue = price * conversionRate;
+    
+    // Format based on currency
+    if (_selectedCurrencyCode == 'JPY') {
+      // JPY doesn't typically use decimal places
+      return '$currencySymbol${convertedValue.round()}';
+    } else {
+      // Most currencies use 2 decimal places
+      return '$currencySymbol${convertedValue.toStringAsFixed(2)}';
+    }
   }
 
   String formatChartValue(double value) {
@@ -103,5 +113,22 @@ class CurrencyProvider with ChangeNotifier {
       
       notifyListeners();
     }
+  }
+
+  // Update conversion rates (e.g., from an API)
+  void updateConversionRates(Map<String, double> rates) {
+    // Convert the incoming rates to Currency objects
+    rates.forEach((code, rate) {
+      if (_availableCurrencies.containsKey(code)) {
+        final currency = _availableCurrencies[code]!;
+        _availableCurrencies[code] = Currency(
+          code: currency.code,
+          symbol: currency.symbol,
+          name: currency.name,
+          conversionRate: rate,
+        );
+      }
+    });
+    notifyListeners();
   }
 }
