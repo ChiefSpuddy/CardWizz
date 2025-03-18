@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/storage_service.dart';
 import '../services/collection_service.dart';
 import '../screens/card_details_screen.dart';
-import 'card_grid_item.dart';
+import '../widgets/card_grid.dart';
 import '../models/custom_collection.dart';
 import '../providers/app_state.dart';
 import '../utils/notification_manager.dart';
@@ -16,6 +16,7 @@ import '../utils/card_details_router.dart';  // Add this import for CardDetailsR
 import 'dart:async'; // Ensure this import is present
 import '../models/tcg_card.dart';  // Add this import
 import '../utils/hero_tags.dart';
+import 'card_grid_item.dart'; // Add this import
 
 class CollectionGrid extends StatefulWidget {
   final bool keepAlive;
@@ -599,15 +600,15 @@ class _CollectionGridState extends State<CollectionGrid>
           children: [
             GridView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.all(2), // Reduced padding from 8 to 2
+              padding: const EdgeInsets.all(4), // Reduced padding for more card space
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                childAspectRatio: 0.68, // Adjusted from 0.7 to 0.68 for better proportions
-                crossAxisSpacing: 1, // Reduced from 8 to 1 for more space for cards
-                mainAxisSpacing: 2, // Reduced from 8 to 2
+                childAspectRatio: 0.72,
+                crossAxisSpacing: 4, // Reduced spacing for more card width
+                mainAxisSpacing: 8, // Reduced spacing
               ),
-              itemCount: filteredCards.length,  // Use filteredCards instead
-              cacheExtent: 500, // Increase cache extent for smoother scrolling
+              itemCount: filteredCards.length,
+              cacheExtent: 500, // Maintain large cache extent for performance
               itemBuilder: (context, index) {
                 // Modify this condition to never use empty placeholders during initial load
                 if (_isScrolling && index > 60 && !_initialRendering) {
@@ -665,33 +666,7 @@ class _CollectionGridState extends State<CollectionGrid>
                           children: [
                             Opacity(
                               opacity: isSelected ? 0.8 : 1.0,
-                              child: CardGridItem(
-                                key: ValueKey(card.id),
-                                card: card,
-                                heroContext: 'collection_$index', // Add unique hero context based on index
-                                showPrice: true, // Changed to true
-                                showName: true,  // Added showName
-                                // Always use high quality for initial rendering and non-scrolling
-                                highQuality: !_lowQualityRendering || _initialRendering,
-                                onTap: () {
-                                  // Fix the navigation by using rootNavigator
-                                  if (_isMultiSelectMode) {
-                                    _toggleCardSelection(card.id);
-                                  } else {
-                                    Navigator.of(context, rootNavigator: true).pushNamed(
-                                      '/card',
-                                      arguments: {
-                                        'card': card, 
-                                        'heroContext': 'collection_$index',
-                                        'isFromCollection': true
-                                      },
-                                    );
-                                  }
-                                },
-                                onAddToCollection: () => _addCardToBinder(card),
-                                isInCollection: true,
-                                hideCheckmarkWhenInCollection: true, // Add this line to hide checkmarks in collection view
-                              ),
+                              child: _buildCard(card, index),
                             ),
                             if (_isMultiSelectMode)
                               Positioned.fill(
@@ -1122,6 +1097,37 @@ class _CollectionGridState extends State<CollectionGrid>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCard(TcgCard card, int index) {
+    return CardGridItem(
+      card: card,
+      onCardTap: (card) {
+        if (_isMultiSelectMode) {
+          _toggleCardSelection(card.id);
+        } else {
+          // Use the onCardTap callback if provided
+          if (widget.onCardTap != null) {
+            widget.onCardTap!(card, index);
+          } else {
+            // Navigate to card details
+            Navigator.of(context, rootNavigator: true).pushNamed(
+              '/card',
+              arguments: {
+                'card': card,
+                'heroContext': 'collection_$index',
+                'isFromCollection': true
+              },
+            );
+          }
+        }
+      },
+      isInCollection: true,
+      heroContext: 'collection_${card.id}',
+      showPrice: true,
+      showName: true,
+      currencySymbol: Provider.of<CurrencyProvider>(context, listen: false).symbol,
     );
   }
 }

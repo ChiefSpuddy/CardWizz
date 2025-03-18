@@ -1,16 +1,27 @@
-import '../services/logging_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ui';
+import '../models/tcg_card.dart';
+import '../models/tcg_set.dart';
 import '../services/tcg_api_service.dart';
-import '../services/tcgdex_api_service.dart';
+import '../widgets/card_grid.dart';
+import '../utils/card_details_router.dart';
 import '../services/search_history_service.dart';
+import '../services/storage_service.dart';
+import '../providers/app_state.dart';
+import '../utils/notification_manager.dart';
+import '../services/logging_service.dart';
+import '../services/tcgdex_api_service.dart';
 import '../services/mtg_api_service.dart';
 import '../constants/sets.dart';
 import '../constants/japanese_sets.dart';
 import '../constants/mtg_sets.dart';
 import '../utils/image_utils.dart';
-import '../utils/card_navigation_helper.dart'; // Moved this import up with other imports
-import '../utils/notification_manager.dart';  // Moved up before any declarations
+import '../utils/card_navigation_helper.dart';
 import 'card_details_screen.dart';
 import 'search_results_screen.dart';
 import '../widgets/search/search_app_bar.dart';
@@ -19,26 +30,20 @@ import '../widgets/search/search_categories_header.dart';
 import '../widgets/search/recent_searches.dart';
 import '../widgets/search/loading_state.dart';
 import '../widgets/search/loading_indicators.dart';
-import '../widgets/search/card_grid.dart';
+import '../widgets/card_grid.dart';
 import '../widgets/search/set_grid.dart';
-import '../widgets/search/card_grid_item.dart';
 import '../services/navigation_service.dart';
-import 'package:provider/provider.dart';
 import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart';
-import '../services/storage_service.dart';
-import '../providers/app_state.dart';
 import '../widgets/search/card_skeleton_grid.dart';
 import '../widgets/standard_app_bar.dart';
-import 'package:flutter/services.dart';
 import '../widgets/app_drawer.dart';
 import 'package:rxdart/rxdart.dart';
 import 'dart:math' as math;
-import '../models/tcg_card.dart';
-import '../models/tcg_set.dart' as models; // Fixed missing quote
+import '../models/tcg_set.dart' as models;
 
 // Import TcgSet from models explicitly
-import '../models/tcg_set.dart'; // Fixed missing quote
+import '../models/tcg_set.dart';
 
 // Then create a typedef to disambiguate
 typedef ModelTcgSet = TcgSet;
@@ -1446,22 +1451,28 @@ class _SearchScreenState extends State<SearchScreen> {
             
             // Results grid - cards or sets
             if (_searchResults != null && _searchMode == SearchMode.mtg)
-              CardSearchGrid(
-                cards: _searchResults!,
-                imageCache: _imageCache,
-                loadImage: _loadImage,
-                loadingRequestedUrls: _loadingRequestedUrls,
-                onCardTap: _onCardTap,
-                onAddToCollection: _onCardAddToCollection,
+              CardGridSliver(
+                cards: _searchResults!.cast<TcgCard>(),
+                onCardTap: (card) {
+                  CardDetailsRouter.navigateToCardDetails(context, card, heroContext: 'search');
+                },
+                preventNavigationOnQuickAdd: true,
+                showPrice: true,
+                showName: true,
+                heroContext: 'search',
+                crossAxisCount: 3,
               )
             else if (_searchMode == SearchMode.eng && _searchResults != null)
-              CardSearchGrid(
-                cards: _searchResults!,
-                imageCache: _imageCache,
-                loadImage: _loadImage,
-                loadingRequestedUrls: _loadingRequestedUrls,
-                onCardTap: _onCardTap,
-                onAddToCollection: _onCardAddToCollection,
+              CardGridSliver(
+                cards: _searchResults!.cast<TcgCard>(),
+                onCardTap: (card) {
+                  CardDetailsRouter.navigateToCardDetails(context, card, heroContext: 'search');
+                },
+                preventNavigationOnQuickAdd: true,
+                showPrice: true,
+                showName: true,
+                heroContext: 'search',
+                crossAxisCount: 3,
               )
             else if (_setResults != null)
               SetSearchGrid(

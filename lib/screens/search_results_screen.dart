@@ -6,6 +6,9 @@ import '../models/tcg_card.dart';
 import '../widgets/card_grid_item.dart';
 import '../services/logging_service.dart';
 import '../utils/notification_manager.dart';
+import '../utils/card_details_router.dart'; // Add this import if missing
+import '../widgets/card_grid.dart'; // Update this import
+import '../providers/currency_provider.dart'; // Add this import for CurrencyProvider
 
 class SearchResultsScreen extends StatefulWidget {
   final List<TcgCard> cards;
@@ -32,31 +35,24 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       appBar: AppBar(
         title: Text("Results for '${widget.searchTerm}'"),
       ),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(8),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          childAspectRatio: 0.68,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-        ),
-        itemCount: widget.cards.length,
-        itemBuilder: (context, index) {
-          final card = widget.cards[index];
-          final isInCollection = _addedCardIds.contains(card.id);
-          
-          return CardGridItem(
-            card: card,
-            heroContext: 'search_results_$index',
-            onTap: () => _navigateToCardDetails(card, index),
-            onAddToCollection: () => _quickAddToCollection(card),
-            isInCollection: isInCollection,
-            showPrice: true,
-            showName: true,
-            highQuality: true,
-          );
-        },
-      ),
+      body: widget.cards.isEmpty
+          ? _buildEmptyResultsView()
+          : SingleChildScrollView(
+              child: CardGrid(
+                cards: widget.cards,
+                onCardTap: (card) {
+                  CardDetailsRouter.navigateToCardDetails(context, card, heroContext: 'search_results');
+                },
+                preventNavigationOnQuickAdd: true,
+                showPrice: true,
+                showName: true,
+                heroContext: 'search_results',
+                scrollable: false, // Critical - non-scrollable when inside SingleChildScrollView
+                crossAxisCount: 3, // Show more cards per row
+                childAspectRatio: 0.72, // Adjusted for better proportions
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10), // Consistent padding
+              ),
+            ),
     );
   }
   
@@ -108,5 +104,48 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         message: 'Error: $e',
       );
     });
+  }
+
+  Widget _buildCardGrid(List<dynamic> cards) {
+    return CardGrid(
+      cards: cards.cast<TcgCard>(),
+      onCardTap: (card) {
+        CardDetailsRouter.navigateToCardDetails(context, card, heroContext: 'search_results');
+      },
+      preventNavigationOnQuickAdd: true,
+      showPrice: true,
+      showName: true,
+      heroContext: 'search_results',
+      scrollable: true, // Explicitly set to true here
+    );
+  }
+
+  Widget _buildEmptyResultsView() {
+    return Center(
+      child: Text('No results found for "${widget.searchTerm}"'),
+    );
+  }
+
+  Widget _buildSearchResultItem(TcgCard card, int index) {
+    return CardGridItem(
+      card: card,
+      onCardTap: (card) {
+        // Handle tap on search result
+        Navigator.pushNamed(
+          context,
+          '/card',
+          arguments: {
+            'card': card,
+            'heroContext': 'search_$index',
+            'isFromCollection': false
+          },
+        );
+      },
+      isInCollection: false, // Assuming search results are not necessarily in collection
+      heroContext: 'search_${card.id}',
+      showPrice: true,
+      showName: true,
+      currencySymbol: Provider.of<CurrencyProvider>(context, listen: false).symbol,
+    );
   }
 }
