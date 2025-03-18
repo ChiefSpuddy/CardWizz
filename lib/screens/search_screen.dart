@@ -1363,6 +1363,7 @@ class _SearchScreenState extends State<SearchScreen> {
             });
           },
           onCameraPressed: _onCameraPressed,
+          onCancelSearch: _handleBackToCategories, // Add this line to handle search cancellation
         ),
         body: CustomScrollView(
           controller: _scrollController,
