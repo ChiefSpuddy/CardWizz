@@ -62,32 +62,58 @@ class NotificationManager {
   /// Shows a success notification
   static void success(
     BuildContext context, {
-    String? title,
+    String title = 'Success',
     required String message,
     IconData icon = Icons.check_circle,
+    Color? backgroundColor,
+    Color? iconColor,
     Duration duration = const Duration(seconds: 3),
-    VoidCallback? onTap,
     NotificationPosition position = NotificationPosition.top,
-    bool preventNavigation = false,
-    String? actionLabel,
-    VoidCallback? onActionPressed,
-    VoidCallback? onAction,
     bool compact = false,
+    bool preventNavigation = false,
   }) {
+    // Use a consistent green color for success notifications
+    final successColor = Colors.green.shade700;
+    
+    // Add this missing method implementation
     show(
-      context,
-      title: title ?? 'Success',
-      message: message,
+      context, 
+      title: title, 
+      message: message, 
       icon: icon,
       isError: false,
       duration: duration,
-      onTap: onTap,
       position: position,
-      actionLabel: actionLabel,
-      onActionPressed: onActionPressed,
-      onAction: onAction,
-      preventNavigation: preventNavigation,
       compact: compact,
+      preventNavigation: preventNavigation,
+    );
+  }
+  
+  // Add the missing _show method
+  static void _show(
+    BuildContext context, {
+    String? title,
+    required String message,
+    required IconData icon,
+    Color? backgroundColor,
+    Color? iconColor,
+    required bool isError,
+    Duration duration = const Duration(seconds: 3),
+    NotificationPosition position = NotificationPosition.top,
+    bool compact = false,
+    bool preventNavigation = false,
+  }) {
+    // Delegate to the show method
+    show(
+      context,
+      title: title,
+      message: message,
+      icon: icon,
+      isError: isError,
+      duration: duration,
+      position: position,
+      compact: compact,
+      preventNavigation: preventNavigation,
     );
   }
   

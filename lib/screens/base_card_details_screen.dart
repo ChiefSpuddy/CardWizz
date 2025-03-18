@@ -255,22 +255,26 @@ abstract class BaseCardDetailsScreenState<T extends BaseCardDetailsScreen>
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     
+    // Use consistent, attractive colors instead of relying blindly on theme
+    final Color startColor = colorScheme.primary;
+    final Color endColor = colorScheme.primaryContainer;
+    
     return Container(
       height: 46,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(23),
-        // Use colorScheme instead of hardcoded colors for better theming
+        // Use specific gradient colors for better visual appeal
         gradient: LinearGradient(
           colors: [
-            colorScheme.primary,
-            colorScheme.secondary,
+            startColor,
+            endColor,
           ],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withOpacity(0.4),
+            color: startColor.withOpacity(0.4),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

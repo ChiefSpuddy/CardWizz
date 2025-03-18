@@ -1948,6 +1948,12 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    
+                  const SizedBox(height: 24),
+                  
+                  // Add marketplace buttons here
+                  _buildMarketplaceButtons(),
+                  
                   const SizedBox(height: 24),
                   _buildEnhancedPriceDisplay(),
                   const SizedBox(height: 24),

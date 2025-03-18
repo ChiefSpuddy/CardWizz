@@ -34,6 +34,8 @@ class MtgCardDetailsScreen extends BaseCardDetailsScreen {
 
 class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetailsScreen> {
   final _apiService = TcgApiService();
+  // Create our own instance of EbayApiService to avoid Provider dependency
+  final _ebayApiService = EbayApiService();
   Map<String, dynamic>? _additionalData;
   Map<String, dynamic>? _priceData;
   bool _isLoading = true;
@@ -324,7 +326,7 @@ class _MtgCardDetailsScreenState extends BaseCardDetailsScreenState<MtgCardDetai
         
         // Use FutureBuilder to fetch and display real eBay sales data
         FutureBuilder<List<Map<String, dynamic>>>(
-          future: Provider.of<EbayApiService>(context, listen: false).getRecentSales(
+          future: _ebayApiService.getRecentSales(
             widget.card.name,
             setName: widget.card.setName,
             number: widget.card.number,
