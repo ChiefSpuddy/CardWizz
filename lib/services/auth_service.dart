@@ -93,7 +93,10 @@ class AuthService {
         await prefs.setString('${_currentUser!.id}_avatar', avatarPath);
         _currentUser = _currentUser!.copyWith(avatarPath: avatarPath);
         
-        LoggingService.debug('Avatar updated to: $avatarPath');
+        // Update app state by emitting the updated user
+        _authStateController.add(_currentUser);
+        
+        LoggingService.debug('Avatar updated to: $avatarPath for user ${_currentUser!.id}');
       } catch (e) {
         LoggingService.debug('Error updating avatar: $e');
       }
@@ -113,6 +116,11 @@ class AuthService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('${_currentUser!.id}_username', username);
       _currentUser = _currentUser!.copyWith(username: username);
+      
+      // Update app state by emitting the updated user
+      _authStateController.add(_currentUser);
+      
+      LoggingService.debug('Username updated to: $username for user ${_currentUser!.id}');
     }
   }
 
@@ -202,14 +210,22 @@ class AuthService {
         return null;
       }
       
+      // CRITICAL FIX: Check if we have existing profile data for this Google account
+      final prefs = await SharedPreferences.getInstance();
+      final googleUserId = 'google_${user.uid}';
+      final existingAvatarPath = prefs.getString('${googleUserId}_avatar');
+      final existingUsername = prefs.getString('${googleUserId}_username');
+      
       // Create or update user in your system
       LoggingService.debug('🔍 AUTH: Creating AuthUser from Google user');
       final authUser = AuthUser(
-        id: user.uid,
+        id: googleUserId,
         email: user.email,
         name: user.displayName,
-        username: user.displayName ?? user.email?.split('@')[0],
-        avatarPath: user.photoURL,
+        // Use existing username if available, otherwise fall back to Google display name or email
+        username: existingUsername ?? user.displayName ?? user.email?.split('@')[0],
+        // Use existing selected avatar if available, otherwise use Google photo URL
+        avatarPath: existingAvatarPath ?? user.photoURL,
         authProvider: 'google',
       );
       
@@ -245,61 +261,22 @@ class AuthService {
     try {
       LoggingService.debug('AuthService: Signing in with Google credentials for $email');
       
-      // Create an AuthCredential with the Google tokens
-      AuthCredential credential;
-      try {
-        credential = GoogleAuthProvider.credential(
-          accessToken: accessToken,
-          idToken: idToken,
-        );
-      } catch (e) {
-        LoggingService.debug('AuthService: Error creating credential: $e');
-        // Continue with local auth as fallback
-      }
+      // Standardized Google user ID format
+      final googleId = 'google_$id';
+      final prefs = await SharedPreferences.getInstance();
       
-      // Try Firebase Auth if credentials are available
-      try {
-        UserCredential? userCredential;
-        try {
-          userCredential = await FirebaseAuth.instance.signInWithCredential(
-            GoogleAuthProvider.credential(
-              accessToken: accessToken,
-              idToken: idToken,
-            )
-          );
-        } catch (e) {
-          LoggingService.debug('AuthService: Firebase auth failed: $e');
-        }
-        
-        if (userCredential?.user != null) {
-          LoggingService.debug('AuthService: Firebase sign-in successful: ${userCredential!.user!.uid}');
-          // Map to AuthUser
-          final authUser = _mapFirebaseUserToAuthUser(userCredential.user!);
-          
-          // Set as current user and save
-          _currentUser = authUser;
-          _isAuthenticated = true;
-          await _saveUserData(authUser);
-          
-          // Emit event
-          _authStateController.add(authUser);
-          
-          return authUser;
-        }
-      } catch (e) {
-        LoggingService.debug('AuthService: Error with Firebase auth: $e');
-        // Continue with local auth
-      }
+      // Check for existing profile data
+      final existingAvatarPath = prefs.getString('${googleId}_avatar');
+      final existingUsername = prefs.getString('${googleId}_username');
       
-      // Create local user as fallback
-      LoggingService.debug('AuthService: Creating local user for Google account');
+      // Create local user, prioritizing custom profile data if available
       final localUser = AuthUser(
-        id: 'google_$id',
+        id: googleId,
         email: email,
         name: displayName,
-        avatarPath: photoUrl,
+        username: existingUsername ?? displayName ?? email.split('@').first,
+        avatarPath: existingAvatarPath ?? photoUrl,
         locale: 'en',
-        username: email.split('@').first,
         authProvider: 'google',
       );
       
@@ -310,10 +287,16 @@ class AuthService {
       // Save user data
       await _saveUserData(localUser);
       
+      // Log the profile data restoration
+      if (existingUsername != null || existingAvatarPath != null) {
+        LoggingService.debug('AuthService: Restored custom profile data for Google user');
+        LoggingService.debug('AuthService: Using username: ${existingUsername ?? "default"}, avatar: ${existingAvatarPath ?? "default Google photo"}');
+      }
+      
       // Emit event
       _authStateController.add(localUser);
       
-      LoggingService.debug('AuthService: Local Google user created successfully');
+      LoggingService.debug('AuthService: Google user sign-in successful with profile restoration');
       return localUser;
     } catch (e) {
       LoggingService.error('AuthService: Error signing in with Google credentials: $e');

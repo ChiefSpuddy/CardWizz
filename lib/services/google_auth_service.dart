@@ -22,19 +22,6 @@ class GoogleAuthService {
     try {
       LoggingService.debug('🔍 GSVC: Step 1 - Starting Google sign-in process');
       
-      // CRITICAL FIX: Force native configuration test and wait for result
-      try {
-        const platform = MethodChannel('com.cardwizz.app/auth');
-        final result = await platform.invokeMethod('testGoogleSignIn');
-        LoggingService.debug('🔍 GSVC: Native configuration test: $result');
-        
-        // Add a small delay after configuration to ensure it propagates
-        await Future.delayed(const Duration(milliseconds: 100));
-      } catch (e) {
-        LoggingService.debug('🔍 GSVC: Native pre-test failed: $e');
-        // Continue anyway, as it might still work
-      }
-      
       // Initialize GoogleSignIn if not already done
       _googleSignIn ??= GoogleSignIn();
       
@@ -46,6 +33,10 @@ class GoogleAuthService {
           LoggingService.debug('🔍 GSVC: Silent sign-in succeeded');
           // Get authentication data and continue with Firebase auth
           final googleAuth = await silentUser.authentication;
+          
+          // IMPORTANT: Add user details logging for debugging profile persistence
+          LoggingService.debug('🔍 GSVC: Google user details - Name: ${silentUser.displayName}, Email: ${silentUser.email}, Photo: ${silentUser.photoUrl != null ? "Available" : "None"}');
+          
           return _processGoogleAuthentication(silentUser, googleAuth);
         }
       } catch (e) {
@@ -60,6 +51,9 @@ class GoogleAuthService {
         LoggingService.debug('🔍 GSVC: Interactive sign-in cancelled by user');
         return null;
       }
+      
+      // Log user details for debugging profile persistence
+      LoggingService.debug('🔍 GSVC: Google user signed in - Name: ${googleUser.displayName}, Email: ${googleUser.email}, Photo: ${googleUser.photoUrl != null ? "Available" : "None"}');
       
       // Get authentication data
       LoggingService.debug('🔍 GSVC: Step 4 - Getting authentication tokens');
