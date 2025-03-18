@@ -2106,154 +2106,170 @@ void _refreshTopMovers(List<TcgCard> cards) {
   Widget _buildValueSummary(List<TcgCard> cards) {
   final currencyProvider = context.watch<CurrencyProvider>();
   final storageService = Provider.of<StorageService>(context, listen: false);
-  final points = ChartService.getPortfolioHistory(storageService, cards);
   
-  double dayChange = 0;
-  if (points.length >= 2) {
-    final now = DateTime.now();
-    final oneDayAgo = now.subtract(const Duration(days: 1));
-    final oldPoint = points.firstWhere(
-      (p) => p.$1.isAfter(oneDayAgo),
-      orElse: () => points.first,
-    );
-    
-    final latestValue = points.last.$2;
-    final oldValue = oldPoint.$2;
-    if (oldValue > 0) {
-      dayChange = ((latestValue - oldValue) / oldValue) * 100;
-    }
-  }
+  // Use FutureBuilder to ensure we're using the same portfolio history data as the chart
+  return FutureBuilder<List<(DateTime, double)>?>(
+    future: _loadPortfolioChartData(cards, storageService),
+    builder: (context, snapshot) {
+      double totalValue = 0;
+      double dayChange = 0;
+      
+      // If we have chart data, use the latest point's value
+      if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+        final points = snapshot.data!;
+        // Use the latest point for the current value
+        totalValue = points.last.$2;
+        
+        // Calculate day change percentage if we have enough points
+        if (points.length >= 2) {
+          final now = DateTime.now();
+          final oneDayAgo = now.subtract(const Duration(days: 1));
+          final oldPoint = points.firstWhere(
+            (p) => p.$1.isAfter(oneDayAgo),
+            orElse: () => points.first,
+          );
+          
+          final latestValue = points.last.$2;
+          final oldValue = oldPoint.$2;
+          if (oldValue > 0) {
+            dayChange = ((latestValue - oldValue) / oldValue) * 100;
+          }
+        }
+      } else {
+        // If no chart data, calculate from current card prices
+        totalValue = cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+      }
 
-  final valueInEur = points.last.$2;
-
-  return Card(
-    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    elevation: 2,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    child: Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.green.shade400,
-            Colors.green.shade600,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.shade700.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TweenAnimationBuilder<double>(
-                  duration: const Duration(milliseconds: 1500),
-                  curve: Curves.easeOutCubic,
-                  tween: Tween(begin: 0, end: valueInEur),
-                  builder: (context, value, child) => Text(
-                    currencyProvider.formatValue(value),
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.style_outlined,
-                            size: 12,
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${cards.length} Cards',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+      return Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.green.shade400,
+                Colors.green.shade600,
               ],
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: dayChange >= 0 
-                  ? Colors.white.withOpacity(0.15)
-                  : Colors.red.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.shade700.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
               ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      dayChange >= 0 ? Icons.trending_up : Icons.trending_down,
-                      size: 14,
-                      color: Colors.white,
+                    TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 1500),
+                      curve: Curves.easeOutCubic,
+                      tween: Tween(begin: 0, end: totalValue),
+                      builder: (context, value, child) => Text(
+                        currencyProvider.formatValue(value),
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.style_outlined,
+                                size: 12,
+                                color: Colors.white.withOpacity(0.9),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${cards.length} Cards',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: dayChange >= 0 
+                      ? Colors.white.withOpacity(0.15)
+                      : Colors.red.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          dayChange >= 0 ? Icons.trending_up : Icons.trending_down,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${dayChange >= 0 ? '+' : ''}${dayChange.toStringAsFixed(1)}%',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
                     Text(
-                      '${dayChange >= 0 ? '+' : ''}${dayChange.toStringAsFixed(1)}%',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                      '24h',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withOpacity(0.8),
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '24h',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.white.withOpacity(0.8),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    ),
+        ),
+      );
+    }
   );
 }
 
@@ -2888,7 +2904,7 @@ Future<void> _refreshPrices() async {
   try {
     final storage = Provider.of<StorageService>(context, listen: false);
     
-    // Show a simple progress indicator in a SnackBar instead of a dialog
+    // Use ScaffoldMessenger instead of NotificationManager since the required methods don't exist
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -2916,11 +2932,12 @@ Future<void> _refreshPrices() async {
       _cachedTopMoversTimestamp = null;
     });
     
-    // Dismiss the SnackBar and show success message
+    // Dismiss the current SnackBar and show success message
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Prices updated successfully'),
+        backgroundColor: Colors.green,
         duration: Duration(seconds: 2),
       ),
     );
@@ -2933,7 +2950,7 @@ Future<void> _refreshPrices() async {
         _isRefreshing = false;
       });
       
-      // Show error message
+      // Show error message using ScaffoldMessenger
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

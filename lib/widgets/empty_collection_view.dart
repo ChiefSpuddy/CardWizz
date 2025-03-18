@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'dart:math' as math;  // Add this import for math.min
 import '../models/tcg_card.dart';  // Add this import for TcgCard
 import '../models/tcg_set.dart' as models;   // Import with alias
+import '../services/navigation_service.dart';  // Add this import
+import '../screens/root_navigator.dart';  // Add this import
 
 class EmptyCollectionView extends StatefulWidget {
   final String title;
@@ -206,15 +208,34 @@ class _EmptyCollectionViewState extends State<EmptyCollectionView> with TickerPr
       return;
     }
 
-    // CRITICAL FIX: Use rootNavigator to ensure we're navigating at the app level
-    // rather than within a nested navigator that might be causing the issue
-    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
-      '/search',
-      (route) => false,
-    );
+    LoggingService.debug('EmptyCollectionView: Navigating to search screen');
     
-    // Add a debug log to track navigation
-    LoggingService.debug('EmptyCollectionView: Navigating to search screen from empty state');
+    // Use the most direct approach - get to root and navigate using established routes
+    try {
+      // Use the simplest, most direct approach that avoids GlobalKey conflicts
+      final navService = Navigator.of(context, rootNavigator: true);
+      navService.pushNamed('/search');
+      LoggingService.debug('EmptyCollectionView: Navigation successful using pushNamed');
+    } catch (e) {
+      LoggingService.debug('EmptyCollectionView: First navigation method failed: $e');
+      
+      // Fall back to the tab switching approach - find the RootNavigator from the context
+      try {
+        // Try to find RootNavigatorState and use its method directly
+        final rootNavigatorState = context.findAncestorStateOfType<RootNavigatorState>();
+        if (rootNavigatorState != null) {
+          rootNavigatorState.setSelectedIndex(2); // Search is tab index 2
+          LoggingService.debug('EmptyCollectionView: Used RootNavigatorState.setSelectedIndex directly');
+          return;
+        }
+        
+        // If we can't find RootNavigatorState, use the service but differently
+        NavigationService.switchToTab(2);
+        LoggingService.debug('EmptyCollectionView: Used NavigationService.switchToTab');
+      } catch (e2) {
+        LoggingService.debug('EmptyCollectionView: All navigation methods failed: $e2');
+      }
+    }
   }
 
   String _getShortDescription(String fullDescription) {
