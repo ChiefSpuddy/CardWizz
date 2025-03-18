@@ -565,15 +565,15 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
       stream: Provider.of<StorageService>(context).watchCards(),
       initialData: const [],
       builder: (context, snapshot) {
-        final currencyProvider = context.watch<CurrencyProvider>();
         final cards = snapshot.data ?? [];
         
-        final totalValueEur = cards.fold<double>(
-          0, 
-          (sum, card) => sum + (card.price ?? 0)
-        );
+        // Remove this block as we now calculate total value in the card itself
+        // final totalValueEur = cards.fold<double>(
+        //  0, 
+        //  (sum, card) => sum + (card.price ?? 0)
+        // );
+        // final displayValue = currencyProvider.formatValue(totalValueEur);
         
-        final displayValue = currencyProvider.formatValue(totalValueEur);
         final reversedCards = cards.reversed.toList();
         
         if (cards.isEmpty) {
@@ -641,7 +641,7 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
                                 child: _buildSummaryCard(
                                   context,
                                   'Collection Value',
-                                  displayValue,
+                                  '', // Value will be calculated in the widget
                                   Icons.currency_exchange,
                                 ),
                               ),
@@ -768,6 +768,8 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
                                   itemCount: reversedCards.length.clamp(0, 10),
                                   itemBuilder: (context, index) {
                                     final card = reversedCards[index];
+                                    // Add a local reference to the currency provider
+                                    final currencyProvider = Provider.of<CurrencyProvider>(context);
                                     return GestureDetector(
                                       onTap: () => Navigator.push(
                                         context,
@@ -844,43 +846,108 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
     final translationKey = title == 'Total Cards' ? 'totalCards' : 
                           title == 'Collection Value' ? 'portfolioValue' : 
                           title.toLowerCase().replaceAll(' ', '_');
+    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
     
     // If this is the Collection Value card, use FutureBuilder with CardDetailsRouter
     if (title == 'Collection Value') {
-      // IMPORTANT: Don't try to access Provider<List<TcgCard>> directly
-      return Card(
-        elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Icon(
-                Icons.currency_exchange,
-                size: 32,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                localizations.translate(translationKey),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).colorScheme.onSurface,
+      return StreamBuilder<List<TcgCard>>(
+        stream: Provider.of<StorageService>(context).watchCards(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.currency_exchange,
+                      size: 32,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      localizations.translate(translationKey),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              // Use the value provided from the parent instead of trying to recalculate
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+            );
+          }
+          
+          final cards = snapshot.data!;
+          
+          // Use FutureBuilder to get accurate calculation
+          return FutureBuilder<double>(
+            future: CardDetailsRouter.calculateRawTotalValue(cards),
+            builder: (context, valueSnapshot) {
+              final totalValue = valueSnapshot.data ?? cards.fold<double>(0, (sum, card) => sum + (card.price ?? 0));
+              
+              return Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.currency_exchange,
+                        size: 32,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        localizations.translate(translationKey),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Use animated value for a nice effect
+                      _valueController.value < 1.0
+                        ? Text(
+                            currencyProvider.formatValue(totalValue),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          )
+                        : TweenAnimationBuilder<double>(
+                            duration: const Duration(milliseconds: 1200),
+                            curve: Curves.easeOutQuad,
+                            tween: Tween(begin: 0, end: totalValue),
+                            builder: (context, value, child) => Text(
+                              currencyProvider.formatValue(value),
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
+              );
+            },
+          );
+        },
       );
     }
     
