@@ -16,6 +16,7 @@ class TcgCard {
   final String? artist;
   final Map<String, dynamic>? cardmarket;
   final double? price;
+  final double? ebayPrice; // Add ebayPrice field
   final Map<String, dynamic>? rawData;
   final DateTime? dateAdded;
   final DateTime? addedToCollection;
@@ -42,6 +43,7 @@ class TcgCard {
     this.artist,
     this.cardmarket,
     this.price,
+    this.ebayPrice, // Add ebayPrice parameter
     this.rawData,
     this.dateAdded,
     this.addedToCollection,
@@ -142,6 +144,7 @@ class TcgCard {
       artist: json['artist'],
       cardmarket: json['cardmarket'],
       price: price, // Use the extracted price
+      ebayPrice: _extractEbayPrice(json), // Add ebayPrice extraction
       rawData: json['rawData'] ?? json, // Store the raw data for future use
       dateAdded: json['dateAdded'] != null
           ? DateTime.parse(json['dateAdded']) 
@@ -153,6 +156,27 @@ class TcgCard {
       isMtg: json['isMtg'] ?? false,
       setTotal: json['setTotal'] ?? json['set']?['total'],
     );
+  }
+
+  // Add helper method to extract eBay price
+  static double? _extractEbayPrice(Map<String, dynamic> json) {
+    // Try to extract from ebayPrice field
+    if (json['ebayPrice'] != null) {
+      final price = json['ebayPrice'];
+      if (price is double) return price;
+      if (price is int) return price.toDouble();
+      if (price is String) return double.tryParse(price);
+    }
+    
+    // Try to extract from ebay.price field if it exists
+    if (json['ebay']?['price'] != null) {
+      final price = json['ebay']['price'];
+      if (price is double) return price;
+      if (price is int) return price.toDouble();
+      if (price is String) return double.tryParse(price);
+    }
+    
+    return null;
   }
 
   // The rest of the methods remain unchanged
@@ -211,6 +235,7 @@ class TcgCard {
       'artist': artist,
       'cardmarket': cardmarket,
       'price': price,
+      'ebayPrice': ebayPrice, // Include ebayPrice
       'rawData': rawData,
       'dateAdded': dateAdded?.toIso8601String(),
       'addedToCollection': addedToCollection?.toIso8601String(),
@@ -243,6 +268,7 @@ class TcgCard {
     String? artist,
     Map<String, dynamic>? cardmarket,
     double? price,
+    double? ebayPrice, // Add ebayPrice parameter
     Map<String, dynamic>? rawData,
     DateTime? dateAdded,
     DateTime? addedToCollection,
@@ -267,6 +293,7 @@ class TcgCard {
       artist: artist ?? this.artist,
       cardmarket: cardmarket ?? this.cardmarket,
       price: price ?? this.price,
+      ebayPrice: ebayPrice ?? this.ebayPrice, // Include ebayPrice
       rawData: rawData ?? this.rawData,
       dateAdded: dateAdded ?? this.dateAdded,
       addedToCollection: addedToCollection ?? this.addedToCollection,

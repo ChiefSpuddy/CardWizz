@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/tcg_card.dart';
 import '../providers/currency_provider.dart';
+import '../utils/card_details_router.dart'; // Add this import for getRawCardPrice method
 
 class CardGridItem extends StatelessWidget {
   final TcgCard card;
@@ -116,8 +117,8 @@ class CardGridItem extends StatelessWidget {
                           ),
                         ),
                       
-                      // Price row
-                      if (showPrice && card.price != null)
+                      // Price row with card number
+                      if (showPrice)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -132,14 +133,33 @@ class CardGridItem extends StatelessWidget {
                                 ),
                               ),
                             
-                            // Price with proper currency formatting
-                            Text(
-                              currencyProvider.formatValue(card.price!),
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green.shade700,
-                              ),
+                            // Price with consistent raw price fetching
+                            FutureBuilder<double?>(
+                              future: CardDetailsRouter.getRawCardPrice(card),
+                              builder: (context, snapshot) {
+                                final priceValue = snapshot.data ?? card.price;
+                                
+                                // Show dash if no price available
+                                if (priceValue == null || priceValue <= 0) {
+                                  return Text(
+                                    '-',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDarkMode ? Colors.white70 : Colors.grey[700],
+                                    ),
+                                  );
+                                }
+                                
+                                return Text(
+                                  currencyProvider.formatValue(priceValue),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green.shade700,
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),

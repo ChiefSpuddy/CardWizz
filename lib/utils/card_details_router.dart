@@ -9,6 +9,7 @@ import '../services/price_service.dart';
 import '../services/logging_service.dart';
 import 'dart:math';  // Add this import for min
 import '../models/tcg_card.dart';  // Add this import for TcgCard
+import '../services/tcg_api_service.dart';
 
 class CardDetailsRouter {
   // Static instance of the price service
@@ -213,15 +214,74 @@ class CardDetailsRouter {
   
   /// Get price for raw (ungraded) cards only
   static Future<double?> getRawCardPrice(TcgCard card) async {
-    // If card already has a price, use it as is (it's already in EUR)
-    // The EUR value is already what we want since that's our base currency
-    if (card.price != null) {
-      return card.price;
+    // If price is already null, return null right away
+    if (card.price == null) return null;
+
+    try {
+      // First try to get the raw eBay price
+      if (card.ebayPrice != null && card.ebayPrice! > 0) {
+        return card.ebayPrice;
+      }
+      
+      // If no eBay price available, fetch latest pricing from API
+      final api = TcgApiService();
+      // Change to nullable type with type check
+      final Map<String, dynamic>? latestData = await api.getCardById(card.id);
+      
+      // Only proceed if we have valid data
+      if (latestData != null && latestData.isNotEmpty) {
+        // Try to get eBay price from the updated data
+        final latestCard = TcgCard.fromJson(latestData);
+        if (latestCard.ebayPrice != null && latestCard.ebayPrice! > 0) {
+          return latestCard.ebayPrice;
+        }
+        
+        // Safely handle tcgplayer prices with null checks
+        final tcgplayer = latestData['tcgplayer'];
+        if (tcgplayer != null && tcgplayer is Map<String, dynamic>) {
+          final prices = tcgplayer['prices'];
+          if (prices != null && prices is Map<String, dynamic>) {
+            // Try to get holofoil price first
+            final holofoil = prices['holofoil'];
+            if (holofoil != null && holofoil is Map<String, dynamic> && holofoil['market'] != null) {
+              final market = holofoil['market'];
+              if (market is num) return market.toDouble();
+            }
+            
+            // Try normal price
+            final normal = prices['normal'];
+            if (normal != null && normal is Map<String, dynamic> && normal['market'] != null) {
+              final market = normal['market'];
+              if (market is num) return market.toDouble();
+            }
+            
+            // Try any other price types
+            for (final priceType in prices.values) {
+              if (priceType is Map<String, dynamic> && priceType['market'] != null) {
+                final market = priceType['market'];
+                if (market is num) return market.toDouble();
+              }
+            }
+          }
+        }
+        
+        // Safely handle cardmarket price with null checks
+        final cardmarket = latestData['cardmarket'];
+        if (cardmarket != null && cardmarket is Map<String, dynamic>) {
+          final prices = cardmarket['prices'];
+          if (prices != null && prices is Map<String, dynamic>) {
+            final avgPrice = prices['averageSellPrice'];
+            if (avgPrice is num) return avgPrice.toDouble();
+          }
+        }
+      }
+    } catch (e) {
+      // If there's any error, return the original price
+      print('Error getting raw card price: $e');
     }
     
-    // For cards without a price, we could try to fetch it from an API,
-    // but for now return null to avoid inconsistencies
-    return null;
+    // Return the original price if all other attempts fail
+    return card.price;
   }
   
   // Update or add this method to ensure consistent calculation
