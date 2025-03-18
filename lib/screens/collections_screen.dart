@@ -30,6 +30,7 @@ import 'dart:math';  // Add this import for Random, pi, etc.
 import '../models/tcg_card.dart';  // Add this import for TcgCard class
 import '../services/premium_features_helper.dart'; // Add this import to fix the error
 import '../screens/root_navigator.dart';
+import '../screens/card_details_screen.dart' as card_details_screen;
 
 class CollectionsScreen extends StatefulWidget {
   final bool _showEmptyState;
@@ -525,15 +526,17 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
     return sortedSets;
   }
 
-  // Add this method to the CollectionsScreenState class
+  // Update this method to match the expected signature for the onCardTap callback
   void _navigateToCardDetails(TcgCard card, int index) {
-    // Use rootNavigator to ensure we don't push onto a nested navigator
-    Navigator.of(context, rootNavigator: true).pushNamed(
-      '/card',
-      arguments: {
-        'card': card,
-        'heroContext': 'collection_$index',
-      },
+    // Use the current context without requiring it as a parameter
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => card_details_screen.CardDetailsScreen(
+          card: card,
+          heroContext: 'collection_${card.id}',
+        ),
+      ),
     );
   }
 
