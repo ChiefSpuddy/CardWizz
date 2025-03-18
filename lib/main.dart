@@ -47,6 +47,15 @@ void main() async {
     // Initialize Flutter binding
     WidgetsFlutterBinding.ensureInitialized();
     
+    // Set a simple status bar style with black text on transparent background
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,  // Black text for light mode
+        statusBarBrightness: Brightness.light,     // Light background for iOS
+      ),
+    );
+    
     // CRITICAL FIX: Initialize Firebase first, synchronously
     await Firebase.initializeApp();
     LoggingService.debug('Firebase initialized successfully');
@@ -420,7 +429,7 @@ class NavigationService {
   static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 }
 
-// MyApp as before
+// MyApp widget with direct AppBar style override
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -429,40 +438,59 @@ class MyApp extends StatelessWidget {
     final appState = Provider.of<AppState>(context, listen: true);
     final themeProvider = Provider.of<ThemeProvider>(context);
     
-    // Ensure proper status bar visibility based on current theme
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      SystemChrome.setSystemUIOverlayStyle(
-        themeProvider.isDarkMode
-            ? SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent)
-            : SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
-      );
-    });
-    
-    return MaterialApp(
-      title: 'CardWizz',
-      debugShowCheckedModeBanner: false,
-      theme: themeProvider.currentThemeData.copyWith(brightness: Brightness.light),
-      darkTheme: themeProvider.currentThemeData.copyWith(brightness: Brightness.dark),
-      themeMode: themeProvider.themeMode,
-      navigatorKey: NavigationService.navigatorKey,
-      locale: appState.locale,
-      supportedLocales: AppState.supportedLocales,
-      localizationsDelegates: const [
-        AppLocalizationsDelegate(),
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const RootNavigator(),
-        '/search': (context) => const RootNavigator(initialTab: 2),
-        // ...existing routes...
-      },
-      onGenerateRoute: (settings) {
-        // ...existing onGenerateRoute logic...
-        return null;
-      },
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Force a specific style regardless of what any other widget tries to do
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        // EXPLICITLY set status bar icons to dark (black) in light mode
+        statusBarIconBrightness: themeProvider.isDarkMode ? Brightness.light : Brightness.dark,
+        // For iOS
+        statusBarBrightness: themeProvider.isDarkMode ? Brightness.dark : Brightness.light,
+      ),
+      child: MaterialApp(
+        title: 'CardWizz',
+        debugShowCheckedModeBanner: false,
+        theme: themeProvider.currentThemeData.copyWith(
+          // Override the AppBarTheme to prevent it from setting status bar style
+          appBarTheme: AppBarTheme(
+            systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.dark, // Always black in light mode
+              statusBarBrightness: Brightness.light,    // Always light in light mode
+            ),
+          ),
+        ),
+        darkTheme: themeProvider.currentThemeData.copyWith(
+          // Override the AppBarTheme to prevent it from setting status bar style
+          appBarTheme: AppBarTheme(
+            systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light, // Always white in dark mode
+              statusBarBrightness: Brightness.dark,      // Always dark in dark mode
+            ),
+          ),
+        ),
+        themeMode: themeProvider.themeMode,
+        navigatorKey: NavigationService.navigatorKey,
+        locale: appState.locale,
+        supportedLocales: AppState.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizationsDelegate(),
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        initialRoute: '/',
+        routes: {
+          '/': (context) => const RootNavigator(),
+          '/search': (context) => const RootNavigator(initialTab: 2),
+          // ...existing routes...
+        },
+        onGenerateRoute: (settings) {
+          // ...existing onGenerateRoute logic...
+          return null;
+        },
+      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
+import '../constants/app_colors.dart';
 
 class StandardAppBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget>? actions;
@@ -37,6 +39,22 @@ class StandardAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // CRITICAL FIX: Force status bar icons to always respect the current theme
+    // This must happen BEFORE anything else in the build method
+    SystemChrome.setSystemUIOverlayStyle(
+      isDark
+          ? const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light, // White icons for dark mode
+              statusBarBrightness: Brightness.dark,
+            )
+          : const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent, 
+              statusBarIconBrightness: Brightness.dark, // BLACK icons for light mode - this is key
+              statusBarBrightness: Brightness.light,
+            ),
+    );
     
     // Determine app bar colors based on transparent flag and provided colors
     final appBarBackgroundColor = useBlack 
@@ -128,6 +146,22 @@ class StandardAppBar extends StatelessWidget implements PreferredSizeWidget {
     bool floating = false, // Default to not floating
   }) {
     final isAuthenticated = context.watch<AppState>().isAuthenticated;
+    
+    // CRITICAL FIX: Force status bar style immediately
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    SystemChrome.setSystemUIOverlayStyle(
+      isDark
+          ? const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light, // White icons
+              statusBarBrightness: Brightness.dark,
+            )
+          : const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.dark, // BLACK icons - fixes white-on-white
+              statusBarBrightness: Brightness.light,
+            ),
+    );
     
     if (!isAuthenticated) {
       return null;

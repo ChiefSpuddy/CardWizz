@@ -1,134 +1,113 @@
 import 'package:flutter/material.dart';
 import '../services/dialog_service.dart';  // Update this import
 
-class PriceUpdateDialog extends StatelessWidget {
-  final int current;
-  final int total;
+class PriceUpdateDialog extends StatefulWidget {
+  final int initialCurrent;
+  final int initialTotal;
 
+  // CRITICAL FIX: Remove the non-constant key from constructor
   const PriceUpdateDialog({
-    super.key,
-    required this.current,
-    required this.total,
-  });
+    Key? key,
+    required this.initialCurrent,
+    required this.initialTotal,
+  }) : super(key: key);
+  
+  // Static method to update dialog progress using global instance tracking
+  static final GlobalKey<_PriceUpdateDialogState> _dialogKey = GlobalKey<_PriceUpdateDialogState>();
+  
+  static void updateProgress(int current, int total) {
+    final state = _dialogKey.currentState;
+    if (state != null) {
+      state._updateProgress(current, total);
+    }
+  }
+  
+  // Static getter for the key to use when creating the dialog
+  static GlobalKey<_PriceUpdateDialogState> get dialogKey => _dialogKey;
+
+  @override
+  State<PriceUpdateDialog> createState() => _PriceUpdateDialogState();
+}
+
+class _PriceUpdateDialogState extends State<PriceUpdateDialog> {
+  late int _current;
+  late int _total;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.initialCurrent;
+    _total = widget.initialTotal;
+  }
+
+  // Update progress from external calls
+  void _updateProgress(int current, int total) {
+    setState(() {
+      _current = current;
+      _total = total;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isComplete = current >= total;
-    final progress = total > 0 ? current / total : 0.0;
-    final percentage = (progress * 100).toInt();
+    // Calculate percentage (protect against division by zero)
+    final progress = _total > 0 ? _current / _total : 0.0;
+    final percentage = (progress * 100).round();
 
     return Dialog(
-      backgroundColor: Colors.white.withOpacity(0.95),
-      elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isComplete) ...[
-              TweenAnimationBuilder<double>(
-                duration: const Duration(milliseconds: 500),
-                tween: Tween(begin: 0.0, end: 1.0),
-                builder: (context, value, child) {
-                  return Transform.scale(
-                    scale: 0.8 + (0.2 * value),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.check_circle_outline,
-                        color: Colors.green,
-                        size: 48 * value,
-                      ),
-                    ),
-                  );
-                },
+            // Title and subtitle
+            const Text(
+              'Updating Card Prices',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Update Complete!',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Checking $_current of $_total cards',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: () => DialogService.instance.hideDialog(),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  minimumSize: const Size(120, 44),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Done'),
-              ),
-            ] else ...[
-              Container(
-                height: 12,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(6),
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [Colors.green.shade300, Colors.green.shade500],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Colors.white.withOpacity(0.5),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Processing card $current of $total',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.green.withOpacity(0.2),
-                  ),
-                ),
-                child: Text(
+            ),
+            const SizedBox(height: 24),
+            
+            // Progress bar
+            LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.primary,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
                   '$percentage%',
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.green.shade600,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            const Text(
+              'Please wait, this might take a few minutes...',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12),
+            ),
           ],
         ),
       ),

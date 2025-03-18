@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';  // Make sure this import is at the top
 import '../screens/profile_screen.dart';
 import '../screens/analytics_screen.dart';
 import '../screens/scanner_screen.dart';
@@ -24,7 +25,7 @@ class RootNavigator extends StatefulWidget {
   State<RootNavigator> createState() => RootNavigatorState();
 }
 
-class RootNavigatorState extends State<RootNavigator> {
+class RootNavigatorState extends State<RootNavigator> with WidgetsBindingObserver {
   late int _selectedIndex;
   
   // Remove one key since we're removing Scanner from the nav bar
@@ -39,12 +40,49 @@ class RootNavigatorState extends State<RootNavigator> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedIndex = widget.initialTab;
+    
+    // Don't use Theme here - move to didChangeDependencies
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    // Update when system brightness changes
+    _updateStatusBarStyle();
+    super.didChangePlatformBrightness();
+  }
+
+  void _updateStatusBarStyle() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    SystemChrome.setSystemUIOverlayStyle(
+      isDark 
+          ? const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light, // White icons
+              statusBarBrightness: Brightness.dark,
+            )
+          : const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.dark,  // Black icons for light mode (THIS IS KEY)
+              statusBarBrightness: Brightness.light,
+            ),
+    );
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    
+    // Now it's safe to use Theme
+    _updateStatusBarStyle();
     
     // Handle initial tab from route arguments if provided
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
@@ -134,6 +172,9 @@ class RootNavigatorState extends State<RootNavigator> {
 
   @override
   Widget build(BuildContext context) {
+    // Update in build as well to ensure it's always correct
+    _updateStatusBarStyle();
+    
     return WillPopScope(
       onWillPop: () async {
         final isFirstRouteInCurrentTab =

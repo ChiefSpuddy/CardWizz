@@ -59,8 +59,8 @@ class DialogManager {
           onWillPop: () async => false, // Prevent back button dismissal
           child: PriceUpdateDialog(
             key: ValueKey('$current-$total'), // Add this line
-            current: current,
-            total: total,
+            initialCurrent: current,  // Changed from 'current: current'
+            initialTotal: total,      // Changed from 'total: total'
           ),
         ),
       ).then((_) {
@@ -75,8 +75,8 @@ class DialogManager {
               onWillPop: () async => false,
               child: PriceUpdateDialog(
                 key: ValueKey('$current-$total'), // Add this line
-                current: current,
-                total: total,
+                initialCurrent: current,  // Changed from 'current: current'
+                initialTotal: total,      // Changed from 'total: total'
               ),
             ),
             opaque: false,

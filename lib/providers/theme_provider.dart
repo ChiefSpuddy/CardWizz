@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 import '../constants/app_colors.dart';
 
 class ThemeProvider extends ChangeNotifier {
@@ -41,6 +42,12 @@ class ThemeProvider extends ChangeNotifier {
     if (_themeMode == mode) return;
 
     _themeMode = mode;
+    
+    // Apply status bar style immediately when theme changes
+    final isDark = mode == ThemeMode.dark || 
+      (mode == ThemeMode.system && 
+        SchedulerBinding.instance.window.platformBrightness == Brightness.dark);
+    SystemChrome.setSystemUIOverlayStyle(AppColors.getStatusBarStyle(isDark));
     
     // Add this line to ensure any listeners have a chance to rebuild before
     // other async operations happen

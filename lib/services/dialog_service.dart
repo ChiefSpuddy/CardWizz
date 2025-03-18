@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/purchase_service.dart';
@@ -5,56 +6,132 @@ import 'navigation_service.dart';
 import '../widgets/price_update_dialog.dart';  // Add this import
 
 class DialogService {
-  static final DialogService _instance = DialogService._();
-  bool _isDialogVisible = false;
-  BuildContext? _dialogContext;
-
+  // If it's meant to be a singleton or used with dependency injection:
+  DialogService();
+  
+  static final DialogService _instance = DialogService._internal();
   static DialogService get instance => _instance;
-  DialogService._();
 
-  Future<void> showPriceUpdateDialog(int current, int total) async {
-    if (!NavigationService.hasContext) return;
+  DialogService._internal();
+
+  BuildContext? _dialogContext;
+  bool _isDialogVisible = false;
+  
+  // Add streams for progress and completion notifications
+  final _progressController = StreamController<double>.broadcast();
+  final _completeController = StreamController<String>.broadcast();
+  
+  // Expose streams
+  Stream<double> get progressStream => _progressController.stream;
+  Stream<String> get completeStream => _completeController.stream;
+
+  // Required to set context from main app
+  void setContext(BuildContext context) {
+    _dialogContext = context;
+  }
+
+  // Fix the showProgressDialog method to not use unsupported parameters
+  void showProgressDialog(
+    BuildContext context, {
+    required String title,
+    required String message,
+    bool showPercentage = false,
+  }) {
+    _dialogContext = context;
     
-    final context = NavigationService.currentContext!;
-    
-    // If a dialog is already showing, hide it first
+    // Dismiss any existing dialogs first
     if (_isDialogVisible) {
       hideDialog();
     }
 
     _isDialogVisible = true;
-    await showDialog(
+    
+    // Show price update dialog with supported parameters only
+    showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.transparent,
-      builder: (dialogContext) {
-        _dialogContext = dialogContext;
-        return Theme(
-          data: Theme.of(context).copyWith(
-            dialogBackgroundColor: Colors.transparent,
-          ),
-          child: PopScope(
-            canPop: false,
-            child: PriceUpdateDialog(
-              current: current,
-              total: total,
-            ),
-          ),
-        );
-      },
-    );
-    
-    _isDialogVisible = false;
-    _dialogContext = null;
+      builder: (context) => PriceUpdateDialog(
+        key: PriceUpdateDialog.dialogKey,
+        initialCurrent: 0,
+        initialTotal: 100,
+        // Remove title and message parameters as they're not supported
+      ),
+    ).then((_) {
+      _isDialogVisible = false;
+    });
   }
 
-  void hideDialog() {
-    // Find the root navigator and pop ALL dialogs
-    final context = NavigationService.currentContext;
-    if (context != null) {
-      Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+  // Notify about progress updates
+  void notifyProgress(double progressValue) {
+    _progressController.add(progressValue);
+    
+    // Update dialog if it exists
+    if (_isDialogVisible && progressValue >= 0 && progressValue <= 1) {
+      PriceUpdateDialog.updateProgress((progressValue * 100).toInt(), 100);
     }
   }
+
+  // Notify about completion
+  void notifyComplete(String message) {
+    _completeController.add(message);
+    hideDialog();
+  }
+  
+  // Fix dialog display issues
+  void showPriceUpdateDialog(int current, int total) {
+    final context = _dialogContext;
+    if (context == null) return;
+
+    // Don't show if already visible
+    if (_isDialogVisible) {
+      // Just update the existing dialog
+      PriceUpdateDialog.updateProgress(current, total);
+      return;
+    }
+
+    // Dismiss any existing dialogs first to prevent stacking
+    if (_isDialogVisible) {
+      hideDialog();
+    }
+
+    _isDialogVisible = true;
+    
+    // Show new dialog and ensure it's displayed by using showDialog directly
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => PriceUpdateDialog(
+          key: PriceUpdateDialog.dialogKey,  // CRITICAL FIX: Use the static key getter
+          initialCurrent: current,
+          initialTotal: total,
+        ),
+      ).then((_) {
+        _isDialogVisible = false;
+      });
+    });
+  }
+
+  // Improved hide dialog method
+  void hideDialog() {
+    if (!_isDialogVisible) return;
+    
+    final context = _dialogContext;
+    if (context != null) {
+      Navigator.of(context, rootNavigator: true).popUntil((route) {
+        return route.settings.name != 'dialog';
+      });
+      _isDialogVisible = false;
+    }
+  }
+
+  // Clean up resources when no longer needed
+  void dispose() {
+    _progressController.close();
+    _completeController.close();
+  }
+
+  bool get isDialogVisible => _isDialogVisible;
 
   static void showPremiumDialog(BuildContext context, {
     required String title,
@@ -184,8 +261,11 @@ class DialogService {
                     child: Text(
                       'Maybe Later',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 13,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey[400] // Lighter in dark mode
+                            : Colors.grey[800], // Much darker in light mode
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500, // Slightly bolder
                       ),
                     ),
                   ),

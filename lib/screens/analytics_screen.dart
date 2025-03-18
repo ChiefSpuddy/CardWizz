@@ -105,16 +105,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       DialogManager.instance.setContext(context);
       
-      // Try to load cached top movers from the service
-      final cachedMovers = _analyticsCacheService.getTopMovers();
-      if (cachedMovers != null && cachedMovers.isNotEmpty) {
+      // Fix: Use async and await properly
+      _loadInitialCachedTopMovers();
+    });
+    AnalyticsScreen._scrollController.addListener(_onScroll);
+  }
+
+  // Fix: Add new method to load data initially in a proper async way
+  Future<void> _loadInitialCachedTopMovers() async {
+    try {
+      final cachedMovers = await _analyticsCacheService.getTopMovers();
+      if (cachedMovers != null && cachedMovers.isNotEmpty && mounted) {
         setState(() {
           _cachedTopMovers = cachedMovers;
           _cachedTopMoversTimestamp = DateTime.now();
         });
+        LoggingService.debug('Loaded ${cachedMovers.length} top movers from cache');
       }
-    });
-    AnalyticsScreen._scrollController.addListener(_onScroll);
+    } catch (e) {
+      LoggingService.debug('Error loading initial cached top movers: $e');
+    }
   }
 
   @override
@@ -365,33 +375,149 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildValueTrendCard(List<TcgCard> cards) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).colorScheme.surface.withOpacity(0.95)
-            : Theme.of(context).colorScheme.background.withOpacity(0.95),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+  final currencyProvider = context.watch<CurrencyProvider>();
+  final storageService = Provider.of<StorageService>(context, listen: false);
+  
+  return Card(
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Portfolio Value History',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                tooltip: 'Refresh chart',
+                onPressed: () {
+                  setState(() {
+                    // Force chart refresh
+                    _portfolioChartKey = UniqueKey();
+                    _analyticsCacheService.clearPortfolioChartCache();
+                  });
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          FutureBuilder<List<(DateTime, double)>?>(
+            future: _loadPortfolioChartData(cards, storageService),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 220,
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+              
+              if (snapshot.hasError) {
+                return SizedBox(
+                  height: 220,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, 
+                             size: 40, 
+                             color: Theme.of(context).colorScheme.error),
+                        const SizedBox(height: 16),
+                        const Text('Error loading chart data'),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              
+              final chartPoints = snapshot.data ?? [];
+              
+              if (chartPoints.isEmpty) {
+                return SizedBox(
+                  height: 220,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.bar_chart,
+                             size: 40,
+                             color: Theme.of(context).colorScheme.primary.withOpacity(0.6)),
+                        const SizedBox(height: 16),
+                        const Text('No portfolio history available yet'),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Check back after updating prices',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              
+              // Cache the chart data for future use
+              if (!_chartDataCached) {
+                _analyticsCacheService.cachePortfolioChart(chartPoints);
+                _chartDataCached = true;
+              }
+              
+              // PortfolioValueChart doesn't accept direct data props
+              // It gets its data from Provider<StorageService>
+              return SizedBox(
+                height: 220,
+                key: _portfolioChartKey,
+                child: const PortfolioValueChart(),
+              );
+            }
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Provider<List<TcgCard>>.value(
-            value: cards,
-            child: const FullWidthAnalyticsChart(),
-          ),
-        ),
-      ),
-    );
+    ),
+  );
+}
+
+// Add this field at the top of the class
+bool _chartDataCached = false;
+Key _portfolioChartKey = UniqueKey();
+
+Future<List<(DateTime, double)>?> _loadPortfolioChartData(
+  List<TcgCard> cards,
+  StorageService storageService
+) async {
+  try {
+    // First try to get cached data
+    final cachedChart = await _analyticsCacheService.getPortfolioChart();
+    if (cachedChart != null && cachedChart.isNotEmpty) {
+      LoggingService.debug('Using cached portfolio chart data: ${cachedChart.length} points');
+      _chartDataCached = true;
+      return cachedChart;
+    }
+    
+    // If no cached data, calculate from storage
+    LoggingService.debug('No cached chart data, calculating from storage');
+    final points = ChartService.getPortfolioHistory(storageService, cards);
+    
+    // Cache the data for future use
+    if (points.isNotEmpty) {
+      await _analyticsCacheService.cachePortfolioChart(points);
+      _chartDataCached = true;
+    }
+    
+    return points;
+  } catch (e) {
+    LoggingService.debug('Error loading portfolio chart data: $e');
+    return null;
   }
+}
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
@@ -826,27 +952,20 @@ Widget _buildTopMovers(List<TcgCard> cards) {
   final currencyProvider = context.watch<CurrencyProvider>();
   final localizations = AppLocalizations.of(context);
   final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-  LoggingService.debug('Building top movers with ${cards.length} cards, cached: ${_cachedTopMovers?.length ?? 0}');
   
   return FutureBuilder<List<Map<String, dynamic>>>(
+    // Fix: Improve Future handling to avoid async chaining issues
     future: _isLoadingTopMovers 
-            ? (_cachedTopMovers != null 
-                ? Future.value(_cachedTopMovers!) // Only use cached data if it's not null
-                : Future.value(<Map<String, dynamic>>[]))  // Return empty list instead of null
-            : _getRecentPriceChanges(cards),
+            ? Future.value(_cachedTopMovers ?? [])  // Just use existing cached data or empty list
+            : _getRecentPriceChanges(cards),        // Normal loading path
     builder: (context, snapshot) {
-      // Determine card content based on state
       Widget cardContent;
 
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        if (_cachedTopMovers != null && _cachedTopMovers!.isNotEmpty && _isLoadingTopMovers) {
-          // Show cached content with loading overlay during updates
-          LoggingService.debug('Showing cached top movers with loading overlay');
+      if (snapshot.connectionState == ConnectionState.waiting || _isLoadingTopMovers) {
+        // Prioritize showing the cached content with loading overlay when available
+        if (_cachedTopMovers != null && _cachedTopMovers!.isNotEmpty) {
           cardContent = _buildTopMoversContent(_cachedTopMovers!, isLoading: true);
         } else {
-          // Initial loading with placeholder
-          LoggingService.debug('Showing top movers loading placeholder');
           cardContent = _buildTopMoversLoading();
         }
       }
@@ -854,13 +973,37 @@ Widget _buildTopMovers(List<TcgCard> cards) {
         LoggingService.debug('Error loading top movers: ${snapshot.error}');
         cardContent = Center(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+                Icon(Icons.error_outline, 
+                     size: 48, 
+                     color: Theme.of(context).colorScheme.error.withOpacity(0.7)),
                 const SizedBox(height: 16),
-                Text('Error: ${snapshot.error}', textAlign: TextAlign.center),
+                Text('Error loading price changes',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text('Try refreshing prices to update data',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Refresh'),
+                  onPressed: () {
+                    setState(() {
+                      _isLoadingTopMovers = true;
+                    });
+                    _getRecentPriceChanges(cards).then((value) {
+                      if (mounted) {
+                        setState(() {
+                          _isLoadingTopMovers = false;
+                        });
+                      }
+                    });
+                  },
+                ),
               ],
             ),
           ),
@@ -868,138 +1011,98 @@ Widget _buildTopMovers(List<TcgCard> cards) {
       }
       else {
         final changes = snapshot.data ?? [];
-        LoggingService.debug('Got ${changes.length} top movers from future builder');
         
         if (changes.isNotEmpty) {
           _cachedTopMovers = changes;
           _cachedTopMoversTimestamp = DateTime.now();
+          _analyticsCacheService.cacheTopMovers(changes);
         }
         
         if (changes.isEmpty) {
-          LoggingService.debug('No top movers found, showing empty state');
           cardContent = _buildEmptyTopMovers();
         } else {
-          LoggingService.debug('Showing ${changes.length} top movers');
           cardContent = _buildTopMoversContent(changes);
         }
       }
 
-      // Wrap with a card of fixed height to prevent layout shifts
+      // Wrap with a card that uses a flexible layout approach
       return Card(
-        color: isDarkMode 
-            ? Theme.of(context).colorScheme.surface 
-            : null,
-        child: SizedBox(
-          height: _topMoversCardHeight,
-          child: Stack( // Use Stack instead of Column to avoid overflow issues
-            children: [
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    localizations.translate('topMovers'),
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 52, // Adjust this value to position below the header
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: cardContent,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
-Widget _buildEmptyTopMovers() {
-  return Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.show_chart,
-          size: 48,
-          color: Theme.of(context).colorScheme.secondary.withOpacity(0.5),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'No recent price changes',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Check back after the next price update',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _buildTopMoversLoading() {
-  return ListView.builder(
-    padding: const EdgeInsets.only(bottom: 8),
-    itemCount: 5,
-    itemBuilder: (context, index) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Row(
+        color: isDarkMode ? Theme.of(context).colorScheme.surface : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Important: Use min size
           children: [
-            Container(
-              width: 28,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
+            // Header section - keep compact
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min, // Important: Use min size
                 children: [
-                  Container(
-                    height: 16,
-                    width: 120,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Top Market Movers',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // Refresh button with loading indicator
+                      _isLoadingTopMovers 
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.refresh, size: 20),
+                          tooltip: 'Refresh price changes',
+                          // Use the correct method reference here
+                          onPressed: () => _refreshTopMovers(cards),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Container(
-                    height: 14,
-                    width: 80,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(2),
+                  
+                  // Make description more compact
+                  Text(
+                    'Cards with significant recent price changes',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12, // Smaller font
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  
+                  // Make timestamp optional and smaller
+                  if (_cachedTopMoversTimestamp != null)
+                    Text(
+                      'Updated: ${_formatDateTime(_cachedTopMoversTimestamp!)}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        fontSize: 11, // Even smaller
+                      ),
+                    ),
                 ],
               ),
             ),
-            Container(
-              height: 28,
-              width: 70,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant,
-                borderRadius: BorderRadius.circular(14),
-              ),
+            
+            // Divider
+            Divider(height: 1, thickness: 1, color: Theme.of(context).dividerColor.withOpacity(0.3)),
+            
+            // Use LimitedBox instead of ConstrainedBox to avoid overflow
+            LimitedBox(
+              maxHeight: 250, // Lower maximum height
+              child: cardContent,
             ),
           ],
         ),
@@ -1008,83 +1111,223 @@ Widget _buildTopMoversLoading() {
   );
 }
 
+// Add a new helper method to refresh top movers with proper state management
+void _refreshTopMovers(List<TcgCard> cards) {
+  // Prevent multiple simultaneous refreshes
+  if (_isLoadingTopMovers) return;
+  
+  setState(() {
+    _isLoadingTopMovers = true;
+  });
+
+  bool isCompleted = false;
+  
+  // Add timeout to prevent infinite loading
+  Timer(const Duration(seconds: 15), () {
+    if (!isCompleted && mounted) {
+      setState(() {
+        _isLoadingTopMovers = false;
+      });
+      LoggingService.debug('Top movers refresh timed out');
+    }
+  });
+
+  _getRecentPriceChanges(cards).then((results) {
+    isCompleted = true;
+    if (mounted) {
+      setState(() {
+        _isLoadingTopMovers = false;
+        if (results.isNotEmpty) {
+          _cachedTopMovers = results;
+          _cachedTopMoversTimestamp = DateTime.now();
+          _analyticsCacheService.cacheTopMovers(results);
+        }
+      });
+    }
+  }).catchError((error) {
+    isCompleted = true;
+    if (mounted) {
+      setState(() {
+        _isLoadingTopMovers = false;
+      });
+      LoggingService.debug('Error refreshing top movers: $error');
+    }
+  });
+}
+
+// Completely rewrite the loading UI to show a clearer loading state
+Widget _buildTopMoversLoading() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Column(
+      children: [
+        // Skeleton loading UI for better user experience
+        for (int i = 0; i < 4; i++)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            child: Row(
+              children: [
+                // Card image placeholder
+                Container(
+                  height: 40,
+                  width: 28,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                
+                // Card details placeholder
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 16,
+                        width: 120,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 12,
+                        width: 80,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Price change indicator placeholder
+                Container(
+                  height: 22,
+                  width: 60,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+        // Add a clear loading indicator at the bottom
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: Column(
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Analyzing market data...',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Fix the content builder to use shrinkWrap and limited items
 Widget _buildTopMoversContent(List<Map<String, dynamic>> changes, {bool isLoading = false}) {
   final currencyProvider = context.watch<CurrencyProvider>();
+  
+  // Limit the number of items we show to prevent overflow
+  final limitedChanges = changes.length > 3 ? changes.sublist(0, 3) : changes;
   
   return Stack(
     key: ValueKey('top_movers_content_$isLoading'),
     children: [
       ListView.builder(
-        padding: const EdgeInsets.only(bottom: 8),
-        itemCount: changes.length,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        shrinkWrap: true,  // Important: Shrink to content size
+        physics: const NeverScrollableScrollPhysics(), // Prevent scrolling
+        itemCount: limitedChanges.length,
         itemBuilder: (context, index) {
-          final item = changes[index];
-          final card = item['card'] as TcgCard;
-          final change = item['change'] as double;
-          final period = item['period'];
-          final changeAmount = item['changeAmount'] as double?;
+          final change = limitedChanges[index];
+          final TcgCard card = change['card'] as TcgCard;
+          final double changePercent = change['change'] as double;
+          final period = change['period'];
+          final isPositive = changePercent >= 0;
           
-          return InkWell(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CardDetailsScreen(
-                  card: card,
-                  heroContext: 'mover_${card.id}',
+          return ListTile(
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: _buildCardImage(card.imageUrl),
+            ),
+            title: Text(
+              card.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              '${card.setName ?? "Unknown Set"} ${card.number != null ? '- #${card.number}' : ''}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            trailing: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  card.price != null
+                      ? currencyProvider.formatValue(card.price!)
+                      : '-',
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 28,
-                    child: Hero(
-                      tag: 'mover_${card.id}',
-                      child: _buildCardImage(card.imageUrl ?? ''),
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (isPositive
+                            ? Colors.green
+                            : Colors.red)
+                        .withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${isPositive ? '+' : ''}${changePercent.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isPositive ? Colors.green : Colors.red,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          card.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        Text(
-                          currencyProvider.formatValue(card.price ?? 0),
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _buildChangeIndicator(change, changeAmount, currencyProvider),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatPricePeriod(period),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
+            onTap: () => _navigateToCardDetails(context, card),
           );
         },
       ),
       
+      // Loading overlay
       if (isLoading)
         Positioned.fill(
           child: Container(
@@ -1093,15 +1336,24 @@ Widget _buildTopMoversContent(List<Map<String, dynamic>> changes, {bool isLoadin
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                  SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Updating price changes...',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    'Updating market data...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onBackground,
+                    ),
                   ),
                 ],
               ),
@@ -1110,193 +1362,6 @@ Widget _buildTopMoversContent(List<Map<String, dynamic>> changes, {bool isLoadin
         ),
     ],
   );
-}
-
-Future<List<Map<String, dynamic>>> _getRecentPriceChanges(List<TcgCard> cards) async {
-  try {
-    // Safely access cached data with null check
-    final now = DateTime.now();
-    if (_cachedTopMovers != null && 
-        _cachedTopMovers!.isNotEmpty &&
-        _cachedTopMoversTimestamp != null && 
-        now.difference(_cachedTopMoversTimestamp!) < const Duration(minutes: 5)) {
-      LoggingService.debug('Using cached top movers data from $_cachedTopMoversTimestamp');
-      if (_isLoadingTopMovers) {
-        return _cachedTopMovers!;
-      }
-    }
-    
-    LoggingService.debug('Analyzing ${cards.length} cards for recent price changes');
-    
-    final cardsWithChanges = <Map<String, dynamic>>[];
-    
-    // Count how many cards have price history for debugging
-    int cardsWithHistory = 0;
-    
-    for (final card in cards) {
-      // Check if card has price history
-      if (card.priceHistory.isNotEmpty && card.price != null) {
-        cardsWithHistory++;
-        
-        // Try to find the most recent price change
-        double? percentChange;
-        double? changeAmount;
-        String period = '';
-        
-        // First check if there's a direct price change record
-        if (card.previousPrice != null && card.previousPrice! > 0) {
-          percentChange = ((card.price! - card.previousPrice!) / card.previousPrice!) * 100;
-          changeAmount = card.price! - card.previousPrice!;
-          period = 'Last update';
-        }
-        // Otherwise check historical price points
-        else {
-          // Look for price changes in different time periods
-          final periods = [
-            {'1d': const Duration(days: 1)},
-            {'7d': const Duration(days: 7)},
-            {'30d': const Duration(days: 30)},
-          ];
-          
-          for (final p in periods) {
-            final key = p.keys.first;
-            final duration = p.values.first;
-            
-            // Find historical price point
-            final historyPoint = card.priceHistory.where(
-              (entry) => now.difference(entry.timestamp) <= duration && 
-                        now.difference(entry.timestamp) > Duration.zero
-            ).toList();
-            
-            if (historyPoint.isNotEmpty) {
-              // Sort by timestamp to get the closest match
-              historyPoint.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-              final oldPrice = historyPoint.first.price;
-              
-              // Calculate percent change if we have valid prices
-              if (oldPrice > 0 && card.price! > 0) {
-                percentChange = ((card.price! - oldPrice) / oldPrice) * 100;
-                changeAmount = card.price! - oldPrice;
-                period = key;
-                break; // Use the first valid change we find
-              }
-            }
-          }
-        }
-        
-        // Add card to result if we found a price change (using a lower threshold of 0.1%)
-        if (percentChange != null && percentChange.abs() >= 0.1) {
-          cardsWithChanges.add({
-            'card': card,
-            'change': percentChange,
-            'changeAmount': changeAmount,
-            'period': period,
-          });
-        }
-      }
-    }
-    
-    LoggingService.debug('Found ${cardsWithChanges.length} cards with price changes');
-    
-    // Sort by absolute percentage change (largest first)
-    cardsWithChanges.sort((a, b) => 
-      (b['change'] as double).abs().compareTo((a['change'] as double).abs()));
-    
-    // Take the top movers (up to 10)
-    final topMovers = cardsWithChanges.take(10).toList();
-    
-    // Store result in cache
-    if (topMovers.isNotEmpty) {
-      _cachedTopMovers = topMovers;
-      _cachedTopMoversTimestamp = now;
-      _analyticsCacheService.cacheTopMovers(topMovers);
-    }
-    
-    return topMovers;
-  } catch (e) {
-    LoggingService.debug('Error calculating price changes: $e');
-    
-    // Try to use cached data if available
-    if (_cachedTopMovers != null && _cachedTopMovers!.isNotEmpty) {
-      return _cachedTopMovers!;
-    }
-    
-    // Return an empty list if no data available
-    return [];
-  }
-}
-
-Future<void> _refreshPrices() async {
-  if (!mounted || _isRefreshing) return;
-  setState(() => _isRefreshing = true);
-  
-  // Only clear caches after we've saved a reference to them
-  final previousCachedTopMovers = _cachedTopMovers;
-  
-  try {
-    final storage = Provider.of<StorageService>(context, listen: false);
-    await storage.initializeBackgroundService();
-    final service = storage.backgroundService;
-    if (service == null) throw Exception('Failed to initialize background service');
-
-    setState(() {
-      _isLoadingTopMovers = true;
-    });
-
-    _progressSubscription?.cancel();
-    _completeSubscription?.cancel();
-
-    _progressSubscription = storage.priceUpdateProgress
-        .distinct()
-        .listen((progress) {
-          final (current, total) = progress;
-          if (mounted) {
-            DialogService.instance.showPriceUpdateDialog(current, total);
-          }
-        });
-
-    _completeSubscription = storage.priceUpdateComplete
-        .listen((_) {
-          if (mounted) {
-            // Now we can safely clear the caches
-            _analyticsCacheService.clearTopMoversCache();
-            _cachedTopMovers = null;
-            _cachedTopMoversTimestamp = null;
-            
-            setState(() {
-              _isRefreshing = false;
-              _isLoadingTopMovers = false;
-              _updateLastRefreshTime();
-            });
-            
-            final cards = storage.getCards().then((cards) {
-              if (cards.isNotEmpty && mounted) {
-                if (!_isLoadingMarketData) {
-                  _loadMarketData(cards);
-                }
-              }
-            });
-          }
-        });
-
-    await service.refreshPrices();
-  } catch (e) {
-    LoggingService.debug('Error refreshing prices: $e');
-    DialogService.instance.hideDialog();
-    
-    // Restore previous cached data on error
-    _cachedTopMovers = previousCachedTopMovers;
-    
-    if (mounted) {
-      setState(() {
-        _isRefreshing = false;
-        _isLoadingTopMovers = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating prices: $e')),
-      );
-    }
-  }
 }
 
   Widget _buildEmptyState() {
@@ -1511,13 +1576,18 @@ Future<void> _refreshPrices() async {
   Future<void> _loadMarketData(List<TcgCard> cards) async {
     if (_isLoadingMarketData) return;
     
-    final cachedData = _analyticsCacheService.getMarketInsights();
-    if (cachedData != null) {
-      setState(() {
-        _marketOpportunities = cachedData;
-        _isLoadingMarketData = false;
-      });
-      return;
+    try {
+      // Fix to properly await the Future result
+      final cachedData = await _analyticsCacheService.getMarketInsights();
+      if (cachedData != null) {
+        setState(() {
+          _marketOpportunities = cachedData;
+          _isLoadingMarketData = false;
+        });
+        return;
+      }
+    } catch (e) {
+      LoggingService.debug('Error loading cached market data: $e');
     }
     
     setState(() {
@@ -2259,7 +2329,9 @@ Future<void> _refreshPrices() async {
 
   Widget _buildChangeIndicator(double change, double? changeAmount, CurrencyProvider currencyProvider) {
   final isPositive = change >= 0;
-  final amountText = changeAmount != null ? '${isPositive ? '+' : ''}${currencyProvider.formatValue(changeAmount)}' : '';
+  final amountText = changeAmount != null 
+      ? '${isPositive ? '+' : ''}${currencyProvider.formatValue(changeAmount)}' 
+      : '';
   
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -2488,11 +2560,13 @@ Future<void> _showPremiumDialog(BuildContext context) async {
     final colorScheme = Theme.of(context).colorScheme;
     
     return Card(
-      clipBehavior: Clip.antiAlias,
+      clipBehavior: Clip.antiAlias, // Essential for proper overlay clipping
       child: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
+          // Container with fixed size for layout stability
+          Container(
+            height: 350, // Fixed height
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2509,17 +2583,21 @@ Future<void> _showPremiumDialog(BuildContext context) async {
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 220,
+                
+                // Only show chart if premium, but maintain layout with Expanded placeholder
+                Expanded(
                   child: purchaseService.isPremium
-                    ? RarityDistributionChart(cards: cards)  // Updated to use 'cards' parameter
-                    : Container(), // Empty container when premium check is shown
+                    ? Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: RarityDistributionChart(cards: cards)
+                      )
+                    : const SizedBox.expand(), // Empty placeholder with same size
                 ),
               ],
             ),
           ),
-          // Show premium overlay if not premium
+          
+          // Premium overlay that completely covers the card when not premium
           if (!purchaseService.isPremium)
             Positioned.fill(
               child: _buildPremiumOverlay(context, purchaseService),
@@ -2573,10 +2651,380 @@ Future<void> _showPremiumDialog(BuildContext context) async {
       ),
     );
   }
+
+  Future<List<Map<String, dynamic>>> _getRecentPriceChanges(List<TcgCard> cards) async {
+  if (_isLoadingTopMovers && _cachedTopMovers != null) {
+    return _cachedTopMovers!;
+  }
+
+  try {
+    LoggingService.debug('Analyzing price changes for ${cards.length} cards');
+    
+    // Get cards with price history
+    final cardsWithHistory = cards.where((card) => 
+      card.priceHistory != null && 
+      card.priceHistory!.isNotEmpty && 
+      card.price != null
+    ).toList();
+    
+    if (cardsWithHistory.isEmpty) {
+      LoggingService.debug('No cards with price history found');
+      return [];
+    }
+
+    // Calculate price changes
+    final results = <Map<String, dynamic>>[];
+    int processedCards = 0;
+    
+    // Process cards in small batches to avoid hanging the UI
+    final batchSize = 10; 
+    for (int i = 0; i < cardsWithHistory.length; i += batchSize) {
+      final endIndex = (i + batchSize < cardsWithHistory.length) ? i + batchSize : cardsWithHistory.length;
+      final batch = cardsWithHistory.sublist(i, endIndex);
+      
+      for (final card in batch) {
+        try {
+          final history = card.priceHistory;
+          if (history == null || history.isEmpty) continue;
+          
+          // Skip cards with too few price points
+          if (history.length < 2) continue;
+          
+          // Find the oldest price within the last week
+          final now = DateTime.now();
+          final oneWeekAgo = now.subtract(const Duration(days: 7));
+          
+          DateTime oldestTime = now;
+          double? oldPrice;
+          String period = '';
+          
+          // Find the oldest price entry in the last week
+          for (final entry in history) {
+            try {
+              final timestamp = entry.timestamp;
+              if (timestamp.isAfter(oneWeekAgo) && timestamp.isBefore(oldestTime)) {
+                oldestTime = timestamp;
+                oldPrice = entry.price;
+                
+                // Determine the period
+                final days = now.difference(timestamp).inDays;
+                period = days < 1 ? '24h' : '${days}d';
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+          
+          // Get new price
+          final newPrice = card.price;
+          
+          // Calculate change percentage
+          if (oldPrice != null && newPrice != null && oldPrice > 0) {
+            final changePercent = ((newPrice - oldPrice) / oldPrice) * 100;
+            
+            // Only include significant changes (more than 3%)
+            if (changePercent.abs() >= 3.0) {
+              results.add({
+                'card': card,
+                'change': changePercent,
+                'period': period,
+                'oldPrice': oldPrice,
+                'newPrice': newPrice,
+              });
+            }
+          }
+          
+          processedCards++;
+          
+        } catch (e) {
+          LoggingService.debug('Error calculating price change for card: $e');
+          continue;
+        }
+      }
+      
+      // Add a small yield to prevent UI freezing
+      await Future.delayed(Duration.zero);
+    }
+    
+    // Sort by absolute change percentage (descending)
+    results.sort((a, b) => (b['change'] as double).abs().compareTo((a['change'] as double).abs()));
+    
+    // Merge with existing data if there are less than 10 results
+    List<Map<String, dynamic>> finalResults = [];
+    
+    if (_cachedTopMovers != null && results.length < 10) {
+      // Filter out cards from cached movers that are already in new results
+      final existingCardIds = results.map((m) => (m['card'] as TcgCard).id).toSet();
+      final filteredCachedMovers = _cachedTopMovers!.where(
+        (m) => !existingCardIds.contains((m['card'] as TcgCard).id)
+      ).toList();
+      
+      // Combine and pick top 10
+      finalResults = [...results, ...filteredCachedMovers];
+      finalResults.sort((a, b) => (b['change'] as double).abs().compareTo((a['change'] as double).abs()));
+      finalResults = finalResults.take(10).toList();
+    } else {
+      // Just take top 10 from new results
+      finalResults = results.take(10).toList();
+    }
+    
+    LoggingService.debug('Found ${finalResults.length} top movers');
+    return finalResults;
+    
+  } catch (e) {
+    LoggingService.debug('Error in _getRecentPriceChanges: $e');
+    // Return cached data if available on error
+    return _cachedTopMovers ?? [];
+  }
 }
 
+  Widget _buildEmptyTopMovers() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.trending_flat,
+              size: 56,
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No Price Changes Yet',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Update prices regularly to track market movements for your cards',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.refresh),
+              label: const Text('Update Prices'),
+              onPressed: () => _refreshPrices(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopMoversContentDetailed(List<Map<String, dynamic>> changes, {bool isLoading = false}) {
+  final currencyProvider = context.watch<CurrencyProvider>();
+  
+  return Stack(
+    key: ValueKey('top_movers_content_$isLoading'),
+    children: [
+      // Use a more flexible approach for the list with constraints
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: ListView.builder(
+          shrinkWrap: true, // Important: Adapt to available space
+          physics: const NeverScrollableScrollPhysics(), // Prevents scrolling inside card
+          itemCount: changes.length > 4 ? 4 : changes.length, // Limit to max 4 items
+          itemBuilder: (context, index) {
+            final change = changes[index];
+            final TcgCard card = change['card'] as TcgCard;
+            final double changePercent = change['change'] as double;
+            final period = change['period'];
+            final isPositive = changePercent >= 0;
+            
+            return ListTile(
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: _buildCardImage(card.imageUrl),
+              ),
+              title: Text(
+                card.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+              subtitle: Text(
+                '${card.setName ?? "Unknown Set"} ${card.number != null ? '- #${card.number}' : ''}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              trailing: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    card.price != null
+                        ? currencyProvider.formatValue(card.price!)
+                        : '-',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: (isPositive
+                              ? Colors.green
+                              : Colors.red)
+                          .withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${isPositive ? '+' : ''}${changePercent.toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isPositive ? Colors.green : Colors.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              onTap: () => _navigateToCardDetails(context, card),
+            );
+          },
+        ),
+      ),
+      
+      // Loading overlay
+      if (isLoading)
+        Positioned.fill(
+          child: Container(
+            color: Theme.of(context).colorScheme.background.withOpacity(0.7),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Updating market data...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onBackground,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+void _navigateToCardDetails(BuildContext context, TcgCard card) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => CardDetailsScreen(
+        card: card,
+        heroContext: 'analytics_${card.id}',
+      ),
+    ),
+  );
+}
+
+Future<void> _refreshPrices() async {
+  if (_isRefreshing) return;
+  
+  setState(() {
+    _isRefreshing = true;
+  });
+
+  try {
+    final storage = Provider.of<StorageService>(context, listen: false);
+    final dialogService = DialogService.instance;
+    
+    // Set up a dialog manually instead of using showProgressDialog
+    _dialogContext = context;
+    _isDialogVisible = true;
+    
+    // Show price update dialog using the existing method from DialogManager
+    DialogManager.instance.showPriceUpdateDialog(0, 100);
+
+    // Create manual streams for progress and completion tracking
+    final progressController = StreamController<double>.broadcast();
+    final completeController = StreamController<String>.broadcast();
+    
+    // Subscribe to the manual streams
+    _progressSubscription = progressController.stream.listen((progress) {
+      // Update the dialog with progress information
+      PriceUpdateDialog.updateProgress((progress * 100).toInt(), 100);
+    });
+    
+    _completeSubscription = completeController.stream.listen((message) {
+      // Hide dialog when complete
+      if (_isDialogVisible) {
+        DialogManager.instance.hideDialog();
+        _isDialogVisible = false;
+      }
+      
+      _updateLastRefreshTime();
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+          // Clear cache to force refresh
+          _cachedTopMovers = null;
+          _cachedTopMoversTimestamp = null;
+        });
+      }
+    });
+
+    // Start the price update
+    await storage.backgroundService?.refreshPrices();
+    
+    // Complete the process
+    completeController.add("Complete");
+    
+    // Cleanup
+    await progressController.close();
+    await completeController.close();
+    
+  } catch (e) {
+    LoggingService.debug('Error refreshing prices: $e');
+    
+    // Close any open dialogs
+    if (_isDialogVisible && _dialogContext != null) {
+      DialogManager.instance.hideDialog();
+      _isDialogVisible = false;
+    }
+    
+    if (mounted) {
+      setState(() {
+        _isRefreshing = false;
+      });
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update prices: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
+} // <- Add this closing brace for _AnalyticsScreenState class
+
 class FullWidthAnalyticsChart extends StatelessWidget {
-  const FullWidthAnalyticsChart({Key? key}) : super(key: key);
+  const FullWidthAnalyticsChart({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -2598,7 +3046,7 @@ class FullWidthAnalyticsChart extends StatelessWidget {
 }
 
 String _formatPricePeriod(dynamic period) {
-  if (period == null) return '';
+  if (period == null) return 'Last 24h';
   
   if (period is MapEntry) {
     return period.key.toString();
@@ -2611,6 +3059,6 @@ String _formatPricePeriod(dynamic period) {
   
   if (period is String) return period;
   
-  return 'Last 24h';
+  return 'Last 24h'; // Default value to ensure non-null return
 }
 

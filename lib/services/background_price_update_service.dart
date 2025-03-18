@@ -184,4 +184,15 @@ class BackgroundPriceUpdateService {
       DialogManager.instance.hideDialog();
     }
   }
+
+  Future<void> updateAllPrices() async {
+    // Implementation for updating all prices
+    await refreshPrices(); // Use the existing refreshPrices method instead
+  }
+
+  // Add the missing updatePricesForAllCards method
+  Future<void> updatePricesForAllCards() async {
+    // This is just a wrapper around the refreshPrices method
+    await refreshPrices();
+  }
 }

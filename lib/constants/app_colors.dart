@@ -136,8 +136,30 @@ class AppColors {
     );
   }
   
+  // Create a method for status bar style that will be called from multiple places
+  static SystemUiOverlayStyle getStatusBarStyle(bool isDarkMode) {
+    return isDarkMode 
+        ? const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light,    // White icons for dark mode
+            statusBarBrightness: Brightness.dark,         // Dark status bar for iOS
+            systemNavigationBarColor: Colors.transparent, // Optional: transparent nav bar
+            systemNavigationBarIconBrightness: Brightness.light,
+          )
+        : const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,     // Black icons for light mode
+            statusBarBrightness: Brightness.light,        // Light status bar for iOS
+            systemNavigationBarColor: Colors.transparent, // Optional: transparent nav bar
+            systemNavigationBarIconBrightness: Brightness.dark,
+          );
+  }
+
   // Helper method to get ThemeData
   static ThemeData getThemeData(bool isDarkMode) {
+    // Apply status bar style immediately when theme is created
+    SystemChrome.setSystemUIOverlayStyle(getStatusBarStyle(isDarkMode));
+    
     if (isDarkMode) {
       return ThemeData.dark().copyWith(
         primaryColor: darkAccentPrimary,

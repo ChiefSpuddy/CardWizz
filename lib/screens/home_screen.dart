@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/services.dart'; // Add this import
 import '../widgets/app_drawer.dart';
 import '../providers/app_state.dart';
 import '../widgets/sign_in_view.dart';
@@ -42,8 +43,36 @@ class HomeScreenState extends State<HomeScreen> {
     super.initState();
     _selectedIndex = widget.initialTabIndex;
     HomeScreen._scrollController.addListener(_onScroll);
+
+    // Force black status bar text on light theme immediately
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateStatusBarIconsForCurrentTheme();
+    });
   }
-  
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Update status bar when dependencies (like theme) change
+    _updateStatusBarIconsForCurrentTheme();
+  }
+
+  // Simple helper to set appropriate status bar icons
+  void _updateStatusBarIconsForCurrentTheme() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        // IMPORTANT: Transparent status bar
+        statusBarColor: Colors.transparent,
+        // IMPORTANT: This controls text color - dark = black text
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        // For iOS
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+      ),
+    );
+  }
+
   void setSelectedIndex(int index) {
     // Find the parent RootNavigator state and call its method directly
     final rootNavigatorState = context.findAncestorStateOfType<RootNavigatorState>();
@@ -186,6 +215,9 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Enforce correct status bar color on every build
+    _updateStatusBarIconsForCurrentTheme();
+
     // Check authentication status before building HomeScreen
     final appState = Provider.of<AppState>(context);
     final isSignedIn = appState.isAuthenticated;
