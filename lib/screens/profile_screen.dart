@@ -105,21 +105,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         await context.read<AppState>().updateAvatar(avatarPath);
         
         if (context.mounted) {
-          NotificationManager.success(
-            context,
-            title: 'Profile updated',
-            message: 'Your profile picture has been changed successfully',
-            icon: Icons.check,
-          );
+          _showSuccessNotification('Your profile picture has been changed successfully');
         }
       } catch (e) {
         if (context.mounted) {
-          NotificationManager.error(
-            context,
-            title: 'Error',
-            message: 'Could not update avatar',
-            icon: Icons.error,
-          );
+          _showErrorNotification('Could not update avatar');
         }
       }
     }
@@ -210,21 +200,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         await context.read<AppState>().updateUsername(newUsername);
         
         if (context.mounted) {
-          NotificationManager.success(
-            context,
-            title: 'Profile updated',
-            message: 'Your username has been changed successfully',
-            icon: Icons.check,
-          );
+          _showSuccessNotification('Your username has been changed successfully');
         }
       } catch (e) {
         if (context.mounted) {
-          NotificationManager.error(
-            context,
-            title: 'Error',
-            message: 'Could not update username',
-            icon: Icons.error,
-          );
+          _showErrorNotification('Could not update username');
         }
       }
     }
@@ -283,12 +263,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         }
       } catch (e) {
         if (mounted) {
-          NotificationManager.error(
-            context,
-            title: 'Error',
-            message: 'Could not delete account',
-            icon: Icons.error,
-          );
+          _showErrorNotification('Could not delete account');
         }
       }
     }
@@ -1333,20 +1308,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       if (context.mounted) {
         if (purchaseSucceeded || isPremiumNow) {
           // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Subscription successful! Enjoy all premium features!'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          _showSuccessNotification('Subscription successful! Enjoy all premium features!');
         } else {
           // Show already subscribed message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('You are already subscribed to premium.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          _showSuccessNotification('You are already subscribed to premium.');
         }
       }
     } catch (e) {
@@ -1354,12 +1319,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       if (context.mounted) Navigator.of(context).pop(); // Close loading dialog
       
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not process subscription. Please try again later.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showErrorNotification('Could not process subscription. Please try again later.');
       }
     }
   }
@@ -1778,16 +1738,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           await collections.permanentlyDeleteUserData(appState.currentUser!.id);
           
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Collection data cleared successfully')),
-            );
+            _showSuccessNotification('Collection data cleared successfully');
           }
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error clearing data: $e')),
-          );
+          _showErrorNotification('Error clearing data: $e');
         }
       }
     }
@@ -1946,6 +1902,24 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
         ],
       ),
+    );
+  }
+
+  void _showSuccessNotification(String message) {
+    // Always show notifications at the bottom above the navigation bar
+    NotificationManager.success(
+      context,
+      message: message,
+      position: NotificationPosition.bottom,
+    );
+  }
+  
+  void _showErrorNotification(String message) {
+    // Always show error notifications at the bottom
+    NotificationManager.error(
+      context,
+      message: message,
+      position: NotificationPosition.bottom,
     );
   }
 
