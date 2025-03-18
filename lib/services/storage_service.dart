@@ -1106,4 +1106,23 @@ class StorageService {
       return [];
     }
   }
+
+  // Get a stream of cards specific to a user
+  Stream<List<TcgCard>> watchUserCards(String userId) {
+    if (userId.isEmpty) {
+      return Stream.value([]);
+    }
+    
+    // In our storage architecture, cards are already filtered by user via the storage keys
+    // So we just need to return all cards if this is the current user
+    if (userId == _currentUserId) {
+      final cards = _getCards();
+      // Return a stream that emits the current cards followed by any updates
+      return _cardsController.stream.startWith(cards);
+    } else {
+      // If asking for a different user's cards, we can't access them in this storage model
+      LoggingService.debug('Attempted to watch cards for user $userId but current user is $_currentUserId');
+      return Stream.value([]);
+    }
+  }
 }

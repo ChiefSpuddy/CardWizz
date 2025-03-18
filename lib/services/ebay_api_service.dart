@@ -1323,4 +1323,45 @@ class EbayApiService {
       },
     ];
   }
+
+  /// Get cached market price for a card if available
+  /// Returns null if no cached price is available
+  double? getCachedMarketPrice(String? cardName, String? setName) {
+    if (cardName == null || cardName.isEmpty) return null;
+    
+    try {
+      // Create a normalized key for the price cache
+      final cacheKey = _createCacheKey(cardName, setName);
+      
+      // Check if we have a cached market price
+      if (_marketPriceCache.containsKey(cacheKey)) {
+        final cachedData = _marketPriceCache[cacheKey];
+        // Only use cached data if it's still valid (less than 24 hours old)
+        final cacheTimestamp = cachedData?['timestamp'] as DateTime?;
+        final cacheAge = cacheTimestamp != null 
+            ? DateTime.now().difference(cacheTimestamp) 
+            : const Duration(days: 1);
+            
+        if (cacheAge.inHours < 24) {
+          return cachedData?['price'] as double?;
+        }
+      }
+      
+      // If we get here, we don't have a valid cached price
+      return null;
+    } catch (e) {
+      LoggingService.debug('Error getting cached market price: $e');
+      return null;
+    }
+  }
+  
+  /// Create a normalized cache key for price lookups
+  String _createCacheKey(String cardName, String? setName) {
+    final normalizedName = cardName.toLowerCase().trim();
+    final normalizedSet = setName?.toLowerCase().trim() ?? '';
+    return '$normalizedName|$normalizedSet';
+  }
+
+  // You may need to add this field if it doesn't exist yet
+  final Map<String, Map<String, dynamic>> _marketPriceCache = {};
 }

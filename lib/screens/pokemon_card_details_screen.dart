@@ -401,23 +401,52 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
     );
   }
 
-  // Helper methods for opening marketplace links
+  // Helper methods for opening marketplace links - improved with better search parameters
   Future<void> _openCardmarket(TcgCard card) async {
-    final query = Uri.encodeComponent(card.name);
-    final setQuery = card.setName != null ? Uri.encodeComponent(card.setName!) : '';
+    // Construct a more precise search query
+    final cardName = Uri.encodeComponent(card.name);
+    final setName = card.setName != null ? Uri.encodeComponent(card.setName!) : '';
+    final setNumber = card.number != null ? card.number! : '';
     
-    // Build a more specific URL with both card name and set if available
-    final url = card.setName != null && card.setName!.isNotEmpty 
-        ? 'https://www.cardmarket.com/en/Pokemon/Products/Singles/${setQuery}/${query}'
-        : 'https://www.cardmarket.com/en/Pokemon/Products/Singles?searchString=$query';
-        
+    // Build a URL that includes card name, set name, and number when available
+    String url;
+    
+    if (setNumber.isNotEmpty && setName.isNotEmpty) {
+      // Most specific search with set name and number
+      url = 'https://www.cardmarket.com/en/Pokemon/Products/Singles/${setName}/${cardName}?idExpansion=&idRarity=&searchString=${cardName}+${setNumber}';
+    } else if (setName.isNotEmpty) {
+      // Search by name and set
+      url = 'https://www.cardmarket.com/en/Pokemon/Products/Singles/${setName}?searchString=${cardName}';
+    } else {
+      // Generic search by name only
+      url = 'https://www.cardmarket.com/en/Pokemon/Products/Singles?searchString=${cardName}';
+    }
+    
     await _launchUrl(url);
   }
 
   Future<void> _openEbay(TcgCard card) async {
-    final query = Uri.encodeComponent('${card.name} pokemon card');
-    final url = Uri.parse('https://www.ebay.com/sch/i.html?_nkw=$query');
-    await _launchUrl(url.toString());
+    // Build a more precise eBay search query
+    String searchQuery = '${card.name} pokemon card';
+    
+    // Add set information and number if available
+    if (card.setName != null && card.number != null) {
+      searchQuery += ' ${card.setName} ${card.number}';
+    } else if (card.setName != null) {
+      searchQuery += ' ${card.setName}';
+    } else if (card.number != null) {
+      searchQuery += ' ${card.number}';
+    }
+    
+    // Add additional relevant keywords
+    if (card.rarity != null && card.rarity!.toLowerCase().contains('holo')) {
+      searchQuery += ' holo';
+    }
+    
+    final encodedQuery = Uri.encodeComponent(searchQuery);
+    final url = 'https://www.ebay.com/sch/i.html?_nkw=${encodedQuery}&_sacat=183454'; // 183454 is Pokemon TCG category
+    
+    await _launchUrl(url);
   }
 
   // Replace all _launchUrl implementations with this single flexible version
