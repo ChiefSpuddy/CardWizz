@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../../utils/image_utils.dart';
+import 'package:provider/provider.dart';
+import '../../providers/currency_provider.dart';
 
 class SetSearchGrid extends StatelessWidget {
   final List<dynamic> sets;
-  final Function(String) onSetSelected;
-  final Function(String) onSetQuerySelected;
+  final void Function(String) onSetSelected;
+  final void Function(String) onSetQuerySelected;
 
   const SetSearchGrid({
     Key? key,
@@ -16,75 +16,79 @@ class SetSearchGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 1.5,
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-        ),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final set = sets[index];
-            final String name = set['name'] ?? 'Unknown Set';
-            final String code = set['id'] ?? '';
-            final String logoUrl = set['images']?['symbol'] ?? '';
-            
-            return Card(
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 10.0,
+        crossAxisSpacing: 10.0,
+        childAspectRatio: 1.0,
+      ),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final set = sets[index];
+          final name = set['name'];
+          final logo = set['logo'];
+          final symbol = set['symbol'];
+          final query = set['query'] ?? 'set.id:${set['id']}';
+
+          return InkWell(
+            onTap: () {
+              onSetSelected(name);
+              onSetQuerySelected(query);
+            },
+            child: Card(
               clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: InkWell(
-                onTap: () {
-                  onSetSelected(name);
-                  onSetQuerySelected('set.id:$code');
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (logoUrl.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Image.network(
-                            logoUrl,
-                            height: 40,
-                            errorBuilder: (_, __, ___) => Icon(
-                              Icons.image_not_supported,
-                              size: 40,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
+              elevation: 2.0,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (logo != null)
+                      Expanded(
+                        child: Image.network(
+                          logo,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return symbol != null
+                                ? Image.network(
+                                    symbol,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        const Icon(Icons.image_not_supported, size: 40),
+                                  )
+                                : const Icon(Icons.image_not_supported, size: 40);
+                          },
                         ),
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                      )
+                    else if (symbol != null)
+                      Expanded(
+                        child: Image.network(
+                          symbol,
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(Icons.image_not_supported, size: 40),
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      )
+                    else
+                      const Expanded(
+                        child: Icon(Icons.style, size: 40),
                       ),
-                      if (code.isNotEmpty)
-                        Text(
-                          code,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                        ),
-                    ],
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
               ),
-            );
-          },
-          childCount: sets.length,
-        ),
+            ),
+          );
+        },
+        childCount: sets.length,
       ),
     );
   }

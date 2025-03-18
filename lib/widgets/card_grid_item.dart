@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/tcg_card.dart';
+import '../providers/currency_provider.dart';
 
 class CardGridItem extends StatelessWidget {
   final TcgCard card;
@@ -27,7 +29,10 @@ class CardGridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final theme = Theme.of(context);
-    final cardBorderRadius = BorderRadius.circular(6); // Reduced border radius for more image space
+    final cardBorderRadius = BorderRadius.circular(6);
+    
+    // Get the currency provider for proper formatting
+    final currencyProvider = Provider.of<CurrencyProvider>(context);
 
     return GestureDetector(
       onTap: () => onCardTap(card),
@@ -92,7 +97,7 @@ class CardGridItem extends StatelessWidget {
 
                 // Info section - more compact with number and price
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), // Reduced vertical padding
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                   color: isDarkMode ? Colors.black45 : Colors.white,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,7 +110,7 @@ class CardGridItem extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 10, // Reduced for more compactness
+                            fontSize: 10,
                             fontWeight: FontWeight.w500,
                             color: isDarkMode ? Colors.white : Colors.black87,
                           ),
@@ -127,24 +132,14 @@ class CardGridItem extends StatelessWidget {
                                 ),
                               ),
                             
-                            // Price with currency symbol
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.attach_money,
-                                  size: 10,
-                                  color: Colors.green.shade700,
-                                ),
-                                Text(
-                                  card.price!.toStringAsFixed(2),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green.shade700,
-                                  ),
-                                ),
-                              ],
+                            // Price with proper currency formatting
+                            Text(
+                              currencyProvider.formatValue(card.price!),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700,
+                              ),
                             ),
                           ],
                         ),

@@ -31,6 +31,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get the currency provider for proper price conversion
+    final currencyProvider = Provider.of<CurrencyProvider>(context);
+    
     return Scaffold(
       appBar: AppBar(
         title: Text("Results for '${widget.searchTerm}'"),
@@ -50,7 +53,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 scrollable: false, // Critical - non-scrollable when inside SingleChildScrollView
                 crossAxisCount: 3, // Show more cards per row
                 childAspectRatio: 0.72, // Adjusted for better proportions
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10), // Consistent padding
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10), // Better padding
+                currencySymbol: currencyProvider.symbol, // Pass currency symbol
               ),
             ),
     );
