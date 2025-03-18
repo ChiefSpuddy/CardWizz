@@ -4,6 +4,7 @@ import 'dart:async';
 enum NotificationPosition {
   top,
   bottom,
+  center
 }
 
 class NotificationManager {
@@ -167,7 +168,9 @@ class NotificationManager {
             child: Align(
               alignment: position == NotificationPosition.top 
                   ? Alignment.topCenter 
-                  : Alignment.bottomCenter,
+                  : position == NotificationPosition.bottom
+                      ? Alignment.bottomCenter
+                      : Alignment.center,
               child: TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0.0, end: 1.0),
                 duration: const Duration(milliseconds: 300),

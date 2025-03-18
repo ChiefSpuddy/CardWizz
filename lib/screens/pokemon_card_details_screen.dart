@@ -263,6 +263,92 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
     );
   }
 
+  // Add a beautiful Cardmarket specific button
+  Widget _buildCardmarketButton() {
+    return GestureDetector(
+      onTap: () => _openCardmarket(widget.card),
+      child: Container(
+        margin: const EdgeInsets.only(top: 16, bottom: 8),
+        height: 56,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF0277BD), Color(0xFF01579B)], // Cardmarket blue gradient
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0277BD).withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _openCardmarket(widget.card),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Cardmarket logo or icon
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.storefront_outlined,
+                        color: Color(0xFF0277BD),
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'View on Cardmarket',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Check current prices and offers',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white70,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // Method for styled gradient buttons
   Widget _buildGradientMarketButton(
     String text, 
@@ -318,8 +404,14 @@ class _PokemonCardDetailsScreenState extends BaseCardDetailsScreenState<PokemonC
   // Helper methods for opening marketplace links
   Future<void> _openCardmarket(TcgCard card) async {
     final query = Uri.encodeComponent(card.name);
-    final url = Uri.parse('https://www.cardmarket.com/en/Pokemon/Products/Singles?searchString=$query');
-    await _launchUrl(url.toString());
+    final setQuery = card.setName != null ? Uri.encodeComponent(card.setName!) : '';
+    
+    // Build a more specific URL with both card name and set if available
+    final url = card.setName != null && card.setName!.isNotEmpty 
+        ? 'https://www.cardmarket.com/en/Pokemon/Products/Singles/${setQuery}/${query}'
+        : 'https://www.cardmarket.com/en/Pokemon/Products/Singles?searchString=$query';
+        
+    await _launchUrl(url);
   }
 
   Future<void> _openEbay(TcgCard card) async {
