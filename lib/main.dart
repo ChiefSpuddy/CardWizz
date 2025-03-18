@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'routes.dart';
 import 'providers/app_state.dart';
 import 'services/storage_service.dart';
@@ -39,102 +40,212 @@ import 'screens/collections_screen.dart';
 import 'services/firebase_service.dart';
 import 'screens/profile_screen.dart';
 import 'screens/analytics_screen.dart';
-import 'services/logging_service.dart'; // Add this import for LoggingService
+import 'services/logging_service.dart'; 
 
-// The simplest possible main function
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // Initialize shared preferences
-  final prefs = await SharedPreferences.getInstance();
-  
-  // Start with just the loading screen
-  runApp(const SimpleLoadingApp());
-  
-  // Initialize the actual app behind the scenes
-  _initializeAppInBackground(prefs);
+  try {
+    // Initialize Flutter binding
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    // CRITICAL FIX: Initialize Firebase first, synchronously
+    await Firebase.initializeApp();
+    LoggingService.debug('Firebase initialized successfully');
+    
+    // Set up NavigationService
+    NavigationService.navigatorKey = GlobalKey<NavigatorState>();
+    
+    // Create a simple loading screen key - don't use static properties
+    final loadingScreenKey = GlobalKey<_SimpleLoadingAppState>();
+    
+    // Initialize SharedPreferences - this is critical
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Start with loading screen
+    runApp(SimpleLoadingApp(key: loadingScreenKey));
+    
+    // Continue initialization in background
+    _initializeApp(prefs, loadingScreenKey);
+  } catch (e, stack) {
+    // Last resort exception handling
+    debugPrint('Error during app startup: $e');
+    debugPrint(stack.toString());
+    
+    // Fall back to a very simple app with error message
+    runApp(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  'Failed to start app',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text('Error: $e', textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                const Text('Please restart the app', textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-// A clean, separate function to handle initialization with transition
-Future<void> _initializeAppInBackground(SharedPreferences prefs) async {
+// More reliable initialization function
+Future<void> _initializeApp(
+  SharedPreferences prefs, 
+  GlobalKey<_SimpleLoadingAppState> loadingScreenKey
+) async {
   try {
-    // Shorter initial delay
-    await Future.delayed(const Duration(milliseconds: 300));
+    // Brief delay to allow loading screen to render
+    await Future.delayed(const Duration(milliseconds: 200));
     
-    // Initialize Firebase first
-    await FirebaseService.initialize();
-    
-    // Initialize services
+    // Initialize core services directly (no parallel for simplicity)
     final storageService = await StorageService.init(null);
     final authService = AuthService();
     await authService.initialize();
     
-    // Prepare other services
-    final tcgApiService = TcgApiService();
-    final collectionService = await CollectionService.getInstance();
-    final scannerService = ScannerService();
-    final purchaseService = PurchaseService();
-    await purchaseService.initialize();
-    final ebayApiService = EbayApiService();
-    final ebaySearchService = EbaySearchService();
-    
-    // Initialize providers
+    // Create core providers
     final appState = AppState(storageService, authService);
     final themeProvider = ThemeProvider();
     final currencyProvider = CurrencyProvider();
     final sortProvider = SortProvider();
     
-    // Create the full app widget for transition
+    // CRITICAL FIX: Initialize PurchaseService during main initialization
+    final purchaseService = PurchaseService();
+    await purchaseService.initialize();
+    
+    // CRITICAL FIX: Make PremiumService available globally
+    final premiumService = await PremiumService.initialize(purchaseService, prefs);
+    
+    // CRITICAL FIX: Initialize CollectionService directly instead of using FutureProvider
+    final collectionService = await CollectionService.getInstance();
+    
+    // Signal loading screen that initialization is complete
+    try {
+      final loadingState = loadingScreenKey.currentState;
+      if (loadingState != null) {
+        loadingState.signalInitComplete();
+      }
+    } catch (e) {
+      LoggingService.debug('Non-critical error signaling loading screen: $e');
+    }
+    
+    // Create remaining services immediately
+    final tcgApiService = TcgApiService();
+    final scannerService = ScannerService();
+    final ebayApiService = EbayApiService();
+    final ebaySearchService = EbaySearchService();
+    
+    // Set up the full MultiProvider for the app
     final fullApp = MultiProvider(
       providers: [
-        ListenableProvider<PurchaseService>.value(value: purchaseService),
-        ListenableProvider<EbaySearchService>.value(value: ebaySearchService),
         Provider<StorageService>.value(value: storageService),
         Provider<AuthService>.value(value: authService),
-        Provider<TcgApiService>.value(value: tcgApiService),
-        Provider<CollectionService>.value(value: collectionService),
-        ChangeNotifierProvider<ScannerService>.value(value: scannerService),
-        Provider<EbayApiService>.value(value: ebayApiService),
         ChangeNotifierProvider<AppState>.value(value: appState),
         ChangeNotifierProvider<ThemeProvider>.value(value: themeProvider),
         ChangeNotifierProvider<CurrencyProvider>.value(value: currencyProvider),
         ChangeNotifierProvider<SortProvider>.value(value: sortProvider),
-        ChangeNotifierProvider<PurchaseService>(
-          create: (context) => PurchaseService(),
-        ),
-        ChangeNotifierProxyProvider<PurchaseService, PremiumService>(
-          create: (context) => PremiumService(
-            Provider.of<PurchaseService>(context, listen: false),
-            prefs,
-          ),
-          update: (context, purchaseService, previous) => 
-            previous ?? PremiumService(purchaseService, prefs),
-        ),
+        ChangeNotifierProvider<PurchaseService>.value(value: purchaseService),
+        // CRITICAL FIX: Use ChangeNotifierProvider for PremiumService to ensure updates propagate
+        ChangeNotifierProvider<PremiumService>.value(value: premiumService),
+        Provider<CollectionService>.value(value: collectionService),
+        Provider<TcgApiService>.value(value: tcgApiService),
+        ChangeNotifierProvider<ScannerService>.value(value: scannerService),
+        Provider<EbayApiService>.value(value: ebayApiService),
+        ChangeNotifierProvider<EbaySearchService>.value(value: ebaySearchService),
       ],
-      child: Builder(
-        builder: (context) {
-          // Add a post-frame callback to check auth state once app is built
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            final appState = Provider.of<AppState>(context, listen: false);
-            LoggingService.debug('App started with auth state: isAuthenticated=${appState.isAuthenticated}');
-            if (appState.isAuthenticated && appState.currentUser != null) {
-              LoggingService.debug('User is authenticated: ${appState.currentUser?.id}');
-            }
-          });
-          return const MyApp();
-        },
-      ),
+      child: const MyApp(),
     );
     
-    // Run the full app with a beautiful transition
-    runApp(AppTransition(child: fullApp));
+    // Run the app with transition
+    runApp(AppTransition(child: MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: fullApp,
+    )));
+    
+    // No need to initialize background services again - we already have them
+    LoggingService.debug('App initialization completed successfully');
     
   } catch (e, stack) {
-    debugPrint('Error during initialization: $e');
-    debugPrint(stack.toString());
+    LoggingService.debug('Error during initialization: $e');
+    LoggingService.debug(stack.toString());
+    
+    // Show a meaningful error screen
+    runApp(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'CardWizz',
+        theme: ThemeData.light(),
+        darkTheme: ThemeData.dark(),
+        themeMode: ThemeMode.system,
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  'Error Loading App',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    e.toString(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Please restart the application', textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
-// Simple app that ONLY shows the loading screen with animated progress
+// Move background task initialization to a separate function
+Future<void> _initializeBackgroundTasks(
+  SharedPreferences prefs, 
+  {PurchaseService? purchaseService,
+  PremiumService? premiumService}
+) async {
+  try {
+    // Initialize purchase service if not provided
+    if (purchaseService == null) {
+      purchaseService = PurchaseService();
+      await purchaseService.initialize();
+    }
+    
+    // Don't create a new PremiumService if one is already provided
+    if (premiumService == null) {
+      // Initialize premium service using the static factory method
+      final newPremiumService = await PremiumService.initialize(purchaseService, prefs);
+      LoggingService.debug('Created new PremiumService instance in background');
+    } else {
+      LoggingService.debug('Using existing PremiumService instance');
+    }
+    
+    LoggingService.debug('Background services initialized successfully');
+  } catch (e) {
+    LoggingService.debug('Non-critical error initializing background services: $e');
+  }
+}
+
+// Simple app that shows loading screen with animated progress
 class SimpleLoadingApp extends StatefulWidget {
   const SimpleLoadingApp({Key? key}) : super(key: key);
 
@@ -146,11 +257,12 @@ class _SimpleLoadingAppState extends State<SimpleLoadingApp> {
   double _simulatedProgress = 0.0;
   String _loadingMessage = 'Starting CardWizz...';
   late Timer _progressTimer;
+  bool _initCompleted = false;
   final List<String> _loadingMessages = [
     'Starting CardWizz...',
     'Loading resources...',
     'Getting things ready...',
-    'Finalizing...',  // Reduced number of messages for faster loading
+    'Finalizing...',
   ];
   int _messageIndex = 0;
 
@@ -161,21 +273,25 @@ class _SimpleLoadingAppState extends State<SimpleLoadingApp> {
   }
 
   void _startProgressSimulation() {
-    // Update progress every 50ms instead of 80ms for faster animation
     _progressTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      if (_simulatedProgress < 0.95) {
+      if (_simulatedProgress < 1.0) {
         setState(() {
-          // Increase increments for faster progress
-          double increment = 0.015;  // Was 0.01
+          // Progress increments
+          double increment = 0.015;
           if (_simulatedProgress > 0.7) {
-            increment = 0.01;  // Was 0.005
+            increment = 0.01;
           } else if (_simulatedProgress < 0.2) {
-            increment = 0.025;  // Was 0.015
+            increment = 0.025;
           }
           
-          _simulatedProgress += increment;
+          // Speed up when initialization is done
+          if (_initCompleted && _simulatedProgress > 0.95) {
+            increment = 0.05;
+          }
           
-          // Update messages more frequently (every 15 ticks instead of 25)
+          _simulatedProgress = (_simulatedProgress + increment).clamp(0.0, 1.0);
+          
+          // Update messages
           if (_simulatedProgress > 0.2 && 
               _simulatedProgress < 0.9 && 
               timer.tick % 15 == 0 && 
@@ -183,9 +299,18 @@ class _SimpleLoadingAppState extends State<SimpleLoadingApp> {
             _messageIndex++;
             _loadingMessage = _loadingMessages[_messageIndex];
           }
+          
+          // Complete the timer when done
+          if (_simulatedProgress >= 0.999) {
+            timer.cancel();
+          }
         });
       }
     });
+  }
+
+  void signalInitComplete() {
+    setState(() => _initCompleted = true);
   }
 
   @override
@@ -202,194 +327,19 @@ class _SimpleLoadingAppState extends State<SimpleLoadingApp> {
         colorScheme: ColorScheme.light(
           primary: Colors.blue.shade700,
           secondary: Colors.lightBlue,
-          surface: Colors.white,
-          background: Colors.white,
         ),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.dark(
           primary: Colors.blue.shade300,
           secondary: Colors.lightBlue,
-          surface: const Color(0xFF121212),
-          background: const Color(0xFF121212),
         ),
       ),
-      // Use system brightness to match the device theme
       themeMode: ThemeMode.system,
       home: LoadingScreen(
         progress: _simulatedProgress,
         message: _loadingMessage,
       ),
-    );
-  }
-}
-
-// The rest of your code...
-
-// Debug wrapper to catch early startup issues
-class AppStartupDebugWrapper extends StatefulWidget {
-  const AppStartupDebugWrapper({Key? key}) : super(key: key);
-
-  @override
-  State<AppStartupDebugWrapper> createState() => _AppStartupDebugWrapperState();
-}
-
-class _AppStartupDebugWrapperState extends State<AppStartupDebugWrapper> {
-  bool _isLoading = true;
-  String _status = 'Starting app...';
-  Object? _error;
-  
-  @override
-  void initState() {
-    super.initState();
-    _initializeApp();
-  }
-  
-  Future<void> _initializeApp() async {
-    try {
-      setState(() => _status = 'Initializing services...');
-      
-      // Initialize any required services here
-      // For example: await Firebase.initializeApp();
-      
-      setState(() => _status = 'Starting app...');
-      
-      // Wait a moment to ensure logs are visible
-      await Future.delayed(const Duration(seconds: 1));
-      
-      setState(() => _isLoading = false);
-    } catch (e) {
-      setState(() {
-        _error = e;
-        _status = 'Error during initialization';
-      });
-      debugPrint('Error during app initialization: $e');
-    }
-  }
-  
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      // Show simple loading screen
-      return MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 24),
-                Text(_status),
-                if (_error != null) ...[
-                  const SizedBox(height: 16),
-                  Text('Error: $_error', 
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                ]
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-    
-    // Launch your actual app
-    return YourActualApp();
-  }
-}
-
-// Replace this with your actual app
-class YourActualApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    // Return your actual MyApp widget here
-    return MyApp();
-  }
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // Get providers
-    final appState = Provider.of<AppState>(context);
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    
-    // Ensure proper status bar visibility based on current theme
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      SystemChrome.setSystemUIOverlayStyle(
-        themeProvider.isDarkMode
-            ? SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent)
-            : SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
-      );
-    });
-    
-    return MaterialApp(
-      title: 'CardWizz',
-      debugShowCheckedModeBanner: false,
-      theme: themeProvider.currentThemeData.copyWith(brightness: Brightness.light),
-      darkTheme: themeProvider.currentThemeData.copyWith(brightness: Brightness.dark),
-      themeMode: themeProvider.themeMode,
-      navigatorKey: NavigationService.navigatorKey,
-      locale: appState.locale,
-      supportedLocales: AppState.supportedLocales,
-      localizationsDelegates: const [
-        AppLocalizationsDelegate(),
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const RootNavigator(),
-        '/search': (context) => const RootNavigator(initialTab: 2),
-        '/card': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-          final card = args?['card'] as TcgCard?;
-          if (card == null) {
-            return const SearchScreen();
-          }
-          return CardDetailsScreen(
-            card: card,
-            heroContext: args?['heroContext'] ?? 'search',
-          );
-        },
-        // Add an explicit route for card-details
-        '/card-details': (context) {
-          final card = ModalRoute.of(context)?.settings.arguments as TcgCard;
-          LoggingService.debug('Direct card-details route activated for: ${card.name}');
-          return CardDetailsScreen(
-            card: card,
-            heroContext: 'direct',
-          );
-        },
-        '/add-to-collection': (context) => AddToCollectionScreen(
-          card: ModalRoute.of(context)!.settings.arguments as TcgCard,
-        ),
-        '/home': (context) => const HomeScreen(),
-        '/scanner': (context) => const ScannerScreen(),
-        '/collection': (context) => const CollectionsScreen(showEmptyState: true),
-        '/profile': (context) => const ProfileScreen(), 
-        '/analytics': (context) => const AnalyticsScreen(), // Add the analytics route
-      },
-      onGenerateRoute: (settings) {
-        if (settings.name == '/card-details') {
-          return MaterialPageRoute(
-            builder: (context) => CardDetailsScreen(
-              card: settings.arguments as TcgCard,
-            ),
-          );
-        } else if (settings.name == '/add-to-collection') {
-          return MaterialPageRoute(
-            builder: (context) => AddToCollectionScreen(
-              card: settings.arguments as TcgCard,
-            ),
-          );
-        }
-        return null;
-      },
     );
   }
 }
@@ -459,6 +409,59 @@ class _AppTransitionState extends State<AppTransition> with SingleTickerProvider
             child: widget.child,
           ),
         );
+      },
+    );
+  }
+}
+
+// Simple NavigationService that doesn't need initialization
+class NavigationService {
+  // Use a direct global key instead of a static reference
+  static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+}
+
+// MyApp as before
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = Provider.of<AppState>(context, listen: true);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    
+    // Ensure proper status bar visibility based on current theme
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SystemChrome.setSystemUIOverlayStyle(
+        themeProvider.isDarkMode
+            ? SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent)
+            : SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
+      );
+    });
+    
+    return MaterialApp(
+      title: 'CardWizz',
+      debugShowCheckedModeBanner: false,
+      theme: themeProvider.currentThemeData.copyWith(brightness: Brightness.light),
+      darkTheme: themeProvider.currentThemeData.copyWith(brightness: Brightness.dark),
+      themeMode: themeProvider.themeMode,
+      navigatorKey: NavigationService.navigatorKey,
+      locale: appState.locale,
+      supportedLocales: AppState.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizationsDelegate(),
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const RootNavigator(),
+        '/search': (context) => const RootNavigator(initialTab: 2),
+        // ...existing routes...
+      },
+      onGenerateRoute: (settings) {
+        // ...existing onGenerateRoute logic...
+        return null;
       },
     );
   }

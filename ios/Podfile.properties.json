@@ -1,0 +1,4 @@
+{
+  "ios.minDeploymentTarget": "13.0",
+  "firebase.ios.minimumTarget": "12.0"
+}

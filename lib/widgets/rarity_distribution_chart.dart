@@ -1,297 +1,189 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:collection/collection.dart';
-import 'dart:math' as math;
 import '../models/tcg_card.dart';
+import 'dart:math' as math;
 
-class RarityDistributionChart extends StatefulWidget {
+class RarityDistributionChart extends StatelessWidget {
   final List<TcgCard> cards;
-
+  
   const RarityDistributionChart({
     Key? key,
     required this.cards,
   }) : super(key: key);
-
-  @override
-  State<RarityDistributionChart> createState() => _RarityDistributionChartState();
-}
-
-class _RarityDistributionChartState extends State<RarityDistributionChart> {
-  int touchedIndex = -1;
-
+  
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Calculate rarity distribution
-    final rarityMap = _getRarityDistribution();
-
-    // If there's no rarity data, show empty state
-    if (rarityMap.isEmpty) {
-      return _buildEmptyState(context);
+    // Get distribution data
+    final distribution = _calculateRarityDistribution();
+    
+    // If no data, show empty state
+    if (distribution.isEmpty) {
+      return const Center(
+        child: Text('No rarity data available'),
+      );
     }
-
-    // Create sorted list of rarity types
-    final rarityData = rarityMap.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    // Color map for common rarities
-    final rarityColors = {
-      'Common': Colors.grey.shade500,
-      'Uncommon': Colors.green.shade500,
-      'Rare': Colors.blue.shade500,
-      'Rare Holo': Colors.purple.shade500,
-      'Ultra Rare': Colors.orange.shade500,
-      'Secret Rare': Colors.red.shade500,
-      'Rare Ultra': Colors.pink.shade500,
-      'Promo': Colors.amber.shade500,
-      'Rainbow Rare': Colors.deepPurple.shade500,
-      'Hyper Rare': Colors.deepOrange.shade500,
-      'Amazing Rare': Colors.indigo.shade500,
-    };
-
-    // Calculate total for percentages
-    final total = rarityMap.values.fold<int>(0, (sum, val) => sum + val);
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+    
+    // Use LayoutBuilder to ensure we respect our parent's constraints
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate available height after subtracting space for title and legend
+        final availableHeight = constraints.maxHeight - 60;
+        
+        // Make sure we have at least some space for the chart
+        final chartHeight = math.max(100, availableHeight);
+        
+        return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Chart title
             Text(
               'Rarity Distribution',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            Text(
-              'Breakdown of card rarities in your collection',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            AspectRatio(
-              aspectRatio: 1.5,
+            
+            // Main chart with fixed height - CRITICAL FIX
+            // FIX: Convert chartHeight from num to double
+            SizedBox(
+              height: chartHeight.toDouble(),
               child: PieChart(
                 PieChartData(
+                  sections: _buildPieSections(distribution),
+                  centerSpaceRadius: 30,
                   sectionsSpace: 2,
-                  centerSpaceRadius: 35,
-                  sections: rarityData.take(8).mapIndexed((index, entry) {
-                    final rarity = entry.key;
-                    final count = entry.value;
-                    final percent = (count / total * 100).toStringAsFixed(1);
-
-                    return PieChartSectionData(
-                      value: count.toDouble(),
-                      title: '$percent%',
-                      radius: 80,
-                      titleStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black54,
-                            blurRadius: 3,
-                          ),
-                        ],
-                      ),
-                      color: rarityColors[rarity] ??
-                        Color.fromARGB(
-                          255,
-                          150 + (index * 20) % 105,
-                          100 + (index * 30) % 155,
-                          200 - (index * 25) % 100,
-                        ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Column(
-              children: rarityData.take(8).mapIndexed((index, entry) {
-                final rarity = entry.key;
-                final count = entry.value;
-                final color = rarityColors[rarity] ??
-                  Color.fromARGB(
-                    255,
-                    150 + (index * 20) % 105,
-                    100 + (index * 30) % 155,
-                    200 - (index * 25) % 100,
-                  );
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          rarity,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '$count cards',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-            if (rarityData.length > 8) ...[
-              Center(
-                child: Text(
-                  '+ ${rarityData.length - 8} more rarity types',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  pieTouchData: PieTouchData(
+                    touchCallback: (event, response) {
+                      // Optional touch handling
+                    },
                   ),
                 ),
               ),
-            ],
-            const SizedBox(height: 16),
-            _buildRarityInsights(context, rarityData, total),
+            ),
+            
+            // Legend - using Wrap for flexible layout
+            Flexible(
+              fit: FlexFit.loose,
+              child: Wrap(
+                spacing: 16,
+                runSpacing: 8,
+                children: distribution.entries
+                    .map((entry) => _buildLegendItem(
+                          context, 
+                          entry.key, 
+                          entry.value, 
+                          _getRarityColor(entry.key),
+                          cards.length,
+                        ))
+                    .toList(),
+              ),
+            ),
           ],
-        ),
-      ),
+        );
+      }
     );
   }
-
-  Widget _buildRarityInsights(
-    BuildContext context,
-    List<MapEntry<String, int>> rarityData,
-    int total,
-  ) {
-    final mostCommonRarity = rarityData.first;
-    final mostCommonPercent = (mostCommonRarity.value / total * 100).toStringAsFixed(1);
-
-    final rarityCount = rarityData.length;
-    final rareCardCount = rarityData
-      .where((e) => !['Common', 'Uncommon', 'Energy'].contains(e.key))
-      .fold<int>(0, (sum, e) => sum + e.value);
-    final rareCardPercent = (rareCardCount / total * 100).toStringAsFixed(1);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  
+  // Calculate rarity distribution
+  Map<String, int> _calculateRarityDistribution() {
+    final Map<String, int> distribution = {};
+    
+    for (final card in cards) {
+      final rarity = card.rarity ?? 'Unknown';
+      distribution[rarity] = (distribution[rarity] ?? 0) + 1;
+    }
+    
+    // Sort by count (descending)
+    final sortedMap = Map.fromEntries(
+      distribution.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value))
+    );
+    
+    return sortedMap;
+  }
+  
+  // Build pie chart sections
+  List<PieChartSectionData> _buildPieSections(Map<String, int> distribution) {
+    final total = cards.length;
+    final colors = _getColorScheme();
+    
+    return distribution.entries.map((entry) {
+      final percent = entry.value / total * 100;
+      final index = distribution.keys.toList().indexOf(entry.key);
+      final color = colors[index % colors.length];
+      
+      return PieChartSectionData(
+        color: color,
+        value: entry.value.toDouble(),
+        title: '${percent.toStringAsFixed(0)}%',
+        radius: 80,
+        titleStyle: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      );
+    }).toList();
+  }
+  
+  // Build legend items
+  Widget _buildLegendItem(BuildContext context, String rarity, int count, Color color, int total) {
+    final percent = count / total * 100;
+    
+    return SizedBox(
+      width: 130,  // Fixed width to ensure consistent layout
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.diamond_outlined,
-                size: 16,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Rarity Insights',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface,
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  rarity,
+                  style: const TextStyle(fontSize: 11),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Most common: ${mostCommonRarity.key} ($mostCommonPercent%)',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Rare cards: $rareCardCount ($rareCardPercent% of collection)',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Rarity types: $rarityCount different rarities',
-            style: Theme.of(context).textTheme.bodyMedium,
+                Text(
+                  '$count (${percent.toStringAsFixed(1)}%)',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              'Rarity Distribution',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Icon(
-              Icons.diamond_outlined,
-              size: 48,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No rarity data available',
-              style: Theme.of(context).textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add cards with rarity information to see distribution',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
+  
+  // Get color scheme for chart
+  List<Color> _getColorScheme() {
+    return [
+      const Color(0xFF4CAF50),  // Green
+      const Color(0xFF2196F3),  // Blue
+      const Color(0xFFFFA726),  // Orange
+      const Color(0xFFE91E63),  // Pink
+      const Color(0xFF9C27B0),  // Purple
+      const Color(0xFF00BCD4),  // Cyan
+      const Color(0xFFFF5722),  // Deep Orange
+      const Color(0xFF607D8B),  // Blue Grey
+    ];
   }
-
-  Map<String, int> _getRarityDistribution() {
-    final rarityMap = <String, int>{};
-
-    for (final card in widget.cards) {
-      if (card.rarity != null && card.rarity!.isNotEmpty) {
-        final rarity = card.rarity!;
-        rarityMap[rarity] = (rarityMap[rarity] ?? 0) + 1;
-      }
-    }
-
-    return rarityMap;
+  
+  // Get color for specific rarity
+  Color _getRarityColor(String rarity) {
+    final index = _calculateRarityDistribution().keys.toList().indexOf(rarity);
+    return _getColorScheme()[index % _getColorScheme().length];
   }
 }
