@@ -30,6 +30,7 @@ class StorageService {
   String? _currentUserId;
   final Map<String, TcgCard> _cardCache = {};
   (String, TcgCard)? _lastRemovedCard;
+  List<TcgCard>? _cachedCards; // Add this missing field
 
   // Add these controllers
   final _priceUpdateController = StreamController<(int, int)>.broadcast();
@@ -250,9 +251,10 @@ class StorageService {
       if (cardsJson != null) {
         try {
           final List<dynamic> decoded = jsonDecode(cardsJson);
-          return decoded
+          _cachedCards = decoded
               .map((item) => TcgCard.fromJson(item as Map<String, dynamic>))
               .toList();
+          return _cachedCards!;
         } catch (e) {
           AppLogger.e('Error decoding cards JSON', tag: 'Storage', error: e);
         }
@@ -261,6 +263,7 @@ class StorageService {
       AppLogger.e('Error loading cards', tag: 'Storage', error: e);
     }
     
+    _cachedCards = [];
     return [];
   }
 
@@ -1084,6 +1087,23 @@ class StorageService {
       debugPrint('State refreshed with ${cards.length} cards');
     } catch (e) {
       debugPrint('Error refreshing state: $e');
+    }
+  }
+
+  /// Gets cards synchronously from local storage without waiting for async operations
+  /// Returns cached cards or empty list if none are available
+  List<TcgCard> getCardsSync() {
+    try {
+      // Return the cached cards if available
+      if (_cachedCards != null) {
+        return _cachedCards!;
+      }
+      
+      // If no cached cards, try to load them synchronously
+      return _getCards();
+    } catch (e) {
+      debugPrint('Error in getCardsSync: $e');
+      return [];
     }
   }
 }
