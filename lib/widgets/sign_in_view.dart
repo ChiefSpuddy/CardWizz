@@ -1066,52 +1066,6 @@ class _SignInViewState extends State<SignInView> with TickerProviderStateMixin {
                 ),
               ),
             ),
-            
-            // Add a debug button below 
-            if (_contentController.value > 0.7) // Only show when animation completed
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton.icon(
-                      icon: const Icon(Icons.bug_report, size: 16),
-                      label: const Text('Debug Sign-In', style: TextStyle(fontSize: 12)),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      onPressed: _handleDebugDirectSignIn,
-                    ),
-                    if (_isLoading)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Text(
-                          '($_debugStepInfo)',
-                          style: const TextStyle(fontSize: 10, color: Colors.grey),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            
-            // Add a native testing option for iOS
-            if (Theme.of(context).platform == TargetPlatform.iOS && _contentController.value > 0.7)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton.icon(
-                      icon: const Icon(Icons.phone_iphone, size: 14),
-                      label: const Text('Test iOS Native', style: TextStyle(fontSize: 12)),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      onPressed: _testNativeGoogleSignIn,
-                    ),
-                  ],
-                ),
-              ),
           ],
         );
       },
