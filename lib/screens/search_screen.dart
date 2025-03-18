@@ -38,6 +38,7 @@ import '../providers/theme_provider.dart';
 import '../widgets/search/card_skeleton_grid.dart';
 import '../widgets/standard_app_bar.dart';
 import '../widgets/app_drawer.dart';
+import '../utils/keyboard_utils.dart'; // Add this import for DismissKeyboardOnTap
 import 'package:rxdart/rxdart.dart';
 import 'dart:math' as math;
 import '../models/tcg_set.dart' as models;
@@ -1341,174 +1342,176 @@ class _SearchScreenState extends State<SearchScreen> {
     final isSignedIn = context.watch<AppState>().isAuthenticated;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return Scaffold(
-      key: _scaffoldKey,
-      drawer: const AppDrawer(),
-      // Replace the StandardAppBar with our SearchAppBar
-      appBar: SearchAppBar(
-        searchController: _searchController,
-        onSearchChanged: _onSearchChanged,
-        onClearSearch: _clearSearch,
-        currentSort: _currentSort,
-        sortAscending: _sortAscending,
-        onSortOptionsPressed: _showSortOptions,
-        hasResults: _searchResults != null || _setResults != null,
-        searchMode: _searchMode,
-        onSearchModeChanged: (modes) {
-          setState(() {
-            _searchMode = modes.first;
-            _clearSearch();
-          });
-        },
-        onCameraPressed: _onCameraPressed,
-      ),
-      body: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          // Back to categories button when showing results
-          if (_searchResults != null || _setResults != null)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 8.0, top: 8.0),
-                child: TextButton.icon(
-                  onPressed: _handleBackToCategories,
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Back to Categories'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).primaryColor,
-                  ),
-                ),
-              ),
-            ),
-            
-          // Content sections
-          if (_searchResults == null && _setResults == null && !_isLoading) ...[
-            // Categories header
-            SliverToBoxAdapter(
-              child: SearchCategoriesHeader(
-                showCategories: _showCategories,
-                onToggleCategories: () => setState(() => _showCategories = !_showCategories),
-              ),
-            ),
-            
-            // Categories grid when expanded
-            if (_showCategories)
-              SliverToBoxAdapter(
-                child: SearchCategories(
-                  searchMode: _searchMode,
-                  onQuickSearch: _performQuickSearch,
-                ),
-              ),
-            
-            // Recent searches
-            SliverToBoxAdapter(
-              child: RecentSearches(
-                searchHistory: _searchHistory,
-                onSearchSelected: _onRecentSearchSelected,
-                onClearHistory: () {
-                  _searchHistory?.clearHistory();
-                  setState(() {});
-                },
-                isLoading: _isHistoryLoading,
-              ),
-            ),
-            
-          ] else if (_isLoading && _searchResults == null && _setResults == null) ...[
-            // Loading state
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: SliverToBoxAdapter(
-                child: Text(
-                  _currentSetName != null
-                      ? 'Loading cards from $_currentSetName...'
-                      : 'Searching for "${_searchController.text}"...',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            ),
-            
-            // Skeleton loading grid
-            CardSkeletonGrid(
-              itemCount: 12,
-              setName: _currentSetName,
-            ),
-            
-          ] else ...[
-            // Results count header
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: SliverToBoxAdapter(
-                child: Text(
-                  _searchMode == SearchMode.mtg
-                      ? (_searchResults == null || _searchResults!.isEmpty ? 'Found 0 cards' : 'Found $_totalCards cards')
-                      : (_searchMode == SearchMode.eng) && _setResults != null
-                          ? 'Found ${_setResults?.length ?? 0} sets'
-                          : 'Found $_totalCards cards',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            ),
-            
-            // Results grid - cards or sets
-            if (_searchResults != null && _searchMode == SearchMode.mtg)
-              CardGridSliver(
-                cards: _searchResults!.cast<TcgCard>(),
-                onCardTap: (card) {
-                  CardDetailsRouter.navigateToCardDetails(context, card, heroContext: 'search');
-                },
-                preventNavigationOnQuickAdd: true,
-                showPrice: true,
-                showName: true,
-                heroContext: 'search',
-                crossAxisCount: 3,
-              )
-            else if (_searchMode == SearchMode.eng && _searchResults != null)
-              CardGridSliver(
-                cards: _searchResults!.cast<TcgCard>(),
-                onCardTap: (card) {
-                  CardDetailsRouter.navigateToCardDetails(context, card, heroContext: 'search');
-                },
-                preventNavigationOnQuickAdd: true,
-                showPrice: true,
-                showName: true,
-                heroContext: 'search',
-                crossAxisCount: 3,
-              )
-            else if (_setResults != null)
-              SetSearchGrid(
-                sets: _setResults!,
-                onSetSelected: (name) {
-                  _searchController.text = name;
-                },
-                onSetQuerySelected: (query) {
-                  _performSearch(query);
-                },
-              ),
-            
-            // Pagination controls
-            if (_hasMorePages && !_isLoadingMore)
+    return DismissKeyboardOnTap( // Wrap the Scaffold with this widget
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawer: const AppDrawer(),
+        // Replace the StandardAppBar with our SearchAppBar
+        appBar: SearchAppBar(
+          searchController: _searchController,
+          onSearchChanged: _onSearchChanged,
+          onClearSearch: _clearSearch,
+          currentSort: _currentSort,
+          sortAscending: _sortAscending,
+          onSortOptionsPressed: _showSortOptions,
+          hasResults: _searchResults != null || _setResults != null,
+          searchMode: _searchMode,
+          onSearchModeChanged: (modes) {
+            setState(() {
+              _searchMode = modes.first;
+              _clearSearch();
+            });
+          },
+          onCameraPressed: _onCameraPressed,
+        ),
+        body: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            // Back to categories button when showing results
+            if (_searchResults != null || _setResults != null)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: FilledButton.icon(
-                    onPressed: _loadNextPage,
-                    icon: const Icon(Icons.expand_more),
-                    label: const Text('Load More'),
+                  padding: const EdgeInsets.only(left: 8.0, top: 8.0),
+                  child: TextButton.icon(
+                    onPressed: _handleBackToCategories,
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Back to Categories'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).primaryColor,
+                    ),
                   ),
                 ),
               ),
-            
-            if (_isLoadingMore)
-              const SliverToBoxAdapter(
-                child: Center(
+              
+            // Content sections
+            if (_searchResults == null && _setResults == null && !_isLoading) ...[
+              // Categories header
+              SliverToBoxAdapter(
+                child: SearchCategoriesHeader(
+                  showCategories: _showCategories,
+                  onToggleCategories: () => setState(() => _showCategories = !_showCategories),
+                ),
+              ),
+              
+              // Categories grid when expanded
+              if (_showCategories)
+                SliverToBoxAdapter(
+                  child: SearchCategories(
+                    searchMode: _searchMode,
+                    onQuickSearch: _performQuickSearch,
+                  ),
+                ),
+              
+              // Recent searches
+              SliverToBoxAdapter(
+                child: RecentSearches(
+                  searchHistory: _searchHistory,
+                  onSearchSelected: _onRecentSearchSelected,
+                  onClearHistory: () {
+                    _searchHistory?.clearHistory();
+                    setState(() {});
+                  },
+                  isLoading: _isHistoryLoading,
+                ),
+              ),
+              
+            ] else if (_isLoading && _searchResults == null && _setResults == null) ...[
+              // Loading state
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    _currentSetName != null
+                        ? 'Loading cards from $_currentSetName...'
+                        : 'Searching for "${_searchController.text}"...',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ),
+              
+              // Skeleton loading grid
+              CardSkeletonGrid(
+                itemCount: 12,
+                setName: _currentSetName,
+              ),
+              
+            ] else ...[
+              // Results count header
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    _searchMode == SearchMode.mtg
+                        ? (_searchResults == null || _searchResults!.isEmpty ? 'Found 0 cards' : 'Found $_totalCards cards')
+                        : (_searchMode == SearchMode.eng) && _setResults != null
+                            ? 'Found ${_setResults?.length ?? 0} sets'
+                            : 'Found $_totalCards cards',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ),
+              
+              // Results grid - cards or sets
+              if (_searchResults != null && _searchMode == SearchMode.mtg)
+                CardGridSliver(
+                  cards: _searchResults!.cast<TcgCard>(),
+                  onCardTap: (card) {
+                    CardDetailsRouter.navigateToCardDetails(context, card, heroContext: 'search');
+                  },
+                  preventNavigationOnQuickAdd: true,
+                  showPrice: true,
+                  showName: true,
+                  heroContext: 'search',
+                  crossAxisCount: 3,
+                )
+              else if (_searchMode == SearchMode.eng && _searchResults != null)
+                CardGridSliver(
+                  cards: _searchResults!.cast<TcgCard>(),
+                  onCardTap: (card) {
+                    CardDetailsRouter.navigateToCardDetails(context, card, heroContext: 'search');
+                  },
+                  preventNavigationOnQuickAdd: true,
+                  showPrice: true,
+                  showName: true,
+                  heroContext: 'search',
+                  crossAxisCount: 3,
+                )
+              else if (_setResults != null)
+                SetSearchGrid(
+                  sets: _setResults!,
+                  onSetSelected: (name) {
+                    _searchController.text = name;
+                  },
+                  onSetQuerySelected: (query) {
+                    _performSearch(query);
+                  },
+                ),
+              
+              // Pagination controls
+              if (_hasMorePages && !_isLoadingMore)
+                SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(),
+                    padding: const EdgeInsets.all(16),
+                    child: FilledButton.icon(
+                      onPressed: _loadNextPage,
+                      icon: const Icon(Icons.expand_more),
+                      label: const Text('Load More'),
+                    ),
                   ),
                 ),
-              ),
+              
+              if (_isLoadingMore)
+                const SliverToBoxAdapter(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

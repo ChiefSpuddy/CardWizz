@@ -5,6 +5,7 @@ import 'screens/scanner_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/collections_screen.dart'; // Note: renamed from collection_screen.dart
 import 'screens/home_screen.dart';
+import 'utils/keyboard_utils.dart'; // Add this import for DismissKeyboardOnTap
 import 'package:intl/intl.dart';
 import 'providers/currency_provider.dart'; // Fixed path
 import 'package:provider/provider.dart';
@@ -151,13 +152,15 @@ class TabNavigator extends StatelessWidget {
       child = const SizedBox.shrink();
     }
 
-    return Navigator(
-      key: navigatorKey,
-      onGenerateRoute: (routeSettings) {
-        return MaterialPageRoute(
-          builder: (context) => child,
-        );
-      },
+    return DismissKeyboardOnTap(
+      child: Navigator(
+        key: navigatorKey,
+        onGenerateRoute: (routeSettings) {
+          return MaterialPageRoute(
+            builder: (context) => child,
+          );
+        },
+      ),
     );
   }
 }
