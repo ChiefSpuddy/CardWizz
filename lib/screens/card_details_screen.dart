@@ -15,6 +15,7 @@ class CardDetailsScreen extends StatefulWidget {
   final String heroContext;
   final bool isFromBinder;
   final bool isFromCollection;
+  final bool fromSearchResults; // Add this parameter
 
   const CardDetailsScreen({
     super.key,
@@ -22,6 +23,7 @@ class CardDetailsScreen extends StatefulWidget {
     this.heroContext = 'details',
     this.isFromBinder = false,
     this.isFromCollection = false,
+    this.fromSearchResults = false, // Default to false
   });
 
   @override
@@ -85,7 +87,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
       if (mounted) {
         setState(() => _isAddingToCollection = false);
         
-        // Use the unified notification system
+        // Use the unified notification system with explicit bottom position
         NotificationManager.success(
           context,
           message: 'Card added to collection',
@@ -96,7 +98,7 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
       if (mounted) {
         setState(() => _isAddingToCollection = false);
         
-        // Use the unified notification system for errors
+        // Use the unified notification system for errors with explicit bottom position
         NotificationManager.error(
           context,
           message: 'Failed to add card: $e',

@@ -44,7 +44,13 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               child: CardGrid(
                 cards: widget.cards,
                 onCardTap: (card) {
-                  CardDetailsRouter.navigateToCardDetails(context, card, heroContext: 'search_results');
+                  // Update this line to pass the fromSearchResults flag
+                  CardDetailsRouter.navigateToCardDetails(
+                    context, 
+                    card, 
+                    heroContext: 'search_results',
+                    fromSearchResults: true // Add this parameter
+                  );
                 },
                 preventNavigationOnQuickAdd: true,
                 showPrice: true,

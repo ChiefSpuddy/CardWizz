@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/tcg_card.dart';
 import '../screens/card_details_screen.dart';
 import '../services/logging_service.dart';
+import '../services/storage_service.dart';
+import '../providers/currency_provider.dart';
+import '../providers/app_state.dart';
 
 /// A helper class that provides consistent card navigation throughout the app.
 class CardNavigationHelper {
@@ -9,45 +13,38 @@ class CardNavigationHelper {
   static void navigateToCardDetails(
     BuildContext context, 
     TcgCard card, 
-    {String heroContext = 'default'}
+    {String heroContext = 'default', bool fromSearchResults = false}
   ) {
     LoggingService.debug('CardNavigationHelper: Navigating to details for ${card.name}');
     
-    // Create the destination screen
-    final detailsScreen = CardDetailsScreen(
-      card: card,
-      heroContext: heroContext,
+    // Get all necessary providers from the current context
+    final storageService = Provider.of<StorageService>(context, listen: false);
+    final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
+    final appState = Provider.of<AppState>(context, listen: false);
+    
+    // Create the destination screen wrapped with all needed providers
+    // Using the correct provider types for each service
+    final wrappedScreen = MultiProvider(
+      providers: [
+        Provider<StorageService>.value(value: storageService),
+        // Fix: Use ChangeNotifierProvider for listenable providers
+        ChangeNotifierProvider<CurrencyProvider>.value(value: currencyProvider),
+        ChangeNotifierProvider<AppState>.value(value: appState),
+      ],
+      child: CardDetailsScreen(
+        card: card,
+        heroContext: heroContext,
+        fromSearchResults: fromSearchResults,
+      ),
     );
     
-    // CRITICAL FIX: Use Navigator.of().push() with rootNavigator:true 
-    // This ensures we're pushing to the root navigator, bypassing any nested navigators
-    // that might be causing the back navigation issue
-    Navigator.of(context, rootNavigator: true).push(
-      PageRouteBuilder(
-        // Use PageRouteBuilder for more control over the transition
-        pageBuilder: (context, animation, secondaryAnimation) => detailsScreen,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          // Use a simple fade + slide transition
-          const begin = Offset(0.0, 0.05);
-          const end = Offset.zero;
-          const curve = Curves.easeOutCubic;
-          
-          var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-          var offsetAnimation = animation.drive(tween);
-          
-          return SlideTransition(
-            position: offsetAnimation,
-            child: FadeTransition(
-              opacity: animation,
-              child: child,
-            ),
-          );
-        },
-        // Force maintain state to prevent premature disposal
-        maintainState: true,
-        // Ensure nested navigation contexts are properly handled
-        fullscreenDialog: false,
-        opaque: true,
+    // Only use rootNavigator when not coming from search results
+    // This ensures we can go back to search results when using the back button
+    final useRootNavigator = !fromSearchResults;
+    
+    Navigator.of(context, rootNavigator: useRootNavigator).push(
+      MaterialPageRoute(
+        builder: (context) => wrappedScreen,
       ),
     );
   }

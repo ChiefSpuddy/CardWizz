@@ -10,6 +10,7 @@ import '../services/logging_service.dart';
 import 'dart:math';  // Add this import for min
 import '../models/tcg_card.dart';  // Add this import for TcgCard
 import '../services/tcg_api_service.dart';
+import '../utils/card_navigation_helper.dart';  // Add this import for CardNavigationHelper
 
 class CardDetailsRouter {
   // Static instance of the price service
@@ -312,21 +313,14 @@ class CardDetailsRouter {
   /// Navigate to the appropriate card details screen
   static void navigateToCardDetails(
     BuildContext context, 
-    TcgCard card, {
-    String heroContext = 'details',
-    bool isFromBinder = false,
-    bool isFromCollection = false,
-  }) {
-    Navigator.push(
+    TcgCard card, 
+    {String heroContext = 'default', bool fromSearchResults = false}
+  ) {
+    CardNavigationHelper.navigateToCardDetails(
       context,
-      MaterialPageRoute(
-        builder: (context) => getDetailsScreen(
-          card: card,
-          heroContext: heroContext,
-          isFromBinder: isFromBinder,
-          isFromCollection: isFromCollection,
-        ),
-      ),
+      card,
+      heroContext: heroContext,
+      fromSearchResults: fromSearchResults // Pass along the fromSearchResults parameter
     );
   }
 }
@@ -349,22 +343,19 @@ Future<void> onAddToCollection(BuildContext context, TcgCard card) async {
     // Notify app state about the change
     appState.notifyCardChange();
     
-    // Set position to bottom for the notification
-    NotificationManager.show(
+    // Ensure notification appears at the bottom of the screen
+    NotificationManager.success(
       context,
-      title: 'Added to Collection',
-      message: '${card.name}',
+      message: 'Added ${card.name} to collection',
       icon: Icons.check_circle,
       position: NotificationPosition.bottom,
     );
   } catch (e) {
-    // Set position to bottom for the notification
-    NotificationManager.show(
+    // Ensure error notification also appears at the bottom
+    NotificationManager.error(
       context,
-      title: 'Error',
       message: 'Failed to add card: $e',
       icon: Icons.error_outline,
-      isError: true,
       position: NotificationPosition.bottom,
     );
   }

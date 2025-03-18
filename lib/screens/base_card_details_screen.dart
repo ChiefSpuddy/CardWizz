@@ -253,21 +253,24 @@ abstract class BaseCardDetailsScreenState<T extends BaseCardDetailsScreen>
     required String label,
     required VoidCallback onPressed,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Container(
       height: 46,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(23),
+        // Use colorScheme instead of hardcoded colors for better theming
         gradient: LinearGradient(
           colors: [
-            Theme.of(context).primaryColor,
-            Theme.of(context).colorScheme.secondary,
+            colorScheme.primary,
+            colorScheme.secondary,
           ],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).primaryColor.withOpacity(0.4),
+            color: colorScheme.primary.withOpacity(0.4),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
