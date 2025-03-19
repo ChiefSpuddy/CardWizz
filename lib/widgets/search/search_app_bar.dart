@@ -14,7 +14,7 @@ class SearchAppBar extends StatefulWidget implements PreferredSizeWidget {
   final SearchMode searchMode;
   final Function(List<SearchMode>) onSearchModeChanged;
   final VoidCallback onCameraPressed;
-  final VoidCallback onCancelSearch; // Add this new callback
+  final VoidCallback onCancelSearch; // Keep this callback
 
   const SearchAppBar({
     Key? key,
@@ -28,7 +28,7 @@ class SearchAppBar extends StatefulWidget implements PreferredSizeWidget {
     required this.searchMode,
     required this.onSearchModeChanged,
     required this.onCameraPressed,
-    required this.onCancelSearch, // Add this required parameter
+    required this.onCancelSearch, // Keep this parameter
   }) : super(key: key);
 
   @override
@@ -41,7 +41,7 @@ class SearchAppBar extends StatefulWidget implements PreferredSizeWidget {
 class _SearchAppBarState extends State<SearchAppBar> {
   // Add a focus node to manage keyboard focus directly
   final FocusNode _searchFocusNode = FocusNode();
-  bool _isSearching = false; // Add a state to track if we're actively searching
+  bool _isSearching = false; // Keep tracking active search
   
   @override
   void initState() {
@@ -68,9 +68,14 @@ class _SearchAppBarState extends State<SearchAppBar> {
   }
   
   void _onFocusChange() {
-    // When focused, ensure keyboard shows immediately by sending a platform channel message
+    // When focused, ensure keyboard shows immediately but safely
     if (_searchFocusNode.hasFocus) {
-      SystemChannels.textInput.invokeMethod('TextInput.show');
+      // Use a safer approach that won't crash on iOS
+      Future.delayed(const Duration(milliseconds: 50), () {
+        if (_searchFocusNode.hasFocus) {
+          SystemChannels.textInput.invokeMethod('TextInput.show');
+        }
+      });
     }
   }
 
@@ -118,62 +123,81 @@ class _SearchAppBarState extends State<SearchAppBar> {
               size: 20,
             ),
             const SizedBox(width: 8),
-            // Use RawKeyboardListener to optimize keyboard performance
+            // Improved vertical centering using Align+Container combo
             Expanded(
-              child: RawKeyboardListener(
-                focusNode: FocusNode(),
-                onKey: (event) {
-                  // Handle keyboard events if needed
-                },
-                child: TextField(
-                  controller: widget.searchController,
-                  focusNode: _searchFocusNode,
-                  onChanged: widget.onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: 'Search cards...',
-                    hintStyle: TextStyle(
-                      color: isDark ? Colors.white54 : Colors.grey[500],
-                      fontSize: 16,
+              child: Align(
+                alignment: Alignment.center,
+                child: Container(
+                  height: 40, // Fixed height to match the search bar
+                  alignment: Alignment.center, // Center the child vertically
+                  child: RawKeyboardListener(
+                    focusNode: FocusNode(),
+                    onKey: (event) {
+                      // Handle keyboard events if needed
+                    },
+                    child: TextField(
+                      controller: widget.searchController,
+                      focusNode: _searchFocusNode,
+                      onChanged: widget.onSearchChanged,
+                      textAlign: TextAlign.left,
+                      decoration: InputDecoration(
+                        hintText: 'Search cards...',
+                        hintStyle: TextStyle(
+                          color: isDark ? Colors.white54 : Colors.grey[500],
+                          fontSize: 16,
+                        ),
+                        border: InputBorder.none,
+                        isCollapsed: true, // Important for vertical centering
+                        contentPadding: EdgeInsets.zero, // Remove default padding
+                      ),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontSize: 16,
+                        height: 1.0, // Important for vertical alignment
+                      ),
+                      textInputAction: TextInputAction.search,
+                      keyboardAppearance: isDark ? Brightness.dark : Brightness.light,
                     ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  style: TextStyle(
-                    color: isDark ? Colors.white : Colors.black87,
-                    fontSize: 16,
-                  ),
-                  textInputAction: TextInputAction.search,
-                  // Add this critical property to ensure immediate keyboard appearance
-                  keyboardAppearance: isDark ? Brightness.dark : Brightness.light,
                 ),
               ),
             ),
+            // Clear button - keep the styling
             if (widget.searchController.text.isNotEmpty)
-              // Enhanced cancel button - more visible and handles both clear and cancel
-              GestureDetector(
-                onTap: () {
-                  widget.onClearSearch(); // Clear the text
-                  widget.onCancelSearch(); // Cancel search and return to categories
-                  _searchFocusNode.requestFocus(); // Keep focus after clearing
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isDark 
-                        ? colorScheme.primary.withOpacity(0.2) 
-                        : colorScheme.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.close,
-                    color: isDark ? Colors.white : colorScheme.primary,
-                    size: 18,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () {
+                      widget.onClearSearch();
+                      widget.onCancelSearch(); // Keep the cancel functionality
+                      _searchFocusNode.requestFocus();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isDark 
+                          ? colorScheme.primary.withOpacity(0.15)
+                          : colorScheme.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Icon(
+                        Icons.close,
+                        color: isDark 
+                          ? Colors.white70
+                          : colorScheme.primary,
+                        size: 18,
+                      ),
+                    ),
                   ),
                 ),
               ),
             // Camera button with enhanced styling
             Padding(
-              padding: const EdgeInsets.only(right: 4.0),
+              padding: const EdgeInsets.only(right: 8.0, left: 4.0),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -183,10 +207,15 @@ class _SearchAppBarState extends State<SearchAppBar> {
                     padding: const EdgeInsets.all(8.0),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18),
+                      color: isDark 
+                        ? Colors.transparent 
+                        : colorScheme.primary.withOpacity(0.05),
                     ),
                     child: Icon(
                       Icons.camera_alt_outlined,
-                      color: isDark ? colorScheme.primary.withOpacity(0.9) : colorScheme.primary,
+                      color: isDark 
+                        ? colorScheme.primary.withOpacity(0.9) 
+                        : colorScheme.primary,
                       size: 20,
                     ),
                   ),
