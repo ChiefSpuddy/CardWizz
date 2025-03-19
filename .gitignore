@@ -81,3 +81,7 @@ app.*.map.json
 
 # Coverage
 coverage/
+
+# Additional generated files
+.metadata
+package-lock.json
