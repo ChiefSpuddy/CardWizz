@@ -70,13 +70,11 @@ Help with data accuracy and card details.
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-🔗 Related Links
+## 🔗 Related Links
+- **Official Website**: [CardWizz](https://cardwizz.com)
+- **Instagram**: [@CardWizz](https://www.instagram.com/cardwizz)
+- **GitHub Repository**: [CardWizz on GitHub](https://github.com/ChiefSpuddy/CardWizz)
 
-Official Website: CardWizz
-
-Instagram: @CardWizz
-
-GitHub Repository: CardWizz on GitHub
 
 ⚠️ Disclaimer
 
