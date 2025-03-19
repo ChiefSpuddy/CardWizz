@@ -713,6 +713,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ),
                   const Divider(height: 1),
                   ListTile(
+                    leading: const Icon(Icons.description_outlined),
+                    title: const Text('Terms of Use'),
+                    onTap: () => launchUrl(
+                      Uri.parse('https://cardwizz.com/terms.html'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
                     contentPadding: EdgeInsets.symmetric(horizontal: 16), // Add horizontal padding here
                     title: _buildPremiumTile(context), // Remove the Padding that was wrapping this
                   ),
@@ -731,9 +740,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             children: [
                               Text(
                                 'Show subscription details (£0.99/month)', // Updated price from £1.99 to £0.99
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
                               ),
                               const Icon(Icons.expand_more, size: 20),
                             ],
@@ -1268,7 +1274,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     Navigator.of(context).pop();
                     _initiatePremiumPurchase(context);
                   },
-                  icon: const Text('💎'),
+                  icon: const Icon(Icons.workspace_premium),
                   label: const Text('Subscribe Now'),
                 ),
             ],
