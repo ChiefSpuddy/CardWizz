@@ -11,17 +11,24 @@ class KeyboardUtils {
   }
 }
 
-/// A widget that dismisses the keyboard when tapped outside of input fields
+/// A widget that dismisses the keyboard when tapped outside of a text field.
 class DismissKeyboardOnTap extends StatelessWidget {
   final Widget child;
-  
+
   const DismissKeyboardOnTap({Key? key, required this.child}) : super(key: key);
-  
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => KeyboardUtils.dismissKeyboard(context),
-      behavior: HitTestBehavior.translucent, // Important: allows taps to pass through empty areas
+      onTap: () {
+        // This will ensure all textfields lose focus when tapping outside
+        final currentFocus = FocusScope.of(context);
+        if (!currentFocus.hasPrimaryFocus && currentFocus.focusedChild != null) {
+          FocusManager.instance.primaryFocus?.unfocus();
+        }
+      },
+      // Set behavior to opaque and remove the exclusion of child taps
+      behavior: HitTestBehavior.translucent, // Changed from opaque to translucent
       child: child,
     );
   }

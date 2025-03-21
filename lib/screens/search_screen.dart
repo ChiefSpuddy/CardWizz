@@ -889,6 +889,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onSearchChanged(String query) {
+    // Only handle empty query case immediately
     if (query.isEmpty) {
       setState(() {
         _searchResults = null;
@@ -900,18 +901,24 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
     
+    // Cancel existing debounce if active
     if (_searchDebounce?.isActive ?? false) {
       _searchDebounce!.cancel();
     }
     
-    // Use a shorter debounce for better responsiveness
-    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+    // SIMPLIFIED: Only search if query is at least 2 characters
+    if (query.length < 2) {
+      return; // Don't search for single characters
+    }
+    
+    // Use a longer debounce for better user experience
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
       if (mounted && query == _searchController.text && query.isNotEmpty) {
         setState(() {
           _currentPage = 1;
           _isInitialSearch = true;
-          _isLoading = true; // Set loading state before search for immediate UI feedback
-          _currentSetName = null; // Reset set name to avoid showing previous set names during loading
+          _isLoading = true;
+          _currentSetName = null;
         });
         
         // Perform search based on mode

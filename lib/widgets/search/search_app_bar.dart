@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../screens/search_screen.dart';
 import '../../constants/app_colors.dart';
+import '../../services/logging_service.dart'; // Add this import
 
 class SearchAppBar extends StatefulWidget implements PreferredSizeWidget {
   final TextEditingController searchController;
@@ -130,36 +131,39 @@ class _SearchAppBarState extends State<SearchAppBar> {
                 child: Container(
                   height: 40, // Fixed height to match the search bar
                   alignment: Alignment.center, // Center the child vertically
-                  child: RawKeyboardListener(
-                    focusNode: FocusNode(),
-                    onKey: (event) {
-                      // Handle keyboard events if needed
-                    },
-                    child: TextField(
-                      controller: widget.searchController,
-                      focusNode: _searchFocusNode,
-                      onChanged: widget.onSearchChanged,
-                      textAlign: TextAlign.left,
-                      decoration: InputDecoration(
-                        hintText: widget.searchMode == SearchMode.eng 
-                          ? 'Search for cards or set names...' // Updated hint
-                          : 'Search cards...',
-                        hintStyle: TextStyle(
-                          color: isDark ? Colors.white54 : Colors.grey[500],
-                          fontSize: 16,
-                        ),
-                        border: InputBorder.none,
-                        isCollapsed: true, // Important for vertical centering
-                        contentPadding: EdgeInsets.zero, // Remove default padding
-                      ),
-                      style: TextStyle(
-                        color: isDark ? Colors.white : Colors.black87,
+                  // SIMPLIFIED: Just use a basic TextField without the Form
+                  child: TextField(
+                    controller: widget.searchController,
+                    focusNode: _searchFocusNode,
+                    onChanged: widget.onSearchChanged,
+                    textAlign: TextAlign.left,
+                    decoration: InputDecoration(
+                      hintText: widget.searchMode == SearchMode.eng 
+                        ? 'Search for cards or set names...' // Updated hint
+                        : 'Search cards...',
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.white54 : Colors.grey[500],
                         fontSize: 16,
-                        height: 1.0, // Important for vertical alignment
                       ),
-                      textInputAction: TextInputAction.search,
-                      keyboardAppearance: isDark ? Brightness.dark : Brightness.light,
+                      border: InputBorder.none,
+                      isCollapsed: true, // Important for vertical centering
+                      contentPadding: EdgeInsets.zero, // Remove default padding
                     ),
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontSize: 16,
+                      height: 1.0, // Important for vertical alignment
+                    ),
+                    textInputAction: TextInputAction.search,
+                    keyboardAppearance: isDark ? Brightness.dark : Brightness.light,
+                    // Simple onSubmitted handler that will just trigger search
+                    onSubmitted: (value) {
+                      if (value.length >= 2) {
+                        widget.onSearchChanged(value);
+                      }
+                      // Unfocus to dismiss keyboard
+                      _searchFocusNode.unfocus();
+                    },
                   ),
                 ),
               ),
