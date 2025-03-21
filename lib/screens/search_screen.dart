@@ -35,7 +35,6 @@ import '../widgets/search/set_grid.dart';
 import '../services/navigation_service.dart';
 import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart';
-import '../widgets/search/card_skeleton_grid.dart';
 import '../widgets/standard_app_bar.dart';
 import '../widgets/app_drawer.dart';
 import '../utils/keyboard_utils.dart'; // Add this import for DismissKeyboardOnTap
@@ -491,6 +490,7 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() {
         _searchResults = null;
         _showCategories = true;
+        _currentSetName = null; // Reset set name when clearing search
       });
       return;
     }
@@ -504,6 +504,11 @@ class _SearchScreenState extends State<SearchScreen> {
     String? setName;
 
     if (!isLoadingMore) {
+      // IMPORTANT: Reset _currentSetName first to avoid lingering old set names
+      setState(() {
+        _currentSetName = null;
+      });
+      
       setState(() {
         _currentPage = 1;
         _searchResults = null;
@@ -535,6 +540,16 @@ class _SearchScreenState extends State<SearchScreen> {
           // Set number sorting for set searches by default
           _currentSort = 'number';
           _sortAscending = true;
+        }
+      });
+      
+      // Add timeout to prevent the UI from getting stuck in loading state
+      Timer(const Duration(seconds: 15), () {
+        if (mounted && _isLoading) {
+          setState(() {
+            _isLoading = false;
+            LoggingService.debug('Search timeout reached - resetting loading state');
+          });
         }
       });
     }
@@ -656,10 +671,14 @@ class _SearchScreenState extends State<SearchScreen> {
       LoggingService.debug('❌ Search error: $e');
       if (mounted) {
         setState(() {
+          _isLoading = false;
+          _isLoadingMore = false;
           if (!isLoadingMore) {
             _searchResults = [];
             _totalCards = 0;
           }
+          // Make sure to clear set name on error to avoid stuck states
+          _currentSetName = null;
         });
       }
     }
@@ -876,6 +895,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _setResults = null;
         _isInitialSearch = true;
         _showCategories = true;
+        _currentSetName = null; // Reset set name when changing search text
       });
       return;
     }
@@ -891,6 +911,7 @@ class _SearchScreenState extends State<SearchScreen> {
           _currentPage = 1;
           _isInitialSearch = true;
           _isLoading = true; // Set loading state before search for immediate UI feedback
+          _currentSetName = null; // Reset set name to avoid showing previous set names during loading
         });
         
         // Perform search based on mode
@@ -1161,6 +1182,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _currentPage = 1;
       _hasMorePages = true;
       _lastQuery = null;
+      _currentSetName = null; // Reset set name when clearing search
       if (_currentSort != 'cardmarket.prices.averageSellPrice') {
         _currentSort = 'cardmarket.prices.averageSellPrice';
         _sortAscending = false;
