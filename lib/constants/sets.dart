@@ -314,21 +314,94 @@ class PokemonSets {
   static const Map<String, String> setAliases = {
     'astral radiance': 'swsh10',
     'brilliant stars': 'swsh9',
-    'steam siege': 'xy11',
+    'steam siege': 'xy11',  // Keep only this instance
     'crown zenith': 'swsh12pt5',
     'silver tempest': 'swsh12',
     'temporal forces': 'sv3p5',
-    // Add more aliases as needed
+    'sword & shield': 'swsh1',
+    'swsh': 'swsh1',
+    'sword and shield': 'swsh1',
+    'scarlet & violet': 'sv1',
+    'sv': 'sv1', 
+    'scarlet and violet': 'sv1',
+    'pokemon 151': 'sv3pt5',
+    '151': 'sv3pt5',
+    'paldean fates': 'sv4pt5',
+    'obsidian flames': 'sv3',
+    'paradox rift': 'sv4',
+    'paldea evolved': 'sv2',
+    'vivid voltage': 'swsh4',
+    'fusion strike': 'swsh8',
+    'evolving skies': 'swsh7',
+    'chilling reign': 'swsh6',
+    'battle styles': 'swsh5',
+    'shining fates': 'swsh45',
+    'champions path': 'swsh35',
+    'darkness ablaze': 'swsh3',
+    'rebel clash': 'swsh2',
+    'cosmic eclipse': 'sm12',
+    'hidden fates': 'sm115',
+    'unified minds': 'sm11',
+    'unbroken bonds': 'sm10',
+    'team up': 'sm9',
+    'lost thunder': 'sm8',
+    'celestial storm': 'sm7',
+    'forbidden light': 'sm6',
+    'ultra prism': 'sm5',
+    'sun & moon': 'sm1',
+    'sun and moon': 'sm1',
+    'crimson invasion': 'sm4',
+    'burning shadows': 'sm3',
+    'guardians rising': 'sm2',
+    'shining legends': 'sm35',
+    'dragon majesty': 'sm75',
+    'evolutions': 'xy12',
+    // Removed duplicate 'steam siege': 'xy11' entry here
+    'fates collide': 'xy10',
+    'breakpoint': 'xy9',
+    'breakthrough': 'xy8',
+    'ancient origins': 'xy7',
+    'roaring skies': 'xy6',
+    'primal clash': 'xy5',
+    'phantom forces': 'xy4',
+    'furious fists': 'xy3',
+    'flashfire': 'xy2',
+    'xy': 'xy1',
+    'xy base': 'xy1',
+    'xy base set': 'xy1',
+    // ...remaining existing code...
   };
-
+  
   static String? getSetId(String searchTerm) {
+    // Clean up the search term
+    final normalizedSearch = searchTerm.toLowerCase().trim();
+    
     // First try direct match in setIdMap
-    final directMatch = setIdMap[searchTerm];
+    final directMatch = setIdMap[normalizedSearch];
     if (directMatch != null) return directMatch;
 
     // Then try aliases (case insensitive)
-    final normalizedSearch = searchTerm.toLowerCase();
-    return setAliases[normalizedSearch];
+    final aliasMatch = setAliases[normalizedSearch];
+    if (aliasMatch != null) return aliasMatch;
+    
+    // Try partial matches if the term is long enough
+    if (normalizedSearch.length >= 4) {
+      // Check if any set name contains this search term
+      for (final entry in setAliases.entries) {
+        if (entry.key.contains(normalizedSearch) || normalizedSearch.contains(entry.key)) {
+          return entry.value;
+        }
+      }
+      
+      // Check if any set ID contains this search term
+      for (final entry in setIdMap.entries) {
+        if (entry.key.contains(normalizedSearch) || normalizedSearch.contains(entry.key)) {
+          return entry.value;
+        }
+      }
+    }
+
+    return null;
   }
 
   static Map<String, String> get allSetIds => setIdMap;

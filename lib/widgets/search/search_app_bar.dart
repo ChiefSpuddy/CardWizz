@@ -141,7 +141,9 @@ class _SearchAppBarState extends State<SearchAppBar> {
                       onChanged: widget.onSearchChanged,
                       textAlign: TextAlign.left,
                       decoration: InputDecoration(
-                        hintText: 'Search cards...',
+                        hintText: widget.searchMode == SearchMode.eng 
+                          ? 'Search for cards or set names...' // Updated hint
+                          : 'Search cards...',
                         hintStyle: TextStyle(
                           color: isDark ? Colors.white54 : Colors.grey[500],
                           fontSize: 16,

@@ -124,6 +124,12 @@ class TcgApiService {
       if (query.startsWith('set.id:')) {
         final setId = query.replaceAll('set.id:', '').trim();
         cleanedQuery = _buildSpecialSetQuery(setId);
+        
+        // For set searches, default to number ordering if not specified
+        if (orderBy == 'cardmarket.prices.averageSellPrice') {
+          orderBy = 'number';
+          orderByDesc = false;
+        }
       } else {
         cleanedQuery = _cleanupQuery(query);
       }
@@ -772,6 +778,12 @@ TcgCard _convertToTcgCard(Map<String, dynamic> data) {
         return 'set.id:swsh10 OR set.id:swsh10tg'; // Include Trainer Gallery
       case 'swsh9': // Brilliant Stars
         return 'set.id:swsh9 OR set.id:swsh9tg'; // Include Trainer Gallery
+      case 'sv3pt5': // Pokemon 151
+        return 'set.id:sv3pt5'; // 151 set
+      case 'sv4': // Paradox Rift
+        return 'set.id:sv4 OR set.id:sv4pt5'; // Include Paldean Fates
+      case 'sv3': // Obsidian Flames
+        return 'set.id:sv3 OR set.id:sv3pt5'; // Include 151
       default:
         return 'set.id:$setId';
     }

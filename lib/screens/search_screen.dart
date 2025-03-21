@@ -351,6 +351,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   String? _getSetIdFromName(String query) {
     final normalizedQuery = query.toLowerCase().trim();
+    
+    // Skip short queries to prevent false matches
+    if (normalizedQuery.length < 3) return null;
+    
     final allSets = _getAllSets();
     
     // Try exact match first
@@ -363,14 +367,72 @@ class _SearchScreenState extends State<SearchScreen> {
       return exactMatch['query'] as String;
     }
 
-    // Try contains match
-    final containsMatch = allSets.firstWhere(
-      (set) => (set['name'] as String).toLowerCase().contains(normalizedQuery) ||
-              normalizedQuery.contains((set['name'] as String).toLowerCase()),
-      orElse: () => {'query': ''},
-    );
+    // Try contains match with more comprehensive matching
+    for (final set in allSets) {
+      final setName = (set['name'] as String).toLowerCase();
+      // Match if the set name contains the query or query contains the set name
+      if (setName.contains(normalizedQuery) || 
+          normalizedQuery.contains(setName) ||
+          _isFuzzyMatch(setName, normalizedQuery)) {
+        return set['query'] as String;
+      }
+    }
 
-    return (containsMatch['query'] as String?)?.isNotEmpty ?? false ? containsMatch['query'] as String : null;
+    // Try matching with set code aliases
+    final setCode = PokemonSets.getSetId(normalizedQuery);
+    if (setCode != null) {
+      return 'set.id:$setCode';
+    }
+
+    // Additional checks for Sword & Shield, Scarlet & Violet abbreviations
+    if (normalizedQuery.contains('swsh') || 
+        normalizedQuery.contains('sv') || 
+        normalizedQuery.contains('sword') || 
+        normalizedQuery.contains('shield') ||
+        normalizedQuery.contains('scarlet') ||
+        normalizedQuery.contains('violet')) {
+      
+      for (final set in allSets) {
+        final setName = (set['name'] as String).toLowerCase();
+        final setQuery = set['query'] as String;
+        
+        if ((setQuery.contains('swsh') && normalizedQuery.contains('sword')) ||
+            (setQuery.contains('swsh') && normalizedQuery.contains('shield')) ||
+            (setQuery.contains('sv') && normalizedQuery.contains('scarlet')) ||
+            (setQuery.contains('sv') && normalizedQuery.contains('violet'))) {
+          return setQuery;
+        }
+      }
+    }
+
+    return null;
+  }
+  
+  // Add a helper method for fuzzy matching set names
+  bool _isFuzzyMatch(String setName, String query) {
+    // Simple fuzzy match: check if all characters from query appear in order in setName
+    if (query.length < 3) return false; // Too short for fuzzy matching
+    
+    // Convert to comparable strings
+    String simplifiedSetName = setName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+    String simplifiedQuery = query.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+    
+    // Quick rejects
+    if (simplifiedQuery.length > simplifiedSetName.length) return false;
+    
+    int setNameIndex = 0;
+    int queryIndex = 0;
+    
+    // Check if characters appear in the same order
+    while (setNameIndex < simplifiedSetName.length && queryIndex < simplifiedQuery.length) {
+      if (simplifiedSetName[setNameIndex] == simplifiedQuery[queryIndex]) {
+        queryIndex++;
+      }
+      setNameIndex++;
+    }
+    
+    // If we matched all query characters, it's a fuzzy match
+    return queryIndex == simplifiedQuery.length;
   }
 
   String _buildSearchQuery(String query) {
@@ -382,9 +444,11 @@ class _SearchScreenState extends State<SearchScreen> {
       return query;
     }
 
-    // Try to match set name
+    // Try to match set name - Enhanced with better set name detection
     final setId = _getSetIdFromName(query);
     if (setId != null) {
+      // Log that we recognized a set name
+      LoggingService.debug('Recognized "$query" as a set name with ID: $setId');
       return setId;
     }
 
@@ -446,20 +510,31 @@ class _SearchScreenState extends State<SearchScreen> {
         _showCategories = false;
         _isLoading = true;
         
-        // Set price sorting for set searches
-        if (query.startsWith('set.id:')) {
-          _currentSort = 'cardmarket.prices.averageSellPrice';
-          _sortAscending = false;
-          
+        // Enhance set name detection for better UI feedback
+        // Check if it's potentially a set name query
+        final potentialSetId = _getSetIdFromName(query);
+        if (potentialSetId != null) {
           // Extract set name for display in loading state
-          final setId = query.substring(7).trim();
           final allSets = _getAllSets();
           final matchingSet = allSets.firstWhere(
-            (set) => (set['query'] as String?)?.contains(setId) ?? false,
+            (set) => (set['query'] as String) == potentialSetId,
             orElse: () => {'name': null},
           );
           setName = matchingSet['name'] as String?;
+          if (setName != null) {
+            // Provide clear feedback about set search
+            NotificationManager.info(
+              context,
+              message: 'Searching for cards in $setName set',
+              duration: const Duration(seconds: 2),
+              position: NotificationPosition.top,
+            );
+          }
           _currentSetName = setName; // Store for skeleton loader
+          
+          // Set number sorting for set searches by default
+          _currentSort = 'number';
+          _sortAscending = true;
         }
       });
     }
@@ -477,15 +552,13 @@ class _SearchScreenState extends State<SearchScreen> {
         if (query.contains('cardmarket.prices.averageSellPrice')) {
           searchQuery = query;
         } else {
-          searchQuery = query.startsWith('set.id:') ? query : _buildSearchQuery(query.trim());
-        }
-        
-        // Default number sorting for new set searches
-        if (searchQuery.startsWith('set.id:') && !isLoadingMore && 
-            _currentSort == 'cardmarket.prices.averageSellPrice' && 
-            !_sortAscending) {
-          _currentSort = 'number';
-          _sortAscending = true;
+          searchQuery = _buildSearchQuery(query.trim());
+          LoggingService.debug('Built search query: $searchQuery from input: $query');
+          
+          // If we converted a set name to a set.id query, store this for later use
+          if (searchQuery.startsWith('set.id:') && !query.startsWith('set.id:')) {
+            _lastActiveSearch = searchQuery; // Store the converted query
+          }
         }
       }
       

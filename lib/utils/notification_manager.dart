@@ -89,6 +89,32 @@ class NotificationManager {
     );
   }
   
+  /// Shows an info notification
+  static void info(
+    BuildContext context, {
+    String title = 'Info',
+    required String message,
+    IconData icon = Icons.info_outline,
+    Color? backgroundColor,
+    Color? iconColor,
+    Duration duration = const Duration(seconds: 3),
+    NotificationPosition position = NotificationPosition.top,
+    bool compact = false,
+    bool preventNavigation = false,
+  }) {
+    show(
+      context, 
+      title: title, 
+      message: message, 
+      icon: icon,
+      isError: false,
+      duration: duration,
+      position: position,
+      compact: compact,
+      preventNavigation: preventNavigation,
+    );
+  }
+  
   // Add the missing _show method
   static void _show(
     BuildContext context, {
