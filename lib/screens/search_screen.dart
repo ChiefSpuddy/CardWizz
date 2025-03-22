@@ -295,25 +295,47 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onScroll() {
-    if (!_isLoading && 
-        !_isLoadingMore &&
-        _hasMorePages &&
-        _searchResults != null &&
-        _scrollController.position.pixels >= 
-        _scrollController.position.maxScrollExtent - 1200) {
-      _loadNextPage();
+    // Debug the scroll position to understand what's happening
+    if (_scrollController.hasClients && 
+        _searchResults != null && 
+        _searchResults!.isNotEmpty && 
+        _hasMorePages) {
+      
+      // Calculate how close we are to the bottom
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final currentScroll = _scrollController.position.pixels;
+      final remainingScroll = maxScroll - currentScroll;
+      
+      // Log when we're getting close to triggering load more
+      if (remainingScroll < 1500) {
+        LoggingService.debug('Scroll position: $currentScroll, Max: $maxScroll, Remaining: $remainingScroll');
+      }
+      
+      // Reduced threshold to trigger earlier
+      if (!_isLoading && 
+          !_isLoadingMore &&
+          _hasMorePages &&
+          remainingScroll < 800) {
+        LoggingService.debug('Triggering load more: page $_currentPage, hasMore: $_hasMorePages');
+        _loadNextPage();
+      }
     }
   }
 
   void _loadNextPage() {
-    if (_isLoading || _isLoadingMore || !_hasMorePages) return;
+    if (_isLoading || _isLoadingMore || !_hasMorePages) {
+      LoggingService.debug('Load more blocked: isLoading=$_isLoading, isLoadingMore=$_isLoadingMore, hasMorePages=$_hasMorePages');
+      return;
+    }
 
+    LoggingService.debug('Loading next page: ${_currentPage + 1}');
+    
     setState(() => _isLoadingMore = true);
     _currentPage++;
     
     // Use the correct search method based on the mode
     if (_searchMode == SearchMode.mtg) {
-      _performMtgSearch(_lastQuery ?? _searchController.text);
+      _performMtgSearch(_lastQuery ?? _searchController.text, isLoadingMore: true);
     } else {
       _performSearch(
         _lastQuery ?? _searchController.text,
@@ -586,6 +608,9 @@ class _SearchScreenState extends State<SearchScreen> {
         orderByDesc: !_sortAscending,
       );
 
+      // Log the results count for debugging
+      LoggingService.debug('Search for "$query" (page $_currentPage) returned ${results['totalCount']} total results');
+
       if (mounted) {
         final List<dynamic> data = results['data'] as List? ?? [];
         final totalCount = results['totalCount'] as int;
@@ -634,6 +659,7 @@ class _SearchScreenState extends State<SearchScreen> {
           setState(() {
             if (isLoadingMore && _searchResults != null) {
               _searchResults = [..._searchResults!, ...newCards];
+              LoggingService.debug('Added ${newCards.length} more cards. Total: ${_searchResults!.length}/$totalCount');
             } else {
               _searchResults = newCards;
               _totalCards = totalCount;
@@ -642,6 +668,8 @@ class _SearchScreenState extends State<SearchScreen> {
             _hasMorePages = (_currentPage * 30) < totalCount;
             _isLoading = false;
             _isLoadingMore = false;
+            
+            LoggingService.debug('Updated search state: hasMorePages=$_hasMorePages, currentPage=$_currentPage, totalCards=$_totalCards');
           });
           
           // Then queue the rest for loading after a tiny delay to not block UI
@@ -684,7 +712,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Future<void> _performMtgSearch(String query) async {
+  Future<void> _performMtgSearch(String query, {bool isLoadingMore = false}) async {
     if (query.isEmpty) {
       setState(() {
         _searchResults = null;
@@ -725,6 +753,9 @@ class _SearchScreenState extends State<SearchScreen> {
         orderByDesc: !_sortAscending, // Already set to descending (high to low)
       );
 
+      // Log the results count for debugging
+      LoggingService.debug('Search for "$query" (page $_currentPage) returned ${results['totalCount']} total results');
+
       if (mounted) {
         final currencyProvider = Provider.of<CurrencyProvider>(context, listen: false);
         final List<dynamic> cardsData = results['data'] as List? ?? [];
@@ -763,8 +794,9 @@ class _SearchScreenState extends State<SearchScreen> {
         }).toList();
         
         setState(() {
-          if (_isLoadingMore && _searchResults != null) {
+          if (isLoadingMore && _searchResults != null) {
             _searchResults = [..._searchResults!, ...cards];
+            LoggingService.debug('Added ${cards.length} more MTG cards. Total: ${_searchResults!.length}/$totalCount');
           } else {
             _searchResults = cards;
           }
@@ -772,6 +804,8 @@ class _SearchScreenState extends State<SearchScreen> {
           _isLoading = false;
           _isLoadingMore = false;
           _hasMorePages = hasMore;
+          
+          LoggingService.debug('Updated MTG search state: hasMorePages=$_hasMorePages, currentPage=$_currentPage, totalCards=$_totalCards');
         });
         
         // Debug log the first few cards
@@ -1590,26 +1624,30 @@ class _SearchScreenState extends State<SearchScreen> {
                   },
                 ),
               
-              // Pagination controls
-              if (_hasMorePages && !_isLoadingMore)
+              // Pagination controls - fixed to show only one loading indicator
+              if (_searchResults != null && _searchResults!.isNotEmpty && _hasMorePages)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: FilledButton.icon(
-                      onPressed: _loadNextPage,
-                      icon: const Icon(Icons.expand_more),
-                      label: const Text('Load More'),
-                    ),
-                  ),
-                ),
-              
-              if (_isLoadingMore)
-                const SliverToBoxAdapter(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: CircularProgressIndicator(),
-                    ),
+                    child: _isLoadingMore
+                        ? const Center(
+                            child: Column(
+                              children: [
+                                CircularProgressIndicator(),
+                                SizedBox(height: 8),
+                                Text('Loading more cards...'),
+                              ],
+                            ),
+                          )
+                        : FilledButton.icon(
+                            onPressed: _loadNextPage,
+                            icon: const Icon(Icons.expand_more),
+                            label: const Text('Load More Cards'),
+                            style: FilledButton.styleFrom(
+                              // Make button wider for easier tapping
+                              minimumSize: const Size(200, 48),
+                            ),
+                          ),
                   ),
                 ),
             ],
