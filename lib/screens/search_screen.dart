@@ -948,6 +948,7 @@ class _SearchScreenState extends State<SearchScreen> {
     // Use a longer debounce for better user experience
     _searchDebounce = Timer(const Duration(milliseconds: 500), () {
       if (mounted && query == _searchController.text && query.isNotEmpty) {
+        LoggingService.debug('Initiating search for query: "$query"');
         setState(() {
           _currentPage = 1;
           _isInitialSearch = true;
@@ -1078,10 +1079,13 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  // COMPLETELY REWRITE the sort function to be as simple as possible
+  // COMPLETELY REWRITE the sort function with better styling
 void _showSortOptions() {
   // Log that sort options was triggered
   LoggingService.debug('Sort options opened, current sort: $_currentSort, ascending: $_sortAscending');
+  
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final colorScheme = Theme.of(context).colorScheme;
   
   showDialog(
     context: context,
@@ -1089,68 +1093,250 @@ void _showSortOptions() {
       // For MTG searches, show that high-to-low is the default and always applied
       bool isMtgMode = _searchMode == SearchMode.mtg;
       
-      return AlertDialog(
-        title: const Text('Sort By'),
-        content: SingleChildScrollView(
+      return Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        elevation: 8,
+        backgroundColor: isDark ? Colors.grey[850] : Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Sort Cards By', 
+                      style: TextStyle(
+                        fontSize: 20, 
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
+                      )
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.close, 
+                        color: isDark ? Colors.white70 : Colors.black54,
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                    )
+                  ],
+                ),
+              ),
+              
               if (isMtgMode)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text(
-                    'MTG cards are always sorted by price (high to low)',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.secondary,
-                      fontStyle: FontStyle.italic,
+                  padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 8.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline, 
+                          color: colorScheme.primary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'MTG cards are always sorted by price (high to low)',
+                            style: TextStyle(
+                              color: colorScheme.primary,
+                              fontStyle: FontStyle.italic,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              const SizedBox(height: 8),
               
-              // Simplified sort options as radio buttons
-              _buildSortRadioTile('cardmarket.prices.averageSellPrice', false, 'Price (High to Low)', Icons.attach_money, context),
+              const Divider(),
+              
+              // Price sorting options
+              Padding(
+                padding: const EdgeInsets.only(left: 24.0, top: 8.0, bottom: 4.0),
+                child: Text(
+                  'Price',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+              ),
+              _buildStyledSortTile(
+                'cardmarket.prices.averageSellPrice', 
+                false, 
+                'High to Low', 
+                Icons.trending_down,
+                isMtgMode && _currentSort == 'cardmarket.prices.averageSellPrice' && !_sortAscending,
+                context,
+                isDark,
+                colorScheme,
+              ),
+              if (!isMtgMode)
+                _buildStyledSortTile(
+                  'cardmarket.prices.averageSellPrice', 
+                  true, 
+                  'Low to High', 
+                  Icons.trending_up, 
+                  false, 
+                  context,
+                  isDark,
+                  colorScheme,
+                ),
               
               if (!isMtgMode) ...[
-                _buildSortRadioTile('cardmarket.prices.averageSellPrice', true, 'Price (Low to High)', Icons.money_off, context),
-                _buildSortRadioTile('name', true, 'Name (A to Z)', Icons.sort_by_alpha, context),
-                _buildSortRadioTile('name', false, 'Name (Z to A)', Icons.sort_by_alpha, context),
-                _buildSortRadioTile('number', true, 'Set Number (Low to High)', Icons.format_list_numbered, context),
-                _buildSortRadioTile('number', false, 'Set Number (High to Low)', Icons.format_list_numbered, context),
+                const Divider(indent: 24, endIndent: 24),
+                
+                // Name sorting options
+                Padding(
+                  padding: const EdgeInsets.only(left: 24.0, top: 8.0, bottom: 4.0),
+                  child: Text(
+                    'Name',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                ),
+                _buildStyledSortTile(
+                  'name', 
+                  true, 
+                  'A to Z', 
+                  Icons.sort, 
+                  false, 
+                  context,
+                  isDark,
+                  colorScheme,
+                ),
+                _buildStyledSortTile(
+                  'name', 
+                  false, 
+                  'Z to A', 
+                  Icons.sort, 
+                  false, 
+                  context,
+                  isDark,
+                  colorScheme,
+                ),
+                
+                const Divider(indent: 24, endIndent: 24),
+                
+                // Number sorting options
+                Padding(
+                  padding: const EdgeInsets.only(left: 24.0, top: 8.0, bottom: 4.0),
+                  child: Text(
+                    'Set Number',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                ),
+                _buildStyledSortTile(
+                  'number', 
+                  true, 
+                  'Low to High', 
+                  Icons.format_list_numbered, 
+                  false, 
+                  context,
+                  isDark,
+                  colorScheme,
+                ),
+                _buildStyledSortTile(
+                  'number', 
+                  false, 
+                  'High to Low', 
+                  Icons.format_list_numbered_rtl, 
+                  false, 
+                  context,
+                  isDark,
+                  colorScheme,
+                ),
               ],
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
       );
     },
   );
 }
 
-// Helper to build consistent radio tiles
-Widget _buildSortRadioTile(String sortField, bool ascending, String title, IconData icon, BuildContext context) {
-  // Simplify the value representation
-  final String value = '$sortField:$ascending';
-  final String currentValue = '$_currentSort:$_sortAscending';
+// Better styled sort tile with visual selection indicator
+Widget _buildStyledSortTile(
+  String sortField, 
+  bool ascending, 
+  String title, 
+  IconData icon, 
+  bool disabledButSelected,
+  BuildContext context,
+  bool isDark,
+  ColorScheme colorScheme,
+) {
+  final bool isSelected = _currentSort == sortField && _sortAscending == ascending;
   
-  return RadioListTile<String>(
-    title: Text(title),
-    secondary: Icon(icon),
-    value: value,
-    groupValue: currentValue,
-    onChanged: (_) {
-      Navigator.of(context).pop(); // Close dialog first
+  return InkWell(
+    onTap: disabledButSelected ? null : () {
+      Navigator.of(context).pop();
       _applySortDirectly(sortField, ascending);
     },
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? colorScheme.primary.withOpacity(isDark ? 0.2 : 0.1)
+              : Colors.transparent,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected 
+                ? colorScheme.primary 
+                : (isDark ? Colors.white70 : Colors.black54),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              title,
+              style: TextStyle(
+                color: isSelected 
+                  ? colorScheme.primary 
+                  : (isDark ? Colors.white : Colors.black87),
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+            const Spacer(),
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: colorScheme.primary,
+                size: 20,
+              ),
+          ],
+        ),
+      ),
+    ),
   );
 }
 
-// Ultra-simple direct sort method for reliability
+// Ultra-simple direct sort method for reliability (unchanged)
 void _applySortDirectly(String sortField, bool ascending) {
   LoggingService.debug('Directly applying sort: $sortField, ascending: $ascending');
   

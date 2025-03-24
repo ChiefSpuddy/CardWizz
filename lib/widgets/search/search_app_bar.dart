@@ -135,7 +135,17 @@ class _SearchAppBarState extends State<SearchAppBar> {
                   child: TextField(
                     controller: widget.searchController,
                     focusNode: _searchFocusNode,
-                    onChanged: widget.onSearchChanged,
+                    onChanged: (value) {
+                      // Call the parent's onSearchChanged method
+                      widget.onSearchChanged(value);
+                      // Also update local state to track if we're searching
+                      final isTextEmpty = value.isEmpty;
+                      if (_isSearching != !isTextEmpty) {
+                        setState(() {
+                          _isSearching = !isTextEmpty;
+                        });
+                      }
+                    },
                     textAlign: TextAlign.left,
                     decoration: InputDecoration(
                       hintText: widget.searchMode == SearchMode.eng 
@@ -159,7 +169,9 @@ class _SearchAppBarState extends State<SearchAppBar> {
                     // Simple onSubmitted handler that will just trigger search
                     onSubmitted: (value) {
                       if (value.length >= 2) {
+                        // IMPORTANT: Make sure to call onSearchChanged explicitly here
                         widget.onSearchChanged(value);
+                        LoggingService.debug('Search submitted: "$value"');
                       }
                       // Unfocus to dismiss keyboard
                       _searchFocusNode.unfocus();
