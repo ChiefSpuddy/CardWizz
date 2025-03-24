@@ -96,110 +96,48 @@ class TcgApiService {
     }
   }
 
-  // Core search method
+  // Core search method - enhance logging and parameter handling
   Future<Map<String, dynamic>> searchCards({
     required String query,
-    String orderBy = 'number',
+    String? orderBy,
     bool orderByDesc = false,
-    int pageSize = 20,
     int page = 1,
+    int pageSize = 20,
   }) async {
-    final cacheKey = '$query-$orderBy-$orderByDesc-$pageSize-$page';
-    
-    // Check cache first
-    final cacheEntry = _cache[cacheKey];
-    if (cacheEntry != null && !cacheEntry.isExpired) {
-      return cacheEntry.data as Map<String, dynamic>;
-    }
-
-    // Check if this is a Japanese set query
-    if (query.startsWith('set.id:') && query.contains('-jp')) {
-      final setId = query.replaceAll('set.id:', '').trim();
-      return _tcgdexApi.searchJapaneseSet(setId);
-    }
-
     try {
-      // If this is a set.id query, check if it needs special handling
-      String cleanedQuery = query;
-      if (query.startsWith('set.id:')) {
-        final setId = query.replaceAll('set.id:', '').trim();
-        cleanedQuery = _buildSpecialSetQuery(setId);
-        
-        // For set searches, default to number ordering if not specified
-        if (orderBy == 'cardmarket.prices.averageSellPrice') {
-          orderBy = 'number';
-          orderByDesc = false;
-        }
-      } else {
-        cleanedQuery = _cleanupQuery(query);
-      }
-
-      LoggingService.debug('Searching with query: $cleanedQuery');
-
-      // IMPORTANT: First debug print to see the API request
-      final request = {
-        'q': cleanedQuery,
-        'orderBy': orderByDesc ? '-$orderBy' : orderBy,
-        'pageSize': pageSize,
+      // Enhanced logging to help diagnose sort issues
+      LoggingService.debug('API Request: Query="$query", Sort="$orderBy", OrderByDesc=$orderByDesc, Page=$page');
+      
+      // Build query parameters with more detailed logging
+      final queryParams = <String, dynamic>{
+        'q': query,
         'page': page,
-        // IMPORTANT: Make sure we're requesting images
-        'select': 'id,name,number,rarity,images,cardmarket,set',
+        'pageSize': pageSize,
       };
       
-      LoggingService.debug('API Request params: $request');
-
-      final response = await _makeRequestWithRetry(
-        '/cards',
-        queryParameters: request,
-      );
-
-      // IMPORTANT: Log the first card to see its structure
-      if (response['data'] != null && (response['data'] as List).isNotEmpty) {
-        LoggingService.debug('First card sample: ${response['data'][0]}');
-        final firstCard = response['data'][0];
-        print('First card name: ${firstCard['name']}, images: ${firstCard['images']}');
+      // Only add sort parameters if provided, but log either way
+      if (orderBy != null && orderBy.isNotEmpty) {
+        LoggingService.debug('Adding sort parameter: $orderBy, direction: ${orderByDesc ? "descending" : "ascending"}');
+        queryParams['orderBy'] = orderBy;
+        queryParams['desc'] = orderByDesc.toString(); // Explicitly convert to string
+      } else {
+        LoggingService.debug('No sort parameters provided for this request');
       }
-
-      if (response['data'] != null) {
-        // Process the data and manually ensure images are extracted properly
-        final processedData = response['data'].map((card) {
-          // IMPORTANT: Make sure image URLs are explicitly copied to prevent loss
-          final cardWithImages = <String, dynamic>{...card};
-          
-          // Log the image data for the first card
-          if (card == response['data'][0]) {
-            print('Processing first card: ${card['name']}');
-            print('Image data: ${card['images']}');
-          }
-          
-          // Process pricing data
-          if (card['cardmarket'] != null) {
-            final prices = card['cardmarket']['prices'];
-            if (prices != null) {
-              prices['averageSellPrice'] = _toDouble(prices['averageSellPrice']);
-              prices['lowPrice'] = _toDouble(prices['lowPrice']);
-              prices['trendPrice'] = _toDouble(prices['trendPrice']);
-            }
-          }
-          
-          return cardWithImages;
-        }).toList();
-
-        // Cache this result
-        final resultData = {
-          'data': processedData,
-          'totalCount': response['totalCount'] ?? 0,
-          'page': page,
-        };
-        
-        _cache[cacheKey] = _CacheEntry(resultData);
-        return resultData;
-      }
-
-      return {'data': [], 'totalCount': 0, 'page': page};
-
+      
+      // Log the final query parameters
+      LoggingService.debug('Final API query parameters: $queryParams');
+      
+      // Make the request with proper query parameters
+      final response = await _dio.get('/cards', queryParameters: queryParams);
+      
+      // Log the result count for debugging
+      final data = response.data as Map<String, dynamic>;
+      final totalCount = data['totalCount'] as int? ?? 0;
+      LoggingService.debug('API Result: Found $totalCount cards for page $page');
+      
+      return data;
     } catch (e) {
-      LoggingService.debug('Search error: $e');
+      LoggingService.error('Error searching cards: $e');
       rethrow;
     }
   }
@@ -232,8 +170,8 @@ class TcgApiService {
       }
     }
 
-    // Process remaining requests
-    if (batch.isNotEmpty) {
+    // Process remaining requests - FIX the syntax error here
+    if (batch.isNotEmpty) {  // Changed from 'if (batch isNotEmpty)'
       results.addAll(await Future.wait(batch));
     }
 

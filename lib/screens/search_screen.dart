@@ -185,6 +185,11 @@ class _SearchScreenState extends State<SearchScreen> {
   Set<String> get _collectionCardIds => _collectionCardsSubject.value;
   StreamSubscription? _cardsSubscription;
 
+  // Add this field near the top of the class with other state variables
+  String _serverSort = 'cardmarket.prices.averageSellPrice';
+  bool _serverSortAscending = false;
+  bool _useClientSideSort = false;
+
   @override
   void initState() {
     super.initState();
@@ -214,6 +219,12 @@ class _SearchScreenState extends State<SearchScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _setupCollectionWatcher();
     });
+
+    // IMPORTANT: Always initialize sorting to price high-to-low
+    _currentSort = 'cardmarket.prices.averageSellPrice';
+    _sortAscending = false;
+    _serverSort = 'cardmarket.prices.averageSellPrice';
+    _serverSortAscending = false;
   }
 
   @override
@@ -522,6 +533,14 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
+    // IMPORTANT: Set default sorting to price high-to-low if not already set
+    if (!isLoadingMore && _currentSort != 'cardmarket.prices.averageSellPrice' && _sortAscending != false) {
+      _currentSort = 'cardmarket.prices.averageSellPrice';
+      _sortAscending = false;
+      _serverSort = 'cardmarket.prices.averageSellPrice';
+      _serverSortAscending = false;
+    }
+
     // Update to store set name for better loading states
     String? setName;
 
@@ -599,13 +618,17 @@ class _SearchScreenState extends State<SearchScreen> {
         }
       }
       
-      // Execute the search
+      // Determine which sort parameters to use for API call
+      final apiSortField = _useClientSideSort ? _serverSort : _currentSort;
+      final apiSortAscending = _useClientSideSort ? _serverSortAscending : _sortAscending;
+      
+      // Execute the search with the appropriate sort parameters
       final results = await _apiService.searchCards(
         query: searchQuery,
         page: _currentPage,
         pageSize: 30,
-        orderBy: _currentSort,
-        orderByDesc: !_sortAscending,
+        orderBy: apiSortField,
+        orderByDesc: !apiSortAscending,
       );
 
       // Log the results count for debugging
@@ -694,6 +717,37 @@ class _SearchScreenState extends State<SearchScreen> {
             _isLoadingMore = false;
           });
         }
+        
+        // Apply client-side sorting if needed after getting results
+        if (_useClientSideSort && mounted) {
+          // If using client-side sort and not the same as server sort, apply the client sort
+          if (_useClientSideSort && (_currentSort != _serverSort || _sortAscending != _serverSortAscending)) {
+            final sortedNewCards = _sortCards(newCards, _currentSort, _sortAscending);
+            
+            setState(() {
+              if (isLoadingMore && _searchResults != null) {
+                // Apply sort to combined results if loading more
+                final combinedResults = [..._searchResults!, ...sortedNewCards];
+                _searchResults = _sortCards(combinedResults, _currentSort, _sortAscending);
+              } else {
+                _searchResults = sortedNewCards;
+              }
+              // ...existing code for updating state...
+            });
+          } else {
+            // No additional client sorting needed
+            setState(() {
+              if (isLoadingMore && _searchResults != null) {
+                _searchResults = [..._searchResults!, ...newCards];
+              } else {
+                _searchResults = newCards;
+              }
+              // ...existing code for updating state...
+            });
+          }
+          
+          // ...rest of existing code...
+        }
       }
     } catch (e) {
       LoggingService.debug('❌ Search error: $e');
@@ -721,12 +775,14 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _searchResults = null;
-      _setResults = null;
-      _showCategories = false;
-    });
+    if (!isLoadingMore) {
+      setState(() {
+        _isLoading = true;
+        _searchResults = null;
+        _setResults = null;
+        _showCategories = false;
+      });
+    }
 
     try {
       // Always enforce price high-to-low for ALL MTG searches
@@ -745,12 +801,17 @@ class _SearchScreenState extends State<SearchScreen> {
         LoggingService.debug('MTG general search: "$searchQuery" (sorted by price high-to-low)');
       }
 
+      // Store last query for pagination consistency
+      if (!isLoadingMore) {
+        _lastQuery = query;
+      }
+
       final results = await _mtgApi.searchCards(
         query: searchQuery,
         page: _currentPage,
         pageSize: 30,
-        orderBy: _currentSort,        // Already set to price
-        orderByDesc: !_sortAscending, // Already set to descending (high to low)
+        orderBy: _currentSort,
+        orderByDesc: !_sortAscending,
       );
 
       // Log the results count for debugging
@@ -795,8 +856,16 @@ class _SearchScreenState extends State<SearchScreen> {
         
         setState(() {
           if (isLoadingMore && _searchResults != null) {
-            _searchResults = [..._searchResults!, ...cards];
-            LoggingService.debug('Added ${cards.length} more MTG cards. Total: ${_searchResults!.length}/$totalCount');
+            // When loading more, append without duplicates
+            final existingIds = _searchResults!.map((c) => c.id).toSet();
+            final uniqueNewCards = cards.where((c) => !existingIds.contains(c.id)).toList();
+            
+            if (uniqueNewCards.isNotEmpty) {
+              _searchResults = [..._searchResults!, ...uniqueNewCards];
+              LoggingService.debug('Added ${uniqueNewCards.length} more unique MTG cards. Total: ${_searchResults!.length}/$totalCount');
+            } else {
+              LoggingService.debug('No new unique cards found in this page');
+            }
           } else {
             _searchResults = cards;
           }
@@ -848,22 +917,6 @@ class _SearchScreenState extends State<SearchScreen> {
         });
       }
     }
-  }
-
-  // Add this helper method to get a set name from code
-  String? _getSetNameFromCode(String code) {
-    // Clean the code
-    final cleanCode = code.trim().toLowerCase();
-    
-    // Try to find the set in all MTG sets
-    final mtgSets = _getAllMtgSets();
-    
-    final matchingSet = mtgSets.firstWhere(
-      (set) => set['code'].toString().toLowerCase() == cleanCode,
-      orElse: () => {'name': null},
-    );
-    
-    return matchingSet['name'] as String?;
   }
 
   Future<void> _performSetSearch(String query) async {
@@ -978,11 +1031,11 @@ class _SearchScreenState extends State<SearchScreen> {
       _hasMorePages = true;
       _showCategories = false;
 
-      // Sort by price high-to-low for set searches (both Pokemon and MTG)
-      if (searchItem['query'].toString().startsWith('set.id:')) {
-        _currentSort = 'cardmarket.prices.averageSellPrice';
-        _sortAscending = false;
-      }
+      // CRITICAL: Always enforce price high-to-low
+      _currentSort = 'cardmarket.prices.averageSellPrice';
+      _sortAscending = false;
+      _serverSort = 'cardmarket.prices.averageSellPrice';
+      _serverSortAscending = false;
     });
 
     try {
@@ -1336,9 +1389,9 @@ Widget _buildStyledSortTile(
   );
 }
 
-// Ultra-simple direct sort method for reliability (unchanged)
+// Ultra-simple direct sort method completely rewritten for consistent server-side sorting
 void _applySortDirectly(String sortField, bool ascending) {
-  LoggingService.debug('Directly applying sort: $sortField, ascending: $ascending');
+  LoggingService.debug('Applying sort: $sortField, ascending: $ascending from server');
   
   // For MTG mode, enforce price high-to-low
   if (_searchMode == SearchMode.mtg) {
@@ -1346,26 +1399,52 @@ void _applySortDirectly(String sortField, bool ascending) {
     ascending = false;
   }
   
+  // Only show loading indicator if we're actually changing the sort
+  if (_currentSort != sortField || _sortAscending != ascending) {
+    NotificationManager.info(
+      context,
+      message: 'Refreshing results with new sort order...',  // Improved message
+      duration: const Duration(seconds: 2),
+      position: NotificationPosition.bottom, // Changed from top to bottom
+    );
+  }
+  
   // Update state
   setState(() {
     _currentSort = sortField;
     _sortAscending = ascending;
+    _serverSort = sortField;
+    _serverSortAscending = ascending;
+    _useClientSideSort = false;
+  });
+
+  // ALWAYS reload from the server with new sort parameters
+  _reloadWithNewSort();
+}
+
+// Simplified reload method - always reload from page 1 with new sort
+void _reloadWithNewSort() {
+  // Show a clearer loading message
+  NotificationManager.info(
+    context,
+    message: 'Reloading cards in new sort order...',  // Improved message
+    duration: const Duration(seconds: 2),
+    position: NotificationPosition.bottom, // Changed from top to bottom
+  );
+  
+  // Reset pagination and trigger reload
+  setState(() {
+    _currentPage = 1;
+    _hasMorePages = true;
+    _isLoading = true;
+    _searchResults = null; // Clear existing results completely
   });
   
-  // Only if we have results, apply sort immediately
-  if (_searchResults != null && _searchResults!.isNotEmpty) {
-    // Show loading indicator for better user feedback
-    NotificationManager.info(
-      context,
-      message: 'Sorting results...',
-      duration: const Duration(seconds: 1),
-      position: NotificationPosition.top,
-    );
-    
-    // Apply client-side sort
-    setState(() {
-      _searchResults = _sortCards(_searchResults!, sortField, ascending);
-    });
+  // Re-perform search with new sort order from the beginning
+  if (_lastQuery != null) {
+    _performSearch(_lastQuery!, useOriginalQuery: true);
+  } else if (_searchController.text.isNotEmpty) {
+    _performSearch(_searchController.text);
   }
 }
 
@@ -1426,10 +1505,13 @@ int _parseCardNumber(String? number) {
       _hasMorePages = true;
       _lastQuery = null;
       _currentSetName = null; // Reset set name when clearing search
-      if (_currentSort != 'cardmarket.prices.averageSellPrice') {
-        _currentSort = 'cardmarket.prices.averageSellPrice';
-        _sortAscending = false;
-      }
+      
+      // Reset sort settings to default - always price high to low
+      _currentSort = 'cardmarket.prices.averageSellPrice';
+      _sortAscending = false;
+      _serverSort = 'cardmarket.prices.averageSellPrice';
+      _serverSortAscending = false;
+      _useClientSideSort = false;
     });
   }
 
@@ -1941,6 +2023,22 @@ int _parseCardNumber(String? number) {
     }
     
     return query;
+  }
+
+  // Add this helper method to get a set name from code
+  String? _getSetNameFromCode(String code) {
+    // Clean the code
+    final cleanCode = code.trim().toLowerCase();
+    
+    // Try to find the set in all MTG sets
+    final mtgSets = _getAllMtgSets();
+    
+    final matchingSet = mtgSets.firstWhere(
+      (set) => set['code'].toString().toLowerCase() == cleanCode,
+      orElse: () => {'name': null},
+    );
+    
+    return matchingSet['name'] as String?;
   }
 }
 
