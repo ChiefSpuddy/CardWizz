@@ -533,12 +533,18 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
-    // IMPORTANT: Set default sorting to price high-to-low if not already set
-    if (!isLoadingMore && _currentSort != 'cardmarket.prices.averageSellPrice' && _sortAscending != false) {
-      _currentSort = 'cardmarket.prices.averageSellPrice';
-      _sortAscending = false;
-      _serverSort = 'cardmarket.prices.averageSellPrice';
-      _serverSortAscending = false;
+    // REMOVE THE AUTO-RESET CODE that was overriding sort settings
+    // if (!isLoadingMore && _currentSort != 'cardmarket.prices.averageSellPrice' && _sortAscending != false) {
+    //   _currentSort = 'cardmarket.prices.averageSellPrice';
+    //   _sortAscending = false;
+    //   _serverSort = 'cardmarket.prices.averageSellPrice';
+    //   _serverSortAscending = false;
+    // }
+
+    // Log current sort settings on search
+    if (!isLoadingMore) {
+      LoggingService.debug('SEARCH WITH SORT: _currentSort=$_currentSort, _sortAscending=$_sortAscending');
+      LoggingService.debug('SEARCH SERVER SORT: _serverSort=$_serverSort, _serverSortAscending=$_serverSortAscending');
     }
 
     // Update to store set name for better loading states
@@ -622,6 +628,9 @@ class _SearchScreenState extends State<SearchScreen> {
       final apiSortField = _useClientSideSort ? _serverSort : _currentSort;
       final apiSortAscending = _useClientSideSort ? _serverSortAscending : _sortAscending;
       
+      // Log sort parameters being sent to API
+      LoggingService.debug('API SORT: Using field=$apiSortField, ascending=$apiSortAscending, desc=${!apiSortAscending}');
+      
       // Execute the search with the appropriate sort parameters
       final results = await _apiService.searchCards(
         query: searchQuery,
@@ -631,34 +640,23 @@ class _SearchScreenState extends State<SearchScreen> {
         orderByDesc: !apiSortAscending,
       );
 
-      // Log the results count for debugging
-      LoggingService.debug('Search for "$query" (page $_currentPage) returned ${results['totalCount']} total results');
+      // Log the results count and first few cards
+      LoggingService.debug('Search returned ${results['totalCount']} total results with sort: $apiSortField (asc=$apiSortAscending)');
 
       if (mounted) {
         final List<dynamic> data = results['data'] as List? ?? [];
-        final totalCount = results['totalCount'] as int;
+        final int totalCount = results['totalCount'] as int; // Define totalCount variable here
         
-        // Try by set name if set.id search fails
-        if (data.isEmpty && query.startsWith('set.id:')) {
-          final setMap = PokemonSets.getSetsForCategory('modern')
-              .firstWhere((s) => s['query'] == query, orElse: () => {'name': ''});
-          final String? setName = setMap['name'] as String?;
-          
-          if (setName?.isNotEmpty ?? false) {
-            final nameQuery = 'set:"$setName"';
-            final nameResults = await _apiService.searchCards(
-              query: nameQuery,
-              page: _currentPage,
-              pageSize: 30,
-              orderBy: _currentSort,
-              orderByDesc: !_sortAscending,
-            );
-            if (nameResults['data'] != null) {
-              data.clear();
-              data.addAll(nameResults['data'] as List);
-              final newTotalCount = (nameResults['totalCount'] as int?) ?? 0;
-              setState(() => _totalCards = newTotalCount);
-            }
+        // Log first few results for debugging
+        if (data.isNotEmpty) {
+          final sampleSize = math.min(5, data.length);
+          LoggingService.debug('FIRST $sampleSize RESULTS RETURNED:');
+          for (int i = 0; i < sampleSize; i++) {
+            final card = data[i] as Map<String, dynamic>;
+            final name = card['name'] ?? 'Unknown';
+            final number = card['number'] ?? 'N/A';
+            final price = card['cardmarket']?['prices']?['averageSellPrice'] ?? 'N/A';
+            LoggingService.debug('  [$i] $name (#$number) - Price: $price');
           }
         }
         
@@ -682,13 +680,13 @@ class _SearchScreenState extends State<SearchScreen> {
           setState(() {
             if (isLoadingMore && _searchResults != null) {
               _searchResults = [..._searchResults!, ...newCards];
-              LoggingService.debug('Added ${newCards.length} more cards. Total: ${_searchResults!.length}/$totalCount');
+              LoggingService.debug('Added ${newCards.length} more cards. Total: ${_searchResults!.length}/${_totalCards}'); // Use _totalCards instead of undefined totalCount
             } else {
               _searchResults = newCards;
-              _totalCards = totalCount;
+              _totalCards = totalCount; // This is correct
             }
             
-            _hasMorePages = (_currentPage * 30) < totalCount;
+            _hasMorePages = (_currentPage * 30) < _totalCards; // Use _totalCards instead of totalCount
             _isLoading = false;
             _isLoadingMore = false;
             
@@ -1135,7 +1133,9 @@ class _SearchScreenState extends State<SearchScreen> {
   // COMPLETELY REWRITE the sort function with better styling
 void _showSortOptions() {
   // Log that sort options was triggered
-  LoggingService.debug('Sort options opened, current sort: $_currentSort, ascending: $_sortAscending');
+  LoggingService.debug('SORT DIALOG: Sort options dialog opened');
+  LoggingService.debug('SORT DIALOG: Current sort: $_currentSort, ascending: $_sortAscending');
+  LoggingService.debug('SORT DIALOG: Search mode: $_searchMode');
   
   final isDark = Theme.of(context).brightness == Brightness.dark;
   final colorScheme = Theme.of(context).colorScheme;
@@ -1145,6 +1145,8 @@ void _showSortOptions() {
     builder: (context) {
       // For MTG searches, show that high-to-low is the default and always applied
       bool isMtgMode = _searchMode == SearchMode.mtg;
+      
+      LoggingService.debug('SORT DIALOG: Building dialog with isMtgMode=$isMtgMode');
       
       return Dialog(
         shape: RoundedRectangleBorder(
@@ -1391,87 +1393,110 @@ Widget _buildStyledSortTile(
 
 // Ultra-simple direct sort method completely rewritten for consistent server-side sorting
 void _applySortDirectly(String sortField, bool ascending) {
-  LoggingService.debug('Applying sort: $sortField, ascending: $ascending from server');
+  // Add more explicit logging of the sort request
+  LoggingService.debug('SORT ACTION: Explicitly setting sort to: $sortField, ascending=$ascending');
+  LoggingService.debug('SORT BEFORE STATE: _currentSort=$_currentSort, _sortAscending=$_sortAscending');
+  LoggingService.debug('SORT BEFORE SERVER: _serverSort=$_serverSort, _serverSortAscending=$_serverSortAscending');
   
   // For MTG mode, enforce price high-to-low
   if (_searchMode == SearchMode.mtg) {
+    LoggingService.debug('SORT OVERRIDE: MTG mode detected, enforcing price high-to-low');
     sortField = 'cardmarket.prices.averageSellPrice';
     ascending = false;
   }
   
-  // Only show loading indicator if we're actually changing the sort
-  if (_currentSort != sortField || _sortAscending != ascending) {
-    NotificationManager.info(
-      context,
-      message: 'Refreshing results with new sort order...',  // Improved message
-      duration: const Duration(seconds: 2),
-      position: NotificationPosition.bottom, // Changed from top to bottom
-    );
-  }
+  // Track if we're changing sort to determine if a reload is needed
+  final bool sortChanged = _currentSort != sortField || _sortAscending != ascending;
   
   // Update state
   setState(() {
     _currentSort = sortField;
     _sortAscending = ascending;
-    _serverSort = sortField;
-    _serverSortAscending = ascending;
-    _useClientSideSort = false;
+    _serverSort = sortField;  // Ensure server sort matches
+    _serverSortAscending = ascending;  // Ensure server sort direction matches
+    _useClientSideSort = false;  // Always use server-side sorting
+    
+    // If we have search results, apply the sort immediately
+    if (_searchResults != null && _searchResults!.isNotEmpty) {
+      LoggingService.debug('Sorting ${_searchResults!.length} cards with $sortField (ascending=$ascending)');
+      
+      // Create a new sorted list based on the specified criteria
+      final sortedResults = _sortCards(_searchResults!, sortField, ascending);
+      
+      // Replace the existing results with the sorted list
+      _searchResults = sortedResults;
+      
+      // Log first few cards after sorting to verify order
+      if (_searchResults!.isNotEmpty) {
+        LoggingService.debug('FIRST FEW CARDS AFTER SORTING:');
+        final sampleSize = math.min(5, _searchResults!.length);
+        for (int i = 0; i < sampleSize; i++) {
+          final card = _searchResults![i];
+          final value = _getCardSortValue(card, sortField);
+          LoggingService.debug('[$i] ${card.name} (#${card.number}) - Value: $value');
+        }
+      }
+    } else {
+      LoggingService.debug('No search results to sort');
+    }
   });
-
-  // ALWAYS reload from the server with new sort parameters
-  _reloadWithNewSort();
-}
-
-// Simplified reload method - always reload from page 1 with new sort
-void _reloadWithNewSort() {
-  // Show a clearer loading message
+  
+  // Show a notification that the sort was applied
   NotificationManager.info(
     context,
-    message: 'Reloading cards in new sort order...',  // Improved message
-    duration: const Duration(seconds: 2),
-    position: NotificationPosition.bottom, // Changed from top to bottom
+    message: 'Sorted by ${_getSortDisplayName(sortField, ascending)}',
+    duration: const Duration(seconds: 1),
+    position: NotificationPosition.top,
   );
-  
-  // Reset pagination and trigger reload
-  setState(() {
-    _currentPage = 1;
-    _hasMorePages = true;
-    _isLoading = true;
-    _searchResults = null; // Clear existing results completely
-  });
-  
-  // Re-perform search with new sort order from the beginning
-  if (_lastQuery != null) {
-    _performSearch(_lastQuery!, useOriginalQuery: true);
-  } else if (_searchController.text.isNotEmpty) {
-    _performSearch(_searchController.text);
-  }
 }
 
-// Ultra-simple card sorting function
+// Completely replace the _sortCards method with this more robust implementation
 List<TcgCard> _sortCards(List<TcgCard> cards, String sortField, bool ascending) {
+  LoggingService.debug('CLIENT SORT: Sorting ${cards.length} cards by $sortField (ascending=$ascending)');
+  
+  // Create a copy of the list to avoid modifying the original
   final sortedCards = List<TcgCard>.from(cards);
   
   switch (sortField) {
     case 'cardmarket.prices.averageSellPrice':
       sortedCards.sort((a, b) {
-        // Handle null values gracefully
-        final aPrice = a.price ?? 0.0;
-        final bPrice = b.price ?? 0.0;
+        // Handle null prices by treating them as 0
+        final double aPrice = a.price ?? 0.0;
+        final double bPrice = b.price ?? 0.0;
+        
+        // Print a sample of values being compared for debug
+        if (sortedCards.indexOf(a) < 5) {
+          LoggingService.debug('Comparing prices: Card A (${a.name}): $aPrice, Card B (${b.name}): $bPrice');
+        }
+        
         return ascending ? aPrice.compareTo(bPrice) : bPrice.compareTo(aPrice);
       });
       break;
+      
     case 'name':
       sortedCards.sort((a, b) {
-        final aName = a.name ?? '';
-        final bName = b.name ?? '';
+        final String aName = a.name ?? '';
+        final String bName = b.name ?? '';
+        
+        // Print a sample of values being compared for debug
+        if (sortedCards.indexOf(a) < 5) {
+          LoggingService.debug('Comparing names: Card A: $aName, Card B: $bName');
+        }
+        
         return ascending ? aName.compareTo(bName) : bName.compareTo(aName);
       });
       break;
+      
     case 'number':
       sortedCards.sort((a, b) {
-        final aNum = _parseCardNumber(a.number);
-        final bNum = _parseCardNumber(b.number);
+        final int aNum = _parseCardNumber(a.number);
+        final int bNum = _parseCardNumber(b.number);
+        
+        // Print a sample of values being compared for debug
+        if (sortedCards.indexOf(a) < 5) {
+          LoggingService.debug('Comparing numbers: Card A (${a.name}): ${a.number} → $aNum, Card B (${b.name}): ${b.number} → $bNum');
+        }
+        
         return ascending ? aNum.compareTo(bNum) : bNum.compareTo(aNum);
       });
       break;
@@ -1480,19 +1505,55 @@ List<TcgCard> _sortCards(List<TcgCard> cards, String sortField, bool ascending) 
   return sortedCards;
 }
 
-// Simple helper to parse card numbers for sorting
+// Replace the _parseCardNumber method with this more robust version
 int _parseCardNumber(String? number) {
   if (number == null || number.isEmpty) return 0;
   
-  // Extract numeric part
-  final match = RegExp(r'^(\d+)').firstMatch(number);
-  if (match != null) {
+  try {
+    // First attempt: Try to parse the entire string as a number
+    return int.parse(number);
+  } catch (_) {
     try {
-      return int.parse(match.group(1)!);
-    } catch (_) {}
+      // Second attempt: Extract just the numeric part at the beginning
+      final match = RegExp(r'^(\d+)').firstMatch(number);
+      if (match != null) {
+        return int.parse(match.group(1)!);
+      }
+    } catch (_) {
+      // If all else fails, use string comparison to sort alphabetically
+      LoggingService.debug('Failed to parse number: $number');
+    }
   }
   
   return 0;
+}
+
+// Add this helper method for display names
+String _getSortDisplayName(String sortField, bool ascending) {
+  switch (sortField) {
+    case 'cardmarket.prices.averageSellPrice':
+      return ascending ? 'Price (Low to High)' : 'Price (High to Low)';
+    case 'name':
+      return ascending ? 'Name (A to Z)' : 'Name (Z to A)';
+    case 'number':
+      return ascending ? 'Set Number (Low to High)' : 'Set Number (High to Low)';
+    default:
+      return 'Custom Sort';
+  }
+}
+
+// Simplify _getCardSortValue for better debugging
+dynamic _getCardSortValue(TcgCard card, String sortField) {
+  switch (sortField) {
+    case 'cardmarket.prices.averageSellPrice':
+      return card.price ?? 0.0;
+    case 'name':
+      return card.name ?? '';
+    case 'number':
+      return '${card.number} (${_parseCardNumber(card.number)})';
+    default:
+      return null;
+  }
 }
 
   void _clearSearch() {
@@ -1773,7 +1834,15 @@ int _parseCardNumber(String? number) {
           onClearSearch: _clearSearch,
           currentSort: _currentSort,
           sortAscending: _sortAscending,
-          onSortOptionsPressed: _showSortOptions,
+          onSortOptionsPressed: () {
+            // Add debug logs to ensure this callback is firing
+            LoggingService.debug('Sort options callback from SearchAppBar triggered');
+            LoggingService.debug('Search results exist: ${_searchResults != null}');
+            LoggingService.debug('Current sort before dialog: $_currentSort, $_sortAscending');
+            
+            // Call the show sort options method
+            _showSortOptions();
+          },
           hasResults: _searchResults != null || _setResults != null,
           searchMode: _searchMode,
           onSearchModeChanged: (modes) {

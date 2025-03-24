@@ -106,7 +106,7 @@ class TcgApiService {
   }) async {
     try {
       // Enhanced logging to help diagnose sort issues
-      LoggingService.debug('API Request: Query="$query", Sort="$orderBy", OrderByDesc=$orderByDesc, Page=$page');
+      LoggingService.debug('API REQUEST: Query="$query", Sort="$orderBy", OrderByDesc=$orderByDesc');
       
       // Build query parameters with more detailed logging
       final queryParams = <String, dynamic>{
@@ -117,18 +117,27 @@ class TcgApiService {
       
       // Only add sort parameters if provided, but log either way
       if (orderBy != null && orderBy.isNotEmpty) {
-        LoggingService.debug('Adding sort parameter: $orderBy, direction: ${orderByDesc ? "descending" : "ascending"}');
+        LoggingService.debug('API SORT: Adding explicit sort field=$orderBy, desc=$orderByDesc');
         queryParams['orderBy'] = orderBy;
-        queryParams['desc'] = orderByDesc.toString(); // Explicitly convert to string
+        
+        // Critical fix - ensure the desc parameter is passed correctly as a string
+        queryParams['desc'] = orderByDesc.toString();
+        
+        // Double-check the final parameter value
+        LoggingService.debug('API DESC PARAM: ${queryParams['desc']}');
       } else {
-        LoggingService.debug('No sort parameters provided for this request');
+        LoggingService.debug('API SORT: No sort parameters provided');
       }
       
-      // Log the final query parameters
-      LoggingService.debug('Final API query parameters: $queryParams');
+      // Log the raw query parameters
+      final requestMap = Map<String, dynamic>.from(queryParams);
+      LoggingService.debug('API PARAMS: $requestMap');
       
       // Make the request with proper query parameters
       final response = await _dio.get('/cards', queryParameters: queryParams);
+      
+      // Log response status to help debug issues
+      LoggingService.debug('API RESPONSE: Status ${response.statusCode}');
       
       // Log the result count for debugging
       final data = response.data as Map<String, dynamic>;

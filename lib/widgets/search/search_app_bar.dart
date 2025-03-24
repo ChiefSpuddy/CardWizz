@@ -244,14 +244,19 @@ class _SearchAppBarState extends State<SearchAppBar> {
         ),
       ),
       actions: [
-        if (widget.hasResults && _isSearching)
+        // Important: Make the sort button always visible when there are results,
+        // regardless of whether the search field has focus
+        if (widget.hasResults)
           IconButton(
             icon: Icon(
               Icons.sort,
               color: isDark ? Colors.white70 : Colors.grey[800],
             ),
-            onPressed: widget.onSortOptionsPressed,
-            tooltip: 'Sort',
+            onPressed: () {
+              print('Sort button pressed in SearchAppBar');
+              widget.onSortOptionsPressed();
+            },
+            tooltip: 'Sort results',
           ),
         _buildSearchModeToggle(isDark, colorScheme),
       ],
