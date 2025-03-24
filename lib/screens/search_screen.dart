@@ -1078,27 +1078,23 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  void _showSortOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        // For MTG searches, show that high-to-low is the default and always applied
-        bool isMtgMode = _searchMode == SearchMode.mtg;
-        
-        return SafeArea(
+  // COMPLETELY REWRITE the sort function to be as simple as possible
+void _showSortOptions() {
+  // Log that sort options was triggered
+  LoggingService.debug('Sort options opened, current sort: $_currentSort, ascending: $_sortAscending');
+  
+  showDialog(
+    context: context,
+    builder: (context) {
+      // For MTG searches, show that high-to-low is the default and always applied
+      bool isMtgMode = _searchMode == SearchMode.mtg;
+      
+      return AlertDialog(
+        title: const Text('Sort By'),
+        content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                title: Text(
-                  'Sort By',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                trailing: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Done'),
-                ),
-              ),
               if (isMtgMode)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -1110,110 +1106,130 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   ),
                 ),
-              const Divider(height: 16),
+              const SizedBox(height: 8),
               
-              ListTile(
-                title: const Text('Price (High to Low)'),
-                leading: const Icon(Icons.attach_money),
-                selected: _currentSort == 'cardmarket.prices.averageSellPrice' && !_sortAscending,
-                // For MTG mode, disable other sorting options
-                enabled: !isMtgMode || (_currentSort == 'cardmarket.prices.averageSellPrice' && !_sortAscending),
-                onTap: () => _updateSort('cardmarket.prices.averageSellPrice', false),
-              ),
+              // Simplified sort options as radio buttons
+              _buildSortRadioTile('cardmarket.prices.averageSellPrice', false, 'Price (High to Low)', Icons.attach_money, context),
               
-              // Only show other options if not in MTG mode
               if (!isMtgMode) ...[
-                ListTile(
-                  title: const Text('Price (Low to High)'),
-                  leading: const Icon(Icons.money_off),
-                  selected: _currentSort == 'cardmarket.prices.averageSellPrice' && _sortAscending,
-                  onTap: () => _updateSort('cardmarket.prices.averageSellPrice', true),
-                ),
-                ListTile(
-                  title: const Text('Name (A to Z)'),
-                  leading: const Icon(Icons.sort_by_alpha),
-                  selected: _currentSort == 'name' && _sortAscending,
-                  onTap: () => _updateSort('name', true),
-                ),
-                ListTile(
-                  title: const Text('Name (Z to A)'),
-                  leading: const Icon(Icons.sort_by_alpha),
-                  selected: _currentSort == 'name' && !_sortAscending,
-                  onTap: () => _updateSort('name', false),
-                ),
-                const Divider(height: 1),
-                ListTile(
-                  title: const Text('Set Number (Low to High)'),
-                  leading: const Icon(Icons.format_list_numbered),
-                  selected: _currentSort == 'number' && _sortAscending,
-                  onTap: () => _updateSort('number', true),
-                ),
-                ListTile(
-                  title: const Text('Set Number (High to Low)'),
-                  leading: const Icon(Icons.format_list_numbered),
-                  selected: _currentSort == 'number' && !_sortAscending,
-                  onTap: () => _updateSort('number', false),
-                ),
+                _buildSortRadioTile('cardmarket.prices.averageSellPrice', true, 'Price (Low to High)', Icons.money_off, context),
+                _buildSortRadioTile('name', true, 'Name (A to Z)', Icons.sort_by_alpha, context),
+                _buildSortRadioTile('name', false, 'Name (Z to A)', Icons.sort_by_alpha, context),
+                _buildSortRadioTile('number', true, 'Set Number (Low to High)', Icons.format_list_numbered, context),
+                _buildSortRadioTile('number', false, 'Set Number (High to Low)', Icons.format_list_numbered, context),
               ],
             ],
           ),
-        );
-      },
-    );
-  }
-
-  void _updateSort(String sortBy, bool ascending) {
-    // For MTG mode, always override to price high-to-low
-    if (_searchMode == SearchMode.mtg) {
-      sortBy = 'cardmarket.prices.averageSellPrice';
-      ascending = false;
-    }
-    
-    setState(() {
-      _currentSort = sortBy;
-      _sortAscending = ascending;
-      
-      // Reset pagination when sorting changes
-      _currentPage = 1;
-      _searchResults = null;
-      _hasMorePages = true;
-    });
-    
-    Navigator.pop(context);
-
-    // Rerun search with new sort
-    if (_lastQuery != null) {
-      _performSearch(_lastQuery!, useOriginalQuery: true);
-    } else if (_searchController.text.isNotEmpty) {
-      _performSearch(_searchController.text);
-    }
-  }
-
-  String _formatSearchForDisplay(String query) {
-    // Format for display in search history
-    if (query.startsWith('set.id:')) {
-      // Find matching set name
-      final allSets = _getAllSets();
-      final matchingSet = allSets.firstWhere(
-        (set) => set['query'] as String == query,
-        orElse: () => {'name': query.replaceAll('set.id:', '')},
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       );
-      return matchingSet['name'] as String;
-    }
-    
-    if (query.contains('subtypes:') || query.contains('rarity:')) {
-      // Find matching special category
-      final specials = PokemonSets.getSetsForCategory('special');
-      final matchingSpecial = specials.firstWhere(
-        (special) => special['query'] as String == query,
-        orElse: () => {'name': query},
-      );
-      return matchingSpecial['name'] as String;
-    }
-    
-    return query;
+    },
+  );
+}
+
+// Helper to build consistent radio tiles
+Widget _buildSortRadioTile(String sortField, bool ascending, String title, IconData icon, BuildContext context) {
+  // Simplify the value representation
+  final String value = '$sortField:$ascending';
+  final String currentValue = '$_currentSort:$_sortAscending';
+  
+  return RadioListTile<String>(
+    title: Text(title),
+    secondary: Icon(icon),
+    value: value,
+    groupValue: currentValue,
+    onChanged: (_) {
+      Navigator.of(context).pop(); // Close dialog first
+      _applySortDirectly(sortField, ascending);
+    },
+  );
+}
+
+// Ultra-simple direct sort method for reliability
+void _applySortDirectly(String sortField, bool ascending) {
+  LoggingService.debug('Directly applying sort: $sortField, ascending: $ascending');
+  
+  // For MTG mode, enforce price high-to-low
+  if (_searchMode == SearchMode.mtg) {
+    sortField = 'cardmarket.prices.averageSellPrice';
+    ascending = false;
   }
   
+  // Update state
+  setState(() {
+    _currentSort = sortField;
+    _sortAscending = ascending;
+  });
+  
+  // Only if we have results, apply sort immediately
+  if (_searchResults != null && _searchResults!.isNotEmpty) {
+    // Show loading indicator for better user feedback
+    NotificationManager.info(
+      context,
+      message: 'Sorting results...',
+      duration: const Duration(seconds: 1),
+      position: NotificationPosition.top,
+    );
+    
+    // Apply client-side sort
+    setState(() {
+      _searchResults = _sortCards(_searchResults!, sortField, ascending);
+    });
+  }
+}
+
+// Ultra-simple card sorting function
+List<TcgCard> _sortCards(List<TcgCard> cards, String sortField, bool ascending) {
+  final sortedCards = List<TcgCard>.from(cards);
+  
+  switch (sortField) {
+    case 'cardmarket.prices.averageSellPrice':
+      sortedCards.sort((a, b) {
+        // Handle null values gracefully
+        final aPrice = a.price ?? 0.0;
+        final bPrice = b.price ?? 0.0;
+        return ascending ? aPrice.compareTo(bPrice) : bPrice.compareTo(aPrice);
+      });
+      break;
+    case 'name':
+      sortedCards.sort((a, b) {
+        final aName = a.name ?? '';
+        final bName = b.name ?? '';
+        return ascending ? aName.compareTo(bName) : bName.compareTo(aName);
+      });
+      break;
+    case 'number':
+      sortedCards.sort((a, b) {
+        final aNum = _parseCardNumber(a.number);
+        final bNum = _parseCardNumber(b.number);
+        return ascending ? aNum.compareTo(bNum) : bNum.compareTo(aNum);
+      });
+      break;
+  }
+  
+  return sortedCards;
+}
+
+// Simple helper to parse card numbers for sorting
+int _parseCardNumber(String? number) {
+  if (number == null || number.isEmpty) return 0;
+  
+  // Extract numeric part
+  final match = RegExp(r'^(\d+)').firstMatch(number);
+  if (match != null) {
+    try {
+      return int.parse(match.group(1)!);
+    } catch (_) {}
+  }
+  
+  return 0;
+}
+
   void _clearSearch() {
     _searchController.clear();
     setState(() {
@@ -1713,6 +1729,32 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
     );
+  }
+
+  // Add this method to format search queries for display
+  String _formatSearchForDisplay(String query) {
+    // Format for display in search history
+    if (query.startsWith('set.id:')) {
+      // Find matching set name
+      final allSets = _getAllSets();
+      final matchingSet = allSets.firstWhere(
+        (set) => set['query'] as String == query,
+        orElse: () => {'name': query.replaceAll('set.id:', '')},
+      );
+      return matchingSet['name'] as String;
+    }
+    
+    if (query.contains('subtypes:') || query.contains('rarity:')) {
+      // Find matching special category
+      final specials = PokemonSets.getSetsForCategory('special');
+      final matchingSpecial = specials.firstWhere(
+        (special) => special['query'] as String == query,
+        orElse: () => {'name': query},
+      );
+      return matchingSpecial['name'] as String;
+    }
+    
+    return query;
   }
 }
 
