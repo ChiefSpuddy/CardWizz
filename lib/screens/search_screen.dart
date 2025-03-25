@@ -334,26 +334,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _loadNextPage() {
-    if (_isLoading || _isLoadingMore || !_hasMorePages) {
-      LoggingService.debug('Load more blocked: isLoading=$_isLoading, isLoadingMore=$_isLoadingMore, hasMorePages=$_hasMorePages');
-      return;
-    }
-
-    LoggingService.debug('Loading next page: ${_currentPage + 1}');
-    
-    setState(() => _isLoadingMore = true);
-    _currentPage++;
-    
-    // Use the correct search method based on the mode
-    if (_searchMode == SearchMode.mtg) {
-      _performMtgSearch(_lastQuery ?? _searchController.text, isLoadingMore: true);
-    } else {
-      _performSearch(
-        _lastQuery ?? _searchController.text,
-        isLoadingMore: true,
-        useOriginalQuery: true,
-      );
-    }
+    // Disabled - we're loading all results at once
+    LoggingService.debug('Pagination disabled - loading all results at once');
   }
 
   // Helpers for API search queries
@@ -512,10 +494,10 @@ class _SearchScreenState extends State<SearchScreen> {
       : 'name:"*$query*"';
   }
 
-  Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useOriginalQuery = false}) async {
+  Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useOriginalQuery = false, String? sortField, bool? sortAscending}) async {
     // Handle MTG mode separately
     if (_searchMode == SearchMode.mtg) {
-      _performMtgSearch(query);
+      _performMtgSearch(query, sortField: sortField, sortAscending: sortAscending);
       return;
     }
 
@@ -528,84 +510,31 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
-    // Don't load more if we're already loading or there are no more pages
-    if (isLoadingMore && (_isLoading || !_hasMorePages)) {
-      return;
-    }
-
-    // REMOVE THE AUTO-RESET CODE that was overriding sort settings
-    // if (!isLoadingMore && _currentSort != 'cardmarket.prices.averageSellPrice' && _sortAscending != false) {
-    //   _currentSort = 'cardmarket.prices.averageSellPrice';
-    //   _sortAscending = false;
-    //   _serverSort = 'cardmarket.prices.averageSellPrice';
-    //   _serverSortAscending = false;
-    // }
-
-    // Log current sort settings on search
-    if (!isLoadingMore) {
-      LoggingService.debug('SEARCH WITH SORT: _currentSort=$_currentSort, _sortAscending=$_sortAscending');
-      LoggingService.debug('SEARCH SERVER SORT: _serverSort=$_serverSort, _serverSortAscending=$_serverSortAscending');
-    }
+    // CRITICAL: Add explicit debugging of sort parameters
+    print('SEARCH: Current sort before function: $_currentSort, $_sortAscending');
+    print('SEARCH: Provided sort parameters: $sortField, $sortAscending');
 
     // Update to store set name for better loading states
     String? setName;
 
     if (!isLoadingMore) {
-      // IMPORTANT: Reset _currentSetName first to avoid lingering old set names
       setState(() {
-        _currentSetName = null;
-      });
-      
-      setState(() {
-        _currentPage = 1;
         _searchResults = null;
         _showCategories = false;
         _isLoading = true;
-        
-        // Enhance set name detection for better UI feedback
-        // Check if it's potentially a set name query
-        final potentialSetId = _getSetIdFromName(query);
-        if (potentialSetId != null) {
-          // Extract set name for display in loading state
-          final allSets = _getAllSets();
-          final matchingSet = allSets.firstWhere(
-            (set) => (set['query'] as String) == potentialSetId,
-            orElse: () => {'name': null},
-          );
-          setName = matchingSet['name'] as String?;
-          if (setName != null) {
-            // Provide clear feedback about set search
-            NotificationManager.info(
-              context,
-              message: 'Searching for cards in $setName set',
-              duration: const Duration(seconds: 2),
-              position: NotificationPosition.top,
-            );
-          }
-          _currentSetName = setName; // Store for skeleton loader
-          
-          // Set number sorting for set searches by default
-          _currentSort = 'number';
-          _sortAscending = true;
-        }
-      });
-      
-      // Add timeout to prevent the UI from getting stuck in loading state
-      Timer(const Duration(seconds: 15), () {
-        if (mounted && _isLoading) {
-          setState(() {
-            _isLoading = false;
-            LoggingService.debug('Search timeout reached - resetting loading state');
-          });
-        }
       });
     }
 
     try {
+      // Determine which sort parameters to use for API call
+      final apiSortField = sortField ?? _currentSort;
+      final apiSortAscending = sortAscending ?? _sortAscending;
+      
+      // Store query for pagination
       if (!isLoadingMore) {
         _lastQuery = query;
       }
-      
+        
       String searchQuery;
       if (useOriginalQuery) {
         searchQuery = query;
@@ -615,137 +544,94 @@ class _SearchScreenState extends State<SearchScreen> {
           searchQuery = query;
         } else {
           searchQuery = _buildSearchQuery(query.trim());
-          LoggingService.debug('Built search query: $searchQuery from input: $query');
-          
-          // If we converted a set name to a set.id query, store this for later use
-          if (searchQuery.startsWith('set.id:') && !query.startsWith('set.id:')) {
-            _lastActiveSearch = searchQuery; // Store the converted query
-          }
+          print('Built search query: $searchQuery from input: $query');
         }
       }
       
-      // Determine which sort parameters to use for API call
-      final apiSortField = _useClientSideSort ? _serverSort : _currentSort;
-      final apiSortAscending = _useClientSideSort ? _serverSortAscending : _sortAscending;
+      // ALWAYS log sort parameters for debugging
+      print('API SORT: Sending request with sort=$apiSortField, ascending=$apiSortAscending, desc=${!apiSortAscending}');
       
-      // Log sort parameters being sent to API
-      LoggingService.debug('API SORT: Using field=$apiSortField, ascending=$apiSortAscending, desc=${!apiSortAscending}');
-      
-      // Execute the search with the appropriate sort parameters
+      // Execute the search with the EXPLICIT sort parameters
       final results = await _apiService.searchCards(
         query: searchQuery,
-        page: _currentPage,
-        pageSize: 30,
+        page: 1,
+        pageSize: 250, // INCREASED to maximum size to get more results
         orderBy: apiSortField,
         orderByDesc: !apiSortAscending,
       );
 
-      // Log the results count and first few cards
-      LoggingService.debug('Search returned ${results['totalCount']} total results with sort: $apiSortField (asc=$apiSortAscending)');
+      // Log success and parameters that were used
+      print('✅ Search succeeded with sort=$apiSortField, ascending=$apiSortAscending');
+      print('Results returned: ${results['totalCount']} cards');
 
       if (mounted) {
         final List<dynamic> data = results['data'] as List? ?? [];
-        final int totalCount = results['totalCount'] as int; // Define totalCount variable here
-        
-        // Log first few results for debugging
-        if (data.isNotEmpty) {
-          final sampleSize = math.min(5, data.length);
-          LoggingService.debug('FIRST $sampleSize RESULTS RETURNED:');
-          for (int i = 0; i < sampleSize; i++) {
-            final card = data[i] as Map<String, dynamic>;
-            final name = card['name'] ?? 'Unknown';
-            final number = card['number'] ?? 'N/A';
-            final price = card['cardmarket']?['prices']?['averageSellPrice'] ?? 'N/A';
-            LoggingService.debug('  [$i] $name (#$number) - Price: $price');
-          }
-        }
+        final int totalCount = results['totalCount'] as int;
         
         final newCards = data
             .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
             .toList();
 
-        // AGGRESSIVE IMAGE PRELOADING - Start loading ALL images IMMEDIATELY
-        // This ensures images show up without requiring scrolling or interaction
-        if (newCards.isNotEmpty) {
-          LoggingService.debug("Starting aggressive image preloading for ${newCards.length} cards");
+        // If we have more cards than were loaded, try to load them all now
+        if (totalCount > newCards.length) {
+          print('Need to load more cards: loaded ${newCards.length}, total ${totalCount}');
           
-          // Directly load the first 12 images synchronously (first 4 rows)
-          for (int i = 0; i < math.min(12, newCards.length); i++) {
-            if (newCards[i].imageUrl != null) {
-              _loadImage(newCards[i].imageUrl!);
-            }
-          }
-          
-          // Update the state quickly to show cards while images are loading
+          // Show loading state with progress
           setState(() {
-            if (isLoadingMore && _searchResults != null) {
-              _searchResults = [..._searchResults!, ...newCards];
-              LoggingService.debug('Added ${newCards.length} more cards. Total: ${_searchResults!.length}/${_totalCards}'); // Use _totalCards instead of undefined totalCount
-            } else {
-              _searchResults = newCards;
-              _totalCards = totalCount; // This is correct
-            }
-            
-            _hasMorePages = (_currentPage * 30) < _totalCards; // Use _totalCards instead of totalCount
-            _isLoading = false;
-            _isLoadingMore = false;
-            
-            LoggingService.debug('Updated search state: hasMorePages=$_hasMorePages, currentPage=$_currentPage, totalCards=$_totalCards');
+            _searchResults = newCards;  // Show what we have so far
+            _isLoading = true;
+            _hasMorePages = true;
           });
+
+          // Load all remaining pages in a single batch
+          final allCards = await _loadAllPages(
+            searchQuery, 
+            apiSortField, 
+            !apiSortAscending, 
+            newCards,
+            totalCount
+          );
           
-          // Then queue the rest for loading after a tiny delay to not block UI
-          Future.delayed(Duration.zero, () {
-            for (int i = 12; i < newCards.length; i++) {
-              if (newCards[i].imageUrl != null) {
-                if (!_loadingRequestedUrls.contains(newCards[i].imageUrl)) {
-                  if (_loadingImages.length < _maxConcurrentLoads) {
-                    _loadImage(newCards[i].imageUrl!);
-                  } else {
-                    _loadQueue.add(newCards[i].imageUrl!);
-                  }
-                }
-              }
-            }
-          });
+          // Force client-side sorting for consistency
+          final sortedCards = _forceSortCards(
+            allCards, 
+            sortField ?? _currentSort, 
+            sortAscending ?? _sortAscending
+          );
           
-          // ...search history code...
-        } else {
+          // Update UI with all cards
           setState(() {
+            _searchResults = sortedCards;
+            _totalCards = totalCount;
+            _hasMorePages = false;
             _isLoading = false;
             _isLoadingMore = false;
           });
+
+          // Start preloading images for improved UX
+          _preloadVisibleImages();
+          
+          return;
         }
+
+        // CRITICAL: Force client-side sorting regardless of API response
+        final sortedCards = _forceSortCards(
+          newCards, 
+          sortField ?? _currentSort, 
+          sortAscending ?? _sortAscending
+        );
         
-        // Apply client-side sorting if needed after getting results
-        if (_useClientSideSort && mounted) {
-          // If using client-side sort and not the same as server sort, apply the client sort
-          if (_useClientSideSort && (_currentSort != _serverSort || _sortAscending != _serverSortAscending)) {
-            final sortedNewCards = _sortCards(newCards, _currentSort, _sortAscending);
-            
-            setState(() {
-              if (isLoadingMore && _searchResults != null) {
-                // Apply sort to combined results if loading more
-                final combinedResults = [..._searchResults!, ...sortedNewCards];
-                _searchResults = _sortCards(combinedResults, _currentSort, _sortAscending);
-              } else {
-                _searchResults = sortedNewCards;
-              }
-              // ...existing code for updating state...
-            });
-          } else {
-            // No additional client sorting needed
-            setState(() {
-              if (isLoadingMore && _searchResults != null) {
-                _searchResults = [..._searchResults!, ...newCards];
-              } else {
-                _searchResults = newCards;
-              }
-              // ...existing code for updating state...
-            });
-          }
-          
-          // ...rest of existing code...
-        }
+        // Update the UI with sorted cards
+        setState(() {
+          _searchResults = sortedCards;
+          _totalCards = totalCount;
+          _hasMorePages = false;
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
+
+        // Continue with image preloading
+        // ...existing code...
       }
     } catch (e) {
       LoggingService.debug('❌ Search error: $e');
@@ -753,18 +639,15 @@ class _SearchScreenState extends State<SearchScreen> {
         setState(() {
           _isLoading = false;
           _isLoadingMore = false;
-          if (!isLoadingMore) {
-            _searchResults = [];
-            _totalCards = 0;
-          }
-          // Make sure to clear set name on error to avoid stuck states
-          _currentSetName = null;
+          _searchResults = [];
+          _totalCards = 0;
+          _currentSetName = null; // Reset set name on error to avoid stuck states
         });
       }
     }
   }
 
-  Future<void> _performMtgSearch(String query, {bool isLoadingMore = false}) async {
+  Future<void> _performMtgSearch(String query, {bool isLoadingMore = false, String? sortField, bool? sortAscending}) async {
     if (query.isEmpty) {
       setState(() {
         _searchResults = null;
@@ -800,14 +683,13 @@ class _SearchScreenState extends State<SearchScreen> {
       }
 
       // Store last query for pagination consistency
-      if (!isLoadingMore) {
-        _lastQuery = query;
-      }
+      _lastQuery = query;
 
+      // Get more results at once
       final results = await _mtgApi.searchCards(
         query: searchQuery,
-        page: _currentPage,
-        pageSize: 30,
+        page: 1,
+        pageSize: 100,  // Increased page size
         orderBy: _currentSort,
         orderByDesc: !_sortAscending,
       );
@@ -853,24 +735,11 @@ class _SearchScreenState extends State<SearchScreen> {
         }).toList();
         
         setState(() {
-          if (isLoadingMore && _searchResults != null) {
-            // When loading more, append without duplicates
-            final existingIds = _searchResults!.map((c) => c.id).toSet();
-            final uniqueNewCards = cards.where((c) => !existingIds.contains(c.id)).toList();
-            
-            if (uniqueNewCards.isNotEmpty) {
-              _searchResults = [..._searchResults!, ...uniqueNewCards];
-              LoggingService.debug('Added ${uniqueNewCards.length} more unique MTG cards. Total: ${_searchResults!.length}/$totalCount');
-            } else {
-              LoggingService.debug('No new unique cards found in this page');
-            }
-          } else {
-            _searchResults = cards;
-          }
+          _searchResults = cards;
           _totalCards = totalCount;
           _isLoading = false;
           _isLoadingMore = false;
-          _hasMorePages = hasMore;
+          _hasMorePages = false;  // Disable pagination
           
           LoggingService.debug('Updated MTG search state: hasMorePages=$_hasMorePages, currentPage=$_currentPage, totalCards=$_totalCards');
         });
@@ -1061,8 +930,8 @@ class _SearchScreenState extends State<SearchScreen> {
           query: searchItem['query'],
           orderBy: _currentSort,
           orderByDesc: true,
-          pageSize: 30,
-          page: _currentPage
+          pageSize: 250, // INCREASED to get more cards
+          page: 1
         );
         
         if (mounted) {
@@ -1074,11 +943,49 @@ class _SearchScreenState extends State<SearchScreen> {
               .where((card) => card.price != null && card.price! > 0)
               .toList();
 
+          // If we have more cards than were loaded, try to load them all now
+          if (totalCount > newCards.length) {
+            print('Need to load more cards: loaded ${newCards.length}, total ${totalCount}');
+            
+            // Show loading state with progress
+            setState(() {
+              _searchResults = newCards;  // Show what we have so far
+              _isLoading = true;
+              _hasMorePages = true;
+            });
+
+            // Load all remaining pages in a single batch
+            final allCards = await _loadAllPages(
+              searchItem['query'], 
+              _currentSort, 
+              true, // descending
+              newCards,
+              totalCount
+            );
+            
+            // Force client-side sorting for consistency
+            final sortedCards = _forceSortCards(allCards, _currentSort, _sortAscending);
+            
+            // Update UI with all cards
+            setState(() {
+              _searchResults = sortedCards;
+              _totalCards = totalCount;
+              _hasMorePages = false;
+              _isLoading = false;
+              _isLoadingMore = false;
+            });
+
+            // Store the query for future pagination
+            _lastQuery = searchItem['query'];
+            
+            return;
+          }
+            
           setState(() {
             _searchResults = newCards;
             _totalCards = totalCount;
             _isLoading = false;
-            _hasMorePages = (_currentPage * 30) < totalCount;
+            _hasMorePages = false;
             _lastQuery = searchItem['query'];
           });
         }
@@ -1088,27 +995,73 @@ class _SearchScreenState extends State<SearchScreen> {
       // Regular search for other items
       final query = searchItem['query'] as String;
       
+      // IMPORTANT: Use larger page size for set searches (which likely come via _performQuickSearch)
       final results = await _apiService.searchCards(
         query: query,
         page: 1,
-        pageSize: 30,
+        pageSize: 250, // INCREASED to get more results
         orderBy: _currentSort,
         orderByDesc: !_sortAscending,
       );
 
       if (mounted) {
-        final cardData = results['data'] as List;
+        final List<dynamic> data = results['data'] as List? ?? [];
         final totalCount = results['totalCount'] as int;
         
-        final newCards = cardData
+        final newCards = data
             .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
             .toList();
 
+        // If we have more cards than were loaded, try to load them all now
+        if (totalCount > newCards.length) {
+          print('Need to load more set cards: loaded ${newCards.length}, total ${totalCount}');
+          
+          // Show loading state with progress
+          setState(() {
+            _searchResults = newCards;  // Show what we have so far
+            _isLoading = true;
+            _hasMorePages = true;
+          });
+
+          // Load all remaining pages in a single batch
+          final allCards = await _loadAllPages(
+            query, 
+            _currentSort, 
+            !_sortAscending, 
+            newCards,
+            totalCount
+          );
+          
+          // Force client-side sorting for consistency
+          final sortedCards = _forceSortCards(allCards, _currentSort, _sortAscending);
+          
+          // Update UI with all cards
+          setState(() {
+            _searchResults = sortedCards;
+            _totalCards = totalCount;
+            _hasMorePages = false;
+            _isLoading = false;
+            _isLoadingMore = false;
+          });
+
+          // Save to history
+          _addToSearchHistory(
+            searchItem['name'],
+            imageUrl: sortedCards.isNotEmpty ? sortedCards[0].imageUrl : null,
+          );
+          
+          // Store the query for future reference
+          _lastQuery = query;
+          
+          return;
+        }
+
+        // Process results when no additional pages needed
         setState(() {
-          _searchResults = newCards;
+          _searchResults = _forceSortCards(newCards, _currentSort, _sortAscending);
           _totalCards = totalCount;
           _isLoading = false;
-          _hasMorePages = (_currentPage * 30) < totalCount;
+          _hasMorePages = false;
           _lastQuery = query;
         });
 
@@ -1394,9 +1347,7 @@ Widget _buildStyledSortTile(
 // Ultra-simple direct sort method completely rewritten for consistent server-side sorting
 void _applySortDirectly(String sortField, bool ascending) {
   // Add more explicit logging of the sort request
-  LoggingService.debug('SORT ACTION: Explicitly setting sort to: $sortField, ascending=$ascending');
-  LoggingService.debug('SORT BEFORE STATE: _currentSort=$_currentSort, _sortAscending=$_sortAscending');
-  LoggingService.debug('SORT BEFORE SERVER: _serverSort=$_serverSort, _serverSortAscending=$_serverSortAscending');
+  LoggingService.debug('SORT ACTION: Setting sort to: $sortField, ascending=$ascending');
   
   // For MTG mode, enforce price high-to-low
   if (_searchMode == SearchMode.mtg) {
@@ -1405,49 +1356,49 @@ void _applySortDirectly(String sortField, bool ascending) {
     ascending = false;
   }
   
-  // Track if we're changing sort to determine if a reload is needed
+  // Check if sort has changed
   final bool sortChanged = _currentSort != sortField || _sortAscending != ascending;
   
-  // Update state
+  if (!sortChanged) {
+    LoggingService.debug('SORT: No sort change detected, maintaining current order');
+    return; // No need to sort if nothing changed
+  }
+  
+  // Update state variables
   setState(() {
     _currentSort = sortField;
     _sortAscending = ascending;
-    _serverSort = sortField;  // Ensure server sort matches
-    _serverSortAscending = ascending;  // Ensure server sort direction matches
-    _useClientSideSort = false;  // Always use server-side sorting
+    _serverSort = sortField;
+    _serverSortAscending = ascending;
     
-    // If we have search results, apply the sort immediately
-    if (_searchResults != null && _searchResults!.isNotEmpty) {
-      LoggingService.debug('Sorting ${_searchResults!.length} cards with $sortField (ascending=$ascending)');
-      
-      // Create a new sorted list based on the specified criteria
-      final sortedResults = _sortCards(_searchResults!, sortField, ascending);
-      
-      // Replace the existing results with the sorted list
-      _searchResults = sortedResults;
-      
-      // Log first few cards after sorting to verify order
-      if (_searchResults!.isNotEmpty) {
-        LoggingService.debug('FIRST FEW CARDS AFTER SORTING:');
-        final sampleSize = math.min(5, _searchResults!.length);
-        for (int i = 0; i < sampleSize; i++) {
-          final card = _searchResults![i];
-          final value = _getCardSortValue(card, sortField);
-          LoggingService.debug('[$i] ${card.name} (#${card.number}) - Value: $value');
-        }
-      }
-    } else {
-      LoggingService.debug('No search results to sort');
-    }
+    // Show loading state
+    _isLoading = true;
+    
+    // Reset pagination to first page
+    _currentPage = 1;
+    
+    // IMPORTANT: Reset search results to null to ensure we show loading state
+    _searchResults = null;
   });
   
-  // Show a notification that the sort was applied
+  // Show feedback to user immediately - CHANGED FROM TOP TO BOTTOM
   NotificationManager.info(
     context,
-    message: 'Sorted by ${_getSortDisplayName(sortField, ascending)}',
+    message: 'Sorting by ${_getSortDisplayName(sortField, ascending)}',
     duration: const Duration(seconds: 1),
-    position: NotificationPosition.top,
+    position: NotificationPosition.bottom, // Changed from top to bottom
   );
+  
+  // CRITICAL: If we have an active search, reload with the new sort
+  if (_lastQuery != null) {
+    // Reload search with the new sort parameters - using the original query
+    _performSearch(
+      _lastQuery!,
+      useOriginalQuery: true,
+      sortField: sortField,
+      sortAscending: ascending
+    );
+  }
 }
 
 // Completely replace the _sortCards method with this more robust implementation
@@ -1528,31 +1479,276 @@ int _parseCardNumber(String? number) {
   return 0;
 }
 
-// Add this helper method for display names
-String _getSortDisplayName(String sortField, bool ascending) {
-  switch (sortField) {
-    case 'cardmarket.prices.averageSellPrice':
-      return ascending ? 'Price (Low to High)' : 'Price (High to Low)';
-    case 'name':
-      return ascending ? 'Name (A to Z)' : 'Name (Z to A)';
-    case 'number':
-      return ascending ? 'Set Number (Low to High)' : 'Set Number (High to Low)';
-    default:
-      return 'Custom Sort';
+// Add this new method for robust client-side sorting that never fails
+List<TcgCard> _forceSortCards(List<TcgCard> cards, String sortField, bool ascending) {
+  print('⚠️ FORCING client-side sort: field=$sortField, ascending=$ascending');
+  
+  if (cards.isEmpty) return cards;
+  
+  // Create a mutable copy of the list
+  final sortedCards = List<TcgCard>.from(cards);
+  
+  // Handle the sorting based on the field
+  try {
+    if (sortField == 'cardmarket.prices.averageSellPrice') {
+      sortedCards.sort((a, b) {
+        // CRITICAL FIX: Consistently use API prices for sorting
+        // This ensures we sort using the same values the API would use
+        final double aPrice = a.getPriceSortValue();
+        final double bPrice = b.getPriceSortValue();
+        
+        // Log a sample of the values to verify correct sorting
+        if (sortedCards.indexOf(a) < 5) {
+          print('Comparing prices: ${a.name} (${a.priceSource}: $aPrice) vs ${b.name} (${b.priceSource}: $bPrice)');
+        }
+        
+        // Perform the sort based on ascending flag
+        return ascending 
+          ? aPrice.compareTo(bPrice)  // Low to High
+          : bPrice.compareTo(aPrice); // High to Low
+      });
+      
+      // Verify the first few cards are sorted correctly
+      if (sortedCards.length > 1) {
+        final firstCard = sortedCards.first;
+        final secondCard = sortedCards[1];
+        
+        // DEBUG: Show full price information for the first two cards
+        print('PRICE SOURCE COMPARISON:');
+        print('First card: ${firstCard.name}');
+        print('  - Primary price (${firstCard.priceSource ?? "unknown"}): ${firstCard.price}');
+        print('  - API price (cardmarket): ${firstCard.apiPrice}');
+        print('  - Sort value: ${firstCard.getPriceSortValue()}');
+        
+        print('Second card: ${secondCard.name}');
+        print('  - Primary price (${secondCard.priceSource ?? "unknown"}): ${secondCard.price}');
+        print('  - API price (cardmarket): ${secondCard.apiPrice}');
+        print('  - Sort value: ${secondCard.getPriceSortValue()}');
+        
+        // Display additional debugging info
+        final sortDirection = ascending ? "ascending (low to high)" : "descending (high to low)";
+        print('Sort check: Sorting by price $sortDirection');
+        
+        // Verify sort order using the consistent sorting values
+        final firstPrice = firstCard.getPriceSortValue();
+        final secondPrice = secondCard.getPriceSortValue();
+        
+        final isCorrectOrder = ascending 
+          ? firstPrice <= secondPrice
+          : firstPrice >= secondPrice;
+          
+        print('Sort order correct? $isCorrectOrder');
+      }
+    } else if (sortField == 'name') {
+      // CRITICAL FIX: Fix name sorting to use proper comparison
+      sortedCards.sort((a, b) {
+        final String aName = a.name ?? '';
+        final String bName = b.name ?? '';
+        
+        // Log a sample for debugging
+        if (sortedCards.indexOf(a) < 5) {
+          print('Comparing names: ${a.name} vs ${b.name}');
+        }
+        
+        // FIX: Correctly apply the ascending flag
+        return ascending 
+          ? aName.compareTo(bName)  // A to Z
+          : bName.compareTo(aName); // Z to A
+      });
+      
+      // Verify sorting worked
+      if (sortedCards.length > 1) {
+        final firstCard = sortedCards.first;
+        final secondCard = sortedCards[1];
+        final sortDirection = ascending ? "ascending (A to Z)" : "descending (Z to A)";
+        print('Name sort check - $sortDirection:');
+        print('First card: ${firstCard.name}');
+        print('Second card: ${secondCard.name}');
+        final isCorrectOrder = ascending 
+          ? firstCard.name.compareTo(secondCard.name) <= 0
+          : firstCard.name.compareTo(secondCard.name) >= 0;
+        print('Sort order correct? $isCorrectOrder');
+      }
+      
+    } else if (sortField == 'number') {
+      // CRITICAL FIX: Fix number sorting to use proper comparison
+      sortedCards.sort((a, b) {
+        final int aNum = _parseCardNumber(a.number);
+        final int bNum = _parseCardNumber(b.number);
+        
+        // Log a sample for debugging
+        if (sortedCards.indexOf(a) < 5) {
+          print('Comparing numbers: ${a.name} (${a.number} → $aNum) vs ${b.name} (${b.number} → $bNum)');
+        }
+        
+        // FIX: Correctly apply the ascending flag
+        return ascending 
+          ? aNum.compareTo(bNum)  // Low to High
+          : bNum.compareTo(aNum); // High to Low
+      });
+      
+      // Verify sorting worked
+      if (sortedCards.length > 1) {
+        final firstCard = sortedCards.first;
+        final secondCard = sortedCards[1];
+        final sortDirection = ascending ? "ascending (low to high)" : "descending (high to low)";
+        print('Number sort check - $sortDirection:');
+        print('First card: ${firstCard.name} (number: ${firstCard.number})');
+        print('Second card: ${secondCard.name} (number: ${secondCard.number})');
+        final firstNum = _parseCardNumber(firstCard.number);
+        final secondNum = _parseCardNumber(secondCard.number);
+        final isCorrectOrder = ascending 
+          ? firstNum <= secondNum
+          : firstNum >= secondNum;
+        print('Sort order correct? $isCorrectOrder');
+      }
+    }
+  } catch (e) {
+    print('❌ Error during sorting: $e');
+    // Return the original list if sorting fails
+    return cards;
+  }
+  
+  print('✅ Client-side sort complete');
+  print('Debug - First 5 cards with BOTH prices:');
+  for (int i = 0; i < math.min(5, sortedCards.length); i++) {
+    final card = sortedCards[i];
+    print('Card #${i+1}: ${card.name}, API: ${card.apiPrice}, UI: ${card.price}, Sort: ${card.getPriceSortValue()}, ID: ${card.id}');
+  }
+  return sortedCards;
+}
+
+// Add this new method to load all pages and sort them
+Future<void> _loadAllAndSort() async {
+  if (_searchResults == null || _lastQuery == null) return;
+  
+  // Show loading dialog
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text('Loading all cards for sorting...'),
+          const SizedBox(height: 8),
+          Text(
+            'Please wait while we load all results',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+    ),
+  );
+  
+  try {
+    // Calculate how many total cards and pages
+    final int totalPages = (_totalCards / 100).ceil();
+    List<TcgCard> allCards = [];
+    
+    // Add current results first
+    allCards.addAll(_searchResults!);
+    
+    // Load remaining pages with larger page size for efficiency
+    for (int page = 2; page <= totalPages; page++) {
+      // Update loading status
+      if (mounted) {
+        Navigator.of(context).pop(); // Remove previous dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text('Loading page $page of $totalPages...'),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: (page - 1) / totalPages,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      
+      // Load this page with a larger page size
+      final results = await _apiService.searchCards(
+        query: _lastQuery!,
+        page: page,
+        pageSize: 100, // Larger page size to reduce API calls
+        orderBy: _currentSort,
+        orderByDesc: !_sortAscending,
+      );
+      
+      final List<dynamic> data = results['data'] as List? ?? [];
+      if (data.isEmpty) break;
+      
+      final pageCards = data
+          .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+          .toList();
+      
+      allCards.addAll(pageCards);
+      
+      // If we've loaded enough cards, break early
+      if (allCards.length >= _totalCards) break;
+    }
+    
+    // Remove loading dialog
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+    
+    // Now that we have all cards, sort them
+    setState(() {
+      // Sort according to current criteria
+      _searchResults = _sortCards(allCards, _currentSort, _sortAscending);
+      
+      // Update state to reflect we have all cards
+      _hasMorePages = false;
+      
+      // Show notification
+      NotificationManager.success(
+        context,
+        message: 'Sorted ${allCards.length} cards by ${_getSortDisplayName(_currentSort, _sortAscending)}',
+        duration: const Duration(seconds: 2),
+        position: NotificationPosition.top,
+      );
+    });
+    
+    // Start loading images for visibility
+    _preloadVisibleImages();
+    
+  } catch (e) {
+    // Remove loading dialog on error
+    if (mounted) {
+      Navigator.of(context).pop();
+      NotificationManager.error(
+        context,
+        message: 'Error loading all cards: $e',
+      );
+    }
   }
 }
 
-// Simplify _getCardSortValue for better debugging
-dynamic _getCardSortValue(TcgCard card, String sortField) {
-  switch (sortField) {
-    case 'cardmarket.prices.averageSellPrice':
-      return card.price ?? 0.0;
-    case 'name':
-      return card.name ?? '';
-    case 'number':
-      return '${card.number} (${_parseCardNumber(card.number)})';
-    default:
-      return null;
+// Add a helper method to preload only currently visible images
+void _preloadVisibleImages() {
+  if (_searchResults == null || _searchResults!.isEmpty) return;
+  
+  // Determine which cards are likely visible based on screen height
+  final screenHeight = MediaQuery.of(context).size.height;
+  final cardHeight = screenHeight / 4; // Approximate card height
+  final visibleCardCount = (screenHeight / cardHeight).ceil() * 3; // 3 columns
+  
+  // Preload just the visible cards' images
+  for (int i = 0; i < math.min(visibleCardCount, _searchResults!.length); i++) {
+    if (_searchResults![i].imageUrl != null) {
+      _loadImage(_searchResults![i].imageUrl!);
+    }
   }
 }
 
@@ -1977,30 +2173,27 @@ dynamic _getCardSortValue(TcgCard card, String sortField) {
                   },
                 ),
               
-              // Pagination controls - fixed to show only one loading indicator
-              if (_searchResults != null && _searchResults!.isNotEmpty && _hasMorePages)
+              // Remove pagination controls section completely
+              // Instead add a debug section showing sorting status
+              if (_searchResults != null && _searchResults!.isNotEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: _isLoadingMore
-                        ? const Center(
-                            child: Column(
-                              children: [
-                                CircularProgressIndicator(),
-                                SizedBox(height: 8),
-                                Text('Loading more cards...'),
-                              ],
-                            ),
-                          )
-                        : FilledButton.icon(
-                            onPressed: _loadNextPage,
-                            icon: const Icon(Icons.expand_more),
-                            label: const Text('Load More Cards'),
-                            style: FilledButton.styleFrom(
-                              // Make button wider for easier tapping
-                              minimumSize: const Size(200, 48),
-                            ),
-                          ),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          Text('Sort: ${_getSortDisplayName(_currentSort, _sortAscending)}'),
+                          Text('Total cards: $_totalCards'),
+                          if (_searchResults != null && _searchResults!.isNotEmpty)
+                            Text('Using price source: ${_searchResults!.first.priceSource ?? "unknown"}'),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -2109,5 +2302,86 @@ dynamic _getCardSortValue(TcgCard card, String sortField) {
     
     return matchingSet['name'] as String?;
   }
+
+  // Add this method to _SearchScreenState class - place it near other sort-related methods
+// Add this helper method for display names
+String _getSortDisplayName(String sortField, bool ascending) {
+  switch (sortField) {
+    case 'cardmarket.prices.averageSellPrice':
+      return ascending ? 'Price (Low to High)' : 'Price (High to Low)';
+    case 'name':
+      return ascending ? 'Name (A to Z)' : 'Name (Z to A)';
+    case 'number':
+      return ascending ? 'Set Number (Low to High)' : 'Set Number (High to Low)';
+    default:
+      return 'Custom Sort';
+  }
+}
+
+// Add this method to load all pages of results
+Future<List<TcgCard>> _loadAllPages(
+  String query,
+  String sortField,
+  bool desc,
+  List<TcgCard> firstPageCards,
+  int totalCount
+) async {
+  // Start with the first page we already loaded
+  List<TcgCard> allCards = List<TcgCard>.from(firstPageCards);
+  
+  // Calculate how many pages we need (250 is maximum page size for API)
+  final int pageSize = 250;
+  final int totalPages = (totalCount / pageSize).ceil();
+  
+  // Skip page 1 since we already loaded it
+  for (int page = 2; page <= totalPages; page++) {
+    print('Loading page $page of $totalPages');
+    
+    // Update loading state to show progress
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+    
+    try {
+      // Load this page
+      final results = await _apiService.searchCards(
+        query: query,
+        page: page,
+        pageSize: pageSize,
+        orderBy: sortField,
+        orderByDesc: desc,
+      );
+      
+      if (results['data'] != null) {
+        final List<dynamic> data = results['data'] as List? ?? [];
+        final pageCards = data
+            .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+            .toList();
+            
+        // Add these cards to our result set
+        allCards.addAll(pageCards);
+        
+        // Update UI with progress
+        if (mounted) {
+          setState(() {
+            // Show progress by updating the cards we have so far
+            _searchResults = allCards;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading page $page: $e');
+      // Continue with what we have so far
+    }
+    
+    // If we've loaded enough cards or something went wrong, break early
+    if (allCards.length >= totalCount) break;
+  }
+  
+  print('✅ Loaded all ${allCards.length} cards successfully');
+  return allCards;
+}
 }
 

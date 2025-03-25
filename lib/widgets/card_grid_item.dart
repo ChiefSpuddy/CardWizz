@@ -139,14 +139,14 @@ class CardGridItem extends StatelessWidget {
                                     ),
                                   ),
                                 
-                                // Price with consistent raw price fetching
-                                FutureBuilder<double?>(
-                                  future: CardDetailsRouter.getRawCardPrice(card),
-                                  builder: (context, snapshot) {
-                                    final priceValue = snapshot.data ?? card.price;
+                                // Price display - SIMPLIFIED to show exactly what's used for sorting
+                                Builder(
+                                  builder: (context) {
+                                    // Always use the price value that's used for sorting
+                                    final priceValue = card.getPriceSortValue();
                                     
                                     // Show dash if no price available
-                                    if (priceValue == null || priceValue <= 0) {
+                                    if (priceValue <= 0) {
                                       return Text(
                                         '-',
                                         style: TextStyle(
@@ -157,12 +157,16 @@ class CardGridItem extends StatelessWidget {
                                       );
                                     }
                                     
-                                    return Text(
-                                      currencyProvider.formatValue(priceValue),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green.shade700,
+                                    // Create a simple tooltip showing the price source
+                                    return Tooltip(
+                                      message: 'From ${card.priceSource ?? "API"}',
+                                      child: Text(
+                                        currencyProvider.formatValue(priceValue),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green.shade700,
+                                        ),
                                       ),
                                     );
                                   },
@@ -284,5 +288,50 @@ class CardGridItem extends StatelessWidget {
     // Prevent the tap event from propagating
     // This prevents navigation to card details when adding to collection
     return;
+  }
+
+  // Add a method to build price display with source information
+  Widget _buildPriceDisplay(BuildContext context, TcgCard card) {
+    final currencyProvider = Provider.of<CurrencyProvider>(context);
+    final symbol = currencySymbol ?? currencyProvider.symbol;
+    
+    // Get the displayed price and formatting
+    final price = card.price;
+    
+    if (price == null || price <= 0) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$symbol${price.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+          if (card.priceSource != null && card.priceSource != 'cardmarket')
+            Padding(
+              padding: const EdgeInsets.only(left: 2),
+              child: Text(
+                ' (${card.priceSource})',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 9,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

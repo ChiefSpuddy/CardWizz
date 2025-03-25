@@ -9,25 +9,30 @@ class TcgCard {
   final String? imageUrl;
   final String? largeImageUrl;
   final TcgSet set;
-  final String? rarity;
   final String? setName;
-  final List<String>? types;
-  final List<String>? subtypes;
-  final String? artist;
-  final Map<String, dynamic>? cardmarket;
-  final double? price;
-  final double? ebayPrice; // Add ebayPrice field
-  final Map<String, dynamic>? rawData;
-  final DateTime? dateAdded;
-  final DateTime? addedToCollection;
-  final List<PriceHistoryEntry> priceHistory;
+  final String? rarity;
+  
+  // Price fields
+  double? price; // Primary price used for display and sorting
+  double? ebayPrice; // eBay-specific price
+  double? previousPrice; // Previous recorded price for change calculation
+  final Map<String, dynamic>? cardmarket; // Raw cardmarket data
+  final Map<String, dynamic>? rawData; // Complete raw data
+  final String? priceSource; // Track where the price came from
+  final Map<String, double>? altPrices; // Alternate price sources
+  
+  // Collection tracking fields
+  final DateTime? dateAdded; // When the card was first added to collection
+  final DateTime? addedToCollection; // Same as dateAdded but explicitly named
+  final DateTime? lastPriceUpdate; // When price was last updated
+  final DateTime? lastPriceChange; // When price last changed
+  final int? setTotal; // Total cards in the set
+  
+  // History tracking
+  final List<PriceHistoryEntry> priceHistory; // Historical price entries
+  
+  // Type tracking
   final bool? isMtg;
-  final int? setTotal;  // Add this property
-
-  // These fields are mutable and updated after construction
-  double? previousPrice;
-  DateTime? lastPriceChange;
-  DateTime? lastPriceUpdate;
 
   TcgCard({
     required this.id,
@@ -38,222 +43,78 @@ class TcgCard {
     required this.set,
     this.rarity,
     this.setName,
-    this.types,
-    this.subtypes,
-    this.artist,
-    this.cardmarket,
     this.price,
-    this.ebayPrice, // Add ebayPrice parameter
+    this.cardmarket,
     this.rawData,
+    this.priceSource,
+    this.altPrices,
+    this.isMtg,
     this.dateAdded,
     this.addedToCollection,
-    List<PriceHistoryEntry>? priceHistory,
-    this.isMtg,
+    this.lastPriceUpdate,
+    this.lastPriceChange,
+    this.previousPrice,
+    this.ebayPrice,
     this.setTotal,
+    List<PriceHistoryEntry>? priceHistory,
   }) : this.priceHistory = priceHistory ?? [];
 
-  // Crucial method to ensure price data is properly extracted during serialization
-  factory TcgCard.fromJson(Map<String, dynamic> json) {
-    // Make sure we extract image URLs from both direct fields and nested 'images' object
-    String? imageUrl = json['imageUrl'];
-    String? largeImageUrl = json['largeImageUrl'];
-    
-    // If we don't have URLs but have images data, extract from there
-    if ((imageUrl == null || largeImageUrl == null) && 
-        json['images'] != null && json['images'] is Map) {
-      final images = json['images'] as Map<String, dynamic>;
-      imageUrl ??= images['small'] as String?;
-      largeImageUrl ??= images['large'] as String?;
+  // Helper method to get price from a specific source
+  double? getPriceFromSource(String source) {
+    if (source == priceSource) {
+      return price;
     }
-
-    // Fix URLs that start with //
-    if (imageUrl != null && imageUrl.startsWith('//')) {
-      imageUrl = 'https:$imageUrl';
-    }
-    if (largeImageUrl != null && largeImageUrl.startsWith('//')) {
-      largeImageUrl = 'https:$largeImageUrl';
-    }
-    
-    // Extract and handle price information correctly
-    double? price;
-    
-    // First try direct price field
-    if (json['price'] != null) {
-      price = (json['price'] as num).toDouble();
-    } 
-    // Then try cardmarket.prices.averageSellPrice for Pokemon cards
-    else if (json['cardmarket'] != null && 
-             json['cardmarket']['prices'] != null && 
-             json['cardmarket']['prices']['averageSellPrice'] != null) {
-      price = (json['cardmarket']['prices']['averageSellPrice'] as num).toDouble();
-    }
-    // For MTG cards, look in usd field (scryfall format)
-    else if (json['prices'] != null && json['prices']['usd'] != null) {
-      final priceStr = json['prices']['usd'] as String?;
-      price = priceStr != null ? double.tryParse(priceStr) : null;
-    }
-    // Also check raw data for price info
-    else if (json['rawData'] != null) {
-      var rawData = json['rawData'] as Map<String, dynamic>;
-      if (rawData['cardmarket'] != null && 
-          rawData['cardmarket']['prices'] != null && 
-          rawData['cardmarket']['prices']['averageSellPrice'] != null) {
-        price = (rawData['cardmarket']['prices']['averageSellPrice'] as num).toDouble();
-      }
-      else if (rawData['prices'] != null && rawData['prices']['usd'] != null) {
-        final priceStr = rawData['prices']['usd'] as String?;
-        price = priceStr != null ? double.tryParse(priceStr) : null;
-      }
-    }
-    
-    // Set up price history
-    final List<PriceHistoryEntry> priceHistory = [];
-    if (json['priceHistory'] != null) {
-      priceHistory.addAll((json['priceHistory'] as List)
-          .map((e) => PriceHistoryEntry.fromJson(e))
-          .toList());
-    }
-    
-    // Add a price history entry if we have a price but no history
-    if (price != null && price > 0 && priceHistory.isEmpty) {
-      priceHistory.add(PriceHistoryEntry(
-        price: price,
-        timestamp: json['dateAdded'] != null 
-            ? DateTime.parse(json['dateAdded']) 
-            : DateTime.now(),
-      ));
-    }
-
-    final setData = json['set'] ?? {};
-    
-    return TcgCard(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      number: json['number']?.toString(),
-      imageUrl: imageUrl,
-      largeImageUrl: largeImageUrl,
-      set: TcgSet.fromJson(setData is Map<String, dynamic> ? setData : {}),
-      rarity: json['rarity'],
-      setName: json['setName'] ?? json['set']?['name'],
-      types: json['types'] != null 
-          ? List<String>.from(json['types'])
-          : null,
-      subtypes: json['subtypes'] != null
-          ? List<String>.from(json['subtypes'])
-          : null,
-      artist: json['artist'],
-      cardmarket: json['cardmarket'],
-      price: price, // Use the extracted price
-      ebayPrice: _extractEbayPrice(json), // Add ebayPrice extraction
-      rawData: json['rawData'] ?? json, // Store the raw data for future use
-      dateAdded: json['dateAdded'] != null
-          ? DateTime.parse(json['dateAdded']) 
-          : null,
-      addedToCollection: json['addedToCollection'] != null
-          ? DateTime.parse(json['addedToCollection'])
-          : null,
-      priceHistory: priceHistory,
-      isMtg: json['isMtg'] ?? false,
-      setTotal: json['setTotal'] ?? json['set']?['total'],
-    );
+    return altPrices?[source];
   }
 
-  // Add helper method to extract eBay price
-  static double? _extractEbayPrice(Map<String, dynamic> json) {
-    // Try to extract from ebayPrice field
-    if (json['ebayPrice'] != null) {
-      final price = json['ebayPrice'];
-      if (price is double) return price;
-      if (price is int) return price.toDouble();
-      if (price is String) return double.tryParse(price);
+  // Get the API price specifically for sorting
+  double? get apiPrice {
+    if (cardmarket != null && cardmarket!['prices'] != null) {
+      return cardmarket!['prices']['averageSellPrice'] as double?;
     }
-    
-    // Try to extract from ebay.price field if it exists
-    if (json['ebay']?['price'] != null) {
-      final price = json['ebay']['price'];
-      if (price is double) return price;
-      if (price is int) return price.toDouble();
-      if (price is String) return double.tryParse(price);
-    }
-    
     return null;
   }
 
-  // The rest of the methods remain unchanged
+  // Method to calculate price change over a specified duration
   double? getPriceChange(Duration period) {
-    if (priceHistory.isEmpty) return null;
+    if (priceHistory.isEmpty || price == null) return null;
 
+    // Sort history by timestamp to ensure order
     final sortedHistory = List<PriceHistoryEntry>.from(priceHistory)
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-
-    if (sortedHistory.length < 2) return null;
-
-    final now = DateTime.now();
-    final cutoffDate = now.subtract(period);
-
-    final oldEntry = sortedHistory.firstWhere(
-      (entry) => entry.timestamp.isAfter(cutoffDate),
-      orElse: () => sortedHistory.first,
-    );
-
-    final newEntry = sortedHistory.last;
-
-    if (oldEntry.price == 0) return null;
-    return ((newEntry.price - oldEntry.price) / oldEntry.price) * 100;
+    
+    if (sortedHistory.isEmpty) return null;
+    
+    // Find oldest entry within the period
+    final cutoffDate = DateTime.now().subtract(period);
+    final oldestRelevantEntry = sortedHistory
+        .lastWhere(
+          (entry) => entry.timestamp.isAfter(cutoffDate),
+          orElse: () => sortedHistory.first,
+        );
+    
+    if (oldestRelevantEntry.price <= 0) return null;
+    
+    // Calculate percentage change
+    return ((price! - oldestRelevantEntry.price) / oldestRelevantEntry.price) * 100;
   }
 
+  // Get the period descriptor for price change
   String? getPriceChangePeriod() {
-    if (lastPriceChange == null) return null;
-
-    final now = DateTime.now();
-    final difference = now.difference(lastPriceChange!);
-
-    if (difference.inHours < 24) {
-      return 'Today';
-    } else if (difference.inDays < 7) {
-      return 'This week';
-    } else if (difference.inDays < 30) {
-      return 'This month';
+    if (priceHistory.isEmpty || price == null) return null;
+    
+    if (getPriceChange(const Duration(days: 1)) != null) {
+      return '24 Hours';
+    } else if (getPriceChange(const Duration(days: 7)) != null) {
+      return '7 Days';
+    } else if (getPriceChange(const Duration(days: 30)) != null) {
+      return '30 Days';
     } else {
-      return 'Older';
+      return 'All Time';
     }
   }
 
-  // Make sure we properly save the price data
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'number': number,
-      'imageUrl': imageUrl,
-      'largeImageUrl': largeImageUrl,
-      'set': set.toJson(),
-      'rarity': rarity,
-      'setName': setName,
-      'types': types,
-      'subtypes': subtypes,
-      'artist': artist,
-      'cardmarket': cardmarket,
-      'price': price,
-      'ebayPrice': ebayPrice, // Include ebayPrice
-      'rawData': rawData,
-      'dateAdded': dateAdded?.toIso8601String(),
-      'addedToCollection': addedToCollection?.toIso8601String(),
-      'priceHistory': priceHistory.map((e) => e.toJson()).toList(),
-      'isMtg': isMtg ?? false,
-      'setTotal': setTotal ?? set.total,
-    };
-  }
-
-  // Add this method for convenience
-  void addPriceHistoryPoint(double price, DateTime timestamp) {
-    priceHistory.add(PriceHistoryEntry(
-      price: price,
-      timestamp: timestamp,
-    ));
-  }
-
-  // Make sure we properly copy all fields including image URLs
+  // Create a copy with updated fields
   TcgCard copyWith({
     String? id,
     String? name,
@@ -263,21 +124,20 @@ class TcgCard {
     TcgSet? set,
     String? rarity,
     String? setName,
-    List<String>? types,
-    List<String>? subtypes,
-    String? artist,
-    Map<String, dynamic>? cardmarket,
     double? price,
-    double? ebayPrice, // Add ebayPrice parameter
+    Map<String, dynamic>? cardmarket,
     Map<String, dynamic>? rawData,
+    String? priceSource,
+    Map<String, double>? altPrices,
+    bool? isMtg,
     DateTime? dateAdded,
     DateTime? addedToCollection,
-    List<PriceHistoryEntry>? priceHistory,
     DateTime? lastPriceUpdate,
-    double? previousPrice,
     DateTime? lastPriceChange,
-    bool? isMtg,
+    double? previousPrice,
+    double? ebayPrice,
     int? setTotal,
+    List<PriceHistoryEntry>? priceHistory,
   }) {
     return TcgCard(
       id: id ?? this.id,
@@ -288,22 +148,177 @@ class TcgCard {
       set: set ?? this.set,
       rarity: rarity ?? this.rarity,
       setName: setName ?? this.setName,
-      types: types ?? this.types,
-      subtypes: subtypes ?? this.subtypes,
-      artist: artist ?? this.artist,
-      cardmarket: cardmarket ?? this.cardmarket,
       price: price ?? this.price,
-      ebayPrice: ebayPrice ?? this.ebayPrice, // Include ebayPrice
+      cardmarket: cardmarket ?? this.cardmarket,
       rawData: rawData ?? this.rawData,
+      priceSource: priceSource ?? this.priceSource,
+      altPrices: altPrices ?? this.altPrices,
+      isMtg: isMtg ?? this.isMtg,
       dateAdded: dateAdded ?? this.dateAdded,
       addedToCollection: addedToCollection ?? this.addedToCollection,
-      priceHistory: priceHistory ?? List.from(this.priceHistory),
-      isMtg: isMtg ?? this.isMtg,
+      lastPriceUpdate: lastPriceUpdate ?? this.lastPriceUpdate,
+      lastPriceChange: lastPriceChange ?? this.lastPriceChange,
+      previousPrice: previousPrice ?? this.previousPrice,
+      ebayPrice: ebayPrice ?? this.ebayPrice,
       setTotal: setTotal ?? this.setTotal,
-    )
-      ..lastPriceUpdate = lastPriceUpdate ?? this.lastPriceUpdate
-      ..previousPrice = previousPrice ?? this.previousPrice
-      ..lastPriceChange = lastPriceChange ?? this.lastPriceChange;
+      priceHistory: priceHistory ?? List<PriceHistoryEntry>.from(this.priceHistory),
+    );
+  }
+
+  // Method to get the specific price to use for API sorting
+  double getPriceSortValue() {
+    // Always use the API price for sorting if available
+    return apiPrice ?? price ?? 0.0;
+  }
+
+  // Add a price history point and return a new card instance
+  // This keeps the immutable pattern by returning a new card rather than modifying this one
+  TcgCard addPriceHistoryPoint(double price, DateTime timestamp, {String? source}) {
+    // Create a copy of the price history to avoid modifying the original
+    final updatedHistory = List<PriceHistoryEntry>.from(priceHistory);
+    
+    // Add the new price point
+    updatedHistory.add(PriceHistoryEntry(
+      timestamp: timestamp,
+      price: price,
+      source: source ?? priceSource,
+    ));
+    
+    // Return a new card with the updated history
+    return copyWith(
+      priceHistory: updatedHistory,
+    );
+  }
+
+  // Instead of setters, provide methods to update specific fields
+  TcgCard withLastPriceUpdate(DateTime timestamp) {
+    return copyWith(lastPriceUpdate: timestamp);
+  }
+
+  TcgCard withLastPriceChange(DateTime timestamp) {
+    return copyWith(lastPriceChange: timestamp);
+  }
+
+  TcgCard withPreviousPrice(double? previousPrice) {
+    return copyWith(previousPrice: previousPrice);
+  }
+
+  // Convert card to JSON for storage
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'number': number,
+      'imageUrl': imageUrl,
+      'largeImageUrl': largeImageUrl,
+      'set': {
+        'id': set.id,
+        'name': set.name,
+        'symbol': set.symbol,
+        'releaseDate': set.releaseDate,
+        'printedTotal': set.printedTotal,
+        'total': set.total,
+      },
+      'rarity': rarity,
+      'setName': setName,
+      'price': price,
+      'ebayPrice': ebayPrice,
+      'previousPrice': previousPrice,
+      'cardmarket': cardmarket,
+      'rawData': rawData,
+      'priceSource': priceSource,
+      'altPrices': altPrices,
+      'isMtg': isMtg,
+      'dateAdded': dateAdded?.toIso8601String(),
+      'addedToCollection': addedToCollection?.toIso8601String(),
+      'lastPriceUpdate': lastPriceUpdate?.toIso8601String(),
+      'lastPriceChange': lastPriceChange?.toIso8601String(),
+      'setTotal': setTotal,
+      'priceHistory': priceHistory.map((entry) => entry.toJson()).toList(),
+    };
+  }
+
+  // Factory method from JSON with enhanced price handling
+  factory TcgCard.fromJson(Map<String, dynamic> json) {
+    // Extract the primary API price
+    double? apiPrice;
+    Map<String, double> priceSources = {};
+    
+    if (json['cardmarket'] != null && json['cardmarket']['prices'] != null) {
+      final prices = json['cardmarket']['prices'];
+      apiPrice = _parseDouble(prices['averageSellPrice']);
+      
+      // Store all available price sources
+      if (prices['averageSellPrice'] != null) {
+        priceSources['cardmarket'] = _parseDouble(prices['averageSellPrice']) ?? 0.0;
+      }
+      if (prices['trendPrice'] != null) {
+        priceSources['trend'] = _parseDouble(prices['trendPrice']) ?? 0.0;
+      }
+      if (prices['lowPrice'] != null) {
+        priceSources['low'] = _parseDouble(prices['lowPrice']) ?? 0.0;
+      }
+    }
+
+    // Parse the price history entries if available
+    List<PriceHistoryEntry>? priceHistory;
+    if (json['priceHistory'] != null) {
+      priceHistory = (json['priceHistory'] as List)
+          .map((entry) => PriceHistoryEntry.fromJson(entry))
+          .toList();
+    }
+
+    // Extract set information
+    Map<String, dynamic> setData = json['set'] ?? {};
+    
+    // Create the set object
+    final TcgSet cardSet = TcgSet(
+      id: setData['id'] ?? json['setId'] ?? '',
+      name: setData['name'] ?? json['setName'] ?? '',
+      symbol: setData['symbol'],
+      releaseDate: setData['releaseDate'],
+      printedTotal: setData['printedTotal'],
+      total: setData['total'],
+    );
+    
+    return TcgCard(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      number: json['number']?.toString(),
+      imageUrl: json['imageUrl'] ?? json['images']?['small'],
+      largeImageUrl: json['largeImageUrl'] ?? json['images']?['large'],
+      set: cardSet,
+      rarity: json['rarity'],
+      setName: json['setName'] ?? setData['name'],
+      price: json['price'] != null ? _parseDouble(json['price']) : apiPrice,
+      ebayPrice: json['ebayPrice'] != null ? _parseDouble(json['ebayPrice']) : null,
+      previousPrice: json['previousPrice'] != null ? _parseDouble(json['previousPrice']) : null,
+      cardmarket: json['cardmarket'],
+      rawData: json['rawData'],
+      priceSource: json['priceSource'] ?? 'cardmarket',
+      altPrices: priceSources,
+      isMtg: json['isMtg'] ?? false,
+      dateAdded: json['dateAdded'] != null ? DateTime.parse(json['dateAdded']) : null,
+      addedToCollection: json['addedToCollection'] != null ? DateTime.parse(json['addedToCollection']) : null,
+      lastPriceUpdate: json['lastPriceUpdate'] != null ? DateTime.parse(json['lastPriceUpdate']) : null,
+      lastPriceChange: json['lastPriceChange'] != null ? DateTime.parse(json['lastPriceChange']) : null,
+      setTotal: json['setTotal'] != null ? int.tryParse(json['setTotal'].toString()) : null,
+      priceHistory: priceHistory ?? [],
+    );
+  }
+  
+  // Helper method to parse doubles from various formats
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      try {
+        return double.parse(value);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
   }
 }
 

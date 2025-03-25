@@ -578,13 +578,13 @@ class StorageService {
       // Only add price history if price has changed
       if (card.price != null && card.price! > 0 && card.price != existingCard.price) {
         final now = DateTime.now();
-        final updatedCard = existingCard.copyWith(
+        var updatedCard = existingCard.copyWith(
           price: card.price,
           lastPriceUpdate: now,
         );
         
         // Add new price point to history
-        updatedCard.addPriceHistoryPoint(card.price!, now);
+        updatedCard = updatedCard.addPriceHistoryPoint(card.price!, now);
         
         cards[index] = updatedCard;
         
@@ -719,18 +719,20 @@ class StorageService {
           final previousPrice = existingCard.price;
           
           // Create updated card with new price - DON'T use lastPriceUpdate in constructor
-          final updatedCard = existingCard.copyWith(
+          var updatedCard = existingCard.copyWith(
             price: newPrice,
           );
           
           // Set the timestamp fields AFTER creating the card
-          updatedCard.lastPriceUpdate = now;
-          updatedCard.previousPrice = previousPrice;
-          updatedCard.lastPriceChange = now;
+          updatedCard = updatedCard.withLastPriceUpdate(now);
+          updatedCard = updatedCard.withPreviousPrice(previousPrice);
+          updatedCard = updatedCard.withLastPriceChange(now);
           
           // Add new price point to history
-          updatedCard.priceHistory.add(
-            PriceHistoryEntry(price: newPrice, timestamp: now)
+          updatedCard = updatedCard.addPriceHistoryPoint(
+            newPrice, 
+            now, 
+            source: 'API'
           );
           
           cards[index] = updatedCard;

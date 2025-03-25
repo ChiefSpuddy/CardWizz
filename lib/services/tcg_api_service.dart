@@ -1,6 +1,7 @@
 import '../services/logging_service.dart';
 import 'package:dio/dio.dart';
 import 'dart:async';
+import 'dart:math' as math; // Add this import for math.min
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import './tcgdex_api_service.dart';
@@ -103,48 +104,76 @@ class TcgApiService {
     bool orderByDesc = false,
     int page = 1,
     int pageSize = 20,
+    bool optimizeForMetadata = false, // New parameter
   }) async {
     try {
-      // Enhanced logging to help diagnose sort issues
-      LoggingService.debug('API REQUEST: Query="$query", Sort="$orderBy", OrderByDesc=$orderByDesc');
+      // CRITICAL FIX: Enhance logging for sorting parameters
+      LoggingService.debug('TCG API SORT DEBUG: orderBy=$orderBy, desc=$orderByDesc, query=$query');
       
-      // Build query parameters with more detailed logging
+      // Convert complex sort fields to proper format if needed
+      String effectiveOrderBy = orderBy ?? '';
+      
+      // Enhanced logging for sorting
+      LoggingService.debug('TCG API: Making request with query="$query", sort=$effectiveOrderBy, desc=$orderByDesc, page=$page, pageSize=$pageSize');
+      
+      // Build query parameters
       final queryParams = <String, dynamic>{
         'q': query,
         'page': page,
         'pageSize': pageSize,
       };
       
-      // Only add sort parameters if provided, but log either way
-      if (orderBy != null && orderBy.isNotEmpty) {
-        LoggingService.debug('API SORT: Adding explicit sort field=$orderBy, desc=$orderByDesc');
-        queryParams['orderBy'] = orderBy;
+      // Only add sort parameters if provided
+      if (effectiveOrderBy.isNotEmpty) {
+        queryParams['orderBy'] = effectiveOrderBy;
         
-        // Critical fix - ensure the desc parameter is passed correctly as a string
+        // CRITICAL FIX: Make sure desc parameter is a string 'true' or 'false'
+        // The API expects string values, not boolean values
         queryParams['desc'] = orderByDesc.toString();
         
-        // Double-check the final parameter value
-        LoggingService.debug('API DESC PARAM: ${queryParams['desc']}');
-      } else {
-        LoggingService.debug('API SORT: No sort parameters provided');
+        // Extra debug logging for this critical parameter
+        LoggingService.debug('TCG API SORT: Set orderBy=${queryParams['orderBy']}, desc=${queryParams['desc']}');
       }
       
-      // Log the raw query parameters
-      final requestMap = Map<String, dynamic>.from(queryParams);
-      LoggingService.debug('API PARAMS: $requestMap');
-      
-      // Make the request with proper query parameters
-      final response = await _dio.get('/cards', queryParameters: queryParams);
-      
-      // Log response status to help debug issues
-      LoggingService.debug('API RESPONSE: Status ${response.statusCode}');
-      
-      // Log the result count for debugging
-      final data = response.data as Map<String, dynamic>;
-      final totalCount = data['totalCount'] as int? ?? 0;
-      LoggingService.debug('API Result: Found $totalCount cards for page $page');
-      
-      return data;
+      // Optimize query for large page sizes
+      if (pageSize > 50) {
+        // Longer timeout for larger requests
+        final dio = Dio(BaseOptions(
+          baseUrl: _baseUrl,
+          headers: {'X-Api-Key': apiKey},
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ));
+        
+        // Make the request with proper query parameters
+        final response = await dio.get('/cards', queryParameters: queryParams);
+        return response.data;
+      } else {
+        // Standard request for smaller page sizes
+        // CRITICAL: Add more detailed error handling
+        try {
+          final response = await _dio.get('/cards', queryParameters: queryParams);
+          
+          // Log first few cards to verify sort order if this is a price sort
+          if (effectiveOrderBy == 'cardmarket.prices.averageSellPrice' && response.data['data'] is List) {
+            final cards = response.data['data'] as List;
+            if (cards.isNotEmpty && cards.length > 1) {
+              final firstCard = cards.first;
+              final lastCard = cards.last;
+              
+              final firstPrice = firstCard['cardmarket']?['prices']?['averageSellPrice'] ?? 'N/A';
+              final lastPrice = lastCard['cardmarket']?['prices']?['averageSellPrice'] ?? 'N/A';
+              
+              LoggingService.debug('SORT RESULT CHECK: First card price: $firstPrice, Last card price: $lastPrice');
+            }
+          }
+          
+          return response.data;
+        } catch (e) {
+          LoggingService.debug('API ERROR: ${e.toString()}');
+          rethrow;
+        }
+      }
     } catch (e) {
       LoggingService.error('Error searching cards: $e');
       rethrow;

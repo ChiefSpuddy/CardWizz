@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../screens/search_screen.dart';
 import '../../constants/app_colors.dart';
-import '../../services/logging_service.dart'; // Add this import
+import '../../services/logging_service.dart'; 
+import 'sort_indicator_badge.dart'; // Add this import for SortIndicatorBadge widget
 
 class SearchAppBar extends StatefulWidget implements PreferredSizeWidget {
   final TextEditingController searchController;
@@ -103,7 +104,8 @@ class _SearchAppBarState extends State<SearchAppBar> {
       ),
       title: Container(
         height: kToolbarHeight - 16,
-        margin: const EdgeInsets.symmetric(horizontal: 8),
+        // Increase the search bar width by reducing margin
+        margin: const EdgeInsets.only(left: 8, right: 4),
         decoration: BoxDecoration(
           color: isDark ? Colors.grey[850] : Colors.grey[200],
           borderRadius: BorderRadius.circular(12),
@@ -149,8 +151,8 @@ class _SearchAppBarState extends State<SearchAppBar> {
                     textAlign: TextAlign.left,
                     decoration: InputDecoration(
                       hintText: widget.searchMode == SearchMode.eng 
-                        ? 'Search for cards or set names...' // Updated hint
-                        : 'Search cards...',
+                        ? 'Search cards...' // Shorter hint
+                        : 'Search...',
                       hintStyle: TextStyle(
                         color: isDark ? Colors.white54 : Colors.grey[500],
                         fontSize: 16,
@@ -215,7 +217,7 @@ class _SearchAppBarState extends State<SearchAppBar> {
               ),
             // Camera button with enhanced styling
             Padding(
-              padding: const EdgeInsets.only(right: 8.0, left: 4.0),
+              padding: const EdgeInsets.only(right: 4.0, left: 2.0),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -244,19 +246,20 @@ class _SearchAppBarState extends State<SearchAppBar> {
         ),
       ),
       actions: [
-        // Important: Make the sort button always visible when there are results,
-        // regardless of whether the search field has focus
+        // Replace the sort button with a more compact version
         if (widget.hasResults)
-          IconButton(
-            icon: Icon(
-              Icons.sort,
-              color: isDark ? Colors.white70 : Colors.grey[800],
+          Padding(
+            // Reduce padding to save space
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: SortIndicatorBadge(
+              sortField: widget.currentSort,
+              ascending: widget.sortAscending,
+              onTap: () {
+                print('Sort button pressed in SearchAppBar');
+                HapticFeedback.mediumImpact();
+                widget.onSortOptionsPressed();
+              },
             ),
-            onPressed: () {
-              print('Sort button pressed in SearchAppBar');
-              widget.onSortOptionsPressed();
-            },
-            tooltip: 'Sort results',
           ),
         _buildSearchModeToggle(isDark, colorScheme),
       ],
@@ -315,5 +318,19 @@ class _SearchAppBarState extends State<SearchAppBar> {
         ],
       ),
     );
+  }
+
+  // Add this helper method to the class
+  String _getSortDisplayName(String sortField, bool ascending) {
+    switch (sortField) {
+      case 'cardmarket.prices.averageSellPrice':
+        return ascending ? 'Price (Low to High)' : 'Price (High to Low)';
+      case 'name':
+        return ascending ? 'Name (A to Z)' : 'Name (Z to A)';
+      case 'number':
+        return ascending ? 'Set Number (Low to High)' : 'Set Number (High to Low)';
+      default:
+        return 'Custom Sort';
+    }
   }
 }

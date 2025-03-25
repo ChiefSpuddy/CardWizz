@@ -1,23 +1,44 @@
 class PriceHistoryEntry {
-  final double price;
   final DateTime timestamp;
+  final double price;
+  final String? source;
 
   PriceHistoryEntry({
+    required this.timestamp, 
     required this.price, 
-    required this.timestamp
+    this.source,
   });
 
+  // Convert to JSON for storage
+  Map<String, dynamic> toJson() {
+    return {
+      'timestamp': timestamp.toIso8601String(),
+      'price': price,
+      'source': source,
+    };
+  }
+
+  // Create from JSON
   factory PriceHistoryEntry.fromJson(Map<String, dynamic> json) {
     return PriceHistoryEntry(
-      price: (json['price'] as num).toDouble(),
-      timestamp: DateTime.parse(json['timestamp'] as String),
+      timestamp: DateTime.parse(json['timestamp']),
+      price: json['price'] is num 
+          ? (json['price'] as num).toDouble() 
+          : double.tryParse(json['price'].toString()) ?? 0.0,
+      source: json['source'],
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'price': price,
-      'timestamp': timestamp.toIso8601String(),
-    };
+  // Create a copy with updated data
+  PriceHistoryEntry copyWith({
+    DateTime? timestamp,
+    double? price,
+    String? source,
+  }) {
+    return PriceHistoryEntry(
+      timestamp: timestamp ?? this.timestamp,
+      price: price ?? this.price,
+      source: source ?? this.source,
+    );
   }
 }
