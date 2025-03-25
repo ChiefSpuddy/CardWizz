@@ -60,8 +60,10 @@ void main() async {
     await Firebase.initializeApp();
     LoggingService.debug('Firebase initialized successfully');
     
-    // Set up NavigationService
-    NavigationService.navigatorKey = GlobalKey<NavigatorState>();
+    // CRITICAL FIX: Make sure NavigationService.navigatorKey is properly initialized just once
+    // and not reassigned later
+    final navigatorKey = NavigationService.navigatorKey;
+    LoggingService.debug('NavigationService global key initialized: ${navigatorKey.toString()}');
     
     // Create a simple loading screen key - don't use static properties
     final loadingScreenKey = GlobalKey<_SimpleLoadingAppState>();
@@ -423,12 +425,6 @@ class _AppTransitionState extends State<AppTransition> with SingleTickerProvider
   }
 }
 
-// Simple NavigationService that doesn't need initialization
-class NavigationService {
-  // Use a direct global key instead of a static reference
-  static GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-}
-
 // MyApp widget with direct AppBar style override
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -437,6 +433,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final appState = Provider.of<AppState>(context, listen: true);
     final themeProvider = Provider.of<ThemeProvider>(context);
+    
+    // IMPORTANT: Log the instance of navigator key being used
+    LoggingService.debug('Building MyApp with navigator key: ${NavigationService.navigatorKey}');
     
     return AnnotatedRegion<SystemUiOverlayStyle>(
       // Force a specific style regardless of what any other widget tries to do
@@ -471,7 +470,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
         themeMode: themeProvider.themeMode,
-        navigatorKey: NavigationService.navigatorKey,
+        navigatorKey: NavigationService.navigatorKey, // Use the singleton instance
         locale: appState.locale,
         supportedLocales: AppState.supportedLocales,
         localizationsDelegates: const [

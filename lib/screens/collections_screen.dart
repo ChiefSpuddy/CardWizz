@@ -31,6 +31,7 @@ import '../models/tcg_card.dart';  // Add this import for TcgCard class
 import '../services/premium_features_helper.dart'; // Add this import to fix the error
 import '../screens/root_navigator.dart';
 import '../screens/card_details_screen.dart' as card_details_screen;
+import '../services/navigation_service.dart';
 
 class CollectionsScreen extends StatefulWidget {
   final bool _showEmptyState;
@@ -802,18 +803,31 @@ class CollectionsScreenState extends State<CollectionsScreen> with TickerProvide
                               if (_showCustomCollections) {
                                 _showCreateBinderDialog(context);
                               } else {
-                                // Update this navigation logic to ensure it goes to the search screen
-                                final homeState = context.findAncestorStateOfType<HomeScreenState>();
-                                if (homeState != null) {
-                                  homeState.setSelectedIndex(2); // Index 2 is the Search tab
+                                // Fix navigation using the root parent's state
+                                final rootNavigator = context.findAncestorStateOfType<RootNavigatorState>();
+                                if (rootNavigator != null) {
+                                  // Most direct method - use the tabs in RootNavigator
+                                  rootNavigator.setSelectedIndex(2); // Switch to Search tab (index 2)
+                                  LoggingService.debug('Using RootNavigatorState directly');
                                 } else {
-                                  // Alternative navigation if not inside HomeScreen
-                                  Navigator.of(context).pushNamed('/search');
+                                  LoggingService.debug('RootNavigatorState not found, trying alternatives');
+                                  
+                                  // Fallback 1: Try to find home state and use that
+                                  final homeState = context.findAncestorStateOfType<HomeScreenState>();
+                                  if (homeState != null) {
+                                    homeState.setSelectedIndex(2);
+                                    return;
+                                  }
+                                  
+                                  // Fallback 2: Just navigate to the search route
+                                  Navigator.of(context).pushNamedAndRemoveUntil(
+                                    '/search', 
+                                    (route) => false
+                                  );
                                 }
                               }
                             },
                             borderRadius: BorderRadius.circular(28),
-                            splashColor: Colors.white.withOpacity(0.1),
                             highlightColor: Colors.white.withOpacity(0.2),
                             child: Container(
                               width: 56,

@@ -28,22 +28,23 @@ class RootNavigator extends StatefulWidget {
 class RootNavigatorState extends State<RootNavigator> with WidgetsBindingObserver {
   late int _selectedIndex;
   
-  // Remove one key since we're removing Scanner from the nav bar
+  // CRITICAL FIX: Don't create duplicate GlobalKeys - create these more carefully
+  // with unique debug labels to identify any issues
   final List<GlobalKey<NavigatorState>> _navigatorKeys = [
-    GlobalKey<NavigatorState>(),
-    GlobalKey<NavigatorState>(),
-    GlobalKey<NavigatorState>(),
-    GlobalKey<NavigatorState>(),
-    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(debugLabel: 'RootNav_Home'),
+    GlobalKey<NavigatorState>(debugLabel: 'RootNav_Collections'),
+    GlobalKey<NavigatorState>(debugLabel: 'RootNav_Search'),
+    GlobalKey<NavigatorState>(debugLabel: 'RootNav_Analytics'),
+    GlobalKey<NavigatorState>(debugLabel: 'RootNav_Profile'),
   ];
 
   @override
   void initState() {
     super.initState();
+    // Log the navigator keys for debugging
+    LoggingService.debug('RootNavigator initialized with tab navigator keys');
     WidgetsBinding.instance.addObserver(this);
     _selectedIndex = widget.initialTab;
-    
-    // Don't use Theme here - move to didChangeDependencies
   }
 
   @override
@@ -98,11 +99,39 @@ class RootNavigatorState extends State<RootNavigator> with WidgetsBindingObserve
     }
   }
 
-  // Make this method public and static
+  // Expose a static helper method to access a RootNavigatorState from anywhere
+  static RootNavigatorState? of(BuildContext context) {
+    return context.findRootAncestorStateOfType<RootNavigatorState>();
+  }
+  
+  // Ensure these methods are public and accessible
   void setSelectedIndex(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    if (_selectedIndex != index) {
+      setState(() {
+        _selectedIndex = index;
+      });
+      LoggingService.debug('RootNavigator: Set selected index to $index');
+    } else {
+      LoggingService.debug('RootNavigator: Already at index $index');
+      
+      // If we're already at this tab, reset its navigation stack
+      // This ensures we go back to the root of this tab
+      resetToRoot(index);
+    }
+  }
+  
+  // Make sure this method works correctly
+  void resetToRoot(int index) {
+    if (index >= 0 && index < _navigatorKeys.length) {
+      final navigatorState = _navigatorKeys[index].currentState;
+      if (navigatorState != null) {
+        // Pop to first route
+        while (navigatorState.canPop()) {
+          navigatorState.pop();
+        }
+        LoggingService.debug('RootNavigator: Reset tab $index to root');
+      }
+    }
   }
 
   // Keep this method in case there are direct calls to it
@@ -137,37 +166,9 @@ class RootNavigatorState extends State<RootNavigator> with WidgetsBindingObserve
       LoggingService.debug('RootNavigator: Navigation error: $e');
     }
     
-    // Third approach: Get global navigator context and try again
-    try {
-      final navigatorContext = NavigationService.navigatorKey.currentContext;
-      if (navigatorContext != null) {
-        final rootState = navigatorContext.findAncestorStateOfType<RootNavigatorState>();
-        if (rootState != null) {
-          LoggingService.debug('RootNavigator: Found state via NavigationService');
-          rootState.setSelectedIndex(index);
-          return;
-        }
-      }
-    } catch (e) {
-      LoggingService.debug('RootNavigator: NavigationService error: $e');
-    }
-    
-    // Last resort: Schedule a callback after the frame
-    LoggingService.debug('RootNavigator: Using post-frame callback');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      try {
-        final navigatorContext = NavigationService.navigatorKey.currentContext;
-        if (navigatorContext != null) {
-          Navigator.of(navigatorContext, rootNavigator: true).pushNamedAndRemoveUntil(
-            '/',
-            (route) => false,
-            arguments: {'initialTab': index}
-          );
-        }
-      } catch (e) {
-        LoggingService.debug('RootNavigator: Post-frame callback error: $e');
-      }
-    });
+    // SIMPLIFIED APPROACH: Just use NavigationService directly
+    LoggingService.debug('RootNavigator: Using NavigationService as fallback');
+    NavigationService.navigateToAndRemoveUntil('/', arguments: {'initialTab': index});
   }
 
   @override
@@ -274,19 +275,6 @@ class RootNavigatorState extends State<RootNavigator> with WidgetsBindingObserve
         return const ProfileScreen();
       default:
         return const HomeScreen();
-    }
-  }
-  
-  // Add a helper method to reset the navigator state when needed
-  void resetToRoot(int index) {
-    if (index >= 0 && index < _navigatorKeys.length) {
-      final navigatorState = _navigatorKeys[index].currentState;
-      if (navigatorState != null) {
-        // Pop to first route
-        while (navigatorState.canPop()) {
-          navigatorState.pop();
-        }
-      }
     }
   }
 }

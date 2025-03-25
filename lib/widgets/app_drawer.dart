@@ -11,7 +11,8 @@ import '../l10n/app_localizations.dart';
 import '../screens/home_screen.dart';
 import '../screens/search_screen.dart'; 
 import '../services/navigation_service.dart';
-import '../services/logging_service.dart'; // Add this import
+import '../services/logging_service.dart'; 
+import '../screens/root_navigator.dart'; // Add this import for RootNavigatorState
 
 class AppDrawer extends StatelessWidget {
   final GlobalKey<ScaffoldState>? scaffoldKey;
@@ -21,35 +22,53 @@ class AppDrawer extends StatelessWidget {
     this.scaffoldKey,
   });
 
-  // Simplify the navigation method to handle search without mode parameter
+  // Completely rewrite this method to ensure proper navigation
   void _navigateAndClose(BuildContext context, String route, {Map<String, dynamic>? arguments}) {
-    Navigator.pop(context); // Close drawer
+    // First close the drawer
+    Navigator.pop(context);
     
-    // Try to use bottom nav first
-    final homeState = context.findRootAncestorStateOfType<HomeScreenState>();
-    if (homeState != null) {
+    LoggingService.debug('AppDrawer: Navigating to $route');
+    
+    // Find the RootNavigatorState which manages the tabs
+    final rootNavigator = context.findRootAncestorStateOfType<RootNavigatorState>();
+    
+    if (rootNavigator != null) {
+      LoggingService.debug('AppDrawer: Found RootNavigatorState');
+      
+      // Map routes to tab indices
+      int? tabIndex;
       switch (route) {
         case AppRoutes.home:
-          homeState.setSelectedIndex(0);
+          tabIndex = 0;
           break;
         case AppRoutes.collection:
-          homeState.setSelectedIndex(1);
+          tabIndex = 1;
           break;
         case AppRoutes.search:
-          homeState.setSelectedIndex(2);
+          tabIndex = 2;
           break;
         case AppRoutes.analytics:
-          homeState.setSelectedIndex(3);
+          tabIndex = 3;
           break;
         case AppRoutes.profile:
-          homeState.setSelectedIndex(4);
+          tabIndex = 4;
           break;
-        default:
-          Navigator.pushNamed(context, route, arguments: arguments);
       }
+      
+      if (tabIndex != null) {
+        // Switch to the appropriate tab
+        rootNavigator.setSelectedIndex(tabIndex);
+        return;
+      }
+    } 
+    
+    // If we can't find RootNavigatorState or it's not a tab route
+    // Use the global NavigationService as a fallback
+    LoggingService.debug('AppDrawer: Using NavigationService fallback');
+    if (arguments != null) {
+      NavigationService.navigateToAndRemoveUntil(route, arguments: arguments);
     } else {
-      // Fallback to direct navigation if not in HomeScreen
-      Navigator.pushNamed(context, route, arguments: arguments);
+      NavigationService.navigateToAndRemoveUntil(route);
     }
   }
 
