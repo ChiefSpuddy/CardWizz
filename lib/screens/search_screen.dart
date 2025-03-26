@@ -5,6 +5,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
+import 'dart:math'; // Import the math library directly
 import '../models/tcg_card.dart';
 import '../models/tcg_set.dart';
 import '../services/tcg_api_service.dart';
@@ -28,8 +29,9 @@ import '../widgets/search/search_app_bar.dart';
 import '../widgets/search/search_categories.dart';
 import '../widgets/search/search_categories_header.dart';
 import '../widgets/search/recent_searches.dart';
-import '../widgets/search/loading_state.dart';
-import '../widgets/search/loading_indicators.dart';
+// Comment out one of these conflicting imports
+// import '../widgets/search/loading_state.dart';
+import '../widgets/search/loading_indicators.dart'; // Use only this one
 import '../widgets/card_grid.dart';
 import '../widgets/search/set_grid.dart';
 import '../services/navigation_service.dart';
@@ -37,9 +39,8 @@ import '../providers/currency_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/standard_app_bar.dart';
 import '../widgets/app_drawer.dart';
-import '../utils/keyboard_utils.dart'; // Add this import for DismissKeyboardOnTap
+import '../utils/keyboard_utils.dart';
 import 'package:rxdart/rxdart.dart';
-import 'dart:math' as math;
 import '../models/tcg_set.dart' as models;
 
 // Import TcgSet from models explicitly
@@ -189,6 +190,11 @@ class _SearchScreenState extends State<SearchScreen> {
   String _serverSort = 'cardmarket.prices.averageSellPrice';
   bool _serverSortAscending = false;
   bool _useClientSideSort = false;
+
+  // Add these fields to track search state
+  bool _isSubmittingSearch = false;
+  String? _pendingSearchQuery;
+  final _searchLock = Object();
 
   @override
   void initState() {
@@ -494,178 +500,316 @@ class _SearchScreenState extends State<SearchScreen> {
       : 'name:"*$query*"';
   }
 
-  Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useOriginalQuery = false, String? sortField, bool? sortAscending}) async {
-    // Handle MTG mode separately
-    if (_searchMode == SearchMode.mtg) {
-      _performMtgSearch(query, sortField: sortField, sortAscending: sortAscending);
-      return;
-    }
-
+  // Improve the search behavior when typing new searches
+  void _onSearchChanged(String query) {
+    LoggingService.debug('Search text changed: "$query"');
+    
+    // Only handle empty query case immediately
     if (query.isEmpty) {
       setState(() {
         _searchResults = null;
+        _setResults = null;
+        _isInitialSearch = true;
         _showCategories = true;
-        _currentSetName = null; // Reset set name when clearing search
+        _currentSetName = null; // Reset set name when changing search text
       });
       return;
     }
-
-    // CRITICAL: Add explicit debugging of sort parameters
-    print('SEARCH: Current sort before function: $_currentSort, $_sortAscending');
-    print('SEARCH: Provided sort parameters: $sortField, $sortAscending');
-
-    // Update to store set name for better loading states
-    String? setName;
-
-    if (!isLoadingMore) {
-      setState(() {
-        _searchResults = null;
-        _showCategories = false;
-        _isLoading = true;
-      });
+    
+    // Cancel existing debounce if active
+    if (_searchDebounce?.isActive ?? false) {
+      _searchDebounce!.cancel();
     }
-
-    try {
-      // Determine which sort parameters to use for API call
-      final apiSortField = sortField ?? _currentSort;
-      final apiSortAscending = sortAscending ?? _sortAscending;
-      
-      // Store query for pagination
-      if (!isLoadingMore) {
-        _lastQuery = query;
-      }
+    
+    // SIMPLIFIED: Only search if query is at least 2 characters
+    if (query.length < 2) {
+      return; // Don't search for single characters
+    }
+    
+    // Use a shorter debounce for better user experience
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted && query == _searchController.text && query.isNotEmpty) {
+        LoggingService.debug('Initiating search for query: "$query" (after debounce)');
         
-      String searchQuery;
-      if (useOriginalQuery) {
-        searchQuery = query;
-      } else {
-        // Special handling for price queries
-        if (query.contains('cardmarket.prices.averageSellPrice')) {
+        // CRITICAL FIX: Always ensure we're using price high-to-low as default sort
+        // before starting any search
+        setState(() {
+          _isLoading = true;
+          _currentSetName = null;
+          _currentSort = 'cardmarket.prices.averageSellPrice';
+          _sortAscending = false;
+          _serverSort = 'cardmarket.prices.averageSellPrice';
+          _serverSortAscending = false;
+        });
+        
+        // Perform search based on mode - use the explicit sort parameters
+        if (_searchMode == SearchMode.eng) {
+          _directSearch(query, true);  // Pass true to enforce high-to-low
+        } else if (_searchMode == SearchMode.mtg) {
+          _directMtgSearch(query, true);  // Pass true to enforce high-to-low
+        } else {
+          _performSetSearch(query);
+        }
+      }
+    });
+  }
+
+  // Add this simpler method for direct searches when typing - update to accept enforceSort parameter
+  void _directSearch(String query, bool enforceHighToLow) {
+    // Clear the pending query flag
+    _pendingSearchQuery = null;
+    
+    // Show immediate loading state
+    setState(() {
+      _isLoading = true;
+      _showCategories = false;
+      _currentPage = 1;
+      
+      // CRITICAL FIX: Only enforce if requested
+      if (enforceHighToLow) {
+        _currentSort = 'cardmarket.prices.averageSellPrice';
+        _sortAscending = false;
+      }
+    });
+    
+    // Use the full search method with original query
+    // Pass explicit sort parameters to ensure consistency
+    _performSearch(
+      query,
+      sortField: enforceHighToLow ? 'cardmarket.prices.averageSellPrice' : _currentSort,
+      sortAscending: enforceHighToLow ? false : _sortAscending
+    );
+  }
+  
+  // Add this simpler method for direct MTG searches - update to accept enforceSort parameter
+  void _directMtgSearch(String query, bool enforceHighToLow) {
+    // Clear the pending query flag
+    _pendingSearchQuery = null;
+    
+    // Show immediate loading state
+    setState(() {
+      _isLoading = true;
+      _showCategories = false;
+      _currentPage = 1;
+      
+      // CRITICAL FIX: Always enforce high-to-low for MTG regardless
+      _currentSort = 'cardmarket.prices.averageSellPrice';
+      _sortAscending = false;
+    });
+    
+    // Use the full search method with explicit sort parameters
+    _performMtgSearch(
+      query,
+      sortField: 'cardmarket.prices.averageSellPrice',
+      sortAscending: false
+    );
+  }
+
+  Future<void> _performSearch(String query, {bool isLoadingMore = false, bool useOriginalQuery = false, String? sortField, bool? sortAscending}) async {
+    // Prevent concurrent searches
+    synchronized(() async {
+      LoggingService.debug('_performSearch executing for: "$query" with sort: ${sortField ?? _currentSort}, ascending: ${sortAscending ?? _sortAscending}');
+      _isSubmittingSearch = true;
+      
+      // Handle MTG mode separately
+      if (_searchMode == SearchMode.mtg) {
+        await _performMtgSearch(query, sortField: sortField, sortAscending: sortAscending);
+        _isSubmittingSearch = false;
+        _checkPendingSearch();
+        return;
+      }
+  
+      if (query.isEmpty) {
+        setState(() {
+          _searchResults = null;
+          _showCategories = true;
+          _currentSetName = null; // Reset set name when clearing search
+        });
+        _isSubmittingSearch = false;
+        _checkPendingSearch();
+        return;
+      }
+  
+      // Show loading state immediately for better UX
+      if (!isLoadingMore && mounted) {
+        setState(() {
+          // Keep existing results visible during loading to avoid UI disruption
+          _isLoading = true;
+          _showCategories = false;
+          
+          // CRITICAL FIX: Apply sort parameters to state
+          if (sortField != null) _currentSort = sortField;
+          if (sortAscending != null) _sortAscending = sortAscending;
+          
+          // Keep server-side sorting in sync
+          _serverSort = _currentSort;
+          _serverSortAscending = _sortAscending;
+        });
+      }
+  
+      try {
+        // PERFORMANCE: Determine which sort parameters to use for API call
+        // Always use explicit sort parameters when provided, otherwise use current state
+        final apiSortField = sortField ?? _currentSort;
+        final apiSortAscending = sortAscending ?? _sortAscending;
+        
+        // CRITICAL FIX: Log the actual sort parameters being used for debugging
+        LoggingService.debug('Search API call with sort: $apiSortField, ascending: $apiSortAscending');
+        
+        // Store query for pagination
+        if (!isLoadingMore) {
+          _lastQuery = query;
+        }
+          
+        String searchQuery;
+        if (useOriginalQuery) {
           searchQuery = query;
         } else {
-          searchQuery = _buildSearchQuery(query.trim());
-          print('Built search query: $searchQuery from input: $query');
+          // Special handling for price queries
+          if (query.contains('cardmarket.prices.averageSellPrice')) {
+            searchQuery = query;
+          } else {
+            searchQuery = _buildSearchQuery(query.trim());
+            LoggingService.debug('Built search query: $searchQuery from input: $query');
+          }
         }
-      }
-      
-      // ALWAYS log sort parameters for debugging
-      print('API SORT: Sending request with sort=$apiSortField, ascending=$apiSortAscending, desc=${!apiSortAscending}');
-      
-      // Execute the search with the EXPLICIT sort parameters
-      final results = await _apiService.searchCards(
-        query: searchQuery,
-        page: 1,
-        pageSize: 250, // INCREASED to maximum size to get more results
-        orderBy: apiSortField,
-        orderByDesc: !apiSortAscending,
-      );
-
-      // Log success and parameters that were used
-      print('✅ Search succeeded with sort=$apiSortField, ascending=$apiSortAscending');
-      print('Results returned: ${results['totalCount']} cards');
-
-      if (mounted) {
-        final List<dynamic> data = results['data'] as List? ?? [];
-        final int totalCount = results['totalCount'] as int;
         
-        final newCards = data
-            .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
-            .toList();
-
-        // If we have more cards than were loaded, try to load them all now
-        if (totalCount > newCards.length) {
-          print('Need to load more cards: loaded ${newCards.length}, total ${totalCount}');
+        // PERFORMANCE: Use a smaller page size for faster initial load
+        final initialPageSize = 50; // Reduced from 250
+        
+        // Execute the search with the EXPLICIT sort parameters and smaller page size
+        final results = await _apiService.searchCards(
+          query: searchQuery,
+          page: 1,
+          pageSize: initialPageSize, 
+          orderBy: apiSortField,
+          orderByDesc: !apiSortAscending,
+        );
+  
+        if (mounted) {
+          final List<dynamic> data = results['data'] as List? ?? [];
+          final int totalCount = results['totalCount'] as int;
           
-          // Show loading state with progress
+          LoggingService.debug('Search results received: ${data.length} cards (total: $totalCount)');
+          
+          final newCards = data
+              .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+              .toList();
+  
+          // PERFORMANCE: Show initial results immediately
           setState(() {
-            _searchResults = newCards;  // Show what we have so far
-            _isLoading = true;
-            _hasMorePages = true;
-          });
-
-          // Load all remaining pages in a single batch
-          final allCards = await _loadAllPages(
-            searchQuery, 
-            apiSortField, 
-            !apiSortAscending, 
-            newCards,
-            totalCount
-          );
-          
-          // Force client-side sorting for consistency
-          final sortedCards = _forceSortCards(
-            allCards, 
-            sortField ?? _currentSort, 
-            sortAscending ?? _sortAscending
-          );
-          
-          // Update UI with all cards
-          setState(() {
-            _searchResults = sortedCards;
+            _searchResults = newCards;  
             _totalCards = totalCount;
-            _hasMorePages = false;
+            _hasMorePages = totalCount > newCards.length;
+            // Keep loading state true if we need more pages
+            _isLoading = _hasMorePages;
+          });
+  
+          // PERFORMANCE: Start preloading images for visible cards
+          _preloadImagesForVisibleCards();
+          
+          // If we have many more results, load them in the background
+          if (totalCount > initialPageSize) {
+            // Load remaining results in background without blocking UI
+            _loadRemainingResultsInBackground(
+              searchQuery, 
+              apiSortField, 
+              !apiSortAscending, 
+              newCards,
+              totalCount
+            );
+          } else {
+            // No more results to load, update UI
+            setState(() {
+              _isLoading = false;
+            });
+          }
+        }
+      } catch (e) {
+        LoggingService.debug('❌ Search error: $e');
+        if (mounted) {
+          setState(() {
             _isLoading = false;
             _isLoadingMore = false;
+            // Don't set search results to empty if we already have results
+            if (_searchResults == null) {
+              _searchResults = [];
+            }
+            _totalCards = _searchResults?.length ?? 0;
+            _currentSetName = null;
           });
-
-          // Start preloading images for improved UX
-          _preloadVisibleImages();
-          
-          return;
         }
-
-        // CRITICAL: Force client-side sorting regardless of API response
-        final sortedCards = _forceSortCards(
-          newCards, 
-          sortField ?? _currentSort, 
-          sortAscending ?? _sortAscending
-        );
-        
-        // Update the UI with sorted cards
-        setState(() {
-          _searchResults = sortedCards;
-          _totalCards = totalCount;
-          _hasMorePages = false;
-          _isLoading = false;
-          _isLoadingMore = false;
-        });
-
-        // Continue with image preloading
-        // ...existing code...
+      } finally {
+        _isSubmittingSearch = false;
+        _checkPendingSearch();
       }
-    } catch (e) {
-      LoggingService.debug('❌ Search error: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isLoadingMore = false;
-          _searchResults = [];
-          _totalCards = 0;
-          _currentSetName = null; // Reset set name on error to avoid stuck states
-        });
-      }
+    });
+  }
+  
+  // Add a helper method to process searches synchronously
+  void synchronized(Future<void> Function() action) async {
+    // Simple synchronization using a lock object
+    if (_isSubmittingSearch) {
+      LoggingService.debug('Search already in progress, waiting...');
+      return; // Don't allow concurrent searches
+    }
+    
+    // Execute the action
+    try {
+      await action();
+    } finally {
+      // Ensure we always reset the flag
+      _isSubmittingSearch = false;
+    }
+  }
+  
+  // Add a helper method to check if we have a pending search
+  void _checkPendingSearch() {
+    // If we have a pending search, execute it now
+    if (_pendingSearchQuery != null && mounted) {
+      final query = _pendingSearchQuery!;
+      _pendingSearchQuery = null;
+      
+      LoggingService.debug('Processing pending search: "$query"');
+      
+      // Use a small delay to ensure UI is updated first
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted && query == _searchController.text) {
+          LoggingService.debug('Executing pending search: "$query"');
+          if (_searchMode == SearchMode.eng) {
+            _performSearch(query);
+          } else if (_searchMode == SearchMode.mtg) {
+            _performMtgSearch(query);
+          } else {
+            _performSetSearch(query);
+          }
+        }
+      });
     }
   }
 
   Future<void> _performMtgSearch(String query, {bool isLoadingMore = false, String? sortField, bool? sortAscending}) async {
-    if (query.isEmpty) {
-      setState(() {
-        _searchResults = null;
-        _showCategories = true;
-      });
-      return;
-    }
-
-    if (!isLoadingMore) {
-      setState(() {
-        _isLoading = true;
-        _searchResults = null;
-        _setResults = null;
-        _showCategories = false;
-      });
-    }
-
+    _isSubmittingSearch = true;
+    LoggingService.debug('Starting MTG search for: "$query"');
+    
     try {
+      if (query.isEmpty) {
+        setState(() {
+          _searchResults = null;
+          _showCategories = true;
+        });
+        return;
+      }
+  
+      if (!isLoadingMore) {
+        setState(() {
+          _isLoading = true;
+          _searchResults = null;
+          _setResults = null;
+          _showCategories = false;
+        });
+      }
+  
       // Always enforce price high-to-low for ALL MTG searches
       _currentSort = 'cardmarket.prices.averageSellPrice';
       _sortAscending = false;
@@ -746,7 +890,7 @@ class _SearchScreenState extends State<SearchScreen> {
         
         // Debug log the first few cards
         if (cards.isNotEmpty) {
-          for (int i = 0; i < math.min(3, cards.length); i++) {
+          for (int i = 0; i < min(3, cards.length); i++) {  // Changed from math.min to just min
             LoggingService.debug('Card $i: ${cards[i].name} - ${cards[i].imageUrl}');
           }
         }
@@ -783,109 +927,74 @@ class _SearchScreenState extends State<SearchScreen> {
           _hasMorePages = false;
         });
       }
+    } finally {
+      _isSubmittingSearch = false;
+      _checkPendingSearch();
     }
   }
 
   Future<void> _performSetSearch(String query) async {
-    if (query.isEmpty) {
-      setState(() => _setResults = null);
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
+    _isSubmittingSearch = true;
+    LoggingService.debug('Starting set search for: "$query"');
+    
     try {
-      if (_searchMode == SearchMode.eng) {
-        final results = await _apiService.searchSets(query: query);
-        if (mounted) {
-          setState(() {
-            _setResults = results['data'] as List?;
-            _isLoading = false;
-          });
-        }
-      } else if (_searchMode == SearchMode.mtg) {
-        try {
-          final response = await _mtgApi.getSetDetails(query);
+      if (query.isEmpty) {
+        setState(() => _setResults = null);
+        return;
+      }
+  
+      setState(() => _isLoading = true);
+  
+      try {
+        if (_searchMode == SearchMode.eng) {
+          final results = await _apiService.searchSets(query: query);
           if (mounted) {
-            if (response != null) {
-              // Format the response to match our expected structure
-              final formattedSets = [response];
+            setState(() {
+              _setResults = results['data'] as List?;
+              _isLoading = false;
+            });
+          }
+        } else if (_searchMode == SearchMode.mtg) {
+          try {
+            final response = await _mtgApi.getSetDetails(query);
+            if (mounted) {
+              if (response != null) {
+                // Format the response to match our expected structure
+                final formattedSets = [response];
+                setState(() {
+                  _setResults = formattedSets;
+                  _isLoading = false;
+                });
+              } else {
+                setState(() {
+                  _setResults = [];
+                  _isLoading = false;
+                });
+              }
+            }
+          } catch (e) {
+            LoggingService.debug('Error fetching MTG set details: $e');
+            if (mounted) {
               setState(() {
-                _setResults = formattedSets;
                 _isLoading = false;
-              });
-            } else {
-              setState(() {
                 _setResults = [];
-                _isLoading = false;
               });
             }
           }
-        } catch (e) {
-          LoggingService.debug('Error fetching MTG set details: $e');
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _setResults = [];
-            });
-          }
+        }
+      } catch (e) {
+        LoggingService.debug('Set search error: $e');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _setResults = [];
+          });
         }
       }
-    } catch (e) {
-      LoggingService.debug('Set search error: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _setResults = [];
-        });
-      }
+    } finally {
+      _isSubmittingSearch = false;
+      _checkPendingSearch();
     }
-  }
-
-  void _onSearchChanged(String query) {
-    // Only handle empty query case immediately
-    if (query.isEmpty) {
-      setState(() {
-        _searchResults = null;
-        _setResults = null;
-        _isInitialSearch = true;
-        _showCategories = true;
-        _currentSetName = null; // Reset set name when changing search text
-      });
-      return;
-    }
-    
-    // Cancel existing debounce if active
-    if (_searchDebounce?.isActive ?? false) {
-      _searchDebounce!.cancel();
-    }
-    
-    // SIMPLIFIED: Only search if query is at least 2 characters
-    if (query.length < 2) {
-      return; // Don't search for single characters
-    }
-    
-    // Use a longer debounce for better user experience
-    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-      if (mounted && query == _searchController.text && query.isNotEmpty) {
-        LoggingService.debug('Initiating search for query: "$query"');
-        setState(() {
-          _currentPage = 1;
-          _isInitialSearch = true;
-          _isLoading = true;
-          _currentSetName = null;
-        });
-        
-        // Perform search based on mode
-        if (_searchMode == SearchMode.eng) {
-          _performSearch(query);
-        } else if (_searchMode == SearchMode.mtg) {
-          _performMtgSearch(query);
-        } else {
-          _performSetSearch(query);
-        }
-      }
-    });
   }
 
   Future<void> _performQuickSearch(Map<String, dynamic> searchItem) async {
@@ -1611,132 +1720,184 @@ List<TcgCard> _forceSortCards(List<TcgCard> cards, String sortField, bool ascend
   
   print('✅ Client-side sort complete');
   print('Debug - First 5 cards with BOTH prices:');
-  for (int i = 0; i < math.min(5, sortedCards.length); i++) {
+  for (int i = 0; i < min(5, sortedCards.length); i++) {  // Changed from math.min to just min
     final card = sortedCards[i];
     print('Card #${i+1}: ${card.name}, API: ${card.apiPrice}, UI: ${card.price}, Sort: ${card.getPriceSortValue()}, ID: ${card.id}');
   }
   return sortedCards;
 }
 
-// Add this new method to load all pages and sort them
-Future<void> _loadAllAndSort() async {
-  if (_searchResults == null || _lastQuery == null) return;
+// Add this method to _SearchScreenState class - place it near other sort-related methods
+// Add this helper method for display names
+String _getSortDisplayName(String sortField, bool ascending) {
+  switch (sortField) {
+    case 'cardmarket.prices.averageSellPrice':
+      return ascending ? 'Price (Low to High)' : 'Price (High to Low)';
+    case 'name':
+      return ascending ? 'Name (A to Z)' : 'Name (Z to A)';
+    case 'number':
+      return ascending ? 'Set Number (Low to High)' : 'Set Number (High to Low)';
+    default:
+      return 'Custom Sort';
+  }
+}
+
+// Add this method to load all pages of results
+Future<List<TcgCard>> _loadAllPages(
+  String query,
+  String sortField,
+  bool desc,
+  List<TcgCard> firstPageCards,
+  int totalCount
+) async {
+  // Start with the first page we already loaded
+  List<TcgCard> allCards = List<TcgCard>.from(firstPageCards);
   
-  // Show loading dialog
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => AlertDialog(
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 16),
-          Text('Loading all cards for sorting...'),
-          const SizedBox(height: 8),
-          Text(
-            'Please wait while we load all results',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-        ],
-      ),
-    ),
-  );
+  // Calculate how many pages we need (250 is maximum page size for API)
+  final int pageSize = 250;
+  final int totalPages = (totalCount / pageSize).ceil();
   
-  try {
-    // Calculate how many total cards and pages
-    final int totalPages = (_totalCards / 100).ceil();
-    List<TcgCard> allCards = [];
+  // Skip page 1 since we already loaded it
+  for (int page = 2; page <= totalPages; page++) {
+    print('Loading page $page of $totalPages');
     
-    // Add current results first
-    allCards.addAll(_searchResults!);
+    // Update loading state to show progress
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
     
-    // Load remaining pages with larger page size for efficiency
-    for (int page = 2; page <= totalPages; page++) {
-      // Update loading status
-      if (mounted) {
-        Navigator.of(context).pop(); // Remove previous dialog
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 16),
-                Text('Loading page $page of $totalPages...'),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: (page - 1) / totalPages,
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-      
-      // Load this page with a larger page size
+    try {
+      // Load this page
       final results = await _apiService.searchCards(
-        query: _lastQuery!,
+        query: query,
         page: page,
-        pageSize: 100, // Larger page size to reduce API calls
-        orderBy: _currentSort,
-        orderByDesc: !_sortAscending,
+        pageSize: pageSize,
+        orderBy: sortField,
+        orderByDesc: desc,
       );
       
-      final List<dynamic> data = results['data'] as List? ?? [];
-      if (data.isEmpty) break;
-      
-      final pageCards = data
-          .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
-          .toList();
-      
-      allCards.addAll(pageCards);
-      
-      // If we've loaded enough cards, break early
-      if (allCards.length >= _totalCards) break;
+      if (results['data'] != null) {
+        final List<dynamic> data = results['data'] as List? ?? [];
+        if (data.isEmpty) break;
+        
+        final pageCards = data
+            .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+            .toList();
+        
+        allCards.addAll(pageCards);
+        
+        // Update UI with progress
+        if (mounted) {
+          setState(() {
+            // Show progress by updating the cards we have so far
+            _searchResults = allCards;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading page $page: $e');
+      // Continue with what we have so far
     }
     
-    // Remove loading dialog
+    // If we've loaded enough cards or something went wrong, break early
+    if (allCards.length >= totalCount) break;
+  }
+  
+  print('✅ Loaded all ${allCards.length} cards successfully');
+  return allCards;
+}
+
+// PERFORMANCE: New method to load remaining results without freezing the UI
+Future<void> _loadRemainingResultsInBackground(
+  String query,
+  String sortField,
+  bool desc,
+  List<TcgCard> firstPageCards,
+  int totalCount
+) async {
+  try {
+    // Set larger page size for background load
+    final pageSize = 100;
+    final pageCount = ((totalCount - firstPageCards.length) / pageSize).ceil();
+    
+    List<TcgCard> allCards = List<TcgCard>.from(firstPageCards);
+    
+    // Load one page at a time
+    for (int page = 2; page <= pageCount + 1; page++) {
+      if (!mounted) break; // Don't continue if widget is disposed
+      
+      LoggingService.debug('Loading page $page of ${pageCount + 1}');
+      
+      // Load the next page
+      final results = await _apiService.searchCards(
+        query: query,
+        page: page,
+        pageSize: pageSize,
+        orderBy: sortField,
+        orderByDesc: desc,
+      );
+      
+      if (results['data'] != null && mounted) {
+        final List<dynamic> data = results['data'] as List? ?? [];
+        final pageCards = data
+            .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
+            .toList();
+            
+        // Add cards to our result set
+        allCards.addAll(pageCards);
+        
+        // Update UI with progress - use client-side sorting for consistency
+        setState(() {
+          _searchResults = _forceSortCards(allCards, _currentSort, _sortAscending);
+          
+          // Check if we've loaded all cards
+          _hasMorePages = allCards.length < totalCount;
+        });
+        
+        // Preload images for the newly added cards
+        _preloadNewImagesOnly(pageCards);
+      }
+    }
+    
+    // Final update after all pages are loaded
     if (mounted) {
-      Navigator.of(context).pop();
+      setState(() {
+        _isLoading = false;
+        _hasMorePages = false;
+      });
     }
-    
-    // Now that we have all cards, sort them
-    setState(() {
-      // Sort according to current criteria
-      _searchResults = _sortCards(allCards, _currentSort, _sortAscending);
-      
-      // Update state to reflect we have all cards
-      _hasMorePages = false;
-      
-      // Show notification
-      NotificationManager.success(
-        context,
-        message: 'Sorted ${allCards.length} cards by ${_getSortDisplayName(_currentSort, _sortAscending)}',
-        duration: const Duration(seconds: 2),
-        position: NotificationPosition.top,
-      );
-    });
-    
-    // Start loading images for visibility
-    _preloadVisibleImages();
-    
   } catch (e) {
-    // Remove loading dialog on error
+    LoggingService.debug('Error loading additional pages: $e');
+    // Update state to show we've finished loading even if there was an error
     if (mounted) {
-      Navigator.of(context).pop();
-      NotificationManager.error(
-        context,
-        message: 'Error loading all cards: $e',
-      );
+      setState(() {
+        _isLoading = false;
+        _hasMorePages = false;
+      });
     }
   }
 }
 
-// Add a helper method to preload only currently visible images
-void _preloadVisibleImages() {
+// PERFORMANCE: More efficient image preloading that only loads new images
+void _preloadNewImagesOnly(List<TcgCard> newCards) {
+  if (newCards.isEmpty) return;
+  
+  // Only preload a limited number of new cards
+  final cardCount = min(10, newCards.length);  // Changed from math.min to just min
+  
+  for (int i = 0; i < cardCount; i++) {
+    if (newCards[i].imageUrl != null && 
+        !_imageCache.containsKey(newCards[i].imageUrl) &&
+        !_loadingRequestedUrls.contains(newCards[i].imageUrl)) {
+      _loadImage(newCards[i].imageUrl!);
+    }
+  }
+}
+
+// PERFORMANCE: Enhanced image loading with prioritization
+void _preloadImagesForVisibleCards() {
   if (_searchResults == null || _searchResults!.isEmpty) return;
   
   // Determine which cards are likely visible based on screen height
@@ -1744,10 +1905,26 @@ void _preloadVisibleImages() {
   final cardHeight = screenHeight / 4; // Approximate card height
   final visibleCardCount = (screenHeight / cardHeight).ceil() * 3; // 3 columns
   
-  // Preload just the visible cards' images
-  for (int i = 0; i < math.min(visibleCardCount, _searchResults!.length); i++) {
-    if (_searchResults![i].imageUrl != null) {
+  // Clear load queue and set up new priority queue
+  _loadQueue.clear();
+  
+  // First pass: Load just the visible cards' images with higher priority
+  for (int i = 0; i < min(visibleCardCount, _searchResults!.length); i++) {  // Changed from math.min to just min
+    if (_searchResults![i].imageUrl != null && 
+        !_imageCache.containsKey(_searchResults![i].imageUrl) &&
+        !_loadingRequestedUrls.contains(_searchResults![i].imageUrl)) {
+      // Load these immediately rather than queueing
       _loadImage(_searchResults![i].imageUrl!);
+    }
+  }
+  
+  // Second pass: Queue the next batch of images with lower priority
+  for (int i = visibleCardCount; i < min(visibleCardCount * 3, _searchResults!.length); i++) {  // Changed from math.min to just min
+    if (_searchResults![i].imageUrl != null && 
+        !_imageCache.containsKey(_searchResults![i].imageUrl) &&
+        !_loadingRequestedUrls.contains(_searchResults![i].imageUrl)) {
+      // Add these to the queue
+      _loadQueue.add(_searchResults![i].imageUrl!);
     }
   }
 }
@@ -2049,6 +2226,35 @@ void _preloadVisibleImages() {
           },
           onCameraPressed: _onCameraPressed,
           onCancelSearch: _handleBackToCategories, // Add this line to handle search cancellation
+          // Add this callback to ensure search submissions work properly
+          onSubmitted: (query) {
+            LoggingService.debug('Search submitted via keyboard: "$query"');
+            if (query.isNotEmpty) {
+              if (_searchDebounce?.isActive ?? false) {
+                _searchDebounce!.cancel();
+              }
+              
+              // CRITICAL FIX: Always ensure default sort for manual searches
+              setState(() {
+                _currentSort = 'cardmarket.prices.averageSellPrice';
+                _sortAscending = false;
+                _serverSort = 'cardmarket.prices.averageSellPrice';
+                _serverSortAscending = false;
+              });
+              
+              if (_searchMode == SearchMode.eng) {
+                _performSearch(query, 
+                  sortField: 'cardmarket.prices.averageSellPrice',
+                  sortAscending: false);
+              } else if (_searchMode == SearchMode.mtg) {
+                _performMtgSearch(query,
+                  sortField: 'cardmarket.prices.averageSellPrice',
+                  sortAscending: false);
+              } else {
+                _performSetSearch(query);
+              }
+            }
+          },
         ),
         body: CustomScrollView(
           controller: _scrollController,
@@ -2115,7 +2321,7 @@ void _preloadVisibleImages() {
                 ),
               ),
               
-              // Skeleton loading grid
+              // Use CardSkeletonGrid from loading_indicators.dart only
               CardSkeletonGrid(
                 itemCount: 12,
                 setName: _currentSetName,
@@ -2244,8 +2450,10 @@ void _preloadVisibleImages() {
   }
   
   // Update to use our single setSearchMode method
-  void _onSearchModeChanged(List<SearchMode> modes) {
-    setSearchMode(modes.first);
+  void _onSearchModeChanged(Set<SearchMode> modes) {
+    if (modes.isNotEmpty) {
+      setSearchMode(modes.first);
+    }
   }
 
   // In your search function, after getting results:
@@ -2302,86 +2510,5 @@ void _preloadVisibleImages() {
     
     return matchingSet['name'] as String?;
   }
-
-  // Add this method to _SearchScreenState class - place it near other sort-related methods
-// Add this helper method for display names
-String _getSortDisplayName(String sortField, bool ascending) {
-  switch (sortField) {
-    case 'cardmarket.prices.averageSellPrice':
-      return ascending ? 'Price (Low to High)' : 'Price (High to Low)';
-    case 'name':
-      return ascending ? 'Name (A to Z)' : 'Name (Z to A)';
-    case 'number':
-      return ascending ? 'Set Number (Low to High)' : 'Set Number (High to Low)';
-    default:
-      return 'Custom Sort';
-  }
-}
-
-// Add this method to load all pages of results
-Future<List<TcgCard>> _loadAllPages(
-  String query,
-  String sortField,
-  bool desc,
-  List<TcgCard> firstPageCards,
-  int totalCount
-) async {
-  // Start with the first page we already loaded
-  List<TcgCard> allCards = List<TcgCard>.from(firstPageCards);
-  
-  // Calculate how many pages we need (250 is maximum page size for API)
-  final int pageSize = 250;
-  final int totalPages = (totalCount / pageSize).ceil();
-  
-  // Skip page 1 since we already loaded it
-  for (int page = 2; page <= totalPages; page++) {
-    print('Loading page $page of $totalPages');
-    
-    // Update loading state to show progress
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
-    
-    try {
-      // Load this page
-      final results = await _apiService.searchCards(
-        query: query,
-        page: page,
-        pageSize: pageSize,
-        orderBy: sortField,
-        orderByDesc: desc,
-      );
-      
-      if (results['data'] != null) {
-        final List<dynamic> data = results['data'] as List? ?? [];
-        final pageCards = data
-            .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
-            .toList();
-            
-        // Add these cards to our result set
-        allCards.addAll(pageCards);
-        
-        // Update UI with progress
-        if (mounted) {
-          setState(() {
-            // Show progress by updating the cards we have so far
-            _searchResults = allCards;
-          });
-        }
-      }
-    } catch (e) {
-      print('Error loading page $page: $e');
-      // Continue with what we have so far
-    }
-    
-    // If we've loaded enough cards or something went wrong, break early
-    if (allCards.length >= totalCount) break;
-  }
-  
-  print('✅ Loaded all ${allCards.length} cards successfully');
-  return allCards;
-}
 }
 

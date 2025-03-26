@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../screens/search_screen.dart';
+import '../../screens/search_screen.dart'; // For SearchMode enum
 import '../../constants/app_colors.dart';
 import '../../services/logging_service.dart'; 
-import 'sort_indicator_badge.dart'; // Add this import for SortIndicatorBadge widget
 
 class SearchAppBar extends StatefulWidget implements PreferredSizeWidget {
   final TextEditingController searchController;
   final Function(String) onSearchChanged;
   final VoidCallback onClearSearch;
   final VoidCallback onSortOptionsPressed;
+  final bool hasResults;
   final String currentSort;
   final bool sortAscending;
-  final bool hasResults;
   final SearchMode searchMode;
-  final Function(List<SearchMode>) onSearchModeChanged;
+  // Fix the type: Change from List<SearchMode> to Set<SearchMode>
+  final Function(Set<SearchMode>) onSearchModeChanged;
   final VoidCallback onCameraPressed;
-  final VoidCallback onCancelSearch; // Keep this callback
+  final VoidCallback onCancelSearch;
+  final Function(String) onSubmitted;
 
   const SearchAppBar({
     Key? key,
@@ -24,313 +25,178 @@ class SearchAppBar extends StatefulWidget implements PreferredSizeWidget {
     required this.onSearchChanged,
     required this.onClearSearch,
     required this.onSortOptionsPressed,
-    required this.currentSort,
-    required this.sortAscending,
     required this.hasResults,
+    required this.currentSort, 
+    required this.sortAscending,
     required this.searchMode,
     required this.onSearchModeChanged,
     required this.onCameraPressed,
-    required this.onCancelSearch, // Keep this parameter
+    required this.onCancelSearch,
+    required this.onSubmitted,
   }) : super(key: key);
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  State<SearchAppBar> createState() => _SearchAppBarState();
 
   @override
-  State<SearchAppBar> createState() => _SearchAppBarState();
+  Size get preferredSize => const Size.fromHeight(60);
 }
 
 class _SearchAppBarState extends State<SearchAppBar> {
-  // Add a focus node to manage keyboard focus directly
-  final FocusNode _searchFocusNode = FocusNode();
-  bool _isSearching = false; // Keep tracking active search
-  
+  late FocusNode _focusNode;
+  bool _isSearchFocused = false;
+
   @override
   void initState() {
     super.initState();
-    // Add a tiny delay before adding the listener to avoid initial state issues
-    Future.microtask(() {
-      _searchFocusNode.addListener(_onFocusChange);
-    });
-
-    // Initialize with current search state
-    _isSearching = widget.searchController.text.isNotEmpty;
-
-    // Add listener to track when search begins
-    widget.searchController.addListener(_onSearchControllerChange);
-  }
-
-  void _onSearchControllerChange() {
-    final isTextEmpty = widget.searchController.text.isEmpty;
-    if (_isSearching != !isTextEmpty) {
+    _focusNode = FocusNode();
+    _focusNode.addListener(() {
       setState(() {
-        _isSearching = !isTextEmpty;
+        _isSearchFocused = _focusNode.hasFocus;
       });
-    }
-  }
-  
-  void _onFocusChange() {
-    // When focused, ensure keyboard shows immediately but safely
-    if (_searchFocusNode.hasFocus) {
-      // Use a safer approach that won't crash on iOS
-      Future.delayed(const Duration(milliseconds: 50), () {
-        if (_searchFocusNode.hasFocus) {
-          SystemChannels.textInput.invokeMethod('TextInput.show');
-        }
-      });
-    }
+    });
   }
 
   @override
   void dispose() {
-    _searchFocusNode.removeListener(_onFocusChange);
-    widget.searchController.removeListener(_onSearchControllerChange);
-    _searchFocusNode.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     
     return AppBar(
-      elevation: 0,
-      backgroundColor: isDark ? Colors.grey[900] : Colors.white,
-      titleSpacing: 0,
-      iconTheme: IconThemeData(
-        color: isDark ? Colors.white : Colors.black87,
-      ),
-      title: Container(
-        height: kToolbarHeight - 16,
-        // Increase the search bar width by reducing margin
-        margin: const EdgeInsets.only(left: 8, right: 4),
-        decoration: BoxDecoration(
-          color: isDark ? Colors.grey[850] : Colors.grey[200],
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 3,
-              offset: const Offset(0, 2),
+      title: Row(
+        children: [
+          // Make toggle much more compact
+          Container(
+            height: 32, // Reduced height
+            constraints: const BoxConstraints(maxWidth: 65), // Constrain width
+            child: SegmentedButton<SearchMode>(
+              showSelectedIcon: false,
+              style: ButtonStyle(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                // Extreme compactness with minimal padding
+                padding: MaterialStateProperty.all(
+                  EdgeInsets.zero, // Remove all padding
+                ),
+                // Reduce icon size
+                iconSize: MaterialStateProperty.all(10),
+                // Minimal shape with smaller border radius
+                shape: MaterialStateProperty.all(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                // Smaller overall button
+                minimumSize: MaterialStateProperty.all(
+                  const Size(28, 26),
+                ),
+              ),
+              segments: const [
+                ButtonSegment(
+                  value: SearchMode.eng,
+                  label: Text('PKM', style: TextStyle(fontSize: 10)), // Smaller text
+                ),
+                ButtonSegment(
+                  value: SearchMode.mtg,
+                  label: Text('MTG', style: TextStyle(fontSize: 10)), // Smaller text
+                ),
+              ],
+              selected: {widget.searchMode},
+              onSelectionChanged: widget.onSearchModeChanged,
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 12),
-            Icon(
-              Icons.search,
-              color: isDark ? Colors.white70 : Colors.grey[600],
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            // Improved vertical centering using Align+Container combo
-            Expanded(
-              child: Align(
-                alignment: Alignment.center,
-                child: Container(
-                  height: 40, // Fixed height to match the search bar
-                  alignment: Alignment.center, // Center the child vertically
-                  // SIMPLIFIED: Just use a basic TextField without the Form
-                  child: TextField(
-                    controller: widget.searchController,
-                    focusNode: _searchFocusNode,
-                    onChanged: (value) {
-                      // Call the parent's onSearchChanged method
-                      widget.onSearchChanged(value);
-                      // Also update local state to track if we're searching
-                      final isTextEmpty = value.isEmpty;
-                      if (_isSearching != !isTextEmpty) {
-                        setState(() {
-                          _isSearching = !isTextEmpty;
-                        });
-                      }
-                    },
-                    textAlign: TextAlign.left,
-                    decoration: InputDecoration(
-                      hintText: widget.searchMode == SearchMode.eng 
-                        ? 'Search cards...' // Shorter hint
-                        : 'Search...',
-                      hintStyle: TextStyle(
-                        color: isDark ? Colors.white54 : Colors.grey[500],
+          ),
+          
+          const SizedBox(width: 6), // Reduce spacing
+          
+          // Search field with expanded width
+          Expanded(
+            child: Container(
+              height: 38, // Reduced height slightly
+              decoration: BoxDecoration(
+                color: isDark ? Colors.black12 : Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _isSearchFocused
+                      ? colorScheme.primary
+                      : colorScheme.onSurface.withOpacity(0.1),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 6), // Reduced
+                  const Icon(Icons.search, size: 16), // Smaller icon
+                  const SizedBox(width: 6), // Reduced
+                  Expanded(
+                    child: TextField(
+                      controller: widget.searchController,
+                      focusNode: _focusNode,
+                      decoration: InputDecoration(
+                        hintText: 'Search cards...',
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                        hintStyle: TextStyle(
+                          color: isDark
+                              ? Colors.white54
+                              : Colors.black38,
+                        ),
+                      ),
+                      style: TextStyle(
                         fontSize: 16,
+                        color: isDark ? Colors.white : Colors.black87,
                       ),
-                      border: InputBorder.none,
-                      isCollapsed: true, // Important for vertical centering
-                      contentPadding: EdgeInsets.zero, // Remove default padding
-                    ),
-                    style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black87,
-                      fontSize: 16,
-                      height: 1.0, // Important for vertical alignment
-                    ),
-                    textInputAction: TextInputAction.search,
-                    keyboardAppearance: isDark ? Brightness.dark : Brightness.light,
-                    // Simple onSubmitted handler that will just trigger search
-                    onSubmitted: (value) {
-                      if (value.length >= 2) {
-                        // IMPORTANT: Make sure to call onSearchChanged explicitly here
-                        widget.onSearchChanged(value);
-                        LoggingService.debug('Search submitted: "$value"');
-                      }
-                      // Unfocus to dismiss keyboard
-                      _searchFocusNode.unfocus();
-                    },
-                  ),
-                ),
-              ),
-            ),
-            // Clear button - keep the styling
-            if (widget.searchController.text.isNotEmpty)
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () {
-                      widget.onClearSearch();
-                      widget.onCancelSearch(); // Keep the cancel functionality
-                      _searchFocusNode.requestFocus();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isDark 
-                          ? colorScheme.primary.withOpacity(0.15)
-                          : colorScheme.primary.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Icon(
-                        Icons.close,
-                        color: isDark 
-                          ? Colors.white70
-                          : colorScheme.primary,
-                        size: 18,
-                      ),
+                      onChanged: widget.onSearchChanged,
+                      onSubmitted: widget.onSubmitted,
+                      textInputAction: TextInputAction.search,
                     ),
                   ),
-                ),
-              ),
-            // Camera button with enhanced styling
-            Padding(
-              padding: const EdgeInsets.only(right: 4.0, left: 2.0),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: widget.onCameraPressed,
-                  child: Container(
-                    padding: const EdgeInsets.all(8.0),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      color: isDark 
-                        ? Colors.transparent 
-                        : colorScheme.primary.withOpacity(0.05),
+                  if (widget.searchController.text.isNotEmpty)
+                    SizedBox(
+                      width: 28, // Fixed width for clear button
+                      height: 28, // Fixed height
+                      child: IconButton(
+                        icon: const Icon(Icons.close, size: 16), // Smaller icon
+                        onPressed: widget.onClearSearch,
+                        splashRadius: 16, // Smaller splash
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
                     ),
-                    child: Icon(
-                      Icons.camera_alt_outlined,
-                      color: isDark 
-                        ? colorScheme.primary.withOpacity(0.9) 
-                        : colorScheme.primary,
-                      size: 20,
-                    ),
-                  ),
-                ),
+                ],
               ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        // Replace the sort button with a more compact version
-        if (widget.hasResults)
-          Padding(
-            // Reduce padding to save space
-            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-            child: SortIndicatorBadge(
-              sortField: widget.currentSort,
-              ascending: widget.sortAscending,
-              onTap: () {
-                print('Sort button pressed in SearchAppBar');
-                HapticFeedback.mediumImpact();
-                widget.onSortOptionsPressed();
-              },
-            ),
-          ),
-        _buildSearchModeToggle(isDark, colorScheme),
-      ],
-    );
-  }
-
-  Widget _buildSearchModeToggle(bool isDark, ColorScheme colorScheme) {
-    final searchMode = widget.searchMode;
-    
-    return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: PopupMenuButton<SearchMode>(
-        initialValue: searchMode,
-        icon: Icon(
-          searchMode == SearchMode.eng ? Icons.catching_pokemon : Icons.auto_awesome,
-          size: 24,
-          color: searchMode == SearchMode.eng 
-              ? (isDark ? Colors.red.shade300 : Colors.red.shade700)
-              : (isDark ? Colors.blue.shade300 : Colors.blue.shade700),
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        onSelected: (mode) {
-          widget.onSearchModeChanged([mode]);
-        },
-        itemBuilder: (context) => [
-          PopupMenuItem(
-            value: SearchMode.eng,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.catching_pokemon, 
-                  size: 20,
-                  color: isDark ? Colors.red.shade300 : Colors.red.shade700,
-                ),
-                const SizedBox(width: 12),
-                const Text('Pokémon'),
-              ],
-            ),
-          ),
-          PopupMenuItem(
-            value: SearchMode.mtg,
-            child: Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome, 
-                  size: 20,
-                  color: isDark ? Colors.blue.shade300 : Colors.blue.shade700,
-                ),
-                const SizedBox(width: 12),
-                const Text('Magic: The Gathering'),
-              ],
             ),
           ),
         ],
       ),
+      actions: [
+        // Sort button - only shown when results are visible
+        if (widget.hasResults)
+          IconButton(
+            icon: Icon(
+              widget.sortAscending ? Icons.arrow_upward : Icons.arrow_downward, 
+              size: 20,
+            ),
+            onPressed: widget.onSortOptionsPressed,
+            tooltip: 'Sort options',
+            padding: const EdgeInsets.all(8), // Add more compact padding
+          ),
+        
+        // Camera button
+        IconButton(
+          icon: const Icon(Icons.camera_alt_outlined, size: 20),
+          onPressed: widget.onCameraPressed,
+          tooltip: 'Scan card',
+          padding: const EdgeInsets.all(8), // Add more compact padding
+        ),
+      ],
+      elevation: 0,
     );
-  }
-
-  // Add this helper method to the class
-  String _getSortDisplayName(String sortField, bool ascending) {
-    switch (sortField) {
-      case 'cardmarket.prices.averageSellPrice':
-        return ascending ? 'Price (Low to High)' : 'Price (High to Low)';
-      case 'name':
-        return ascending ? 'Name (A to Z)' : 'Name (Z to A)';
-      case 'number':
-        return ascending ? 'Set Number (Low to High)' : 'Set Number (High to Low)';
-      default:
-        return 'Custom Sort';
-    }
   }
 }
