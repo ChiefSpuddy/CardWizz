@@ -472,16 +472,21 @@ class TcgApiService {
     return url;
   }
 
-  // Search set pagination handler
+  // Search set pagination handler - modify to accept orderBy and orderByDesc
   Future<Map<String, dynamic>> searchSet(
     String setId, {
     int page = 1,
     int pageSize = 20,
+    String? orderBy,
+    bool orderByDesc = false,
   }) async {
+    // Construct the query with ordering if specified
+    String query = 'set.id:$setId';
+    
     return searchCards(
-      query: 'set.id:$setId',
-      orderBy: 'number',
-      orderByDesc: false,
+      query: query,
+      orderBy: orderBy ?? 'number',
+      orderByDesc: orderByDesc,
       page: page,
       pageSize: pageSize,
     );
@@ -520,10 +525,10 @@ class TcgApiService {
   // Set logos map with actual URLs
   static const _setLogos = {
     // Latest Scarlet & Violet
+    'sv9': 'https://images.pokemontcg.io/sv9/logo.png',       // Journey Together - ADD THIS LINE
     'sv8pt5': 'https://images.pokemontcg.io/sv8pt5/logo.png', // Prismatic Evolution
     'sv8': 'https://images.pokemontcg.io/sv8/logo.png',       // Surging Sparks
     'sv9pt5': 'https://images.pokemontcg.io/sv9pt5/logo.png', // Twilight Masquerade
-    'sv9': 'https://images.pokemontcg.io/sv9/logo.png',       // Stellar Crown
     'sv5': 'https://images.pokemontcg.io/sv5/logo.png',       // Temporal Forces
     'sv4pt5': 'https://images.pokemontcg.io/sv4pt5/logo.png', // Paldean Fates
     'sv4': 'https://images.pokemontcg.io/sv4/logo.png',       // Paradox Rift

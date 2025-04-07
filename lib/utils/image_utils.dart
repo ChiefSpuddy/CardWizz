@@ -62,10 +62,15 @@ class CardImageUtils {
   }
 
   /// Get the Pokemon set logo URL
-  static String getPokemonSetLogo(String setCode) {
-    // Make lowercase for consistency
-    final code = setCode.toLowerCase();
-    return 'https://images.pokemontcg.io/$code/logo.png';
+  static String getPokemonSetLogo(String setId) {
+    // Check if we have a local asset for this set logo first
+    if (setId == 'sv9') {
+      // Use the local asset path instead of network URL
+      return 'assets/images/sv9-logo.png';
+    }
+    
+    // Default logic for other sets
+    return 'https://images.pokemontcg.io/$setId/logo.png';
   }
   
   /// Get the Japanese Pokemon set logo URL

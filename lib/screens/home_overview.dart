@@ -116,22 +116,26 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
     });
 
     try {
+      // Remove the orderBy and orderByDesc parameters since searchSet doesn't accept them
       final nextPageData = await Provider.of<TcgApiService>(context, listen: false)
-          .searchSet('sv8pt5', page: _currentPage + 1, pageSize: cardsPerPage);
+          .searchSet('sv9', page: _currentPage + 1, pageSize: cardsPerPage);
       
-      final currentData = await _cacheManager.get('${LATEST_SET_CACHE_KEY}_sv8pt5');
+      final currentData = await _cacheManager.get('${LATEST_SET_CACHE_KEY}_sv9');
       if (currentData != null) {
         final List currentCards = currentData['data'];
         final List newCards = nextPageData['data'];
         
-        // Merge and cache the new data
+        // Merge and cache the new data - fix the spread operator usage
         final mergedData = {
-          ...nextPageData,
           'data': [...currentCards, ...newCards],
+          'page': nextPageData['page'],
+          'pageSize': nextPageData['pageSize'],
+          'count': nextPageData['count'],
+          'totalCount': nextPageData['totalCount'],
         };
         
         await _cacheManager.set(
-          '${LATEST_SET_CACHE_KEY}_sv8pt5',
+          '${LATEST_SET_CACHE_KEY}_sv9',
           mergedData,
           const Duration(hours: 1),
         );
@@ -379,7 +383,7 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
                 ),
               ),
               Text(
-                'Prismatic Evolutions',  // Updated set name
+                'Journey Together',
                 style: TextStyle(
                   color: Colors.grey[600],
                   fontSize: 14,
@@ -391,8 +395,8 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
         SizedBox(
           height: 200,
           child: FutureBuilder(
-            // Update the search query to use sv8pt5 instead of sv8
-            future: _getLatestSetCards(context, setId: 'sv8pt5'),
+            // Update the search query to use sv9 instead of sv8
+            future: _getLatestSetCards(context, setId: 'sv9'),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return _buildCardLoadingAnimation();
@@ -492,7 +496,7 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
   }
 
   // Update the method to accept setId parameter
-  Future<Map<String, dynamic>> _getLatestSetCards(BuildContext context, {String setId = 'sv8pt5'}) async {
+  Future<Map<String, dynamic>> _getLatestSetCards(BuildContext context, {String setId = 'sv9'}) async {
     try {
       // Update cache key to include setId
       final cacheKey = '${LATEST_SET_CACHE_KEY}_$setId';
@@ -503,8 +507,12 @@ class _HomeOverviewState extends State<HomeOverview> with TickerProviderStateMix
         return cachedData;
       }
 
-      // If no cached data, fetch from API
-      final data = await Provider.of<TcgApiService>(context, listen: false).searchSet(setId, page: _currentPage, pageSize: cardsPerPage);
+      // If no cached data, fetch from API - remove orderBy and orderByDesc parameters
+      final data = await Provider.of<TcgApiService>(context, listen: false).searchSet(
+        setId,
+        page: _currentPage,
+        pageSize: cardsPerPage
+      );
       
       // Cache the response for 1 hour
       await _cacheManager.set(cacheKey, data, const Duration(hours: 1));

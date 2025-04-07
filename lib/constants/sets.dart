@@ -32,6 +32,7 @@ class PokemonSets {
   ];
 
   static const Map<String, Map<String, String>> setQueries = {
+    'Journey Together': {'query': 'set.id:sv9', 'icon': '🛤️'},
     'Prismatic Evolution': {'query': 'set.id:sv8pt5', 'icon': '✨'},
     'Crown Zenith': {'query': 'set.id:swsh12pt5', 'icon': '👑'},
     '151': {'query': 'set.id:sv5', 'icon': '🎮'},
@@ -117,6 +118,7 @@ class PokemonSets {
   };
 
   static const modernEra = {
+    'Journey Together': {'code': 'sv9', 'year': '2025', 'icon': '🛤️'},
     'Prismatic Evolution': {'code': 'sv8pt5', 'year': '2024', 'icon': '✨'},
     'Crown Zenith': {'code': 'swsh12pt5', 'year': '2023', 'icon': '👑'},
     'Silver Tempest': {'code': 'swsh12', 'year': '2022', 'icon': '🌪️'},
@@ -135,8 +137,9 @@ class PokemonSets {
   };
 
   static const scarletViolet = <String, Map<String, dynamic>>{
+    'Journey Together': {'code': 'sv9', 'year': '2025', 'icon': '🛤️'},
     'Prismatic Evolution': {'code': 'sv8pt5', 'year': '2024', 'icon': '💎'},
-    'Surging Sparks': {'code': 'sv8', 'year': '2024', 'icon': '⚡'},
+    'Surging Sparks': {'code': 'sv8', 'year': '2025', 'icon': '⚡'},
     'Stellar Crown': {'code': 'sv7', 'year': '2024', 'icon': '👑'},
     'Twilight Masquerade': {'code': 'sv6', 'year': '2024', 'icon': '🎭'}, // Fixed from sv6p5 to sv6
     'Temporal Forces': {'code': 'sv5', 'year': '2024', 'icon': '⌛'}, // Fixed code from sv6 to sv5

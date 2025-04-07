@@ -750,6 +750,26 @@ class _SearchCategoriesState extends State<SearchCategories> with TickerProvider
   Widget _buildStandardSetLogo(BuildContext context, Map<String, dynamic> item, String? setCode, ColorScheme colorScheme) {
     // For Pokemon sets, use the Pokemon TCG API
     if (setCode != null) {
+      // Special handling for Journey Together
+      if (setCode == 'sv9') {
+        // Use local asset instead of network image
+        return Image.asset(
+          'assets/images/sv9-logo.png',
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stack) {
+            LoggingService.debug('Error loading set logo for ${item['name']}: $error');
+            return Text(
+              item['icon'] ?? '📦',
+              style: TextStyle(
+                fontSize: 20,
+                color: colorScheme.primary.withOpacity(0.8)
+              ),
+            );
+          },
+        );
+      }
+      
+      // For all other sets, use the network URL
       final logoUrl = CardImageUtils.getPokemonSetLogo(setCode);
 
       return Image.network(

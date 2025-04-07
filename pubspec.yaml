@@ -119,6 +119,7 @@ flutter:
     - assets/images/
     - assets/animations/
     - assets/avatars/
+    - assets/images/sv9-logo.png
     # Remove or create these directories
     # - assets/lottie/
     # - assets/logos/
