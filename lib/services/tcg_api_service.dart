@@ -77,22 +77,76 @@ class TcgApiService {
     int pageSize = 50,
   }) async {
     try {
-      final searchQuery = query.isEmpty ? '' : 'name:"*${query.trim()}*"';
+      // Clean the query for better matching
+      final String normalizedQuery = query.trim().toLowerCase();
       
-      LoggingService.debug('Searching sets with query: $searchQuery');
+      // Log the search attempt
+      LoggingService.debug('Searching sets with query: $normalizedQuery');
       
-      final response = await _dio.get('/sets', queryParameters: {
-        if (searchQuery.isNotEmpty) 'q': searchQuery,
+      // Prepare API parameters
+      Map<String, String> queryParams = {
         'page': page.toString(),
         'pageSize': pageSize.toString(),
         'orderBy': '-releaseDate', // Latest sets first
-      });
+      };
+      
+      // Only add name filter if query is not empty
+      if (normalizedQuery.isNotEmpty) {
+        queryParams['q'] = 'name:"*$normalizedQuery*"';
+      }
+      
+      final response = await _dio.get('/sets', queryParameters: queryParams);
 
-      LoggingService.debug('Found ${response.data['totalCount'] ?? 0} sets');
-      return response.data;
+      if (response.statusCode == 200) {
+        final data = response.data;
+        
+        // Debug logging
+        LoggingService.debug('Found ${data['totalCount'] ?? 0} sets');
+        
+        // If we have data, log the first set for debugging
+        if (data['data'] != null && (data['data'] as List).isNotEmpty) {
+          LoggingService.debug('First set: ${(data['data'] as List)[0]['name']}');
+        }
+        
+        return data;
+      } else {
+        LoggingService.debug('Set search failed: ${response.statusCode}');
+        return {'data': [], 'totalCount': 0, 'page': page};
+      }
     } catch (e) {
       LoggingService.debug('Set search error: $e');
       return {'data': [], 'totalCount': 0, 'page': page};
+    }
+  }
+  
+  // Get single set details
+  Future<Map<String, dynamic>?> getSetDetails(String setId) async {
+    try {
+      final cacheKey = 'set_$setId';
+      
+      // Check cache first
+      final cacheEntry = _cache[cacheKey];
+      if (cacheEntry != null && !cacheEntry.isExpired) {
+        return cacheEntry.data as Map<String, dynamic>;
+      }
+
+      await _waitForRateLimit();
+      final response = await _dio.get('/sets/$setId');
+      
+      if (response.statusCode == 200) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        
+        // Cache the response
+        _cache[cacheKey] = _CacheEntry(data);
+        
+        return data;
+      } else {
+        LoggingService.debug('Failed to get set details: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      LoggingService.debug('Error getting set details: $e');
+      return null;
     }
   }
 
@@ -807,6 +861,74 @@ TcgCard _convertToTcgCard(Map<String, dynamic> data) {
       }
     } catch (e) {
       LoggingService.debug('Error fetching rarities: $e');
+      return [];
+    }
+  }
+
+  // Method to search sets by name - uses the /sets endpoint directly
+  Future<Map<String, dynamic>> searchSetsByName(String setName) async {
+    try {
+      LoggingService.debug('Searching for set with name: $setName');
+      
+      final queryParams = <String, String>{
+        'q': 'name:"*$setName*"', // Use wildcard search to match partial names
+        'orderBy': 'releaseDate',  // Sort by release date
+        'page': '1',
+        'pageSize': '250',         // Get all sets in one request
+      };
+      
+      final response = await _dio.get('/sets', queryParameters: queryParams);
+      
+      if (response.statusCode == 200) {
+        final data = response.data;
+        LoggingService.debug('Found ${data['count']} sets matching "$setName"');
+        
+        // If the set is found, log the first match
+        if (data['data'] != null && (data['data'] as List).isNotEmpty) {
+          final firstSet = (data['data'] as List)[0];
+          LoggingService.debug('First matching set: ${firstSet['name']} (${firstSet['id']})');
+        }
+        
+        return data;
+      } else {
+        LoggingService.debug('Set search failed with status: ${response.statusCode}');
+        return {'data': [], 'count': 0};
+      }
+    } catch (e) {
+      LoggingService.debug('Error searching sets: $e');
+      return {'data': [], 'count': 0};
+    }
+  }
+  
+  // Get all sets - primarily for UI display and selection
+  Future<List<Map<String, dynamic>>> getAllSets() async {
+    try {
+      final cacheKey = 'all_sets';
+      final cacheEntry = _cache[cacheKey];
+      
+      // Return from cache if available
+      if (cacheEntry != null && !cacheEntry.isExpired) {
+        return (cacheEntry.data as List).cast<Map<String, dynamic>>();
+      }
+      
+      final response = await _dio.get('/sets', queryParameters: {
+        'orderBy': '-releaseDate', // Newest sets first
+        'pageSize': '250'          // Get all sets
+      });
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> sets = response.data['data'];
+        final formattedSets = sets.map((set) => set as Map<String, dynamic>).toList();
+        
+        // Cache the response
+        _cache[cacheKey] = _CacheEntry(formattedSets);
+        
+        return formattedSets;
+      } else {
+        return [];
+      }
+    } catch (e) {
+      LoggingService.debug('Error fetching all sets: $e');
       return [];
     }
   }

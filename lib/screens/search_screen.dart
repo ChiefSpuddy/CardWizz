@@ -436,31 +436,12 @@ class _SearchScreenState extends State<SearchScreen> {
       return;
     }
 
-    // Update to store set name for better loading states
-    String? setName;
-
     if (!isLoadingMore) {
       setState(() {
         _currentPage = 1;
         _searchResults = null;
         _showCategories = false;
         _isLoading = true;
-        
-        // Set price sorting for set searches
-        if (query.startsWith('set.id:')) {
-          _currentSort = 'cardmarket.prices.averageSellPrice';
-          _sortAscending = false;
-          
-          // Extract set name for display in loading state
-          final setId = query.substring(7).trim();
-          final allSets = _getAllSets();
-          final matchingSet = allSets.firstWhere(
-            (set) => (set['query'] as String?)?.contains(setId) ?? false,
-            orElse: () => {'name': null},
-          );
-          setName = matchingSet['name'] as String?;
-          _currentSetName = setName; // Store for skeleton loader
-        }
       });
     }
 
@@ -470,68 +451,139 @@ class _SearchScreenState extends State<SearchScreen> {
       }
       
       String searchQuery;
+      bool isSetSearch = false;
+      int pageSize = 30; // Default page size
+      
       if (useOriginalQuery) {
         searchQuery = query;
+        // Check if this is a set ID query
+        isSetSearch = searchQuery.startsWith('set.id:');
       } else {
-        // Special handling for price queries
-        if (query.contains('cardmarket.prices.averageSellPrice')) {
+        // First check if the query is already formatted as set.id
+        if (query.startsWith('set.id:')) {
           searchQuery = query;
-        } else {
-          searchQuery = query.startsWith('set.id:') ? query : _buildSearchQuery(query.trim());
-        }
-        
-        // Default number sorting for new set searches
-        if (searchQuery.startsWith('set.id:') && !isLoadingMore && 
-            _currentSort == 'cardmarket.prices.averageSellPrice' && 
-            !_sortAscending) {
+          isSetSearch = true;
           _currentSort = 'number';
           _sortAscending = true;
+        } else {
+          // Try to find if this is a set name search
+          // Use the API to search for sets by name
+          final normalizedQuery = query.trim().toLowerCase();
+          
+          // Check if query matches any set in our PokemonSets data first
+          bool foundInSetsData = false;
+          String? matchedSetId;
+          
+          // Step 1: Check if this is a known set name from our static data
+          // This approach is faster than API calls and more reliable
+          // Check in scarletViolet sets
+          for (var entry in PokemonSets.scarletViolet.entries) {
+            if (entry.key.toLowerCase() == normalizedQuery || 
+                entry.key.toLowerCase().contains(normalizedQuery)) {
+              matchedSetId = entry.value['code'] as String?;
+              LoggingService.debug('Found set match in scarletViolet: ${entry.key} with ID: $matchedSetId');
+              foundInSetsData = true;
+              break;
+            }
+          }
+          
+          // If not found, check in swordShield sets
+          if (!foundInSetsData) {
+            for (var entry in PokemonSets.swordShield.entries) {
+              if (entry.key.toLowerCase() == normalizedQuery || 
+                  entry.key.toLowerCase().contains(normalizedQuery)) {
+                matchedSetId = entry.value['code'] as String?;
+                LoggingService.debug('Found set match in swordShield: ${entry.key} with ID: $matchedSetId');
+                foundInSetsData = true;
+                break;
+              }
+            }
+          }
+          
+          // Continue checking in other set collections
+          if (!foundInSetsData) {
+            for (var collection in [
+              PokemonSets.sunMoon, 
+              PokemonSets.xy, 
+              PokemonSets.blackWhite,
+              PokemonSets.heartGoldSoulSilver,
+              PokemonSets.diamondPearl,
+              PokemonSets.ex,
+              PokemonSets.eCard,
+              PokemonSets.classic
+            ]) {
+              for (var entry in collection.entries) {
+                if (entry.key.toLowerCase() == normalizedQuery || 
+                    entry.key.toLowerCase().contains(normalizedQuery)) {
+                  matchedSetId = entry.value['code'] as String?;
+                  LoggingService.debug('Found set match in collection: ${entry.key} with ID: $matchedSetId');
+                  foundInSetsData = true;
+                  break;
+                }
+              }
+              if (foundInSetsData) break;
+            }
+          }
+          
+          // If we found a match in our static data, use it
+          if (foundInSetsData && matchedSetId != null) {
+            searchQuery = 'set.id:$matchedSetId';
+            isSetSearch = true;
+            _currentSort = 'number';
+            _sortAscending = true;
+            LoggingService.debug('Using matched set ID: $matchedSetId for query: $normalizedQuery');
+          } else {
+            // Fall back to API search if not found in static data
+            final setResults = await _apiService.searchSetsByName(normalizedQuery);
+            
+            // Check if we found any matching sets
+            if (setResults['data'] != null && (setResults['data'] as List).isNotEmpty) {
+              // Found a matching set - use the first match
+              final matchingSet = (setResults['data'] as List)[0];
+              final setId = matchingSet['id'];
+              
+              LoggingService.debug('Found set match via API: "${matchingSet['name']}" with ID: $setId');
+              
+              searchQuery = 'set.id:$setId';
+              isSetSearch = true;
+              _currentSort = 'number';
+              _sortAscending = true;
+            } else {
+              // No set match found, use regular search
+              searchQuery = _buildSearchQuery(query.trim());
+            }
+          }
         }
+      }
+
+      // For set searches, increase the page size to get all cards (up to 250)
+      if (isSetSearch) {
+        pageSize = 250; // Maximum allowed by API
+        LoggingService.debug('This is a set search. Using maximum page size: $pageSize');
       }
       
       // Execute the search
+      LoggingService.debug('Executing search with query: $searchQuery, pageSize: $pageSize');
       final results = await _apiService.searchCards(
         query: searchQuery,
         page: _currentPage,
-        pageSize: 30,
+        pageSize: pageSize, // Use dynamic page size based on search type
         orderBy: _currentSort,
         orderByDesc: !_sortAscending,
       );
 
+      // ... rest of existing method unchanged
       if (mounted) {
         final List<dynamic> data = results['data'] as List? ?? [];
         final totalCount = results['totalCount'] as int;
         
-        // Try by set name if set.id search fails
-        if (data.isEmpty && query.startsWith('set.id:')) {
-          final setMap = PokemonSets.getSetsForCategory('modern')
-              .firstWhere((s) => s['query'] == query, orElse: () => {'name': ''});
-          final String? setName = setMap['name'] as String?;
-          
-          if (setName?.isNotEmpty ?? false) {
-            final nameQuery = 'set:"$setName"';
-            final nameResults = await _apiService.searchCards(
-              query: nameQuery,
-              page: _currentPage,
-              pageSize: 30,
-              orderBy: _currentSort,
-              orderByDesc: !_sortAscending,
-            );
-            if (nameResults['data'] != null) {
-              data.clear();
-              data.addAll(nameResults['data'] as List);
-              final newTotalCount = (nameResults['totalCount'] as int?) ?? 0;
-              setState(() => _totalCards = newTotalCount);
-            }
-          }
-        }
+        LoggingService.debug('Search returned ${data.length} results out of $totalCount total');
         
         final newCards = data
             .map((card) => TcgCard.fromJson(card as Map<String, dynamic>))
             .toList();
 
         // AGGRESSIVE IMAGE PRELOADING - Start loading ALL images IMMEDIATELY
-        // This ensures images show up without requiring scrolling or interaction
         if (newCards.isNotEmpty) {
           LoggingService.debug("Starting aggressive image preloading for ${newCards.length} cards");
           
@@ -551,7 +603,8 @@ class _SearchScreenState extends State<SearchScreen> {
               _totalCards = totalCount;
             }
             
-            _hasMorePages = (_currentPage * 30) < totalCount;
+            // For set searches that return all cards, disable pagination
+            _hasMorePages = isSetSearch ? false : (_currentPage * pageSize) < totalCount;
             _isLoading = false;
             _isLoadingMore = false;
           });
@@ -571,7 +624,18 @@ class _SearchScreenState extends State<SearchScreen> {
             }
           });
           
-          // ...search history code...
+          // Add to search history
+          if (_searchHistory != null && !isLoadingMore) {
+            final displayName = searchQuery.startsWith('set.id:') 
+                ? _formatSearchForDisplay(searchQuery) 
+                : query;
+                
+            _searchHistory!.addSearch(
+              displayName,
+              imageUrl: newCards.isNotEmpty ? newCards[0].imageUrl : null,
+              isSetSearch: searchQuery.startsWith('set.id:'),
+            );
+          }
         } else {
           setState(() {
             _isLoading = false;
@@ -587,6 +651,8 @@ class _SearchScreenState extends State<SearchScreen> {
             _searchResults = [];
             _totalCards = 0;
           }
+          _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
