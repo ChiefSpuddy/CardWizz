@@ -463,11 +463,11 @@ class _SearchScreenState extends State<SearchScreen> {
         if (query.startsWith('set.id:')) {
           searchQuery = query;
           isSetSearch = true;
-          _currentSort = 'number';
-          _sortAscending = true;
+          // IMPORTANT: Set price sorting for set searches
+          _currentSort = 'cardmarket.prices.averageSellPrice';
+          _sortAscending = false;
         } else {
           // Try to find if this is a set name search
-          // Use the API to search for sets by name
           final normalizedQuery = query.trim().toLowerCase();
           
           // Check if query matches any set in our PokemonSets data first
@@ -529,9 +529,10 @@ class _SearchScreenState extends State<SearchScreen> {
           if (foundInSetsData && matchedSetId != null) {
             searchQuery = 'set.id:$matchedSetId';
             isSetSearch = true;
-            _currentSort = 'number';
-            _sortAscending = true;
-            LoggingService.debug('Using matched set ID: $matchedSetId for query: $normalizedQuery');
+            // IMPORTANT: Set price sorting for set searches to match logo tap behavior
+            _currentSort = 'cardmarket.prices.averageSellPrice';
+            _sortAscending = false;
+            LoggingService.debug('Using matched set ID: $matchedSetId for query: $normalizedQuery (sorted by price high to low)');
           } else {
             // Fall back to API search if not found in static data
             final setResults = await _apiService.searchSetsByName(normalizedQuery);
@@ -546,8 +547,10 @@ class _SearchScreenState extends State<SearchScreen> {
               
               searchQuery = 'set.id:$setId';
               isSetSearch = true;
-              _currentSort = 'number';
-              _sortAscending = true;
+              // IMPORTANT: Set price sorting for set searches to match logo tap behavior
+              _currentSort = 'cardmarket.prices.averageSellPrice';
+              _sortAscending = false;
+              LoggingService.debug('Using API matched set ID: $setId (sorted by price high to low)');
             } else {
               // No set match found, use regular search
               searchQuery = _buildSearchQuery(query.trim());
@@ -563,7 +566,7 @@ class _SearchScreenState extends State<SearchScreen> {
       }
       
       // Execute the search
-      LoggingService.debug('Executing search with query: $searchQuery, pageSize: $pageSize');
+      LoggingService.debug('Executing search with query: $searchQuery, pageSize: $pageSize, sort: $_currentSort, ascending: $_sortAscending');
       final results = await _apiService.searchCards(
         query: searchQuery,
         page: _currentPage,
@@ -686,9 +689,9 @@ class _SearchScreenState extends State<SearchScreen> {
       if (query.startsWith('set.id:')) {
         originalSetCode = query.substring(7).trim();
         searchQuery = 'e:$originalSetCode';
-        LoggingService.debug('MTG search for set: "$originalSetCode" using query: "$searchQuery" (sorted by price high-to-low)');
+        LoggingService.debug('MTG search for set: "$originalSetCode" using query: "$searchQuery" (sorted by price high to low)');
       } else {
-        LoggingService.debug('MTG general search: "$searchQuery" (sorted by price high-to-low)');
+        LoggingService.debug('MTG general search: "$searchQuery" (sorted by price high to low)');
       }
 
       final results = await _mtgApi.searchCards(
