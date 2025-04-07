@@ -1411,7 +1411,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final isSignedIn = context.watch<AppState>().isAuthenticated;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return DismissKeyboardOnTap( // Wrap the Scaffold with this widget
+    return DismissKeyboardOnTap( // This widget will dismiss the keyboard when tapping outside input fields
       child: Scaffold(
         key: _scaffoldKey,
         drawer: const AppDrawer(),
