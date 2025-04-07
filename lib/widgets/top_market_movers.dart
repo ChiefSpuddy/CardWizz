@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
-import 'dart:math';
 import '../models/tcg_card.dart';
 import '../services/ebay_api_service.dart';
 import '../services/logging_service.dart';
 import '../services/purchase_service.dart';
 import '../utils/premium_features_helper.dart';
+import '../utils/price_change_tracker.dart';
+import '../providers/currency_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TopMarketMovers extends StatefulWidget {
@@ -33,7 +34,7 @@ class _TopMarketMoversState extends State<TopMarketMovers> {
   // Add timestamp for cache validation
   DateTime? _lastUpdate;
   static const _cacheDuration = Duration(hours: 12);
-  static const _maxMoversToShow = 5;
+  static const _maxMoversToShow = 8; // Increased from 5 for more content
 
   @override
   void initState() {
@@ -77,8 +78,18 @@ class _TopMarketMoversState extends State<TopMarketMovers> {
         return;
       }
 
-      // Generate market movers for current user's cards only
-      final generatedMovers = await _generateMarketMovers();
+      // Use the PriceChangeTracker to calculate market movers
+      final movers = await PriceChangeTracker.getRecentPriceChanges(
+        widget.cards,
+        minChangePercentage: 2.0, // Show smaller changes
+        maxResults: _maxMoversToShow,
+        preferEbayPrices: true, // Prioritize eBay prices
+      );
+      
+      // If no price changes found, generate some placeholder data for visualization
+      final generatedMovers = movers.isNotEmpty 
+        ? movers 
+        : await _generatePlaceholderMovers();
       
       // Cache the results with the user identifier
       await _cacheMarketMovers(generatedMovers);
@@ -119,20 +130,9 @@ class _TopMarketMoversState extends State<TopMarketMovers> {
         return null;
       }
       
-      // Get the cached data
-      final cachedJson = prefs.getString(cacheKey);
-      if (cachedJson == null) {
-        return null;
-      }
-      
-      // Return the cached data along with the timestamp
+      // For simplicity, we'll skip actual cache serialization in this version
+      // and just return fresh data for now
       _lastUpdate = lastUpdate;
-      
-      // Parse the cached data
-      // For this example, we'll use a simple format, but in a real app you'd use JSON
-      // return jsonDecode(cachedJson) as List<Map<String, dynamic>>;
-      
-      // Instead, generate fresh data for now
       return null;
     } catch (e) {
       LoggingService.debug('Top Market Movers: Error loading cached data: $e');
@@ -150,10 +150,6 @@ class _TopMarketMoversState extends State<TopMarketMovers> {
       final now = DateTime.now();
       await prefs.setInt('${cacheKey}_timestamp', now.millisecondsSinceEpoch);
       
-      // Cache the data
-      // In a real app, you'd serialize this to JSON
-      // await prefs.setString(cacheKey, jsonEncode(movers));
-      
       // Update the timestamp in memory
       _lastUpdate = now;
     } catch (e) {
@@ -161,54 +157,55 @@ class _TopMarketMoversState extends State<TopMarketMovers> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _generateMarketMovers() async {
+  // Generate placeholder market movers based on user collection
+  Future<List<Map<String, dynamic>>> _generatePlaceholderMovers() async {
     if (widget.cards.isEmpty) {
       return [];
     }
 
-    // Select random cards from the user's collection to simulate market movers
-    // In a real app, you'd use actual market data
-    final random = Random();
-    final selectedCards = <TcgCard>[];
-    final allCards = widget.cards;
+    // Filter cards that have both price and ebayPrice
+    final cardsWithPrices = widget.cards.where((card) => 
+      card.price != null && card.price! > 0 && card.ebayPrice != null && card.ebayPrice! > 0).toList();
     
-    // Ensure we have enough cards
-    final numCardsToSelect = min(_maxMoversToShow, allCards.length);
-    
-    // Select random cards without duplicates
-    final selectedIndices = <int>{};
-    while (selectedCards.length < numCardsToSelect) {
-      final index = random.nextInt(allCards.length);
-      if (!selectedIndices.contains(index)) {
-        selectedIndices.add(index);
-        selectedCards.add(allCards[index]);
-      }
+    if (cardsWithPrices.isEmpty) {
+      return [];
     }
     
-    // Generate random market movements for the selected cards
-    return selectedCards.map((card) {
-      final price = card.price ?? 10.0;
+    final results = <Map<String, dynamic>>[];
+    
+    // Use real data comparison between API and eBay prices when available
+    for (final card in cardsWithPrices.take(_maxMoversToShow)) {
+      // Calculate real change between API and eBay price
+      final apiPrice = card.price!;
+      final ebayPrice = card.ebayPrice!;
       
-      // Generate a random price change (-20% to +30%)
-      final changePercent = (random.nextDouble() * 0.5) - 0.2; // -20% to +30%
-      final newPrice = price * (1 + changePercent);
+      // Skip if prices are too similar
+      if ((apiPrice - ebayPrice).abs() / apiPrice < 0.02) continue;
       
-      return {
+      // Calculate percentage difference
+      final percentChange = ((ebayPrice - apiPrice) / apiPrice) * 100;
+      
+      results.add({
         'card': card,
-        'oldPrice': price,
-        'newPrice': newPrice,
-        'change': newPrice - price,
-        'changePercent': changePercent,
-      };
-    }).toList()
-      ..sort((a, b) => (b['changePercent'] as double).abs()
-          .compareTo((a['changePercent'] as double).abs()));
+        'oldPrice': apiPrice,
+        'newPrice': ebayPrice,
+        'change': percentChange,
+        'period': 'eBay',
+      });
+    }
+    
+    // Sort by absolute percentage change
+    results.sort((a, b) =>
+      (b['change'] as double).abs().compareTo((a['change'] as double).abs()));
+    
+    return results;
   }
 
   @override
   Widget build(BuildContext context) {
     final purchaseService = Provider.of<PurchaseService>(context);
     final isPremium = purchaseService.isPremium;
+    final currencyProvider = Provider.of<CurrencyProvider>(context);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     
@@ -367,6 +364,8 @@ class _TopMarketMoversState extends State<TopMarketMovers> {
   }
 
   Widget _buildMarketMoversContent() {
+    final currencyProvider = Provider.of<CurrencyProvider>(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -383,10 +382,10 @@ class _TopMarketMoversState extends State<TopMarketMovers> {
             final card = mover['card'] as TcgCard;
             final oldPrice = mover['oldPrice'] as double;
             final newPrice = mover['newPrice'] as double;
-            final change = mover['change'] as double;
-            final changePercent = mover['changePercent'] as double;
+            final changePercent = mover['change'] as double;
+            final period = mover['period'] as String? ?? '7d';
             
-            final isIncreasing = change > 0;
+            final isIncreasing = changePercent > 0;
             
             return ListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
@@ -409,7 +408,9 @@ class _TopMarketMoversState extends State<TopMarketMovers> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              subtitle: Text('${(oldPrice).toStringAsFixed(2)} → ${newPrice.toStringAsFixed(2)}'),
+              subtitle: Text(
+                '$period: ${currencyProvider.formatValue(oldPrice)} → ${currencyProvider.formatValue(newPrice)}'
+              ),
               trailing: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -424,7 +425,7 @@ class _TopMarketMoversState extends State<TopMarketMovers> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${isIncreasing ? '+' : ''}${(changePercent * 100).toStringAsFixed(1)}%',
+                        '${isIncreasing ? '+' : ''}${(changePercent).toStringAsFixed(1)}%',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: isIncreasing ? Colors.green : Colors.red,
@@ -433,7 +434,7 @@ class _TopMarketMoversState extends State<TopMarketMovers> {
                     ],
                   ),
                   Text(
-                    '${isIncreasing ? '+' : ''}${change.toStringAsFixed(2)}',
+                    '${isIncreasing ? '+' : ''}${currencyProvider.formatValueChange(newPrice - oldPrice)}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.outline,

@@ -6,6 +6,7 @@ import 'dart:convert';
 import './tcgdex_api_service.dart';
 import '../models/tcg_card.dart';
 import '../models/tcg_set.dart' as models; // Direct import, not aliased
+import '../utils/cache_manager.dart';
 
 // Cache entry class
 class _CacheEntry {
@@ -51,6 +52,11 @@ class TcgApiService {
   ));
 
   final _tcgdexApi = TcgdexApiService();
+  final _cacheManager = CustomCacheManager();
+  
+  // Configure cache durations based on search type
+  static const Duration _normalSearchCacheDuration = Duration(hours: 1);  // Cache normal searches for 1 hour
+  static const Duration _setSearchCacheDuration = Duration(hours: 24);    // Cache set searches for 24 hours
 
   // Rate limiting method
   Future<void> _waitForRateLimit() async {
@@ -157,6 +163,7 @@ class TcgApiService {
     bool orderByDesc = false,
     int pageSize = 20,
     int page = 1,
+    bool useCache = true,
   }) async {
     final cacheKey = '$query-$orderBy-$orderByDesc-$pageSize-$page';
     
@@ -866,7 +873,7 @@ TcgCard _convertToTcgCard(Map<String, dynamic> data) {
   }
 
   // Method to search sets by name - uses the /sets endpoint directly
-  Future<Map<String, dynamic>> searchSetsByName(String setName) async {
+  Future<Map<String, dynamic>> searchSetsByName(String setName, {bool useCache = true}) async {
     try {
       LoggingService.debug('Searching for set with name: $setName');
       
@@ -877,6 +884,18 @@ TcgCard _convertToTcgCard(Map<String, dynamic> data) {
         'pageSize': '250',         // Get all sets in one request
       };
       
+      final cacheKey = _createCacheKey('/sets', queryParams);
+      
+      // Try to get from cache first
+      if (useCache) {
+        final cachedResult = await _cacheManager.get(cacheKey);
+        if (cachedResult != null) {
+          LoggingService.debug('Retrieved set search results from cache for: $setName');
+          return cachedResult;
+        }
+      }
+      
+      // No cache hit, perform actual API request
       final response = await _dio.get('/sets', queryParameters: queryParams);
       
       if (response.statusCode == 200) {
@@ -887,6 +906,12 @@ TcgCard _convertToTcgCard(Map<String, dynamic> data) {
         if (data['data'] != null && (data['data'] as List).isNotEmpty) {
           final firstSet = (data['data'] as List)[0];
           LoggingService.debug('First matching set: ${firstSet['name']} (${firstSet['id']})');
+        }
+        
+        // Cache this result for longer (24 hours) since sets don't change often
+        if (useCache) {
+          await _cacheManager.set(cacheKey, data, Duration(hours: 24));
+          LoggingService.debug('Cached set search results for: $setName');
         }
         
         return data;
@@ -901,14 +926,23 @@ TcgCard _convertToTcgCard(Map<String, dynamic> data) {
   }
   
   // Get all sets - primarily for UI display and selection
-  Future<List<Map<String, dynamic>>> getAllSets() async {
+  Future<List<Map<String, dynamic>>> getAllSets({bool useCache = true}) async {
     try {
       final cacheKey = 'all_sets';
       final cacheEntry = _cache[cacheKey];
       
       // Return from cache if available
-      if (cacheEntry != null && !cacheEntry.isExpired) {
+      if (useCache && cacheEntry != null && !cacheEntry.isExpired) {
         return (cacheEntry.data as List).cast<Map<String, dynamic>>();
+      }
+      
+      // Try from persistent cache
+      if (useCache) {
+        final cachedResult = await _cacheManager.get(cacheKey);
+        if (cachedResult != null) {
+          LoggingService.debug('Retrieved all sets from persistent cache');
+          return (cachedResult as List).cast<Map<String, dynamic>>();
+        }
       }
       
       final response = await _dio.get('/sets', queryParameters: {
@@ -923,6 +957,11 @@ TcgCard _convertToTcgCard(Map<String, dynamic> data) {
         // Cache the response
         _cache[cacheKey] = _CacheEntry(formattedSets);
         
+        // Also cache in persistent storage (for 7 days since sets don't change often)
+        if (useCache) {
+          await _cacheManager.set(cacheKey, formattedSets, Duration(days: 7));
+        }
+        
         return formattedSets;
       } else {
         return [];
@@ -931,5 +970,38 @@ TcgCard _convertToTcgCard(Map<String, dynamic> data) {
       LoggingService.debug('Error fetching all sets: $e');
       return [];
     }
+  }
+
+  // Clear cache for a specific search
+  Future<void> clearSearchCache(String query, {
+    int page = 1,
+    int pageSize = 20,
+    String orderBy = 'name',
+    bool orderByDesc = false,
+  }) async {
+    final queryParams = <String, String>{
+      'q': query,
+      'page': '$page',
+      'pageSize': '$pageSize',
+      'orderBy': orderByDesc ? '-$orderBy' : orderBy,
+    };
+    
+    final cacheKey = _createCacheKey('/cards', queryParams);
+    await _cacheManager.clear(cacheKey);
+    LoggingService.debug('Cleared cache for search: $query');
+  }
+  
+  // Clear all search caches
+  Future<void> clearAllSearchCaches() async {
+    // This would require enhancements to CustomCacheManager to clear by prefix
+    // For now, we can implement a placeholder
+    LoggingService.debug('Attempting to clear all search caches');
+    // Implementation would depend on how we want to handle bulk cache clearing
+  }
+
+  // Helper method to create cache keys
+  String _createCacheKey(String endpoint, Map<String, String> queryParams) {
+    final sortedParams = Map.fromEntries(queryParams.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
+    return '$endpoint:${sortedParams.toString()}';
   }
 }

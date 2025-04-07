@@ -37,6 +37,8 @@ import '../services/premium_features_helper.dart';
 import '../models/tcg_card.dart';  // Add this import for TcgCard class
 import '../widgets/standard_app_bar.dart';  // Add this import for StandardAppBar
 import '../services/analytics_cache_service.dart';  // Add this import for AnalyticsCacheService
+import 'package:flutter/foundation.dart'; // For compute method
+import '../utils/price_change_tracker.dart'; // For PriceChangeTracker
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -1125,6 +1127,15 @@ Widget _buildTopMoversContent(List<Map<String, dynamic>> changes, {bool isLoadin
           final card = change['card'] as TcgCard;
           final changePercent = change['change'] as double;
           final isPositive = changePercent >= 0;
+          final oldPrice = change['oldPrice'] as double;
+          final newPrice = change['newPrice'] as double;
+          final period = change['period'] as String? ?? '7d';
+          
+          // Format the period text better
+          String periodText = period;
+          if (period == 'eBay') {
+            periodText = 'eBay vs API';
+          }
           
           return ListTile(
             dense: true, // More compact layout
@@ -1143,7 +1154,7 @@ Widget _buildTopMoversContent(List<Map<String, dynamic>> changes, {bool isLoadin
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
             subtitle: Text(
-              '${card.setName ?? "Unknown Set"} ${card.number != null ? '- #${card.number}' : ''}',
+              '${periodText}: ${currencyProvider.formatValue(oldPrice)} → ${currencyProvider.formatValue(newPrice)}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -2640,130 +2651,32 @@ Future<void> _showPremiumDialog(BuildContext context) async {
   }
 
   Future<List<Map<String, dynamic>>> _getRecentPriceChanges(List<TcgCard> cards) async {
-  if (_isLoadingTopMovers && _cachedTopMovers != null) {
-    return _cachedTopMovers!;
-  }
-
-  try {
-    LoggingService.debug('Analyzing price changes for ${cards.length} cards');
-    
-    // Get cards with price history
-    final cardsWithHistory = cards.where((card) => 
-      card.priceHistory != null && 
-      card.priceHistory!.isNotEmpty && 
-      card.price != null
-    ).toList();
-    
-    if (cardsWithHistory.isEmpty) {
-      LoggingService.debug('No cards with price history found');
-      return [];
+    if (_isLoadingTopMovers && _cachedTopMovers != null) {
+      return _cachedTopMovers!;
     }
 
-    // Calculate price changes
-    final results = <Map<String, dynamic>>[];
-    int processedCards = 0;
-    
-    // Process cards in small batches to avoid hanging the UI
-    final batchSize = 10; 
-    for (int i = 0; i < cardsWithHistory.length; i += batchSize) {
-      final endIndex = (i + batchSize < cardsWithHistory.length) ? i + batchSize : cardsWithHistory.length;
-      final batch = cardsWithHistory.sublist(i, endIndex);
+    try {
+      LoggingService.debug('Calculating recent price changes for ${cards.length} cards');
       
-      for (final card in batch) {
-        try {
-          final history = card.priceHistory;
-          if (history == null || history.isEmpty) continue;
-          
-          // Skip cards with too few price points
-          if (history.length < 2) continue;
-          
-          // Find the oldest price within the last week
-          final now = DateTime.now();
-          final oneWeekAgo = now.subtract(const Duration(days: 7));
-          
-          DateTime oldestTime = now;
-          double? oldPrice;
-          String period = '';
-          
-          // Find the oldest price entry in the last week
-          for (final entry in history) {
-            try {
-              final timestamp = entry.timestamp;
-              if (timestamp.isAfter(oneWeekAgo) && timestamp.isBefore(oldestTime)) {
-                oldestTime = timestamp;
-                oldPrice = entry.price;
-                
-                // Determine the period
-                final days = now.difference(timestamp).inDays;
-                period = days < 1 ? '24h' : '${days}d';
-              }
-            } catch (e) {
-              continue;
-            }
-          }
-          
-          // Get new price
-          final newPrice = card.price;
-          
-          // Calculate change percentage
-          if (oldPrice != null && newPrice != null && oldPrice > 0) {
-            final changePercent = ((newPrice - oldPrice) / oldPrice) * 100;
-            
-            // Only include significant changes (more than 3%)
-            if (changePercent.abs() >= 3.0) {
-              results.add({
-                'card': card,
-                'change': changePercent,
-                'period': period,
-                'oldPrice': oldPrice,
-                'newPrice': newPrice,
-              });
-            }
-          }
-          
-          processedCards++;
-          
-        } catch (e) {
-          LoggingService.debug('Error calculating price change for card: $e');
-          continue;
-        }
-      }
+      // Use the PriceChangeTracker utility to get price changes including eBay data
+      final results = await compute(
+        (List<TcgCard> cardsToProcess) => PriceChangeTracker.getRecentPriceChanges(
+          cardsToProcess,
+          minChangePercentage: 3.0,
+          maxResults: 10,
+          preferEbayPrices: true,
+        ),
+        cards,
+      );
       
-      // Add a small yield to prevent UI freezing
-      await Future.delayed(Duration.zero);
+      LoggingService.debug('Found ${results.length} top movers');
+      return results;
+    } catch (e) {
+      LoggingService.debug('Error in _getRecentPriceChanges: $e');
+      // Return cached data if available on error
+      return _cachedTopMovers ?? [];
     }
-    
-    // Sort by absolute change percentage (descending)
-    results.sort((a, b) => (b['change'] as double).abs().compareTo((a['change'] as double).abs()));
-    
-    // Merge with existing data if there are less than 10 results
-    List<Map<String, dynamic>> finalResults = [];
-    
-    if (_cachedTopMovers != null && results.length < 10) {
-      // Filter out cards from cached movers that are already in new results
-      final existingCardIds = results.map((m) => (m['card'] as TcgCard).id).toSet();
-      final filteredCachedMovers = _cachedTopMovers!.where(
-        (m) => !existingCardIds.contains((m['card'] as TcgCard).id)
-      ).toList();
-      
-      // Combine and pick top 10
-      finalResults = [...results, ...filteredCachedMovers];
-      finalResults.sort((a, b) => (b['change'] as double).abs().compareTo((a['change'] as double).abs()));
-      finalResults = finalResults.take(10).toList();
-    } else {
-      // Just take top 10 from new results
-      finalResults = results.take(10).toList();
-    }
-    
-    LoggingService.debug('Found ${finalResults.length} top movers');
-    return finalResults;
-    
-  } catch (e) {
-    LoggingService.debug('Error in _getRecentPriceChanges: $e');
-    // Return cached data if available on error
-    return _cachedTopMovers ?? [];
   }
-}
 
   Widget _buildEmptyTopMovers() {
   return SingleChildScrollView(  // Wrap with SingleChildScrollView to handle overflow
@@ -2971,7 +2884,11 @@ Future<void> _refreshPrices() async {
       _isRefreshing = false;
       _cachedTopMovers = null;
       _cachedTopMoversTimestamp = null;
+      _chartDataCached = false; // Reset chart cache flag to regenerate chart
     });
+    
+    // Refresh top movers immediately
+    _refreshTopMovers(await storage.getCards());
     
     // Dismiss the current SnackBar and show success message
     ScaffoldMessenger.of(context).hideCurrentSnackBar();

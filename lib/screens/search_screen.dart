@@ -573,6 +573,7 @@ class _SearchScreenState extends State<SearchScreen> {
         pageSize: pageSize, // Use dynamic page size based on search type
         orderBy: _currentSort,
         orderByDesc: !_sortAscending,
+        useCache: true, // Use the cache flag
       );
 
       // ... rest of existing method unchanged
@@ -976,6 +977,7 @@ class _SearchScreenState extends State<SearchScreen> {
         pageSize: 30,
         orderBy: _currentSort,
         orderByDesc: !_sortAscending,
+        useCache: true, // Use the cache flag
       );
 
       if (mounted) {
